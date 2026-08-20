@@ -13,6 +13,9 @@ import {
   readJsonBody,
   sendJson,
 } from "./http.js";
+import { enforceRateLimit, FixedWindowRateLimiter } from "./rateLimit.js";
+
+const labLimiter = new FixedWindowRateLimiter({ limit: 4, windowMs: 10 * 60_000 });
 
 function parseExperiment(value: unknown): StrategyLabExperiment {
   if (value === undefined || value === null || value === "") return "fixed-core";
@@ -32,6 +35,7 @@ export async function serveStrategyLab(
   const corsOrigin = options.corsOrigin ?? process.env.API_CORS_ORIGIN ?? "http://localhost:3000";
 
   try {
+    if (!enforceRateLimit(request, response, labLimiter, "strategy-lab")) return true;
     const body = await readJsonBody(request);
     const lottery = parseLottery(body.lottery);
     const experiment = parseExperiment(body.experiment);
@@ -40,22 +44,22 @@ export async function serveStrategyLab(
     }
     const gameCount = parsePositiveInt(body.gameCount, "gameCount", {
       min: 1,
-      max: 20,
+      max: 10,
       defaultValue: lottery === "mega-sena" ? 2 : 4,
     });
     const warmupContests = parsePositiveInt(body.warmupContests, "warmupContests", {
       min: 1,
-      max: 5000,
+      max: 500,
       defaultValue: 20,
     });
     const lookbackContests = parsePositiveInt(body.lookbackContests, "lookbackContests", {
       min: 10,
-      max: 5000,
+      max: 500,
       defaultValue: 200,
     });
     const bucketSize = parsePositiveInt(body.bucketSize, "bucketSize", {
       min: 5,
-      max: 200,
+      max: 100,
       defaultValue: 25,
     });
     const startContest = parseOptionalPositiveInt(body.startContest, "startContest");
