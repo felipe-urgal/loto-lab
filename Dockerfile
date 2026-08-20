@@ -5,13 +5,12 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY tsconfig.json ./
+COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
-COPY tests ./tests
 COPY db ./db
 COPY web ./web
 
-RUN npm run build
+RUN npm run build:prod
 
 FROM node:22-alpine AS runtime
 
