@@ -6,24 +6,44 @@ export interface RankedCandidate {
   rank: number;
 }
 
-export function combinations<T>(items: T[], size: number): T[][] {
-  const result: T[][] = [];
+export function* combinationIterator<T>(items: T[], size: number): Generator<T[]> {
+  if (!Number.isInteger(size) || size < 0 || size > items.length) return;
 
-  function walk(start: number, current: T[]): void {
+  function* walk(start: number, current: T[]): Generator<T[]> {
     if (current.length === size) {
-      result.push([...current]);
+      yield [...current];
       return;
     }
 
-    for (let index = start; index < items.length; index += 1) {
+    const remaining = size - current.length;
+    const lastStart = items.length - remaining;
+    for (let index = start; index <= lastStart; index += 1) {
       current.push(items[index]!);
-      walk(index + 1, current);
+      yield* walk(index + 1, current);
       current.pop();
     }
   }
 
-  walk(0, []);
-  return result;
+  yield* walk(0, []);
+}
+
+export function combinations<T>(items: T[], size: number): T[][] {
+  return [...combinationIterator(items, size)];
+}
+
+export function topRankedCandidates<T extends RankedCandidate>(
+  candidates: Iterable<T>,
+  limit = 24,
+  compare: (a: T, b: T) => number = (a, b) => b.rank - a.rank,
+): T[] {
+  if (!Number.isInteger(limit) || limit < 1) throw new Error("candidate limit must be positive");
+  const top: T[] = [];
+  for (const candidate of candidates) {
+    top.push(candidate);
+    top.sort(compare);
+    if (top.length > limit) top.pop();
+  }
+  return top;
 }
 
 export function buildMetadata(
