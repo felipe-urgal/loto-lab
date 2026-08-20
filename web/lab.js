@@ -21,6 +21,17 @@ const LOTTERIES = {
   },
 };
 
+const MEGA_EXPERIMENT_COPY = {
+  "fixed-core": {
+    title: "Mega-Sena: núcleo fixo",
+    description: "Compara 0, 2 e 3 dezenas fixas usando exatamente os mesmos concursos.",
+  },
+  "external-rules": {
+    title: "Mega-Sena: validação de regras externas",
+    description: "Testa isoladamente o grupo das 26, consecutivas, colunas, paridade, quadrantes e o pacote completo do artigo, sem alterar a estratégia oficial.",
+  },
+};
+
 const METRICS = {
   averageHitsPerGame: {
     label: "Média de acertos",
@@ -46,6 +57,12 @@ const METRICS = {
 
 const lotterySelect = document.querySelector("#lab-lottery");
 const form = document.querySelector("#lab-form");
+const formGrid = form.querySelector(".lab-form-grid");
+const experimentField = document.createElement("div");
+experimentField.className = "field lab-experiment-field";
+experimentField.innerHTML = `<label for="lab-experiment">Experimento</label><select id="lab-experiment"><option value="fixed-core">Núcleo fixo</option><option value="external-rules">Regras externas</option></select>`;
+formGrid.prepend(experimentField);
+const experimentSelect = experimentField.querySelector("#lab-experiment");
 const gamesInput = document.querySelector("#lab-games");
 const lookbackInput = document.querySelector("#lab-lookback");
 const bucketInput = document.querySelector("#lab-bucket");
@@ -119,15 +136,28 @@ function selectedLottery() {
   return lotterySelect.value;
 }
 
+function selectedExperiment() {
+  return selectedLottery() === "mega-sena" ? experimentSelect.value : "fixed-core";
+}
+
 function updateLotteryCopy(resetGames = false) {
-  const config = LOTTERIES[selectedLottery()];
-  title.textContent = config.title;
-  description.textContent = config.description;
+  const lottery = selectedLottery();
+  const config = LOTTERIES[lottery];
+  const experiment = selectedExperiment();
+  experimentField.hidden = lottery !== "mega-sena";
+  if (lottery !== "mega-sena") experimentSelect.value = "fixed-core";
+
+  const copy = lottery === "mega-sena" ? MEGA_EXPERIMENT_COPY[experiment] : config;
+  title.textContent = copy.title;
+  description.textContent = copy.description;
   if (resetGames) gamesInput.value = String(config.defaultGames);
-  localStorage.setItem("loto-lab:lottery", selectedLottery());
+  localStorage.setItem("loto-lab:lottery", lottery);
   currentResult = undefined;
   resultsRoot.hidden = true;
-  setMessage("", "Pronto para comparar", "Escolha o período e execute. O laboratório não altera a metodologia principal nem salva um vencedor automaticamente.");
+  message.hidden = false;
+  setMessage("", "Pronto para comparar", experiment === "external-rules"
+    ? "As regras externas são hipóteses experimentais. O resultado não altera a metodologia principal automaticamente."
+    : "Escolha o período e execute. O laboratório não altera a metodologia principal nem salva um vencedor automaticamente.");
   renderHistoryStatus();
 }
 
@@ -178,13 +208,19 @@ function rankingPrimary(variant, rankingBasis) {
   return { label: "Taxa de premiação", value: formatPercent(variant.summary.prizeRate), raw: variant.summary.prizeRate };
 }
 
+function variantBadge(result, variant, index) {
+  if (index === 0) return "melhor no período";
+  if (result.experiment === "external-rules") return "regra experimental";
+  return `${variant.fixedCount} fixas`;
+}
+
 function renderRanking(result) {
   rankingRoot.innerHTML = result.variants.map((variant, index) => {
     const primary = rankingPrimary(variant, result.rankingBasis);
     const tone = primary.raw >= 0 ? "positive" : "negative";
     const winner = index === 0;
     return `<article class="panel lab-strategy-card ${winner ? "is-winner" : ""}">
-      <div class="lab-rank-row"><span class="lab-rank-number">${index + 1}</span><span class="badge ${winner ? "positive" : ""}">${winner ? "melhor no período" : `${variant.fixedCount} fixas`}</span></div>
+      <div class="lab-rank-row"><span class="lab-rank-number">${index + 1}</span><span class="badge ${winner ? "positive" : ""}">${variantBadge(result, variant, index)}</span></div>
       <h3>${escapeHtml(variant.label)}</h3>
       <p>${variant.summary.testedContests} concursos · ${variant.summary.totalGames} jogos simulados</p>
       <div class="lab-primary-metric"><span>${primary.label}</span><strong class="${tone}">${primary.value}</strong></div>
@@ -201,10 +237,13 @@ function renderTable(result) {
   tableBody.innerHTML = result.variants.map((variant, index) => {
     const winnerClass = index === 0 ? "lab-winner-cell" : "";
     const roiClass = variant.summary.roi >= 0 ? "positive" : "negative";
+    const fixedAverage = result.experiment === "external-rules"
+      ? "—"
+      : variant.summary.averageFixedHitsPerContest.toFixed(2).replace(".", ",");
     return `<tr>
       <td class="${winnerClass}"><span class="lab-table-rank">${index + 1}</span><strong>${escapeHtml(variant.label)}</strong></td>
       <td>${variant.summary.averageHitsPerGame.toFixed(2).replace(".", ",")}</td>
-      <td>${variant.summary.averageFixedHitsPerContest.toFixed(2).replace(".", ",")}</td>
+      <td>${fixedAverage}</td>
       <td><strong>${variant.summary.maxHits}</strong></td>
       <td>${formatPercent(variant.summary.prizeRate)}</td>
       <td>${formatPercent(variant.summary.financialCoverage)}</td>
@@ -223,7 +262,9 @@ function renderChart() {
   if (!currentResult) return;
   const metric = metricSelect.value;
   const metricConfig = METRICS[metric];
-  const variants = currentResult.variants;
+  const variants = currentResult.experiment === "external-rules"
+    ? currentResult.variants.slice(0, 3)
+    : currentResult.variants;
   const allValues = variants.flatMap((variant) => variant.series.map((point) => chartValue(point, metric)));
   const maxPoints = Math.max(0, ...variants.map((variant) => variant.series.length));
 
@@ -282,8 +323,11 @@ function renderChart() {
   }).join("");
 
   const legend = variants.map((variant, index) => `<span class="lab-legend-item"><span class="lab-legend-dot series-${index}"></span>${escapeHtml(variant.label)}</span>`).join("");
+  const note = currentResult.experiment === "external-rules"
+    ? '<div class="lab-chart-top-note">Gráfico: Top 3 do ranking atual. A tabela abaixo mantém todas as regras.</div>'
+    : "";
 
-  chartRoot.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(metricConfig.label)} por bloco de concursos">${grid}${zeroLine}${lines}${xLabels}</svg><div class="lab-chart-legend">${legend}</div>`;
+  chartRoot.innerHTML = `${note}<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(metricConfig.label)} por bloco de concursos">${grid}${zeroLine}${lines}${xLabels}</svg><div class="lab-chart-legend">${legend}</div>`;
 }
 
 function renderResult(result) {
@@ -291,7 +335,8 @@ function renderResult(result) {
   resultsRoot.hidden = false;
   message.hidden = true;
   basis.textContent = result.rankingBasis === "roi" ? "Ranking por ROI" : "Ranking por taxa de premiação";
-  periodCopy.textContent = `Concursos #${result.startContest ?? "—"} a #${result.endContest ?? "—"} · ${result.gameCount} jogo(s) por concurso · blocos de ${result.bucketSize}`;
+  const experimentCopy = result.experiment === "external-rules" ? "regras externas" : "núcleo fixo";
+  periodCopy.textContent = `Concursos #${result.startContest ?? "—"} a #${result.endContest ?? "—"} · ${result.gameCount} jogo(s) por concurso · ${experimentCopy} · blocos de ${result.bucketSize}`;
   metricSelect.value = result.rankingBasis === "roi" ? "roi" : "prizeRate";
   renderRanking(result);
   renderTable(result);
@@ -304,13 +349,21 @@ async function runComparison(event) {
   runButton.textContent = "Comparando...";
   message.hidden = false;
   resultsRoot.hidden = true;
-  setMessage("running", "Executando backtests", "As três variantes estão sendo calculadas sobre o mesmo período. Isso pode levar alguns segundos.");
+  const external = selectedExperiment() === "external-rules";
+  setMessage(
+    "running",
+    "Executando backtests",
+    external
+      ? "As regras externas estão sendo testadas sobre o mesmo período e sem vazamento futuro. Pode levar alguns segundos."
+      : "As três variantes estão sendo calculadas sobre o mesmo período. Isso pode levar alguns segundos.",
+  );
 
   try {
     const payload = await api("/lab/compare", {
       method: "POST",
       body: JSON.stringify({
         lottery: selectedLottery(),
+        experiment: selectedExperiment(),
         gameCount: Number(gamesInput.value),
         warmupContests: Number(warmupInput.value),
         lookbackContests: Number(lookbackInput.value),
@@ -329,6 +382,7 @@ async function runComparison(event) {
 }
 
 lotterySelect.addEventListener("change", () => updateLotteryCopy(true));
+experimentSelect.addEventListener("change", () => updateLotteryCopy(false));
 form.addEventListener("submit", runComparison);
 metricSelect.addEventListener("change", renderChart);
 
