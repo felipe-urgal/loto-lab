@@ -10,6 +10,7 @@ export interface OperationsSchedulerOptions {
 
 export interface OperationsScheduler {
   stop(): void;
+  stopAndDrain(): Promise<void>;
 }
 
 function intervalMs(minutes: number): number {
@@ -26,6 +27,7 @@ export function startOperationsScheduler(
   const delayMs = intervalMs(options.intervalMinutes ?? 30);
   let stopped = false;
   let timer: NodeJS.Timeout | undefined;
+  let inFlight: Promise<void> | undefined;
 
   const scheduleNext = (): void => {
     if (stopped) return;
@@ -33,21 +35,37 @@ export function startOperationsScheduler(
     timer.unref();
   };
 
-  const execute = async (): Promise<void> => {
-    if (stopped) return;
-    try {
-      const result = await runOperationalSync(pool);
-      options.onRun?.(
-        `Operational sync #${result.id}: ${result.status} (${result.details.successfulLotteries}/3 lotteries, ${result.details.reconciledRealBets} real bets reconciled)`,
-      );
-    } catch (error) {
-      if (error instanceof OperationAlreadyRunningError) {
-        options.onRun?.("Operational sync skipped because another run is active");
-      } else {
-        options.onError?.(error);
+  const execute = (): Promise<void> => {
+    if (stopped) return Promise.resolve();
+    if (inFlight) return inFlight;
+
+    const run = (async (): Promise<void> => {
+      try {
+        const result = await runOperationalSync(pool);
+        options.onRun?.(
+          `Operational sync #${result.id}: ${result.status} (${result.details.successfulLotteries}/3 lotteries, ${result.details.reconciledRealBets} real bets reconciled)`,
+        );
+      } catch (error) {
+        if (error instanceof OperationAlreadyRunningError) {
+          options.onRun?.("Operational sync skipped because another run is active");
+        } else {
+          options.onError?.(error);
+        }
+      } finally {
+        inFlight = undefined;
+        scheduleNext();
       }
-    } finally {
-      scheduleNext();
+    })();
+
+    inFlight = run;
+    return run;
+  };
+
+  const stop = (): void => {
+    stopped = true;
+    if (timer) {
+      clearTimeout(timer);
+      timer = undefined;
     }
   };
 
@@ -58,9 +76,10 @@ export function startOperationsScheduler(
   }
 
   return {
-    stop() {
-      stopped = true;
-      if (timer) clearTimeout(timer);
+    stop,
+    async stopAndDrain() {
+      stop();
+      await inFlight;
     },
   };
 }
