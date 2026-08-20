@@ -35,6 +35,18 @@ Frequências, scores, geração de jogos e backtests são reproduzíveis por có
 - comandos CLI para sincronização e backtest;
 - testes automatizados e GitHub Actions.
 
+### Milestone 3 — geradores completos
+
+- Lotofácil com núcleo compartilhado configurável de **8, 9 ou 10 dezenas**;
+- preferência por **8–10 repetidas** do concurso anterior, sem transformar isso em regra absoluta;
+- diversificação de pares/ímpares entre os jogos;
+- linhas e colunas usadas apenas para evitar extremos, sem forçar simetria;
+- Dia de Sorte com **3 fixas + 4 variáveis**;
+- preferência por **1–2 repetidas** do concurso anterior;
+- diversidade entre 3/4 e 4/3 em pares/ímpares;
+- seleção e diversificação do **Mês da Sorte**;
+- CLI única para gerar jogos das três loterias.
+
 ## Requisitos
 
 - Node.js 22+
@@ -51,8 +63,6 @@ npm install
 ```bash
 npm test
 ```
-
-O comando compila o TypeScript e executa os testes com o runner nativo do Node.js.
 
 ## Build
 
@@ -74,17 +84,47 @@ npm run data:sync -- dia-de-sorte
 
 ### Preencher um intervalo
 
-O sincronizador consulta apenas os concursos que ainda não existem no arquivo local.
-
 ```bash
 npm run data:sync -- mega-sena 1 3046
 ```
 
-Também é possível informar outro arquivo como quarto argumento:
+Também é possível informar outro arquivo:
 
 ```bash
 npm run data:sync -- mega-sena 1 3046 data/mega.json
 ```
+
+## Gerar jogos
+
+Formato:
+
+```text
+npm run games:generate -- <lottery> [dataPath] [gameCount] [lotofacilFixedCount]
+```
+
+### Mega-Sena
+
+```bash
+npm run games:generate -- mega-sena data/contests.json 2
+```
+
+Usa 3 dezenas fixas compartilhadas e 3 variáveis por jogo.
+
+### Lotofácil
+
+```bash
+npm run games:generate -- lotofacil data/contests.json 4 8
+```
+
+O último argumento pode ser `8`, `9` ou `10` e define o tamanho do núcleo fixo compartilhado.
+
+### Dia de Sorte
+
+```bash
+npm run games:generate -- dia-de-sorte data/contests.json 4
+```
+
+Usa 3 dezenas fixas compartilhadas, 4 variáveis por jogo e seleciona um Mês da Sorte diferente conforme o ranking disponível.
 
 ## Rodar backtest da Mega-Sena
 
@@ -104,21 +144,11 @@ Exemplo:
 npm run backtest:mega -- data/contests.json 2 20 2500 3046
 ```
 
-O relatório mostra:
-
-- quantidade de concursos testados;
-- quantidade total de jogos gerados;
-- média de acertos por jogo;
-- maior quantidade de acertos;
-- distribuição do melhor jogo de cada concurso;
-- desempenho das 3 dezenas fixas;
-- últimas rodadas detalhadas.
-
 ### Regra anti-leakage
 
 Ao testar o concurso `N`, o gerador recebe **somente os concursos anteriores a N**.
 
-O resultado do próprio concurso testado e todos os concursos futuros ficam invisíveis para o algoritmo. Essa regra é testada automaticamente e é obrigatória para qualquer futuro módulo de backtest.
+O resultado do próprio concurso testado e todos os concursos futuros ficam invisíveis para o algoritmo. Essa regra é obrigatória para qualquer módulo de backtest.
 
 ## Estrutura atual
 
@@ -131,6 +161,7 @@ src/
 │   └── megaSena.ts
 ├── cli/
 │   ├── backtestMega.ts
+│   ├── generateGames.ts
 │   └── sync.ts
 ├── data/
 │   ├── caixa.ts
@@ -140,7 +171,10 @@ src/
 ├── domain/
 │   └── types.ts
 ├── generator/
-│   └── megaSena.ts
+│   ├── diaDeSorte.ts
+│   ├── lotofacil.ts
+│   ├── megaSena.ts
+│   └── shared.ts
 ├── lotteries/
 │   └── config.ts
 └── index.ts
@@ -156,18 +190,17 @@ src/
 | Histórico | 15% |
 | Últimos 10 | 10% |
 
-Esses pesos são hipóteses iniciais. O backtest existe justamente para medir estratégias sem usar informação futura e, posteriormente, comparar pesos e regras diferentes.
+Esses pesos são hipóteses iniciais. Os backtests existem justamente para medir estratégias sem usar informação futura e comparar pesos e regras diferentes.
 
 ## Próximos milestones
 
-1. gerador da Lotofácil com núcleo de 8–10 dezenas;
-2. gerador do Dia de Sorte com 3 fixas + 4 variáveis e Mês da Sorte;
-3. conferência automática de jogos e faixas de acerto;
-4. backtests para as três loterias e comparação entre estratégias;
-5. persistência em banco de dados;
-6. API da aplicação;
-7. interface web;
-8. camada de interpretação por IA.
+1. conferência automática de jogos e faixas de acerto;
+2. backtests para Lotofácil e Dia de Sorte;
+3. comparação entre estratégias e cálculo de custo/retorno;
+4. persistência em banco de dados;
+5. API da aplicação;
+6. interface web;
+7. camada de interpretação por IA.
 
 ## Aviso
 
