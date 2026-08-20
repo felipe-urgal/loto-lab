@@ -1,5 +1,7 @@
 import { createPostgresPool } from "../db/client.js";
+import { runMigrations } from "../db/migrations.js";
 import { createLotoLabServer } from "../api/server.js";
+import { startOperationsScheduler, type OperationsScheduler } from "../operations/scheduler.js";
 
 function parsePort(value: string | undefined): number {
   const port = Number(value ?? 3000);
@@ -9,38 +11,80 @@ function parsePort(value: string | undefined): number {
   return port;
 }
 
-const pool = createPostgresPool();
-const port = parsePort(process.env.API_PORT);
-const host = process.env.API_HOST ?? "127.0.0.1";
-const server = createLotoLabServer({
-  pool,
-  corsOrigin: process.env.API_CORS_ORIGIN,
-});
+function parseInterval(value: string | undefined): number {
+  const minutes = Number(value ?? 30);
+  if (!Number.isFinite(minutes) || minutes < 5 || minutes > 1440) {
+    throw new Error("OPS_INTERVAL_MINUTES must be between 5 and 1440");
+  }
+  return minutes;
+}
 
-server.listen(port, host, () => {
-  console.log(`Loto Lab listening on http://${host}:${port}`);
-});
+function autoSyncEnabled(value: string | undefined): boolean {
+  if (value === undefined || value === "") return true;
+  return value === "1" || value.toLowerCase() === "true";
+}
 
-let shuttingDown = false;
-async function shutdown(signal: string): Promise<void> {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  console.log(`Received ${signal}; shutting down Loto Lab`);
+async function main(): Promise<void> {
+  const pool = createPostgresPool();
+  await runMigrations(pool);
+
+  const port = parsePort(process.env.API_PORT);
+  const host = process.env.API_HOST ?? "127.0.0.1";
+  const server = createLotoLabServer({
+    pool,
+    corsOrigin: process.env.API_CORS_ORIGIN,
+  });
+
+  let scheduler: OperationsScheduler | undefined;
+  if (autoSyncEnabled(process.env.OPS_AUTO_SYNC)) {
+    scheduler = startOperationsScheduler(pool, {
+      intervalMinutes: parseInterval(process.env.OPS_INTERVAL_MINUTES),
+      runOnStart: true,
+      onRun: (message) => console.log(message),
+      onError: (error) => console.error("Operational sync failed", error),
+    });
+  }
 
   await new Promise<void>((resolve, reject) => {
-    server.close((error) => {
-      if (error) reject(error);
-      else resolve();
+    server.once("error", reject);
+    server.listen(port, host, () => {
+      console.log(`Loto Lab listening on http://${host}:${port}`);
+      console.log(
+        scheduler
+          ? `Operational auto-sync enabled every ${parseInterval(process.env.OPS_INTERVAL_MINUTES)} minutes`
+          : "Operational auto-sync disabled",
+      );
+      resolve();
     });
   });
-  await pool.end();
+
+  let shuttingDown = false;
+  async function shutdown(signal: string): Promise<void> {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`Received ${signal}; shutting down Loto Lab`);
+    scheduler?.stop();
+
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+    await pool.end();
+  }
+
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => {
+      shutdown(signal).catch((error: unknown) => {
+        console.error(error instanceof Error ? error.message : error);
+        process.exitCode = 1;
+      });
+    });
+  }
 }
 
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.once(signal, () => {
-    shutdown(signal).catch((error: unknown) => {
-      console.error(error instanceof Error ? error.message : error);
-      process.exitCode = 1;
-    });
-  });
-}
+main().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+});
