@@ -8,6 +8,7 @@ import { serveRealBets } from "./realBets.js";
 import { serveGameBatchManagement } from "./gameBatchManagement.js";
 import { serveAiInsights } from "./aiInsights.js";
 import { serveOperations } from "./operations.js";
+import { serveAgenda } from "./agenda.js";
 import { serveWebAsset } from "./web.js";
 
 export interface LotoLabServerOptions extends ApiServerOptions {
@@ -29,6 +30,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
       if (await serveGameBatchManagement(request, response, options)) return;
       if (await serveAiInsights(request, response, options)) return;
       if (await serveOperations(request, response, options)) return;
+      if (await serveAgenda(request, response, options)) return;
       if (method === "GET" && await serveWebAsset(url.pathname, response)) return;
       apiHandler(request, response);
     } catch (error) {
