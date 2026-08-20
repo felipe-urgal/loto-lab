@@ -52,9 +52,25 @@ test("web application shell, Strategy Lab and assets are served by the Loto Lab 
   assert.match(labPage.headers.get("content-type") ?? "", /^text\/html/);
   const labHtml = await labPage.text();
   assert.match(labHtml, /Laboratório/);
+  assert.match(labHtml, /Agenda/);
+  assert.match(labHtml, />IA</);
   assert.match(labHtml, /Executar comparação/);
   assert.match(labHtml, /\/assets\/lab\.js/);
   assert.match(labHtml, /\/assets\/lab\.css/);
+
+  const aiPage = await fetch(`${baseUrl}/ai`);
+  assert.equal(aiPage.status, 200);
+  const aiHtml = await aiPage.text();
+  assert.match(aiHtml, /Laboratório/);
+  assert.match(aiHtml, /Agenda/);
+  assert.match(aiHtml, />IA</);
+
+  const agendaPage = await fetch(`${baseUrl}/agenda`);
+  assert.equal(agendaPage.status, 200);
+  const agendaHtml = await agendaPage.text();
+  assert.match(agendaHtml, /Laboratório/);
+  assert.match(agendaHtml, /Agenda/);
+  assert.match(agendaHtml, />IA</);
 
   const javascript = await fetch(`${baseUrl}/assets/app.js`);
   assert.equal(javascript.status, 200);
