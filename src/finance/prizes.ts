@@ -43,14 +43,12 @@ export function resolvePrizeValue(
   hits: number,
   luckyMonthHit = false,
 ): ResolvedPrize {
+  if (!target.prizeTiers) return {};
+
   const numberPrizeValue = validPrizeValue(prizeTierForHits(target, hits));
   const luckyMonthPrizeValue = luckyMonthHit
     ? validPrizeValue(luckyMonthPrizeTier(target))
     : undefined;
-
-  if (numberPrizeValue === undefined && luckyMonthPrizeValue === undefined) {
-    return {};
-  }
 
   return {
     ...(numberPrizeValue !== undefined ? { numberPrizeValue } : {}),
