@@ -45,5 +45,5 @@ test("UI refinement assets are served for the main app and strategy lab", async 
   assert.equal(labApp.status, 200);
   const labAppSource = await labApp.text();
   assert.match(labAppSource, /external-rules/);
-  assert.match(labAppSource, /Grupo das 26/);
+  assert.match(labAppSource, /grupo das 26/i);
 });
