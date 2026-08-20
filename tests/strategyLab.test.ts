@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import type { Contest, LotteryId } from "../src/domain/types.js";
 import { generateMegaSenaGames } from "../src/generator/megaSena.js";
 import { generateDiaDeSorteGames } from "../src/generator/diaDeSorte.js";
+import { backtestRandomControl } from "../src/lab/randomControl.js";
 import { compareStrategyLab } from "../src/lab/strategyLab.js";
 
 function contestsFor(
@@ -15,10 +16,7 @@ function contestsFor(
     lottery,
     number: index + 1,
     date: `2026-01-${String((index % 28) + 1).padStart(2, "0")}`,
-    numbers: Array.from(
-      { length: drawSize },
-      (_, offset) => ((index * 3 + offset) % maxNumber) + 1,
-    ).sort((a, b) => a - b),
+    numbers: Array.from({ length: drawSize }, (_, offset) => ((index * 3 + offset) % maxNumber) + 1).sort((a, b) => a - b),
     ...(lottery === "dia-de-sorte" ? { luckyMonth: "Janeiro" } : {}),
   }));
 }
@@ -43,7 +41,27 @@ test("Mega-Sena and Dia de Sorte generators support experimental fixed-core size
   assert.ok(diaThree.every((game) => game.fixedNumbers.length === 3 && game.variableNumbers.length === 4));
 });
 
-test("strategy lab compares the expected presets over the same period", () => {
+test("random control is reproducible for the same period and seed", () => {
+  const contests = contestsFor("lotofacil", 20, 15, 25);
+  const options = {
+    lottery: "lotofacil" as const,
+    gameCount: 4,
+    warmupContests: 5,
+    startContest: 11,
+    endContest: 20,
+    seed: "test-seed",
+  };
+
+  const first = backtestRandomControl(contests, options);
+  const second = backtestRandomControl(contests, options);
+
+  assert.deepEqual(first, second);
+  assert.equal(first.rounds.length, 10);
+  assert.equal(first.summary.totalGames, 40);
+  assert.ok(first.rounds.every((round) => round.checks.every((check) => check.fixedHits === 0)));
+});
+
+test("strategy lab compares the expected presets and a random control over the same period", () => {
   const fixtures = [
     { lottery: "mega-sena" as const, drawSize: 6, maxNumber: 60, expected: [0, 2, 3] },
     { lottery: "lotofacil" as const, drawSize: 15, maxNumber: 25, expected: [8, 9, 10] },
@@ -61,19 +79,27 @@ test("strategy lab compares the expected presets over the same period", () => {
     });
 
     assert.deepEqual(
-      result.variants.map((variant) => variant.fixedCount).sort((a, b) => a - b),
+      result.variants.filter((variant) => !variant.isControl).map((variant) => variant.fixedCount).sort((a, b) => a - b),
       fixture.expected,
     );
     assert.equal(result.experiment, "fixed-core");
+    assert.equal(result.variants.length, 4);
     assert.equal(result.startContest, 9);
     assert.equal(result.endContest, 18);
     assert.ok(result.winner);
     assert.ok(result.variants.every((variant) => variant.summary.testedContests === 10));
     assert.ok(result.variants.every((variant) => variant.series.length === 2));
+
+    const control = result.variants.find((variant) => variant.isControl);
+    assert.ok(control);
+    assert.equal(control.key, "random-control");
+    assert.equal(result.benchmark.controlKey, "random-control");
+    assert.equal(result.benchmark.basis, result.rankingBasis);
+    assert.equal(result.benchmark.beatsRandom, result.benchmark.delta > 0);
   }
 });
 
-test("strategy lab exposes external Mega-Sena rules as a separate experiment", () => {
+test("strategy lab exposes external Mega-Sena rules plus random control", () => {
   const contests = contestsFor("mega-sena", 24, 6, 60);
   const result = compareStrategyLab(contests, {
     lottery: "mega-sena",
@@ -86,7 +112,7 @@ test("strategy lab exposes external Mega-Sena rules as a separate experiment", (
 
   const keys = new Set(result.variants.map((variant) => variant.key));
   assert.equal(result.experiment, "external-rules");
-  assert.equal(result.variants.length, 9);
+  assert.equal(result.variants.length, 10);
   assert.ok(keys.has("mega-rules-baseline"));
   assert.ok(keys.has("mega-rules-group-2"));
   assert.ok(keys.has("mega-rules-group-3"));
@@ -96,6 +122,8 @@ test("strategy lab exposes external Mega-Sena rules as a separate experiment", (
   assert.ok(keys.has("mega-rules-quadrants"));
   assert.ok(keys.has("mega-rules-article-2"));
   assert.ok(keys.has("mega-rules-article-3"));
+  assert.ok(keys.has("random-control"));
   assert.ok(result.variants.every((variant) => variant.fixedCount === 0));
   assert.ok(result.variants.every((variant) => variant.summary.testedContests === 10));
+  assert.equal(result.benchmark.controlKey, "random-control");
 });
