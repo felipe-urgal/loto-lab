@@ -1,6 +1,6 @@
 {
   "name": "loto-lab",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -20,7 +20,8 @@
     "db:import-json": "npm run build && node --env-file-if-exists=.env dist/src/cli/dbImportJson.js",
     "db:sync": "npm run build && node --env-file-if-exists=.env dist/src/cli/dbSync.js",
     "db:bootstrap": "npm run build && node --env-file-if-exists=.env dist/src/cli/dbBootstrap.js",
-    "db:status": "npm run build && node --env-file-if-exists=.env dist/src/cli/dbStatus.js"
+    "db:status": "npm run build && node --env-file-if-exists=.env dist/src/cli/dbStatus.js",
+    "ops:sync": "npm run build && node --env-file-if-exists=.env dist/src/cli/opsSync.js"
   },
   "dependencies": {
     "pg": "^8.23.0"
