@@ -44,6 +44,8 @@ test("web application shell, Strategy Lab and assets are served by the Loto Lab 
   assert.match(html, /\/assets\/real-bets\.css/);
   assert.match(html, /\/assets\/generation-diversity\.js/);
   assert.match(html, /\/assets\/generation-diversity\.css/);
+  assert.match(html, /\/assets\/my-games-management\.js/);
+  assert.match(html, /\/assets\/my-games-management\.css/);
 
   const labPage = await fetch(`${baseUrl}/lab`);
   assert.equal(labPage.status, 200);
@@ -84,6 +86,18 @@ test("web application shell, Strategy Lab and assets are served by the Loto Lab 
   const diversityStyles = await fetch(`${baseUrl}/assets/generation-diversity.css`);
   assert.equal(diversityStyles.status, 200);
   assert.match(await diversityStyles.text(), /\.generation-mode-card/);
+
+  const managementJavascript = await fetch(`${baseUrl}/assets/my-games-management.js`);
+  assert.equal(managementJavascript.status, 200);
+  assert.match(managementJavascript.headers.get("content-type") ?? "", /^text\/javascript/);
+  const managementSource = await managementJavascript.text();
+  assert.match(managementSource, /Arquivar duplicados/);
+  assert.match(managementSource, /game-batches\/manage/);
+  assert.match(managementSource, /Apostados/);
+
+  const managementStyles = await fetch(`${baseUrl}/assets/my-games-management.css`);
+  assert.equal(managementStyles.status, 200);
+  assert.match(await managementStyles.text(), /\.my-games-management/);
 
   const labJavascript = await fetch(`${baseUrl}/assets/lab.js`);
   assert.equal(labJavascript.status, 200);

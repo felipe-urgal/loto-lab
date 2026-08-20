@@ -5,6 +5,8 @@ import type {
   SaveGeneratedGameBatchInput,
 } from "./types.js";
 
+export type GeneratedBatchScope = "active" | "archived" | "all";
+
 interface BatchRow {
   id: string;
   lottery: LotteryId;
@@ -12,6 +14,8 @@ interface BatchRow {
   target_contest_number: number | null;
   generator_options: Record<string, unknown>;
   created_at: Date;
+  archived_at: Date | null;
+  has_real_bet: boolean;
 }
 
 interface GameRow {
@@ -98,7 +102,15 @@ export class PostgresGameRepository {
 
   async findBatch(id: number): Promise<GeneratedGameBatchRecord | undefined> {
     const batchResult = await this.pool.query<BatchRow>(
-      "SELECT * FROM generated_game_batches WHERE id = $1",
+      `
+        SELECT
+          batch.*,
+          EXISTS (
+            SELECT 1 FROM real_bets bet WHERE bet.batch_id = batch.id
+          ) AS has_real_bet
+        FROM generated_game_batches batch
+        WHERE batch.id = $1
+      `,
       [id],
     );
     const batch = batchResult.rows[0];
@@ -123,17 +135,29 @@ export class PostgresGameRepository {
         : {}),
       generatorOptions: batch.generator_options,
       createdAt: batch.created_at.toISOString(),
+      ...(batch.archived_at ? { archivedAt: batch.archived_at.toISOString() } : {}),
+      hasRealBet: Boolean(batch.has_real_bet),
       games: gamesResult.rows.map((row) => mapGame(batch.lottery, row)),
     };
   }
 
-  async listRecent(lottery: LotteryId, limit = 20): Promise<GeneratedGameBatchRecord[]> {
+  async listRecent(
+    lottery: LotteryId,
+    limit = 20,
+    scope: GeneratedBatchScope = "active",
+  ): Promise<GeneratedGameBatchRecord[]> {
+    const lifecycleFilter = scope === "active"
+      ? "AND archived_at IS NULL"
+      : scope === "archived"
+        ? "AND archived_at IS NOT NULL"
+        : "";
     const result = await this.pool.query<{ id: string }>(
       `
         SELECT id
         FROM generated_game_batches
         WHERE lottery = $1
-        ORDER BY created_at DESC, id DESC
+          ${lifecycleFilter}
+        ORDER BY COALESCE(archived_at, created_at) DESC, id DESC
         LIMIT $2
       `,
       [lottery, limit],
@@ -141,5 +165,41 @@ export class PostgresGameRepository {
 
     const batches = await Promise.all(result.rows.map((row) => this.findBatch(Number(row.id))));
     return batches.filter((batch): batch is GeneratedGameBatchRecord => batch !== undefined);
+  }
+
+  async setArchived(id: number, archived: boolean): Promise<GeneratedGameBatchRecord | undefined> {
+    const current = await this.findBatch(id);
+    if (!current) return undefined;
+    if (archived && current.hasRealBet) {
+      throw new Error(`BATCH_HAS_REAL_BET:${id}`);
+    }
+    if (Boolean(current.archivedAt) === archived) return current;
+
+    const result = await this.pool.query<{ id: string }>(
+      archived
+        ? `
+            UPDATE generated_game_batches batch
+            SET archived_at = NOW()
+            WHERE batch.id = $1
+              AND NOT EXISTS (
+                SELECT 1 FROM real_bets bet WHERE bet.batch_id = batch.id
+              )
+            RETURNING batch.id
+          `
+        : `
+            UPDATE generated_game_batches
+            SET archived_at = NULL
+            WHERE id = $1
+            RETURNING id
+          `,
+      [id],
+    );
+
+    if (archived && result.rowCount === 0) {
+      const refreshed = await this.findBatch(id);
+      if (refreshed?.hasRealBet) throw new Error(`BATCH_HAS_REAL_BET:${id}`);
+    }
+
+    return this.findBatch(id);
   }
 }
