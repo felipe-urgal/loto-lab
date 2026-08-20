@@ -3,13 +3,21 @@ import { backtestMegaSena } from "../backtest/megaSena.js";
 import { backtestLotofacil } from "../backtest/lotofacil.js";
 import { backtestDiaDeSorte } from "../backtest/diaDeSorte.js";
 import {
+  ARTICLE_RULES_GROUP_2,
+  ARTICLE_RULES_GROUP_3,
+  type MegaSenaGameRules,
+} from "../generator/megaSenaRules.js";
+import {
   summarizeBacktestRounds,
   type BacktestSummary,
   type SummarizableRound,
 } from "../backtest/shared.js";
 
+export type StrategyLabExperiment = "fixed-core" | "external-rules";
+
 export interface StrategyLabOptions {
   lottery: LotteryId;
+  experiment?: StrategyLabExperiment;
   gameCount?: number;
   warmupContests?: number;
   startContest?: number;
@@ -36,12 +44,14 @@ export interface StrategyLabVariant {
   key: string;
   label: string;
   fixedCount: number;
+  rules?: MegaSenaGameRules;
   summary: BacktestSummary;
   series: StrategyLabPoint[];
 }
 
 export interface StrategyLabResult {
   lottery: LotteryId;
+  experiment: StrategyLabExperiment;
   startContest?: number;
   endContest?: number;
   gameCount: number;
@@ -56,6 +66,60 @@ interface LabRound extends SummarizableRound {
   contest: number;
   date: string;
 }
+
+interface MegaExternalVariant {
+  key: string;
+  label: string;
+  rules: MegaSenaGameRules;
+}
+
+const MEGA_EXTERNAL_VARIANTS: MegaExternalVariant[] = [
+  {
+    key: "mega-rules-baseline",
+    label: "Score atual · sem filtro externo",
+    rules: {},
+  },
+  {
+    key: "mega-rules-group-2",
+    label: "Grupo das 26 · mínimo 2",
+    rules: { minPreferredGroup: 2 },
+  },
+  {
+    key: "mega-rules-group-3",
+    label: "Grupo das 26 · mínimo 3",
+    rules: { minPreferredGroup: 3 },
+  },
+  {
+    key: "mega-rules-no-consecutive",
+    label: "Sem dezenas consecutivas",
+    rules: { avoidConsecutive: true },
+  },
+  {
+    key: "mega-rules-columns",
+    label: "Sem repetir coluna vertical",
+    rules: { avoidSameColumn: true },
+  },
+  {
+    key: "mega-rules-parity",
+    label: "Paridade exata · 3/3",
+    rules: { equalParity: true },
+  },
+  {
+    key: "mega-rules-quadrants",
+    label: "Todos os 4 quadrantes",
+    rules: { minQuadrants: 4 },
+  },
+  {
+    key: "mega-rules-article-2",
+    label: "Artigo completo · grupo 2+",
+    rules: ARTICLE_RULES_GROUP_2,
+  },
+  {
+    key: "mega-rules-article-3",
+    label: "Artigo completo · grupo 3+",
+    rules: ARTICLE_RULES_GROUP_3,
+  },
+];
 
 function integerInRange(value: number, name: string, min: number, max: number): number {
   if (!Number.isInteger(value) || value < min || value > max) {
@@ -118,20 +182,55 @@ function toVariant(
   rounds: LabRound[],
   summary: BacktestSummary,
   bucketSize: number,
+  rules?: MegaSenaGameRules,
 ): StrategyLabVariant {
   return {
     key,
     label,
     fixedCount,
+    ...(rules ? { rules } : {}),
     summary,
     series: seriesFor(rounds, bucketSize),
   };
+}
+
+function compareMegaExternalRules(
+  contests: Contest[],
+  common: {
+    gameCount: number;
+    warmupContests: number;
+    startContest?: number;
+    endContest?: number;
+  },
+  bucketSize: number,
+): StrategyLabVariant[] {
+  return MEGA_EXTERNAL_VARIANTS.map((variant) => {
+    const result = backtestMegaSena(contests, {
+      ...common,
+      fixedCount: 0,
+      rules: variant.rules,
+    });
+    return toVariant(
+      variant.key,
+      variant.label,
+      0,
+      result.rounds,
+      result.summary,
+      bucketSize,
+      variant.rules,
+    );
+  });
 }
 
 export function compareStrategyLab(
   contests: Contest[],
   options: StrategyLabOptions,
 ): StrategyLabResult {
+  const experiment = options.experiment ?? "fixed-core";
+  if (experiment === "external-rules" && options.lottery !== "mega-sena") {
+    throw new Error("external-rules experiment is available only for Mega-Sena");
+  }
+
   const gameCount = integerInRange(
     options.gameCount ?? (options.lottery === "mega-sena" ? 2 : 4),
     "gameCount",
@@ -151,7 +250,9 @@ export function compareStrategyLab(
 
   let variants: StrategyLabVariant[];
 
-  if (options.lottery === "mega-sena") {
+  if (options.lottery === "mega-sena" && experiment === "external-rules") {
+    variants = compareMegaExternalRules(contests, common, bucketSize);
+  } else if (options.lottery === "mega-sena") {
     variants = ([0, 2, 3] as const).map((fixedCount) => {
       const result = backtestMegaSena(contests, { ...common, fixedCount });
       return toVariant(
@@ -210,6 +311,7 @@ export function compareStrategyLab(
 
   return {
     lottery: options.lottery,
+    experiment,
     ...period,
     gameCount,
     warmupContests,
