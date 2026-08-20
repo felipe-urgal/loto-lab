@@ -3,6 +3,7 @@ export * from "./lotteries/config.js";
 export * from "./analysis/frequency.js";
 export * from "./analysis/scoring.js";
 export * from "./generator/megaSena.js";
+export * from "./generator/megaSenaRules.js";
 export * from "./generator/lotofacil.js";
 export * from "./generator/diaDeSorte.js";
 export * from "./data/source.js";

@@ -26,7 +26,8 @@
 .lab-history-status.is-warning { color: var(--warning); border-color: rgba(240,189,102,.32); background: var(--warning-soft); }
 .lab-history-status.is-ok { color: var(--accent-strong); border-color: rgba(101,214,164,.28); background: var(--accent-soft); }
 
-.lab-form-grid { grid-template-columns: 1.25fr 1fr 1fr 1fr; }
+.lab-form-grid { grid-template-columns: 1.15fr 1.15fr 1fr 1fr 1fr; }
+.lab-experiment-field[hidden] { display: none; }
 .lab-run-button { min-width: 164px; }
 
 .lab-message {
@@ -108,6 +109,7 @@
   padding: 12px;
   overflow: hidden;
 }
+.lab-chart-top-note { margin: 0 0 8px; color: var(--muted-2); font-size: 9px; text-align: right; }
 .lab-chart svg { display: block; width: 100%; height: auto; min-height: 285px; }
 .lab-chart-grid { stroke: var(--border); stroke-width: 1; }
 .lab-chart-zero { stroke: var(--muted-2); stroke-width: 1; stroke-dasharray: 4 5; }
@@ -130,6 +132,10 @@
 .lab-winner-cell { color: var(--accent-strong); }
 .lab-table-rank { display: inline-flex; width: 20px; height: 20px; border-radius: 6px; align-items: center; justify-content: center; margin-right: 7px; background: var(--surface-3); font-size: 9px; font-weight: 800; }
 
+@media (max-width: 1180px) {
+  .lab-form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 @media (max-width: 1050px) {
   .lab-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lab-ranking { grid-template-columns: 1fr; }
@@ -143,4 +149,5 @@
   .lab-chart-head { align-items: stretch; flex-direction: column; }
   .lab-metric-select { min-width: 0; }
   .lab-mini-metrics { grid-template-columns: 1fr 1fr; }
+  .lab-chart-top-note { text-align: left; }
 }

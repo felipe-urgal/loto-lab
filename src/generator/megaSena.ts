@@ -2,6 +2,13 @@ import type { Contest, GeneratedGame, NumberAnalysis } from "../domain/types.js"
 import { getLotteryConfig } from "../lotteries/config.js";
 import { buildNumberAnalysis } from "../analysis/scoring.js";
 import {
+  GUILHERMINO_HIGH_FREQUENCY_GROUP,
+  matchesMegaSenaRules,
+  megaSenaColumn,
+  megaSenaQuadrant,
+  type MegaSenaGameRules,
+} from "./megaSenaRules.js";
+import {
   generationRandom,
   selectRankedCandidate,
   selectWeightedItem,
@@ -9,6 +16,7 @@ import {
 } from "./shared.js";
 
 const config = getLotteryConfig("mega-sena");
+const preferredGroup = new Set<number>(GUILHERMINO_HIGH_FREQUENCY_GROUP);
 
 export type MegaSenaFixedCount = 0 | 2 | 3;
 
@@ -17,6 +25,7 @@ export interface MegaSenaGeneratorOptions {
   fixedCount?: MegaSenaFixedCount;
   generationMode?: GenerationMode;
   seed?: string;
+  rules?: MegaSenaGameRules;
 }
 
 function bestUnused(
@@ -95,27 +104,105 @@ interface NormalizedMegaSenaGeneratorOptions {
   fixedCount: MegaSenaFixedCount;
   generationMode: GenerationMode;
   seed?: string;
+  rules: MegaSenaGameRules;
 }
 
 function normalizeOptions(
   value: number | MegaSenaGeneratorOptions,
 ): NormalizedMegaSenaGeneratorOptions {
   if (typeof value === "number") {
-    return { gameCount: value, fixedCount: 3, generationMode: "deterministic" };
+    return { gameCount: value, fixedCount: 3, generationMode: "deterministic", rules: {} };
   }
   return {
     gameCount: value.gameCount ?? 2,
     fixedCount: value.fixedCount ?? 3,
     generationMode: value.generationMode ?? "deterministic",
     ...(value.seed !== undefined ? { seed: value.seed } : {}),
+    rules: value.rules ?? {},
   };
+}
+
+function hasRules(rules: MegaSenaGameRules): boolean {
+  return Object.values(rules).some((value) => value !== undefined && value !== false);
+}
+
+function buildCandidatePool(
+  analysis: NumberAnalysis[],
+  fixedSet: Set<number>,
+  fixedCount: MegaSenaFixedCount,
+  rules: MegaSenaGameRules,
+): number[] {
+  const ranked = [...analysis]
+    .filter((row) => !fixedSet.has(row.number))
+    .sort((a, b) => b.score - a.score || a.number - b.number);
+
+  if (fixedCount !== 0 || !hasRules(rules)) {
+    const poolSize = fixedCount === 0 ? 14 : fixedCount === 2 ? 18 : 24;
+    return ranked.slice(0, poolSize).map((row) => row.number);
+  }
+
+  const selected = new Set<number>();
+
+  if (rules.minPreferredGroup !== undefined) {
+    const wanted = rules.minPreferredGroup + 3;
+    let added = 0;
+    for (const row of ranked) {
+      if (!preferredGroup.has(row.number)) continue;
+      selected.add(row.number);
+      added += 1;
+      if (added >= wanted) break;
+    }
+  }
+
+  if (rules.minQuadrants !== undefined) {
+    for (const quadrant of [1, 2, 3, 4] as const) {
+      let added = 0;
+      for (const row of ranked) {
+        if (megaSenaQuadrant(row.number) !== quadrant) continue;
+        selected.add(row.number);
+        added += 1;
+        if (added >= 2) break;
+      }
+    }
+  }
+
+  if (rules.equalParity) {
+    for (const parity of [0, 1] as const) {
+      let added = 0;
+      for (const row of ranked) {
+        if (row.number % 2 !== parity) continue;
+        selected.add(row.number);
+        added += 1;
+        if (added >= 4) break;
+      }
+    }
+  }
+
+  if (rules.avoidSameColumn) {
+    const represented = new Set<number>();
+    for (const row of ranked) {
+      const column = megaSenaColumn(row.number);
+      if (represented.has(column)) continue;
+      selected.add(row.number);
+      represented.add(column);
+      if (represented.size >= 6) break;
+    }
+  }
+
+  const targetSize = Math.max(18, selected.size);
+  for (const row of ranked) {
+    selected.add(row.number);
+    if (selected.size >= targetSize) break;
+  }
+
+  return [...selected];
 }
 
 export function generateMegaSenaGames(
   contests: Contest[],
   options: number | MegaSenaGeneratorOptions = 2,
 ): GeneratedGame[] {
-  const { gameCount, fixedCount, generationMode, seed } = normalizeOptions(options);
+  const { gameCount, fixedCount, generationMode, seed, rules } = normalizeOptions(options);
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
   }
@@ -133,12 +220,7 @@ export function generateMegaSenaGames(
   const lastContest = scoped.at(-1);
   const scoreByNumber = new Map(analysis.map((row) => [row.number, row.score]));
   const variableCount = config.drawSize - fixedCount;
-  const poolSize = fixedCount === 0 ? 14 : fixedCount === 2 ? 18 : 24;
-  const candidatePool = [...analysis]
-    .filter((row) => !fixedSet.has(row.number))
-    .sort((a, b) => b.score - a.score || a.number - b.number)
-    .slice(0, poolSize)
-    .map((row) => row.number);
+  const candidatePool = buildCandidatePool(analysis, fixedSet, fixedCount, rules);
 
   const variableOptions = combinations(candidatePool, variableCount);
   const usedVariables = new Map<number, number>();
@@ -146,11 +228,13 @@ export function generateMegaSenaGames(
   const games: GeneratedGame[] = [];
 
   for (let gameIndex = 0; gameIndex < gameCount; gameIndex += 1) {
-    const targetOdd = parityTargets[gameIndex % parityTargets.length]!;
+    const targetOdd = rules.equalParity ? 3 : parityTargets[gameIndex % parityTargets.length]!;
 
     const ranked = variableOptions
       .map((variableNumbers) => {
         const numbers = [...fixedNumbers, ...variableNumbers].sort((a, b) => a - b);
+        if (!matchesMegaSenaRules(numbers, rules)) return undefined;
+
         const metadata = buildMetadata(numbers, lastContest);
         const baseScore = variableNumbers.reduce(
           (total, number) => total + (scoreByNumber.get(number) ?? 0),
@@ -171,10 +255,13 @@ export function generateMegaSenaGames(
           rank: baseScore - parityPenalty - repeatPenalty - reusePenalty,
         };
       })
+      .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== undefined)
       .sort((a, b) => b.rank - a.rank || a.numbers.join("-").localeCompare(b.numbers.join("-")));
 
     const winner = selectRankedCandidate(ranked, generationMode, random, 6);
-    if (!winner) throw new Error("Unable to generate a Mega-Sena game");
+    if (!winner) {
+      throw new Error("Unable to generate a Mega-Sena game with the requested experimental rules");
+    }
 
     for (const number of winner.variableNumbers) {
       usedVariables.set(number, (usedVariables.get(number) ?? 0) + 1);

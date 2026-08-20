@@ -40,4 +40,10 @@ test("UI refinement assets are served for the main app and strategy lab", async 
   const labSource = await labRefinements.text();
   assert.match(labSource, /Empate em/);
   assert.match(labSource, /averageHitsPerGame/);
+
+  const labApp = await fetch(`${baseUrl}/assets/lab.js`);
+  assert.equal(labApp.status, 200);
+  const labAppSource = await labApp.text();
+  assert.match(labAppSource, /external-rules/);
+  assert.match(labAppSource, /grupo das 26/i);
 });

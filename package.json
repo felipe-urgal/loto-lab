@@ -21,7 +21,11 @@
     "db:sync": "npm run build && node --env-file-if-exists=.env dist/src/cli/dbSync.js",
     "db:bootstrap": "npm run build && node --env-file-if-exists=.env dist/src/cli/dbBootstrap.js",
     "db:status": "npm run build && node --env-file-if-exists=.env dist/src/cli/dbStatus.js",
-    "ops:sync": "npm run build && node --env-file-if-exists=.env dist/src/cli/opsSync.js"
+    "ops:sync": "npm run build && node --env-file-if-exists=.env dist/src/cli/opsSync.js",
+    "prod:config": "docker compose --env-file .env.production -f docker-compose.prod.yml config",
+    "prod:up": "docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build",
+    "prod:down": "docker compose --env-file .env.production -f docker-compose.prod.yml down",
+    "prod:logs": "docker compose --env-file .env.production -f docker-compose.prod.yml logs -f app"
   },
   "dependencies": {
     "pg": "^8.23.0"

@@ -36,9 +36,42 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run tests
         run: npm test
+
+      - name: Validate production Compose
+        run: docker compose --env-file .env.production.example -f docker-compose.prod.yml config >/dev/null
+
+      - name: Build production image
+        run: docker build -t loto-lab:ci .
+
+      - name: Smoke-test production image
+        shell: bash
+        run: |
+          set -euo pipefail
+          container=loto-lab-ci
+          cleanup() { docker rm -f "$container" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+
+          docker run -d --name "$container" --network host \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e API_HOST=127.0.0.1 \
+            -e API_PORT=3099 \
+            -e OPS_AUTO_SYNC=false \
+            loto-lab:ci >/dev/null
+
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3099/health/ready >/dev/null; then
+              curl -fsS http://127.0.0.1:3099/ >/dev/null
+              exit 0
+            fi
+            sleep 1
+          done
+
+          docker logs "$container"
+          exit 1

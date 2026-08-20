@@ -1,0 +1,68 @@
+name: loto-lab-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-loto_lab}
+      POSTGRES_USER: ${POSTGRES_USER:-loto_lab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - loto_lab_postgres_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-loto_lab} -d ${POSTGRES_DB:-loto_lab}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - backend
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: loto-lab:${LOTO_LAB_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${POSTGRES_DB:-loto_lab}
+      DATABASE_USER: ${POSTGRES_USER:-loto_lab}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
+      API_CORS_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:3000}
+      OPS_AUTO_SYNC: ${OPS_AUTO_SYNC:-true}
+      OPS_INTERVAL_MINUTES: ${OPS_INTERVAL_MINUTES:-30}
+      OPS_STALE_AFTER_MINUTES: ${OPS_STALE_AFTER_MINUTES:-180}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.6-luna}
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    networks:
+      - backend
+
+networks:
+  backend:
+    internal: false
+
+volumes:
+  loto_lab_postgres_prod:
