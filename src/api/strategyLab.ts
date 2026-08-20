@@ -14,6 +14,7 @@ import {
   sendJson,
 } from "./http.js";
 import { enforceRateLimit, FixedWindowRateLimiter } from "./rateLimit.js";
+import { expensiveAnalysisGate } from "./workGate.js";
 
 const labLimiter = new FixedWindowRateLimiter({ limit: 4, windowMs: 10 * 60_000 });
 
@@ -69,32 +70,41 @@ export async function serveStrategyLab(
       throw new ApiError(400, "INVALID_ARGUMENT", "startContest must be less than or equal to endContest");
     }
 
-    const contests = await new PostgresContestRepository(options.pool).list({
-      lottery,
-      order: "asc",
-    });
-
-    if (contests.length <= warmupContests) {
-      throw new ApiError(
-        409,
-        "INSUFFICIENT_HISTORY",
-        `At least ${warmupContests + 1} contests are required to compare strategies`,
-      );
+    const release = expensiveAnalysisGate.acquire();
+    if (!release) {
+      throw new ApiError(429, "ANALYSIS_BUSY", "Another backtest or Strategy Lab analysis is already running");
     }
 
-    const result = compareStrategyLab(contests, {
-      lottery,
-      experiment,
-      gameCount,
-      warmupContests,
-      lookbackContests,
-      bucketSize,
-      ...(startContest !== undefined ? { startContest } : {}),
-      ...(endContest !== undefined ? { endContest } : {}),
-    });
+    try {
+      const contests = await new PostgresContestRepository(options.pool).list({
+        lottery,
+        order: "asc",
+      });
 
-    sendJson(response, 200, result, corsOrigin);
-    return true;
+      if (contests.length <= warmupContests) {
+        throw new ApiError(
+          409,
+          "INSUFFICIENT_HISTORY",
+          `At least ${warmupContests + 1} contests are required to compare strategies`,
+        );
+      }
+
+      const result = compareStrategyLab(contests, {
+        lottery,
+        experiment,
+        gameCount,
+        warmupContests,
+        lookbackContests,
+        bucketSize,
+        ...(startContest !== undefined ? { startContest } : {}),
+        ...(endContest !== undefined ? { endContest } : {}),
+      });
+
+      sendJson(response, 200, result, corsOrigin);
+      return true;
+    } finally {
+      release();
+    }
   } catch (error) {
     if (error instanceof ApiError) {
       sendJson(response, error.statusCode, {
