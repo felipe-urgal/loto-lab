@@ -50,9 +50,11 @@ export class FixedWindowRateLimiter {
 }
 
 export function requestClientKey(request: IncomingMessage): string {
-  const forwarded = request.headers["x-forwarded-for"];
-  const firstForwarded = Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(",")[0];
-  return firstForwarded?.trim() || request.socket.remoteAddress || "unknown";
+  // Do not trust X-Forwarded-For here: it is client-controlled unless every
+  // deployment has a carefully configured trusted-proxy chain. Using the
+  // socket peer keeps the limiter non-bypassable; behind the recommended
+  // localhost reverse proxy this intentionally behaves as a global guardrail.
+  return request.socket.remoteAddress || "unknown";
 }
 
 export function enforceRateLimit(
