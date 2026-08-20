@@ -42,6 +42,8 @@ test("web application shell, Strategy Lab and assets are served by the Loto Lab 
   assert.match(html, /\/assets\/data-status\.js/);
   assert.match(html, /\/assets\/real-bets\.js/);
   assert.match(html, /\/assets\/real-bets\.css/);
+  assert.match(html, /\/assets\/generation-diversity\.js/);
+  assert.match(html, /\/assets\/generation-diversity\.css/);
 
   const labPage = await fetch(`${baseUrl}/lab`);
   assert.equal(labPage.status, 200);
@@ -71,6 +73,17 @@ test("web application shell, Strategy Lab and assets are served by the Loto Lab 
   const realBetStyles = await fetch(`${baseUrl}/assets/real-bets.css`);
   assert.equal(realBetStyles.status, 200);
   assert.match(await realBetStyles.text(), /\.real-bet-status/);
+
+  const diversityJavascript = await fetch(`${baseUrl}/assets/generation-diversity.js`);
+  assert.equal(diversityJavascript.status, 200);
+  assert.match(diversityJavascript.headers.get("content-type") ?? "", /^text\/javascript/);
+  const diversitySource = await diversityJavascript.text();
+  assert.match(diversitySource, /Modo real · diversificado/);
+  assert.match(diversitySource, /generatorOptions/);
+
+  const diversityStyles = await fetch(`${baseUrl}/assets/generation-diversity.css`);
+  assert.equal(diversityStyles.status, 200);
+  assert.match(await diversityStyles.text(), /\.generation-mode-card/);
 
   const labJavascript = await fetch(`${baseUrl}/assets/lab.js`);
   assert.equal(labJavascript.status, 200);
