@@ -40,6 +40,8 @@ test("web application shell, Strategy Lab and assets are served by the Loto Lab 
   assert.match(html, /data-status-bar/);
   assert.match(html, /\/assets\/app\.js/);
   assert.match(html, /\/assets\/data-status\.js/);
+  assert.match(html, /\/assets\/real-bets\.js/);
+  assert.match(html, /\/assets\/real-bets\.css/);
 
   const labPage = await fetch(`${baseUrl}/lab`);
   assert.equal(labPage.status, 200);
@@ -57,6 +59,18 @@ test("web application shell, Strategy Lab and assets are served by the Loto Lab 
   assert.match(source, /\/api\/v1/);
   assert.match(source, /games\/generate/);
   assert.match(source, /backtests\/run/);
+
+  const realBetsJavascript = await fetch(`${baseUrl}/assets/real-bets.js`);
+  assert.equal(realBetsJavascript.status, 200);
+  assert.match(realBetsJavascript.headers.get("content-type") ?? "", /^text\/javascript/);
+  const realBetSource = await realBetsJavascript.text();
+  assert.match(realBetSource, /real-bets/);
+  assert.match(realBetSource, /Marcar como apostado/);
+  assert.match(realBetSource, /Desempenho real/);
+
+  const realBetStyles = await fetch(`${baseUrl}/assets/real-bets.css`);
+  assert.equal(realBetStyles.status, 200);
+  assert.match(await realBetStyles.text(), /\.real-bet-status/);
 
   const labJavascript = await fetch(`${baseUrl}/assets/lab.js`);
   assert.equal(labJavascript.status, 200);
