@@ -1,3 +1,7 @@
+.main-nav a.nav-item {
+  text-decoration: none;
+}
+
 .data-status-bar {
   padding: 18px 40px 0;
 }
