@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import type { Pool } from "pg";
 import { createLotoLabServer } from "../src/api/server.js";
 
-test("web application shell, coverage status and assets are served by the Loto Lab process", async (t) => {
+test("web application shell, Strategy Lab and assets are served by the Loto Lab process", async (t) => {
   const pool = {
     async query() {
       return {
@@ -36,9 +36,19 @@ test("web application shell, coverage status and assets are served by the Loto L
   assert.match(html, /Loto Lab/);
   assert.match(html, /Dashboard/);
   assert.match(html, /Gerar jogos/);
+  assert.match(html, /Laboratório/);
   assert.match(html, /data-status-bar/);
   assert.match(html, /\/assets\/app\.js/);
   assert.match(html, /\/assets\/data-status\.js/);
+
+  const labPage = await fetch(`${baseUrl}/lab`);
+  assert.equal(labPage.status, 200);
+  assert.match(labPage.headers.get("content-type") ?? "", /^text\/html/);
+  const labHtml = await labPage.text();
+  assert.match(labHtml, /Laboratório/);
+  assert.match(labHtml, /Executar comparação/);
+  assert.match(labHtml, /\/assets\/lab\.js/);
+  assert.match(labHtml, /\/assets\/lab\.css/);
 
   const javascript = await fetch(`${baseUrl}/assets/app.js`);
   assert.equal(javascript.status, 200);
@@ -48,6 +58,11 @@ test("web application shell, coverage status and assets are served by the Loto L
   assert.match(source, /games\/generate/);
   assert.match(source, /backtests\/run/);
 
+  const labJavascript = await fetch(`${baseUrl}/assets/lab.js`);
+  assert.equal(labJavascript.status, 200);
+  assert.match(labJavascript.headers.get("content-type") ?? "", /^text\/javascript/);
+  assert.match(await labJavascript.text(), /lab\/compare/);
+
   const dataStatusJavascript = await fetch(`${baseUrl}/assets/data-status.js`);
   assert.equal(dataStatusJavascript.status, 200);
   assert.match(await dataStatusJavascript.text(), /data\/status/);
@@ -56,6 +71,10 @@ test("web application shell, coverage status and assets are served by the Loto L
   assert.equal(stylesheet.status, 200);
   assert.match(stylesheet.headers.get("content-type") ?? "", /^text\/css/);
   assert.match(await stylesheet.text(), /\.app-shell/);
+
+  const labStyles = await fetch(`${baseUrl}/assets/lab.css`);
+  assert.equal(labStyles.status, 200);
+  assert.match(await labStyles.text(), /\.lab-ranking/);
 
   const dataStatusStyles = await fetch(`${baseUrl}/assets/data-status.css`);
   assert.equal(dataStatusStyles.status, 200);

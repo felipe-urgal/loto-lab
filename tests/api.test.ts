@@ -5,7 +5,7 @@ import type { Contest } from "../src/domain/types.js";
 import { createPostgresPool } from "../src/db/client.js";
 import { runMigrations } from "../src/db/migrations.js";
 import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
-import { createApiServer } from "../src/api/app.js";
+import { createLotoLabServer } from "../src/api/server.js";
 
 function makeMegaContest(offset: number): Contest {
   const number = 2600 + offset;
@@ -26,7 +26,7 @@ function makeMegaContest(offset: number): Contest {
 }
 
 test(
-  "HTTP API exposes contests, analysis, generation, checking, strategies and backtests",
+  "HTTP API exposes contests, analysis, generation, checking, strategies, backtests and lab",
   { skip: !process.env.DATABASE_URL },
   async (t) => {
     const pool = createPostgresPool({ max: 4 });
@@ -46,7 +46,7 @@ test(
     const contests = Array.from({ length: 25 }, (_, index) => makeMegaContest(index));
     await new PostgresContestRepository(pool).upsertMany(contests);
 
-    const server = createApiServer({ pool, corsOrigin: "http://localhost:5173" });
+    const server = createLotoLabServer({ pool, corsOrigin: "http://localhost:5173" });
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject);
       server.listen(0, "127.0.0.1", resolve);
@@ -171,6 +171,38 @@ test(
     assert.equal(storedRun.status, 200);
     const stored = (await storedRun.json()) as { rounds: unknown[] };
     assert.equal(stored.rounds.length, 3);
+
+    const labResponse = await fetch(`${baseUrl}/api/v1/lab/compare`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lottery: "mega-sena",
+        gameCount: 1,
+        warmupContests: 15,
+        lookbackContests: 10,
+        bucketSize: 5,
+      }),
+    });
+    assert.equal(labResponse.status, 200);
+    const lab = (await labResponse.json()) as {
+      startContest: number;
+      endContest: number;
+      rankingBasis: string;
+      winner: string;
+      variants: Array<{
+        fixedCount: number;
+        summary: { testedContests: number; financialCoverage: number };
+        series: unknown[];
+      }>;
+    };
+    assert.equal(lab.startContest, 2615);
+    assert.equal(lab.endContest, 2624);
+    assert.equal(lab.rankingBasis, "roi");
+    assert.ok(lab.winner);
+    assert.deepEqual(lab.variants.map((variant) => variant.fixedCount).sort((a, b) => a - b), [0, 2, 3]);
+    assert.ok(lab.variants.every((variant) => variant.summary.testedContests === 10));
+    assert.ok(lab.variants.every((variant) => variant.summary.financialCoverage === 1));
+    assert.ok(lab.variants.every((variant) => variant.series.length === 2));
 
     const invalid = await fetch(`${baseUrl}/api/v1/contests/not-a-lottery`);
     assert.equal(invalid.status, 400);

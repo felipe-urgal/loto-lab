@@ -10,6 +10,13 @@ import {
 
 const config = getLotteryConfig("dia-de-sorte");
 
+export type DiaDeSorteFixedCount = 0 | 2 | 3;
+
+export interface DiaDeSorteGeneratorOptions {
+  gameCount?: number;
+  fixedCount?: DiaDeSorteFixedCount;
+}
+
 const LUCKY_MONTHS = [
   "Janeiro",
   "Fevereiro",
@@ -57,12 +64,26 @@ export function rankLuckyMonths(contests: Contest[]): string[] {
   });
 }
 
+function normalizeOptions(
+  value: number | DiaDeSorteGeneratorOptions,
+): Required<DiaDeSorteGeneratorOptions> {
+  if (typeof value === "number") return { gameCount: value, fixedCount: 3 };
+  return {
+    gameCount: value.gameCount ?? 2,
+    fixedCount: value.fixedCount ?? 3,
+  };
+}
+
 export function generateDiaDeSorteGames(
   contests: Contest[],
-  gameCount = 2,
+  options: number | DiaDeSorteGeneratorOptions = 2,
 ): GeneratedGame[] {
+  const { gameCount, fixedCount } = normalizeOptions(options);
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
+  }
+  if (![0, 2, 3].includes(fixedCount)) {
+    throw new Error("Dia de Sorte fixedCount must be 0, 2 or 3");
   }
 
   const scoped = contests
@@ -70,14 +91,19 @@ export function generateDiaDeSorteGames(
     .sort((a, b) => a.number - b.number);
   const lastContest = scoped.at(-1);
   const analysis = buildNumberAnalysis(scoped, config);
-  const fixedNumbers = selectProfiledFixedNumbers(analysis, 3, lastContest, 1);
+  const fixedNumbers = fixedCount === 0
+    ? []
+    : selectProfiledFixedNumbers(analysis, fixedCount, lastContest, Math.min(1, fixedCount));
   const fixedSet = new Set(fixedNumbers);
   const scores = scoreMap(analysis);
+  const variableCount = config.drawSize - fixedCount;
+  const poolSize = fixedCount === 0 ? 13 : fixedCount === 2 ? 14 : 18;
   const candidatePool = analysis
     .filter((row) => !fixedSet.has(row.number))
     .sort((a, b) => b.score - a.score || a.number - b.number)
+    .slice(0, poolSize)
     .map((row) => row.number);
-  const variableOptions = combinations(candidatePool, 4);
+  const variableOptions = combinations(candidatePool, variableCount);
   const usedVariables = new Map<number, number>();
   const repeatTargets = [1, 2, 1, 2];
   const oddTargets = [3, 4, 3, 4];

@@ -4,6 +4,13 @@ import { buildNumberAnalysis } from "../analysis/scoring.js";
 
 const config = getLotteryConfig("mega-sena");
 
+export type MegaSenaFixedCount = 0 | 2 | 3;
+
+export interface MegaSenaGeneratorOptions {
+  gameCount?: number;
+  fixedCount?: MegaSenaFixedCount;
+}
+
 function bestUnused(
   analysis: NumberAnalysis[],
   selected: Set<number>,
@@ -18,22 +25,25 @@ function bestUnused(
   return candidate.number;
 }
 
-export function selectMegaSenaFixedNumbers(analysis: NumberAnalysis[]): number[] {
+export function selectMegaSenaFixedNumbers(
+  analysis: NumberAnalysis[],
+  count: MegaSenaFixedCount = 3,
+): number[] {
+  if (![0, 2, 3].includes(count)) {
+    throw new Error("Mega-Sena fixedCount must be 0, 2 or 3");
+  }
+  if (count === 0) return [];
+
   const selected = new Set<number>();
+  bestUnused(analysis, selected, (row) => row.year);
+  if (selected.size < count) {
+    bestUnused(analysis, selected, (row) => row.historical * 0.5 + row.year * 0.5);
+  }
+  if (selected.size < count) {
+    bestUnused(analysis, selected, (row) => row.recent10 * 0.6 + row.month * 0.4);
+  }
 
-  const annual = bestUnused(analysis, selected, (row) => row.year);
-  const historicalAndAnnual = bestUnused(
-    analysis,
-    selected,
-    (row) => row.historical * 0.5 + row.year * 0.5,
-  );
-  const recent = bestUnused(
-    analysis,
-    selected,
-    (row) => row.recent10 * 0.6 + row.month * 0.4,
-  );
-
-  return [annual, historicalAndAnnual, recent].sort((a, b) => a - b);
+  return [...selected].sort((a, b) => a - b);
 }
 
 function combinations<T>(items: T[], size: number): T[][] {
@@ -69,34 +79,53 @@ function buildMetadata(numbers: number[], lastContest?: Contest): GeneratedGame[
   };
 }
 
-export function generateMegaSenaGames(contests: Contest[], gameCount = 2): GeneratedGame[] {
+function normalizeOptions(
+  value: number | MegaSenaGeneratorOptions,
+): Required<MegaSenaGeneratorOptions> {
+  if (typeof value === "number") return { gameCount: value, fixedCount: 3 };
+  return {
+    gameCount: value.gameCount ?? 2,
+    fixedCount: value.fixedCount ?? 3,
+  };
+}
+
+export function generateMegaSenaGames(
+  contests: Contest[],
+  options: number | MegaSenaGeneratorOptions = 2,
+): GeneratedGame[] {
+  const { gameCount, fixedCount } = normalizeOptions(options);
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
+  }
+  if (![0, 2, 3].includes(fixedCount)) {
+    throw new Error("Mega-Sena fixedCount must be 0, 2 or 3");
   }
 
   const scoped = contests
     .filter((contest) => contest.lottery === "mega-sena")
     .sort((a, b) => a.number - b.number);
   const analysis = buildNumberAnalysis(scoped, config);
-  const fixedNumbers = selectMegaSenaFixedNumbers(analysis);
+  const fixedNumbers = selectMegaSenaFixedNumbers(analysis, fixedCount);
   const fixedSet = new Set(fixedNumbers);
   const lastContest = scoped.at(-1);
   const scoreByNumber = new Map(analysis.map((row) => [row.number, row.score]));
+  const variableCount = config.drawSize - fixedCount;
+  const poolSize = fixedCount === 0 ? 14 : fixedCount === 2 ? 18 : 24;
   const candidatePool = [...analysis]
     .filter((row) => !fixedSet.has(row.number))
     .sort((a, b) => b.score - a.score || a.number - b.number)
-    .slice(0, 24)
+    .slice(0, poolSize)
     .map((row) => row.number);
 
-  const usedVariables = new Set<number>();
+  const variableOptions = combinations(candidatePool, variableCount);
+  const usedVariables = new Map<number, number>();
   const parityTargets = [3, 4, 2];
   const games: GeneratedGame[] = [];
 
   for (let gameIndex = 0; gameIndex < gameCount; gameIndex += 1) {
     const targetOdd = parityTargets[gameIndex % parityTargets.length]!;
-    const options = combinations(candidatePool, 3);
 
-    const ranked = options
+    const ranked = variableOptions
       .map((variableNumbers) => {
         const numbers = [...fixedNumbers, ...variableNumbers].sort((a, b) => a - b);
         const metadata = buildMetadata(numbers, lastContest);
@@ -104,7 +133,10 @@ export function generateMegaSenaGames(contests: Contest[], gameCount = 2): Gener
           (total, number) => total + (scoreByNumber.get(number) ?? 0),
           0,
         );
-        const reused = variableNumbers.filter((number) => usedVariables.has(number)).length;
+        const reused = variableNumbers.reduce(
+          (total, number) => total + (usedVariables.get(number) ?? 0),
+          0,
+        );
         const parityPenalty = Math.abs(metadata.odd - targetOdd) * 20;
         const repeatPenalty = Math.max(0, metadata.repeatedFromLastContest.length - 2) * 30;
         const reusePenalty = reused * 80;
@@ -121,7 +153,9 @@ export function generateMegaSenaGames(contests: Contest[], gameCount = 2): Gener
     const winner = ranked[0];
     if (!winner) throw new Error("Unable to generate a Mega-Sena game");
 
-    winner.variableNumbers.forEach((number) => usedVariables.add(number));
+    for (const number of winner.variableNumbers) {
+      usedVariables.set(number, (usedVariables.get(number) ?? 0) + 1);
+    }
     games.push({
       lottery: "mega-sena",
       numbers: winner.numbers,

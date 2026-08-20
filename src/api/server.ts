@@ -1,6 +1,7 @@
 import { createServer, type Server } from "node:http";
 import { createApiRequestHandler, type ApiServerOptions } from "./app.js";
 import { serveDataStatus } from "./dataStatus.js";
+import { serveStrategyLab } from "./strategyLab.js";
 import { serveWebAsset } from "./web.js";
 
 export function createLotoLabServer(options: ApiServerOptions): Server {
@@ -11,6 +12,7 @@ export function createLotoLabServer(options: ApiServerOptions): Server {
       const method = request.method ?? "GET";
       const url = new URL(request.url ?? "/", "http://localhost");
       if (await serveDataStatus(request, response, options)) return;
+      if (await serveStrategyLab(request, response, options)) return;
       if (method === "GET" && await serveWebAsset(url.pathname, response)) return;
       apiHandler(request, response);
     } catch (error) {
