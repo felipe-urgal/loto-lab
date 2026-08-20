@@ -4,6 +4,7 @@ import {
   generateMegaSenaGames,
   type MegaSenaFixedCount,
 } from "../generator/megaSena.js";
+import type { MegaSenaGameRules } from "../generator/megaSenaRules.js";
 import { summarizeBacktestRounds, type BacktestSummary } from "./shared.js";
 
 export interface MegaSenaBacktestOptions {
@@ -12,6 +13,7 @@ export interface MegaSenaBacktestOptions {
   warmupContests?: number;
   startContest?: number;
   endContest?: number;
+  rules?: MegaSenaGameRules;
 }
 
 export interface MegaSenaBacktestRound {
@@ -32,6 +34,7 @@ export interface MegaSenaBacktestResult {
     gameCount: number;
     fixedCount: MegaSenaFixedCount;
     warmupContests: number;
+    rules: MegaSenaGameRules;
   };
 }
 
@@ -42,6 +45,7 @@ export function backtestMegaSena(
   const gameCount = options.gameCount ?? 2;
   const fixedCount = options.fixedCount ?? 3;
   const warmupContests = options.warmupContests ?? 20;
+  const rules = options.rules ?? {};
 
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
@@ -65,7 +69,7 @@ export function backtestMegaSena(
 
     // Anti-leakage: only draws before the target are visible to the generator.
     const history = scoped.slice(0, index);
-    const generatedGames = generateMegaSenaGames(history, { gameCount, fixedCount });
+    const generatedGames = generateMegaSenaGames(history, { gameCount, fixedCount, rules });
     const checks = evaluateGames(generatedGames, target);
     const hitsByGame = checks.map((check) => check.hits);
 
@@ -84,6 +88,6 @@ export function backtestMegaSena(
   return {
     rounds,
     summary: summarizeBacktestRounds(rounds),
-    strategy: { gameCount, fixedCount, warmupContests },
+    strategy: { gameCount, fixedCount, warmupContests, rules },
   };
 }
