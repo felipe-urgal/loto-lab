@@ -45,6 +45,7 @@ export interface RealBetSummary {
   lottery: LotteryId;
   totalBets: number;
   checkedBets: number;
+  financiallyCheckedBets: number;
   pendingBets: number;
   actualCost: number;
   checkedCost: number;
@@ -247,8 +248,11 @@ export class PostgresRealBetRepository {
       throw new Error("Check result count must match the real-bet game count");
     }
 
-    const totalPrizeValue = checks.reduce((sum, check) => sum + (check.totalPrizeValue ?? 0), 0);
-    const netResult = totalPrizeValue - current.actualCost;
+    const financialKnown = checks.every((check) => check.totalPrizeValue !== undefined);
+    const totalPrizeValue = financialKnown
+      ? checks.reduce((sum, check) => sum + check.totalPrizeValue!, 0)
+      : undefined;
+    const netResult = totalPrizeValue !== undefined ? totalPrizeValue - current.actualCost : undefined;
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -262,7 +266,7 @@ export class PostgresRealBetRepository {
                 updated_at = NOW()
             WHERE real_bet_id = $3 AND batch_position = $4
           `,
-          [JSON.stringify(check), check.totalPrizeValue ?? 0, id, game.batchPosition],
+          [JSON.stringify(check), check.totalPrizeValue ?? null, id, game.batchPosition],
         );
       }
       await client.query(
@@ -275,7 +279,7 @@ export class PostgresRealBetRepository {
               updated_at = NOW()
           WHERE id = $1
         `,
-        [id, totalPrizeValue, netResult],
+        [id, totalPrizeValue ?? null, netResult ?? null],
       );
       await client.query("COMMIT");
     } catch (error) {
@@ -292,6 +296,7 @@ export class PostgresRealBetRepository {
     const result = await this.pool.query<{
       total_bets: string;
       checked_bets: string;
+      financially_checked_bets: string;
       pending_bets: string;
       actual_cost: number;
       checked_cost: number;
@@ -302,11 +307,12 @@ export class PostgresRealBetRepository {
         SELECT
           COUNT(*)::text AS total_bets,
           COUNT(*) FILTER (WHERE status = 'checked')::text AS checked_bets,
+          COUNT(*) FILTER (WHERE status = 'checked' AND total_prize_value IS NOT NULL)::text AS financially_checked_bets,
           COUNT(*) FILTER (WHERE status IN ('planned', 'placed', 'awaiting_result'))::text AS pending_bets,
           COALESCE(SUM(actual_cost), 0)::float8 AS actual_cost,
-          COALESCE(SUM(actual_cost) FILTER (WHERE status = 'checked'), 0)::float8 AS checked_cost,
-          COALESCE(SUM(total_prize_value) FILTER (WHERE status = 'checked'), 0)::float8 AS total_prize_value,
-          COALESCE(SUM(net_result) FILTER (WHERE status = 'checked'), 0)::float8 AS net_result
+          COALESCE(SUM(actual_cost) FILTER (WHERE status = 'checked' AND total_prize_value IS NOT NULL), 0)::float8 AS checked_cost,
+          COALESCE(SUM(total_prize_value) FILTER (WHERE status = 'checked' AND total_prize_value IS NOT NULL), 0)::float8 AS total_prize_value,
+          COALESCE(SUM(net_result) FILTER (WHERE status = 'checked' AND total_prize_value IS NOT NULL), 0)::float8 AS net_result
         FROM real_bets
         WHERE lottery = $1
       `,
@@ -319,6 +325,7 @@ export class PostgresRealBetRepository {
       lottery,
       totalBets: Number(row.total_bets),
       checkedBets: Number(row.checked_bets),
+      financiallyCheckedBets: Number(row.financially_checked_bets),
       pendingBets: Number(row.pending_bets),
       actualCost: Number(row.actual_cost),
       checkedCost,
