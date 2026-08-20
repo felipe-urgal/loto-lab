@@ -1,5 +1,7 @@
 [hidden] { display: none !important; }
 
+a.nav-item { text-decoration: none; }
+
 /* Analysis */
 .analysis-refinement { display: grid; gap: 12px; margin-bottom: 12px; }
 .analysis-toolbar {
