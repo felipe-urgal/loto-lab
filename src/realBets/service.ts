@@ -51,14 +51,23 @@ export class RealBetService {
     const playedAt = input.playedAt ?? new Date().toISOString();
     if (!Number.isFinite(new Date(playedAt).getTime())) throw new Error("INVALID_PLAYED_AT");
 
-    const created = await this.realBets.create({
-      batchId: batch.id,
-      lottery: batch.lottery,
-      contestNumber,
-      actualCost: input.actualCost,
-      playedAt,
-      games,
-    });
+    let created: RealBetRecord;
+    try {
+      created = await this.realBets.create({
+        batchId: batch.id,
+        lottery: batch.lottery,
+        contestNumber,
+        actualCost: input.actualCost,
+        playedAt,
+        games,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "REAL_BET_ALREADY_EXISTS") {
+        const concurrent = await this.realBets.findByBatchId(input.batchId);
+        throw new Error(`REAL_BET_ALREADY_EXISTS:${concurrent?.id ?? "unknown"}`);
+      }
+      throw error;
+    }
 
     return (await this.reconcile(created.id)) ?? created;
   }
@@ -86,7 +95,6 @@ export class RealBetService {
   }
 
   async list(lottery: LotteryId, limit = 50): Promise<{ items: RealBetRecord[]; summary: RealBetSummary }> {
-    await this.reconcilePending(lottery);
     const [items, summary] = await Promise.all([
       this.realBets.listRecent(lottery, limit),
       this.realBets.summary(lottery),
