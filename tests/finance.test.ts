@@ -8,11 +8,8 @@ import { evaluateGame } from "../src/checker/evaluate.js";
 function contest(overrides: Partial<Contest> & Pick<Contest, "lottery" | "number" | "date">): Contest {
   const drawSize = overrides.lottery === "lotofacil" ? 15 : overrides.lottery === "dia-de-sorte" ? 7 : 6;
   return {
-    lottery: overrides.lottery,
-    number: overrides.number,
-    date: overrides.date,
-    numbers: overrides.numbers ?? Array.from({ length: drawSize }, (_, index) => index + 1),
     ...overrides,
+    numbers: overrides.numbers ?? Array.from({ length: drawSize }, (_, index) => index + 1),
   };
 }
 
