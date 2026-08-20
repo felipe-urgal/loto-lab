@@ -16,7 +16,7 @@ const JULY_2025_REPRICE = "2025-07-09";
  * Mega-Sena and Lotofacil intentionally start at the November/2019 price
  * schedule. Older contests are rejected instead of silently using a wrong
  * price. Dia de Sorte kept the R$ 2.00 simple bet in the 2019 schedule and
- * changed to R$ 2.50 at contest 753 in 2023.
+ * changed to R$ 2.50 on 2023-05-03 (contest 753).
  */
 export const SIMPLE_BET_PRICE_PERIODS: PricePeriod[] = [
   {
@@ -63,9 +63,9 @@ export const SIMPLE_BET_PRICE_PERIODS: PricePeriod[] = [
   },
   {
     lottery: "dia-de-sorte",
-    fromContest: 753,
+    fromDate: "2023-05-03",
     price: 2.5,
-    sourceNote: "CAIXA 2023 repricing effective from contest 753",
+    sourceNote: "CAIXA 2023 repricing effective from contest 753 on 2023-05-03",
   },
 ];
 
