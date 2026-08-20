@@ -11,6 +11,7 @@ export interface StrategyComparisonRow {
   testedContests: number;
   totalGames: number;
   totalCost: number;
+  financialCost: number;
   totalPrizeValue: number;
   netResult: number;
   returnRate: number;
@@ -48,6 +49,7 @@ export function compareLotofacilFixedCores(
         testedContests: result.summary.testedContests,
         totalGames: result.summary.totalGames,
         totalCost: result.summary.totalCost,
+        financialCost: result.summary.financialCost,
         totalPrizeValue: result.summary.totalPrizeValue,
         netResult: result.summary.netResult,
         returnRate: result.summary.returnRate,
