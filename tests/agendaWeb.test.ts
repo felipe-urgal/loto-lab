@@ -24,6 +24,12 @@ test("agenda notification center is served by the web process", async (t) => {
   assert.match(html, /Notificações/);
   assert.match(html, /\/assets\/agenda\.js/);
 
+  const styles = await fetch(`${baseUrl}/assets/agenda.css`);
+  assert.equal(styles.status, 200);
+  const css = await styles.text();
+  assert.match(css, /\.main-nav a\.nav-item/);
+  assert.match(css, /text-decoration:\s*none\s*!important/);
+
   const script = await fetch(`${baseUrl}/assets/agenda.js`);
   assert.equal(script.status, 200);
   const source = await script.text();
