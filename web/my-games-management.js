@@ -168,8 +168,13 @@ async function enhanceGames() {
   const metadata = new Map((data.items || []).map((batch) => [batch.id, batch]));
   const active = (data.items || []).filter((batch) => !batch.archivedAt);
   const archived = (data.items || []).filter((batch) => batch.archivedAt);
-  const realCount = active.filter((batch) => batch.hasRealBet).length;
-  const generatedCount = active.filter((batch) => !batch.hasRealBet).length;
+  const counts = data.counts || {};
+  const activeCount = Number.isInteger(counts.active) ? counts.active : active.length;
+  const archivedCount = Number.isInteger(counts.archived) ? counts.archived : archived.length;
+  const realCount = Number.isInteger(counts.realBets)
+    ? counts.realBets
+    : active.filter((batch) => batch.hasRealBet).length;
+  const generatedCount = Math.max(0, activeCount - realCount);
   const duplicateIds = duplicateArchiveIds(data.items || []);
 
   const toolbar = document.createElement("section");
@@ -181,10 +186,10 @@ async function enhanceGames() {
     </div>
     <div class="my-games-management-row">
       <div class="batch-filter-tabs" role="tablist" aria-label="Filtrar lotes">
-        <button class="batch-filter is-active" type="button" data-batch-filter="active">Ativos <span>${active.length}</span></button>
+        <button class="batch-filter is-active" type="button" data-batch-filter="active">Ativos <span>${activeCount}</span></button>
         <button class="batch-filter" type="button" data-batch-filter="real">Apostados <span>${realCount}</span></button>
         <button class="batch-filter" type="button" data-batch-filter="generated">Só gerados <span>${generatedCount}</span></button>
-        <button class="batch-filter" type="button" data-batch-filter="archived">Arquivados <span>${archived.length}</span></button>
+        <button class="batch-filter" type="button" data-batch-filter="archived">Arquivados <span>${archivedCount}</span></button>
       </div>
       <div class="batch-management-actions">
         <input class="batch-search" type="search" placeholder="Lote ou concurso" aria-label="Buscar lote ou concurso" />
@@ -215,9 +220,14 @@ async function enhanceGames() {
       archivedHost.querySelectorAll("[data-restore-batch]").forEach((button) => button.addEventListener("click", async () => {
         button.disabled = true;
         button.textContent = "Restaurando...";
-        await api(`/game-batches/${button.dataset.restoreBatch}/restore`, { method: "POST" });
-        managementCache = undefined;
-        document.querySelector("#refresh-view")?.click();
+        try {
+          await api(`/game-batches/${button.dataset.restoreBatch}/restore`, { method: "POST" });
+          managementCache = undefined;
+          document.querySelector("#refresh-view")?.click();
+        } catch {
+          button.disabled = false;
+          button.textContent = "Tentar novamente";
+        }
       }));
       return;
     }
@@ -236,15 +246,20 @@ async function enhanceGames() {
     if (!duplicateIds.length || !confirm(`Arquivar ${duplicateIds.length} lote(s) duplicado(s) antigo(s)? O lote mais recente de cada combinação será mantido.`)) return;
     button.disabled = true;
     button.textContent = "Arquivando...";
-    for (const id of duplicateIds) {
-      try {
-        await api(`/game-batches/${id}/archive`, { method: "POST" });
-      } catch (error) {
-        if (error.code !== "BATCH_HAS_REAL_BET") throw error;
+    try {
+      for (const id of duplicateIds) {
+        try {
+          await api(`/game-batches/${id}/archive`, { method: "POST" });
+        } catch (error) {
+          if (error.code !== "BATCH_HAS_REAL_BET") throw error;
+        }
       }
+      managementCache = undefined;
+      document.querySelector("#refresh-view")?.click();
+    } catch {
+      button.disabled = false;
+      button.textContent = "Tentar novamente";
     }
-    managementCache = undefined;
-    document.querySelector("#refresh-view")?.click();
   });
 
   apply();
