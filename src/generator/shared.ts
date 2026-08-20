@@ -57,16 +57,32 @@ export function selectProfiledFixedNumbers(
   analysis: NumberAnalysis[],
   count: number,
   lastContest?: Contest,
+  maxRepeatedFromLastContest = count,
 ): number[] {
   if (!Number.isInteger(count) || count < 1 || count > analysis.length) {
     throw new Error("Invalid fixed-number count");
+  }
+  if (
+    !Number.isInteger(maxRepeatedFromLastContest) ||
+    maxRepeatedFromLastContest < 0 ||
+    maxRepeatedFromLastContest > count
+  ) {
+    throw new Error("Invalid fixed-core repeat limit");
   }
 
   const selected = new Set<number>();
 
   function pick(value: (row: NumberAnalysis) => number): void {
+    const selectedRepeats = lastContest
+      ? [...selected].filter((number) => lastContest.numbers.includes(number)).length
+      : 0;
     const candidate = [...analysis]
-      .filter((row) => !selected.has(row.number))
+      .filter((row) => {
+        if (selected.has(row.number)) return false;
+        if (!lastContest) return true;
+        if (selectedRepeats < maxRepeatedFromLastContest) return true;
+        return !lastContest.numbers.includes(row.number);
+      })
       .sort((a, b) => value(b) - value(a) || b.score - a.score || a.number - b.number)[0];
 
     if (!candidate) throw new Error("Unable to select fixed number");
