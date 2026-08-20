@@ -98,6 +98,12 @@ function formatPercent(value) {
   return `${(value * 100).toFixed(1).replace(".", ",")}%`;
 }
 
+function formatPercentagePoints(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+  const points = value * 100;
+  return `${points > 0 ? "+" : ""}${points.toFixed(1).replace(".", ",")} p.p.`;
+}
+
 function formatCurrency(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "—";
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -157,7 +163,7 @@ function updateLotteryCopy(resetGames = false) {
   message.hidden = false;
   setMessage("", "Pronto para comparar", experiment === "external-rules"
     ? "As regras externas são hipóteses experimentais. O resultado não altera a metodologia principal automaticamente."
-    : "Escolha o período e execute. O laboratório não altera a metodologia principal nem salva um vencedor automaticamente.");
+    : "Escolha o período e execute. A comparação também mede a melhor estratégia contra um controle aleatório reproduzível.");
   renderHistoryStatus();
 }
 
@@ -214,8 +220,30 @@ function variantBadge(result, variant, index) {
   return `${variant.fixedCount} fixas`;
 }
 
+function renderBenchmark(result) {
+  const benchmark = result.benchmark;
+  const bestStrategy = result.variants.find((variant) => variant.key === benchmark.bestStrategyKey);
+  const control = benchmark.control;
+  if (!bestStrategy || !control) return "";
+
+  const metricLabel = benchmark.basis === "roi" ? "ROI" : "taxa de premiação";
+  const heading = benchmark.beatsRandom
+    ? `${bestStrategy.label} supera o controle aleatório`
+    : "A melhor estratégia não superou o controle aleatório";
+  const controlMetric = rankingPrimary(control, benchmark.basis);
+
+  return `<article class="panel lab-benchmark-card ${benchmark.beatsRandom ? "is-positive" : "is-negative"}">
+    <div>
+      <span class="lab-eyebrow">Benchmark</span>
+      <strong>${escapeHtml(heading)}</strong>
+      <p>Diferença de ${formatPercentagePoints(benchmark.delta)} em ${metricLabel}. Controle: ${controlMetric.value} · ${control.summary.totalGames} jogos simulados. Uma amostra isolada é referência, não prova estatística.</p>
+    </div>
+    <div class="lab-benchmark-delta">${formatPercentagePoints(benchmark.delta)}</div>
+  </article>`;
+}
+
 function renderRanking(result) {
-  rankingRoot.innerHTML = result.variants.map((variant, index) => {
+  const cards = result.variants.map((variant, index) => {
     const primary = rankingPrimary(variant, result.rankingBasis);
     const tone = primary.raw >= 0 ? "positive" : "negative";
     const winner = index === 0;
@@ -231,17 +259,21 @@ function renderRanking(result) {
       </div>
     </article>`;
   }).join("");
+
+  rankingRoot.innerHTML = `${renderBenchmark(result)}${cards}`;
 }
 
 function renderTable(result) {
-  tableBody.innerHTML = result.variants.map((variant, index) => {
-    const winnerClass = index === 0 ? "lab-winner-cell" : "";
+  const rows = [...result.variants, result.benchmark.control];
+  tableBody.innerHTML = rows.map((variant, index) => {
+    const isControl = variant.key === result.benchmark.controlKey;
+    const winnerClass = index === 0 && !isControl ? "lab-winner-cell" : "";
     const roiClass = variant.summary.roi >= 0 ? "positive" : "negative";
-    const fixedAverage = result.experiment === "external-rules"
+    const fixedAverage = isControl || result.experiment === "external-rules"
       ? "—"
       : variant.summary.averageFixedHitsPerContest.toFixed(2).replace(".", ",");
-    return `<tr>
-      <td class="${winnerClass}"><span class="lab-table-rank">${index + 1}</span><strong>${escapeHtml(variant.label)}</strong></td>
+    return `<tr class="${isControl ? "lab-control-row" : ""}">
+      <td class="${winnerClass}"><span class="lab-table-rank">${isControl ? "C" : index + 1}</span><strong>${escapeHtml(variant.label)}</strong>${isControl ? ' <span class="badge">benchmark</span>' : ""}</td>
       <td>${variant.summary.averageHitsPerGame.toFixed(2).replace(".", ",")}</td>
       <td>${fixedAverage}</td>
       <td><strong>${variant.summary.maxHits}</strong></td>
@@ -262,9 +294,10 @@ function renderChart() {
   if (!currentResult) return;
   const metric = metricSelect.value;
   const metricConfig = METRICS[metric];
-  const variants = currentResult.experiment === "external-rules"
+  const strategyVariants = currentResult.experiment === "external-rules"
     ? currentResult.variants.slice(0, 3)
     : currentResult.variants;
+  const variants = [...strategyVariants, currentResult.benchmark.control];
   const allValues = variants.flatMap((variant) => variant.series.map((point) => chartValue(point, metric)));
   const maxPoints = Math.max(0, ...variants.map((variant) => variant.series.length));
 
@@ -309,9 +342,10 @@ function renderChart() {
     : "";
 
   const lines = variants.map((variant, variantIndex) => {
+    const isControl = variant.key === currentResult.benchmark.controlKey;
     const points = variant.series.map((point, index) => `${xFor(index)},${yFor(chartValue(point, metric))}`).join(" ");
     const dots = variant.series.map((point, index) => `<circle class="lab-point-${variantIndex}" cx="${xFor(index)}" cy="${yFor(chartValue(point, metric))}" r="3"/>`).join("");
-    return `<polyline class="lab-series lab-series-${variantIndex}" points="${points}"/>${dots}`;
+    return `<polyline class="lab-series lab-series-${variantIndex}${isControl ? " lab-series-control" : ""}" points="${points}"/>${dots}`;
   }).join("");
 
   const referenceSeries = variants[0]?.series || [];
@@ -322,10 +356,13 @@ function renderChart() {
     return `<text class="lab-chart-axis" x="${xFor(index)}" y="${height - 14}" text-anchor="middle">#${point.startContest}–${point.endContest}</text>`;
   }).join("");
 
-  const legend = variants.map((variant, index) => `<span class="lab-legend-item"><span class="lab-legend-dot series-${index}"></span>${escapeHtml(variant.label)}</span>`).join("");
+  const legend = variants.map((variant, index) => {
+    const isControl = variant.key === currentResult.benchmark.controlKey;
+    return `<span class="lab-legend-item"><span class="lab-legend-dot series-${index}"></span>${escapeHtml(variant.label)}${isControl ? " · benchmark" : ""}</span>`;
+  }).join("");
   const note = currentResult.experiment === "external-rules"
-    ? '<div class="lab-chart-top-note">Gráfico: Top 3 do ranking atual. A tabela abaixo mantém todas as regras.</div>'
-    : "";
+    ? '<div class="lab-chart-top-note">Gráfico: Top 3 das regras + controle aleatório. A tabela abaixo mantém todas as regras.</div>'
+    : '<div class="lab-chart-top-note">A linha tracejada representa o controle aleatório.</div>';
 
   chartRoot.innerHTML = `${note}<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(metricConfig.label)} por bloco de concursos">${grid}${zeroLine}${lines}${xLabels}</svg><div class="lab-chart-legend">${legend}</div>`;
 }
@@ -336,7 +373,7 @@ function renderResult(result) {
   message.hidden = true;
   basis.textContent = result.rankingBasis === "roi" ? "Ranking por ROI" : "Ranking por taxa de premiação";
   const experimentCopy = result.experiment === "external-rules" ? "regras externas" : "núcleo fixo";
-  periodCopy.textContent = `Concursos #${result.startContest ?? "—"} a #${result.endContest ?? "—"} · ${result.gameCount} jogo(s) por concurso · ${experimentCopy} · blocos de ${result.bucketSize}`;
+  periodCopy.textContent = `Concursos #${result.startContest ?? "—"} a #${result.endContest ?? "—"} · ${result.gameCount} jogo(s) por concurso · ${experimentCopy} · benchmark aleatório · blocos de ${result.bucketSize}`;
   metricSelect.value = result.rankingBasis === "roi" ? "roi" : "prizeRate";
   renderRanking(result);
   renderTable(result);
@@ -354,8 +391,8 @@ async function runComparison(event) {
     "running",
     "Executando backtests",
     external
-      ? "As regras externas estão sendo testadas sobre o mesmo período e sem vazamento futuro. Pode levar alguns segundos."
-      : "As três variantes estão sendo calculadas sobre o mesmo período. Isso pode levar alguns segundos.",
+      ? "As regras externas e o controle aleatório estão sendo testados sobre o mesmo período e sem vazamento futuro. Pode levar alguns segundos."
+      : "As três variantes e o controle aleatório estão sendo calculados sobre o mesmo período. Isso pode levar alguns segundos.",
   );
 
   try {

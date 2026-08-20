@@ -58,6 +58,23 @@
 }
 
 .lab-ranking { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.lab-benchmark-card {
+  grid-column: 1 / -1;
+  min-height: 82px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-style: dashed;
+}
+.lab-benchmark-card.is-positive { border-color: rgba(101,214,164,.38); background: var(--accent-soft); }
+.lab-benchmark-card.is-negative { border-color: rgba(239,125,140,.32); background: var(--danger-soft); }
+.lab-benchmark-card strong { display: block; margin-top: 4px; font-size: 13px; }
+.lab-benchmark-card p { margin: 5px 0 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+.lab-benchmark-delta { font-size: 21px; font-weight: 850; letter-spacing: -0.04em; white-space: nowrap; }
+.lab-benchmark-card.is-positive .lab-benchmark-delta { color: var(--accent-strong); }
+.lab-benchmark-card.is-negative .lab-benchmark-delta { color: var(--danger); }
 .lab-strategy-card { position: relative; padding: 18px; min-height: 210px; overflow: hidden; }
 .lab-strategy-card.is-winner { border-color: rgba(101,214,164,.38); }
 .lab-strategy-card.is-winner::after {
@@ -118,18 +135,24 @@
 .lab-series-0 { stroke: var(--accent); }
 .lab-series-1 { stroke: var(--info); }
 .lab-series-2 { stroke: var(--warning); }
+.lab-series-3 { stroke: var(--muted-2); }
+.lab-series-control { stroke-dasharray: 6 5; }
 .lab-point-0 { fill: var(--accent); }
 .lab-point-1 { fill: var(--info); }
 .lab-point-2 { fill: var(--warning); }
+.lab-point-3 { fill: var(--muted-2); }
 .lab-chart-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; }
 .lab-legend-item { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 9px; }
 .lab-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
 .lab-legend-dot.series-0 { background: var(--accent); }
 .lab-legend-dot.series-1 { background: var(--info); }
 .lab-legend-dot.series-2 { background: var(--warning); }
+.lab-legend-dot.series-3 { background: var(--muted-2); }
 .lab-chart-empty { min-height: 290px; display: grid; place-items: center; color: var(--muted); font-size: 11px; }
 
 .lab-winner-cell { color: var(--accent-strong); }
+.lab-control-row { background: rgba(255,255,255,.012); }
+.lab-control-row td { border-top-style: dashed; }
 .lab-table-rank { display: inline-flex; width: 20px; height: 20px; border-radius: 6px; align-items: center; justify-content: center; margin-right: 7px; background: var(--surface-3); font-size: 9px; font-weight: 800; }
 
 @media (max-width: 1180px) {
@@ -146,6 +169,7 @@
   .lab-intro { align-items: stretch; flex-direction: column; }
   .lab-history-status { min-width: 0; }
   .lab-form-grid { grid-template-columns: 1fr; }
+  .lab-benchmark-card { align-items: flex-start; flex-direction: column; }
   .lab-chart-head { align-items: stretch; flex-direction: column; }
   .lab-metric-select { min-width: 0; }
   .lab-mini-metrics { grid-template-columns: 1fr 1fr; }
