@@ -19,6 +19,7 @@ import {
   sendNoContent,
 } from "./http.js";
 import { enforceRateLimit, FixedWindowRateLimiter } from "./rateLimit.js";
+import { expensiveAnalysisGate } from "./workGate.js";
 
 export interface ApiServerOptions {
   pool: Pool;
@@ -266,17 +267,25 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
         }
         const persist = parseBoolean(body.persist, "persist", true);
         const fixedCount = lottery === "lotofacil" ? parseFixedCount(body.fixedCount) : undefined;
-        const result = await services.runBacktest({
-          lottery,
-          gameCount,
-          warmupContests,
-          ...(fixedCount !== undefined ? { fixedCount } : {}),
-          ...(startContest !== undefined ? { startContest } : {}),
-          ...(endContest !== undefined ? { endContest } : {}),
-          persist,
-        });
-        sendJson(response, persist ? 201 : 200, result, corsOrigin);
-        return;
+        const release = expensiveAnalysisGate.acquire();
+        if (!release) {
+          throw new ApiError(429, "ANALYSIS_BUSY", "Another backtest or Strategy Lab analysis is already running");
+        }
+        try {
+          const result = await services.runBacktest({
+            lottery,
+            gameCount,
+            warmupContests,
+            ...(fixedCount !== undefined ? { fixedCount } : {}),
+            ...(startContest !== undefined ? { startContest } : {}),
+            ...(endContest !== undefined ? { endContest } : {}),
+            persist,
+          });
+          sendJson(response, persist ? 201 : 200, result, corsOrigin);
+          return;
+        } finally {
+          release();
+        }
       }
 
       match = pathMatch(pathname, /^\/api\/v1\/backtest-runs\/(\d+)$/);
