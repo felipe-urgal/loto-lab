@@ -14,9 +14,10 @@ const JULY_2025_REPRICE = "2025-07-09";
  * Historical prices supported by the Loto Lab.
  *
  * Mega-Sena and Lotofacil intentionally start at the November/2019 price
- * schedule. Older contests are rejected instead of silently using a wrong
- * price. Dia de Sorte kept the R$ 2.00 simple bet in the 2019 schedule and
- * changed to R$ 2.50 on 2023-05-03 (contest 753).
+ * schedule. Older contests stay valid for statistical backtests, but are
+ * excluded from financial metrics instead of receiving an invented price.
+ * Dia de Sorte kept the R$ 2.00 simple bet in the 2019 schedule and changed
+ * to R$ 2.50 on 2023-05-03 (contest 753).
  */
 export const SIMPLE_BET_PRICE_PERIODS: PricePeriod[] = [
   {
@@ -76,15 +77,19 @@ function applies(period: PricePeriod, contest: Contest): boolean {
   return true;
 }
 
-export function simpleBetPriceForContest(contest: Contest): number {
+export function trySimpleBetPriceForContest(contest: Contest): number | undefined {
   const periods = SIMPLE_BET_PRICE_PERIODS.filter((period) => applies(period, contest));
-  const winner = periods.at(-1);
+  return periods.at(-1)?.price;
+}
 
-  if (!winner) {
+export function simpleBetPriceForContest(contest: Contest): number {
+  const price = trySimpleBetPriceForContest(contest);
+
+  if (price === undefined) {
     throw new Error(
       `No supported historical simple-bet price for ${contest.lottery} contest ${contest.number}`,
     );
   }
 
-  return winner.price;
+  return price;
 }
