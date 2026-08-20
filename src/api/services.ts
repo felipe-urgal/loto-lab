@@ -213,7 +213,7 @@ export class LotoLabApiServices {
     return {
       id: saved.id,
       lottery: saved.lottery,
-      options: saved.options,
+      options: saved.options ?? {},
       summary: saved.summary,
       roundCount: saved.rounds.length,
       createdAt: saved.createdAt,
