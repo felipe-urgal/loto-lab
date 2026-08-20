@@ -12,6 +12,8 @@ const ASSETS: Record<string, { file: string; contentType: string; cache: string 
   "/assets/data-status.js": { file: "data-status.js", contentType: "text/javascript; charset=utf-8", cache: "no-cache" },
   "/assets/refinements.css": { file: "refinements.css", contentType: "text/css; charset=utf-8", cache: "public, max-age=300" },
   "/assets/refinements.js": { file: "refinements.js", contentType: "text/javascript; charset=utf-8", cache: "no-cache" },
+  "/assets/real-bets.css": { file: "real-bets.css", contentType: "text/css; charset=utf-8", cache: "public, max-age=300" },
+  "/assets/real-bets.js": { file: "real-bets.js", contentType: "text/javascript; charset=utf-8", cache: "no-cache" },
   "/assets/lab.css": { file: "lab.css", contentType: "text/css; charset=utf-8", cache: "public, max-age=300" },
   "/assets/lab.js": { file: "lab.js", contentType: "text/javascript; charset=utf-8", cache: "no-cache" },
   "/assets/lab-refinements.js": { file: "lab-refinements.js", contentType: "text/javascript; charset=utf-8", cache: "no-cache" },

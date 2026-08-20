@@ -3,6 +3,7 @@ import { CaixaContestSource } from "../data/caixa.js";
 import { createPostgresPool } from "../db/client.js";
 import { runMigrations } from "../db/migrations.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
+import { RealBetService } from "../realBets/service.js";
 
 const lotteryIds: LotteryId[] = ["mega-sena", "lotofacil", "dia-de-sorte"];
 
@@ -43,6 +44,7 @@ async function main(): Promise<void> {
     await runMigrations(pool);
     const repository = new PostgresContestRepository(pool);
     await repository.upsertMany(fetched);
+    const reconciledRealBets = await new RealBetService(pool).reconcilePending(lottery);
     const last = fetched.at(-1);
 
     process.stdout.write(
@@ -52,6 +54,7 @@ async function main(): Promise<void> {
           fetched: fetched.length,
           firstContest: fetched[0]?.number,
           lastContest: last?.number,
+          reconciledRealBets,
         },
         null,
         2,

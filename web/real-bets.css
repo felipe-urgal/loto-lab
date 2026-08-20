@@ -1,0 +1,117 @@
+.real-performance-section .metric-value.is-empty {
+  color: var(--muted);
+}
+
+.real-bet-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  margin-top: 8px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.real-bet-status.is-waiting {
+  color: var(--warning);
+  border-color: rgba(240, 189, 102, .32);
+  background: var(--warning-soft);
+}
+
+.real-bet-status.is-checked {
+  color: var(--accent-strong);
+  border-color: rgba(101, 214, 164, .32);
+  background: var(--accent-soft);
+}
+
+.real-bet-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(255,255,255,.018);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.real-bet-summary strong { color: var(--text); }
+.real-bet-summary .positive { color: var(--accent-strong); }
+.real-bet-summary .negative { color: var(--danger); }
+
+.real-bet-form {
+  margin: 12px 16px 16px;
+  padding: 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.real-bet-form-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.real-bet-form-head strong { font-size: 12px; }
+.real-bet-form-head p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+
+.real-bet-games {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0;
+}
+
+.real-bet-game-option {
+  min-height: 38px;
+  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.real-bet-game-option input { accent-color: var(--accent); }
+.real-bet-game-option strong { color: var(--text); }
+.real-bet-game-option .compact-numbers { margin-left: auto; }
+
+.real-bet-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.real-bet-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.real-bet-history {
+  margin-top: 22px;
+}
+
+.real-bet-history .list-row-value strong.negative { color: var(--danger); }
+.real-bet-history .list-row-value strong.positive { color: var(--accent-strong); }
+
+@media (max-width: 760px) {
+  .real-bet-form-grid { grid-template-columns: 1fr; }
+  .real-bet-game-option { align-items: flex-start; }
+  .real-bet-game-option .compact-numbers { margin-left: 0; }
+}
