@@ -1,5 +1,7 @@
 import type { Contest, GeneratedGame } from "../domain/types.js";
+import { evaluateGames, type GameCheckResult } from "../checker/evaluate.js";
 import { generateMegaSenaGames } from "../generator/megaSena.js";
+import { summarizeBacktestRounds, type BacktestSummary } from "./shared.js";
 
 export interface MegaSenaBacktestOptions {
   gameCount?: number;
@@ -13,32 +15,15 @@ export interface MegaSenaBacktestRound {
   date: string;
   targetNumbers: number[];
   generatedGames: GeneratedGame[];
+  checks: GameCheckResult[];
   hitsByGame: number[];
   bestHits: number;
   fixedHits: number;
 }
 
-export interface MegaSenaBacktestSummary {
-  testedContests: number;
-  totalGames: number;
-  averageHitsPerGame: number;
-  maxHits: number;
-  bestHitDistribution: Record<number, number>;
-  fixedHitDistribution: Record<number, number>;
-}
-
 export interface MegaSenaBacktestResult {
   rounds: MegaSenaBacktestRound[];
-  summary: MegaSenaBacktestSummary;
-}
-
-function hits(numbers: number[], target: number[]): number {
-  const targetSet = new Set(target);
-  return numbers.filter((number) => targetSet.has(number)).length;
-}
-
-function increment(distribution: Record<number, number>, value: number): void {
-  distribution[value] = (distribution[value] ?? 0) + 1;
+  summary: BacktestSummary;
 }
 
 export function backtestMegaSena(
@@ -65,49 +50,26 @@ export function backtestMegaSena(
     if (options.startContest !== undefined && target.number < options.startContest) continue;
     if (options.endContest !== undefined && target.number > options.endContest) continue;
 
-    // Anti-leakage rule: only contests that existed before the target draw
-    // are visible to the generator. The target and every future draw are excluded.
+    // Anti-leakage: only draws before the target are visible to the generator.
     const history = scoped.slice(0, index);
     const generatedGames = generateMegaSenaGames(history, gameCount);
-    const hitsByGame = generatedGames.map((game) => hits(game.numbers, target.numbers));
-    const fixedNumbers = generatedGames[0]?.fixedNumbers ?? [];
+    const checks = evaluateGames(generatedGames, target);
+    const hitsByGame = checks.map((check) => check.hits);
 
     rounds.push({
       contest: target.number,
       date: target.date,
       targetNumbers: [...target.numbers],
       generatedGames,
+      checks,
       hitsByGame,
       bestHits: Math.max(...hitsByGame),
-      fixedHits: hits(fixedNumbers, target.numbers),
+      fixedHits: checks[0]?.fixedHits ?? 0,
     });
-  }
-
-  const bestHitDistribution: Record<number, number> = {};
-  const fixedHitDistribution: Record<number, number> = {};
-  let totalHits = 0;
-  let totalGames = 0;
-  let maxHits = 0;
-
-  for (const round of rounds) {
-    increment(bestHitDistribution, round.bestHits);
-    increment(fixedHitDistribution, round.fixedHits);
-    for (const gameHits of round.hitsByGame) {
-      totalHits += gameHits;
-      totalGames += 1;
-      maxHits = Math.max(maxHits, gameHits);
-    }
   }
 
   return {
     rounds,
-    summary: {
-      testedContests: rounds.length,
-      totalGames,
-      averageHitsPerGame: totalGames === 0 ? 0 : totalHits / totalGames,
-      maxHits,
-      bestHitDistribution,
-      fixedHitDistribution,
-    },
+    summary: summarizeBacktestRounds(rounds),
   };
 }
