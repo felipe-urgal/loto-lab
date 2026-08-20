@@ -16,7 +16,8 @@
     "backtest:dia": "npm run build && node dist/src/cli/backtestDiaDeSorte.js",
     "backtest:compare": "npm run build && node dist/src/cli/compareStrategies.js",
     "db:migrate": "npm run build && node dist/src/cli/dbMigrate.js",
-    "db:import-json": "npm run build && node dist/src/cli/dbImportJson.js"
+    "db:import-json": "npm run build && node dist/src/cli/dbImportJson.js",
+    "db:sync": "npm run build && node dist/src/cli/dbSync.js"
   },
   "dependencies": {
     "pg": "^8.23.0"
