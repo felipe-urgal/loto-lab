@@ -3,11 +3,12 @@ import { buildNumberAnalysis } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import {
   buildMetadata,
-  combinations,
+  combinationIterator,
   generationRandom,
   scoreMap,
   selectProfiledFixedNumbers,
   selectRankedCandidate,
+  topRankedCandidates,
   type GenerationMode,
 } from "./shared.js";
 
@@ -126,7 +127,6 @@ export function generateDiaDeSorteGames(
     .sort((a, b) => b.score - a.score || a.number - b.number)
     .slice(0, poolSize)
     .map((row) => row.number);
-  const variableOptions = combinations(candidatePool, variableCount);
   const usedVariables = new Map<number, number>();
   const repeatTargets = [1, 2, 1, 2];
   const oddTargets = [3, 4, 3, 4];
@@ -137,8 +137,8 @@ export function generateDiaDeSorteGames(
     const targetRepeat = lastContest ? repeatTargets[gameIndex % repeatTargets.length]! : 0;
     const targetOdd = oddTargets[gameIndex % oddTargets.length]!;
 
-    const ranked = variableOptions
-      .map((variableNumbers) => {
+    const candidates = function* () {
+      for (const variableNumbers of combinationIterator(candidatePool, variableCount)) {
         const numbers = [...fixedNumbers, ...variableNumbers].sort((a, b) => a - b);
         const metadata = buildMetadata(numbers, lastContest);
         const variableScore = variableNumbers.reduce(
@@ -156,7 +156,7 @@ export function generateDiaDeSorteGames(
         const sumPenalty = Math.abs(metadata.sum - 112) * 0.25;
         const reusePenalty = reused * 45;
 
-        return {
+        yield {
           variableNumbers,
           numbers,
           metadata,
@@ -167,13 +167,16 @@ export function generateDiaDeSorteGames(
             sumPenalty -
             reusePenalty,
         };
-      })
-      .sort(
-        (a, b) =>
-          b.rank - a.rank ||
-          a.numbers.join("-").localeCompare(b.numbers.join("-")),
-      );
+      }
+    };
 
+    const ranked = topRankedCandidates(
+      candidates(),
+      24,
+      (a, b) =>
+        b.rank - a.rank ||
+        a.numbers.join("-").localeCompare(b.numbers.join("-")),
+    );
     const winner = selectRankedCandidate(ranked, generationMode, random, 6);
     if (!winner) throw new Error("Unable to generate a Dia de Sorte game");
 
