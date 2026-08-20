@@ -4,7 +4,7 @@ Motor de análise, geração, conferência e backtest estruturado para Mega-Sena
 
 > **Algoritmo calcula; IA interpreta.**
 
-Frequências, scores, geração, conferência, custos, premiações e backtests precisam ser reproduzíveis por código. A IA entra para explicar resultados e sugerir hipóteses, não para inventar dezenas.
+Frequências, scores, geração, conferência, custos, premiações, backtests e comparações precisam ser reproduzíveis por código. A IA entra para explicar resultados e sugerir hipóteses, não para inventar dezenas.
 
 ## Estado atual
 
@@ -42,20 +42,15 @@ Frequências, scores, geração, conferência, custos, premiações e backtests 
 - rateio e arrecadação reais da CAIXA;
 - custo histórico da aposta;
 - prêmio e resultado líquido por jogo;
-- retorno, ROI e cobertura financeira;
-- comparação de estratégias usando métricas financeiras.
+- retorno, ROI e cobertura financeira.
 
 Detalhes em [`docs/FINANCIALS.md`](docs/FINANCIALS.md).
 
 ### Milestone 6 — PostgreSQL
 
 - migrations SQL versionadas;
-- pool de conexões com `pg`;
-- persistência de concursos e rateios;
-- persistência de estratégias versionadas;
-- persistência de lotes de jogos;
-- persistência de backtests e rodadas;
-- importação idempotente do JSON atual;
+- persistência de concursos, rateios, estratégias, lotes e backtests;
+- importação idempotente do JSON legado;
 - PostgreSQL local via Docker Compose;
 - PostgreSQL real no CI.
 
@@ -69,35 +64,102 @@ Detalhes em [`docs/DATABASE.md`](docs/DATABASE.md).
 - geração e conferência de lotes;
 - estratégias;
 - execução e persistência de backtests;
-- CORS e validação de entrada;
-- testes HTTP com PostgreSQL real.
+- CORS e validação de entrada.
 
 Detalhes em [`docs/API.md`](docs/API.md).
 
 ### Milestone 8 — interface web
 
-- aplicação servida pelo mesmo processo HTTP da API;
-- Dashboard com os últimos concursos das três loterias;
-- Análises com grupos fortes/intermediários/frios e score detalhado;
-- Gerar Jogos com persistência e concurso alvo;
-- Meus Jogos com lotes e conferência automática;
-- Backtests com ROI, custo, prêmio e cobertura financeira;
-- layout responsivo para desktop, tablet e mobile;
-- nenhum cálculo estatístico duplicado no navegador;
-- teste do shell web e assets no CI.
+- Dashboard;
+- Análises;
+- Gerar Jogos;
+- Meus Jogos;
+- Backtests;
+- layout responsivo;
+- nenhum cálculo estatístico duplicado no navegador.
 
 Detalhes em [`docs/WEB.md`](docs/WEB.md).
+
+### Milestone 9 — base histórica e operação
+
+- `db:bootstrap` idempotente e retomável;
+- descoberta do último concurso oficial;
+- preenchimento apenas de lacunas;
+- retries e concorrência limitada;
+- `db:status`;
+- cobertura histórica/financeira no Dashboard;
+- carregamento automático de `.env` nos comandos operacionais.
+
+Detalhes em [`docs/DATA_OPERATIONS.md`](docs/DATA_OPERATIONS.md).
+
+### Milestone 10 — Laboratório de Estratégias
+
+- Mega-Sena: 0 vs 2 vs 3 fixas;
+- Lotofácil: 8 vs 9 vs 10 fixas;
+- Dia de Sorte: 0 vs 2 vs 3 fixas;
+- mesmo período e quantidade de jogos para todas as variantes;
+- ranking por ROI quando a cobertura financeira é suficiente;
+- fallback para taxa de premiação quando o rateio histórico está incompleto;
+- séries por blocos de concursos;
+- gráficos de acertos, premiação, ROI e resultado líquido;
+- interface em `/lab`.
+
+Detalhes em [`docs/STRATEGY_LAB.md`](docs/STRATEGY_LAB.md).
 
 ## Requisitos
 
 - Node.js 22+
 - npm
-- Docker, opcional para PostgreSQL local
+- Docker para PostgreSQL local
 
 ## Instalação
 
 ```bash
 npm install
+cp .env.example .env
+```
+
+O `.env.example` já aponta para o PostgreSQL do compose em `localhost:5433`.
+
+## Primeira carga local
+
+```bash
+docker compose up -d postgres
+npm run db:migrate
+npm run db:bootstrap
+npm run db:status
+```
+
+O bootstrap pode ser interrompido e executado novamente. Concursos já armazenados são pulados.
+
+## Rodar a aplicação
+
+```bash
+npm run api:start
+```
+
+Aplicação:
+
+```text
+http://127.0.0.1:3000
+```
+
+Laboratório:
+
+```text
+http://127.0.0.1:3000/lab
+```
+
+API:
+
+```text
+http://127.0.0.1:3000/api/v1
+```
+
+Health check:
+
+```bash
+curl http://127.0.0.1:3000/health/ready
 ```
 
 ## Testes
@@ -106,7 +168,7 @@ npm install
 npm test
 ```
 
-Sem `DATABASE_URL`, os testes unitários e o teste de assets web rodam normalmente; testes que dependem de PostgreSQL são ignorados. No CI, um PostgreSQL real é iniciado automaticamente.
+`npm test` propositalmente não carrega `.env` automaticamente, pois testes de integração podem limpar tabelas. No CI, um PostgreSQL isolado é iniciado automaticamente.
 
 ## Build
 
@@ -114,29 +176,27 @@ Sem `DATABASE_URL`, os testes unitários e o teste de assets web rodam normalmen
 npm run build
 ```
 
-## Rodar a aplicação completa
+## Operação dos dados
 
-Suba o banco:
-
-```bash
-docker compose up -d postgres
-```
-
-O compose publica PostgreSQL na porta **5433** da máquina.
-
-Configure a conexão:
+Carga histórica completa das três loterias:
 
 ```bash
-export DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5433/loto_lab
+npm run db:bootstrap
 ```
 
-Aplique migrations:
+Uma loteria:
 
 ```bash
-npm run db:migrate
+npm run db:bootstrap -- mega-sena
 ```
 
-Sincronize dados quando necessário:
+Status:
+
+```bash
+npm run db:status
+```
+
+Sync apenas do último concurso:
 
 ```bash
 npm run db:sync -- mega-sena
@@ -144,47 +204,14 @@ npm run db:sync -- lotofacil
 npm run db:sync -- dia-de-sorte
 ```
 
-Inicie o Loto Lab:
-
-```bash
-npm run api:start
-```
-
-Abra no navegador:
-
-```text
-http://127.0.0.1:3000
-```
-
-A interface web fica em `/` e a API continua disponível em `/api/v1`.
-
-Health check:
-
-```bash
-curl http://127.0.0.1:3000/health/ready
-```
-
-## PostgreSQL
-
-Importar o histórico JSON legado:
-
-```bash
-npm run db:import-json -- data/contests.json
-```
-
-Sincronizar diretamente da CAIXA:
-
-```bash
-npm run db:sync -- mega-sena
-npm run db:sync -- lotofacil
-npm run db:sync -- dia-de-sorte
-```
+Detalhes em [`docs/DATA_OPERATIONS.md`](docs/DATA_OPERATIONS.md).
 
 ## API HTTP
 
-Alguns endpoints:
+Endpoints principais:
 
 ```text
+GET  /api/v1/data/status
 GET  /api/v1/lotteries
 GET  /api/v1/contests/:lottery
 GET  /api/v1/contests/:lottery/latest
@@ -197,17 +224,7 @@ POST /api/v1/strategies
 POST /api/v1/backtests/run
 GET  /api/v1/backtests/:lottery
 GET  /api/v1/backtest-runs/:id
-```
-
-Veja exemplos completos em [`docs/API.md`](docs/API.md).
-
-## Dados JSON legados
-
-Os comandos baseados em JSON continuam disponíveis durante a transição e os arquivos da pasta `data/` não são versionados.
-
-```bash
-npm run data:sync -- mega-sena
-npm run data:refresh -- lotofacil 3500 3767
+POST /api/v1/lab/compare
 ```
 
 ## CLI de geração e conferência
@@ -242,7 +259,7 @@ npm run backtest:compare -- data/contests.json 4 20 3500 3767
 
 Ao testar o concurso `N`, o gerador recebe **somente os concursos anteriores a N**. O resultado do próprio concurso e todos os concursos futuros ficam invisíveis para o algoritmo.
 
-Quando `targetContestNumber` é passado para a API ou interface de geração, a mesma regra é aplicada.
+Essa regra vale para backtests tradicionais e para todas as variantes do Laboratório.
 
 ## Estrutura
 
@@ -252,18 +269,16 @@ db/
 
 web/
 ├── index.html
-├── styles.css
 ├── app.js
+├── styles.css
+├── lab.html
+├── lab.js
+├── lab.css
 └── favicon.svg
 
 src/
 ├── analysis/
 ├── api/
-│   ├── app.ts
-│   ├── http.ts
-│   ├── server.ts
-│   ├── services.ts
-│   └── web.ts
 ├── backtest/
 ├── checker/
 ├── cli/
@@ -272,24 +287,18 @@ src/
 ├── domain/
 ├── finance/
 ├── generator/
+├── lab/
 ├── lotteries/
 ├── persistence/
 └── index.ts
-
-docs/
-├── API.md
-├── DATABASE.md
-├── FINANCIALS.md
-├── METHODOLOGY.md
-└── WEB.md
 ```
 
 ## Próximos milestones
 
-1. laboratório visual para comparação de estratégias;
-2. gráficos históricos e evolução de ROI/acertos;
+1. tracking de apostas efetivamente realizadas;
+2. atualização/conferência automática pós-sorteio;
 3. estratégias configuráveis pela interface;
-4. autenticação e apostas efetivamente realizadas;
+4. execução assíncrona de experimentos longos;
 5. camada de interpretação por IA.
 
 ## Aviso
