@@ -1,10 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CaixaContestSource, normalizeCaixaContest } from "../src/data/caixa.js";
+import { CaixaContestSource, normalizeCaixaAgenda, normalizeCaixaContest } from "../src/data/caixa.js";
 
 const megaPayload = {
   numero: 3046,
   dataApuracao: "18/08/2026",
+  dataProximoConcurso: "20/08/2026",
+  numeroConcursoProximo: 3047,
+  valorEstimadoProximoConcurso: 50000000,
+  acumulado: true,
   listaDezenas: ["16", "23", "24", "33", "36", "52"],
   nomeTimeCoracaoMesSorte: "\0\0\0",
   listaRateioPremio: [
@@ -29,6 +33,17 @@ test("normalizeCaixaContest converts Caixa payload to domain contest", () => {
       { description: "4 acertos", winners: 3290, prizeValue: 921.02 },
     ],
     amountCollected: 44677284,
+  });
+});
+
+test("normalizeCaixaAgenda converts official next-contest metadata", () => {
+  assert.deepEqual(normalizeCaixaAgenda("mega-sena", megaPayload), {
+    lottery: "mega-sena",
+    currentContest: 3046,
+    nextContest: 3047,
+    nextDrawDate: "2026-08-20",
+    estimatedPrize: 50000000,
+    accumulated: true,
   });
 });
 
@@ -63,13 +78,21 @@ test("CaixaContestSource requests the expected contest endpoint", async () => {
   assert.equal(contest.prizeTiers?.[1]?.prizeValue, 55819.16);
 });
 
+test("CaixaContestSource fetches latest agenda metadata", async () => {
+  let requestedUrl = "";
+  const source = new CaixaContestSource(async (input) => {
+    requestedUrl = String(input);
+    return new Response(JSON.stringify(megaPayload), { status: 200 });
+  });
+  const agenda = await source.fetchAgenda("mega-sena");
+  assert.equal(requestedUrl, "https://servicebus2.caixa.gov.br/portaldeloterias/api/megasena");
+  assert.equal(agenda.nextContest, 3047);
+  assert.equal(agenda.nextDrawDate, "2026-08-20");
+});
+
 test("normalizeCaixaContest rejects invalid draw sizes", () => {
   assert.throws(
-    () =>
-      normalizeCaixaContest("mega-sena", {
-        ...megaPayload,
-        listaDezenas: ["01", "02"],
-      }),
+    () => normalizeCaixaContest("mega-sena", { ...megaPayload, listaDezenas: ["01", "02"] }),
     /Expected 6 numbers/,
   );
 });
