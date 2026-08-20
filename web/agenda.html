@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b1117" />
+    <meta name="description" content="Loto Lab — agenda oficial e notificações operacionais." />
+    <title>Agenda · Loto Lab</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <link rel="stylesheet" href="/assets/refinements.css" />
+    <link rel="stylesheet" href="/assets/agenda.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegação principal">
+        <a class="brand" href="/#dashboard" aria-label="Loto Lab - Dashboard">
+          <span class="brand-mark" aria-hidden="true">L</span>
+          <span class="brand-copy"><strong>Loto Lab</strong><small>Strategy console</small></span>
+        </a>
+        <nav class="main-nav">
+          <a class="nav-item" href="/#dashboard"><span class="nav-icon">▦</span><span>Dashboard</span></a>
+          <a class="nav-item" href="/#analysis"><span class="nav-icon">▥</span><span>Análises</span></a>
+          <a class="nav-item" href="/#generate"><span class="nav-icon">✦</span><span>Gerar jogos</span></a>
+          <a class="nav-item" href="/#games"><span class="nav-icon">▤</span><span>Meus jogos</span></a>
+          <a class="nav-item" href="/#backtests"><span class="nav-icon">↶</span><span>Backtests</span></a>
+          <a class="nav-item" href="/lab"><span class="nav-icon">♧</span><span>Laboratório</span></a>
+          <a class="nav-item is-active" href="/agenda" aria-current="page"><span class="nav-icon">◷</span><span>Agenda</span><span class="agenda-nav-badge" id="agenda-nav-badge" hidden></span></a>
+          <a class="nav-item" href="/ai"><span class="nav-icon">◇</span><span>IA</span></a>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="status-row"><span class="status-dot"></span><span>Agenda sincronizada</span></div>
+          <p>Resultados, apostas<br />e operação em um lugar.</p>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <div class="topbar-copy">
+            <h1>Agenda</h1>
+            <p>Próximos concursos oficiais e itens que pedem sua atenção.</p>
+          </div>
+          <div class="topbar-actions">
+            <button class="button secondary" id="agenda-refresh" type="button">Atualizar</button>
+          </div>
+        </header>
+
+        <section class="content agenda-content">
+          <div class="stack">
+            <section>
+              <div class="section-head"><div><h2>Próximos concursos</h2><p>Agenda informada pela CAIXA na última sincronização.</p></div></div>
+              <div class="agenda-grid" id="agenda-grid"><div class="panel agenda-loading">Carregando agenda...</div></div>
+            </section>
+
+            <section>
+              <div class="section-head agenda-inbox-head">
+                <div><h2>Notificações</h2><p id="agenda-unread-copy">Carregando caixa de entrada...</p></div>
+                <div class="agenda-actions">
+                  <div class="agenda-filter" role="group" aria-label="Filtro de notificações">
+                    <button class="is-active" data-agenda-filter="all" type="button">Todas</button>
+                    <button data-agenda-filter="unread" type="button">Não lidas</button>
+                  </div>
+                  <button class="button secondary" id="agenda-read-all" type="button">Marcar tudo como lido</button>
+                </div>
+              </div>
+              <div class="agenda-inbox" id="agenda-inbox"><div class="panel agenda-loading">Carregando notificações...</div></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div class="toast-root" id="toast-root" aria-live="assertive"></div>
+    <script type="module" src="/assets/agenda.js"></script>
+  </body>
+</html>
