@@ -3,12 +3,13 @@ import { buildNumberAnalysis } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import {
   buildMetadata,
-  combinations,
+  combinationIterator,
   generationRandom,
   gridExtremePenalty,
   scoreMap,
   selectProfiledFixedNumbers,
   selectRankedCandidate,
+  topRankedCandidates,
   type GenerationMode,
 } from "./shared.js";
 
@@ -57,7 +58,6 @@ export function generateLotofacilGames(
     .sort((a, b) => b.score - a.score || a.number - b.number)
     .map((row) => row.number);
 
-  const optionsByVariables = combinations(candidatePool, variableCount);
   const usedVariables = new Map<number, number>();
   const repeatTargets = [8, 9, 10, 8];
   const oddTargets = [8, 7, 9, 6];
@@ -67,8 +67,8 @@ export function generateLotofacilGames(
     const targetRepeat = lastContest ? repeatTargets[gameIndex % repeatTargets.length]! : 0;
     const targetOdd = oddTargets[gameIndex % oddTargets.length]!;
 
-    const ranked = optionsByVariables
-      .map((variableNumbers) => {
+    const candidates = function* () {
+      for (const variableNumbers of combinationIterator(candidatePool, variableCount)) {
         const numbers = [...fixedNumbers, ...variableNumbers].sort((a, b) => a - b);
         const metadata = buildMetadata(numbers, lastContest, true);
         const variableScore = variableNumbers.reduce(
@@ -87,7 +87,7 @@ export function generateLotofacilGames(
         const columnPenalty = gridExtremePenalty(metadata.columnDistribution);
         const reusePenalty = reused * 28;
 
-        return {
+        yield {
           variableNumbers,
           numbers,
           metadata,
@@ -99,13 +99,16 @@ export function generateLotofacilGames(
             columnPenalty -
             reusePenalty,
         };
-      })
-      .sort(
-        (a, b) =>
-          b.rank - a.rank ||
-          a.numbers.join("-").localeCompare(b.numbers.join("-")),
-      );
+      }
+    };
 
+    const ranked = topRankedCandidates(
+      candidates(),
+      24,
+      (a, b) =>
+        b.rank - a.rank ||
+        a.numbers.join("-").localeCompare(b.numbers.join("-")),
+    );
     const winner = selectRankedCandidate(ranked, generationMode, random, 6);
     if (!winner) throw new Error("Unable to generate a Lotofacil game");
 
