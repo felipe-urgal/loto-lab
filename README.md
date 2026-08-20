@@ -55,28 +55,38 @@ Detalhes em [`docs/FINANCIALS.md`](docs/FINANCIALS.md).
 - persistência de estratégias versionadas;
 - persistência de lotes de jogos;
 - persistência de backtests e rodadas;
-- métricas financeiras indexáveis para futuros dashboards;
 - importação idempotente do JSON atual;
 - PostgreSQL local via Docker Compose;
-- PostgreSQL real no CI para testes de integração.
+- PostgreSQL real no CI.
 
 Detalhes em [`docs/DATABASE.md`](docs/DATABASE.md).
 
 ### Milestone 7 — API HTTP
 
 - API versionada em `/api/v1`;
-- health checks de liveness e readiness;
-- consultas de concursos com paginação limitada e ordenação no SQL;
-- análise estatística por loteria;
-- geração de jogos com persistência em lote;
-- conferência de lotes contra concursos armazenados;
-- cadastro/listagem de estratégias;
+- health checks;
+- concursos e análise estatística;
+- geração e conferência de lotes;
+- estratégias;
 - execução e persistência de backtests;
-- listagem leve de backtests sem carregar todas as rodadas;
-- CORS configurável para o futuro frontend;
-- testes HTTP de integração usando PostgreSQL real no CI.
+- CORS e validação de entrada;
+- testes HTTP com PostgreSQL real.
 
 Detalhes em [`docs/API.md`](docs/API.md).
+
+### Milestone 8 — interface web
+
+- aplicação servida pelo mesmo processo HTTP da API;
+- Dashboard com os últimos concursos das três loterias;
+- Análises com grupos fortes/intermediários/frios e score detalhado;
+- Gerar Jogos com persistência e concurso alvo;
+- Meus Jogos com lotes e conferência automática;
+- Backtests com ROI, custo, prêmio e cobertura financeira;
+- layout responsivo para desktop, tablet e mobile;
+- nenhum cálculo estatístico duplicado no navegador;
+- teste do shell web e assets no CI.
+
+Detalhes em [`docs/WEB.md`](docs/WEB.md).
 
 ## Requisitos
 
@@ -96,7 +106,7 @@ npm install
 npm test
 ```
 
-Sem `DATABASE_URL`, os testes unitários rodam normalmente e os testes PostgreSQL/API são ignorados. No CI, um PostgreSQL real é iniciado automaticamente.
+Sem `DATABASE_URL`, os testes unitários e o teste de assets web rodam normalmente; testes que dependem de PostgreSQL são ignorados. No CI, um PostgreSQL real é iniciado automaticamente.
 
 ## Build
 
@@ -104,35 +114,65 @@ Sem `DATABASE_URL`, os testes unitários rodam normalmente e os testes PostgreSQ
 npm run build
 ```
 
-## PostgreSQL local
+## Rodar a aplicação completa
 
-Subir o banco:
+Suba o banco:
 
 ```bash
 docker compose up -d postgres
 ```
 
-O compose publica PostgreSQL na porta **5433** da máquina para não conflitar com instalações locais em 5432.
+O compose publica PostgreSQL na porta **5433** da máquina.
 
-Configurar a conexão:
+Configure a conexão:
 
 ```bash
 export DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5433/loto_lab
 ```
 
-Aplicar migrations:
+Aplique migrations:
 
 ```bash
 npm run db:migrate
 ```
 
-Importar o histórico JSON já existente:
+Sincronize dados quando necessário:
+
+```bash
+npm run db:sync -- mega-sena
+npm run db:sync -- lotofacil
+npm run db:sync -- dia-de-sorte
+```
+
+Inicie o Loto Lab:
+
+```bash
+npm run api:start
+```
+
+Abra no navegador:
+
+```text
+http://127.0.0.1:3000
+```
+
+A interface web fica em `/` e a API continua disponível em `/api/v1`.
+
+Health check:
+
+```bash
+curl http://127.0.0.1:3000/health/ready
+```
+
+## PostgreSQL
+
+Importar o histórico JSON legado:
 
 ```bash
 npm run db:import-json -- data/contests.json
 ```
 
-Sincronizar a CAIXA diretamente com PostgreSQL:
+Sincronizar diretamente da CAIXA:
 
 ```bash
 npm run db:sync -- mega-sena
@@ -141,26 +181,6 @@ npm run db:sync -- dia-de-sorte
 ```
 
 ## API HTTP
-
-Configuração local recomendada:
-
-```bash
-export API_HOST=127.0.0.1
-export API_PORT=3000
-export API_CORS_ORIGIN=http://localhost:5173
-```
-
-Iniciar:
-
-```bash
-npm run api:start
-```
-
-Health check:
-
-```bash
-curl http://127.0.0.1:3000/health/ready
-```
 
 Alguns endpoints:
 
@@ -185,67 +205,26 @@ Veja exemplos completos em [`docs/API.md`](docs/API.md).
 
 Os comandos baseados em JSON continuam disponíveis durante a transição e os arquivos da pasta `data/` não são versionados.
 
-Buscar o concurso mais recente:
-
 ```bash
 npm run data:sync -- mega-sena
-npm run data:sync -- lotofacil
-npm run data:sync -- dia-de-sorte
-```
-
-Preencher concursos ausentes:
-
-```bash
-npm run data:sync -- mega-sena 2500 3047
-```
-
-Enriquecer concursos existentes com rateio/arrecadação:
-
-```bash
-npm run data:refresh -- mega-sena 2500 3047
 npm run data:refresh -- lotofacil 3500 3767
-npm run data:refresh -- dia-de-sorte 1000 1277
 ```
 
 ## CLI de geração e conferência
-
-Gerar:
 
 ```bash
 npm run games:generate -- mega-sena data/contests.json 2
 npm run games:generate -- lotofacil data/contests.json 4 8
 npm run games:generate -- dia-de-sorte data/contests.json 4
-```
-
-Conferir:
-
-```bash
 npm run games:check -- data/games.json data/contests.json 3767
 ```
 
 ## Backtests por CLI
 
-Mega-Sena:
-
 ```bash
 npm run backtest:mega -- data/contests.json 2 20 2500 3047
-```
-
-Lotofácil:
-
-```bash
 npm run backtest:lotofacil -- data/contests.json 4 8 20 3500 3767
-```
-
-Dia de Sorte:
-
-```bash
 npm run backtest:dia -- data/contests.json 4 20 1000 1277
-```
-
-Comparação 8/9/10 fixas da Lotofácil:
-
-```bash
 npm run backtest:compare -- data/contests.json 4 20 3500 3767
 ```
 
@@ -263,7 +242,7 @@ npm run backtest:compare -- data/contests.json 4 20 3500 3767
 
 Ao testar o concurso `N`, o gerador recebe **somente os concursos anteriores a N**. O resultado do próprio concurso e todos os concursos futuros ficam invisíveis para o algoritmo.
 
-Quando `targetContestNumber` é passado para a API de geração, a mesma regra é aplicada: apenas concursos anteriores ao alvo são usados.
+Quando `targetContestNumber` é passado para a API ou interface de geração, a mesma regra é aplicada.
 
 ## Estrutura
 
@@ -271,12 +250,20 @@ Quando `targetContestNumber` é passado para a API de geração, a mesma regra �
 db/
 └── migrations/
 
+web/
+├── index.html
+├── styles.css
+├── app.js
+└── favicon.svg
+
 src/
 ├── analysis/
 ├── api/
 │   ├── app.ts
 │   ├── http.ts
-│   └── services.ts
+│   ├── server.ts
+│   ├── services.ts
+│   └── web.ts
 ├── backtest/
 ├── checker/
 ├── cli/
@@ -293,15 +280,16 @@ docs/
 ├── API.md
 ├── DATABASE.md
 ├── FINANCIALS.md
-└── METHODOLOGY.md
+├── METHODOLOGY.md
+└── WEB.md
 ```
 
 ## Próximos milestones
 
-1. interface web;
-2. dashboard com próximos concursos, análises e jogos ativos;
-3. telas de geração, conferência e histórico;
-4. laboratório visual de backtests e estratégias;
+1. laboratório visual para comparação de estratégias;
+2. gráficos históricos e evolução de ROI/acertos;
+3. estratégias configuráveis pela interface;
+4. autenticação e apostas efetivamente realizadas;
 5. camada de interpretação por IA.
 
 ## Aviso
