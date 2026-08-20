@@ -63,7 +63,6 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     console.log(`Received ${signal}; shutting down Loto Lab`);
-    scheduler?.stop();
 
     await new Promise<void>((resolve, reject) => {
       server.close((error) => {
@@ -71,6 +70,7 @@ async function main(): Promise<void> {
         else resolve();
       });
     });
+    await scheduler?.stopAndDrain();
     await pool.end();
   }
 
