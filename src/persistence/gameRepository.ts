@@ -7,6 +7,12 @@ import type {
 
 export type GeneratedBatchScope = "active" | "archived" | "all";
 
+export interface GeneratedBatchCounts {
+  active: number;
+  archived: number;
+  realBets: number;
+}
+
 interface BatchRow {
   id: string;
   lottery: LotteryId;
@@ -19,6 +25,7 @@ interface BatchRow {
 }
 
 interface GameRow {
+  batch_id: string;
   numbers: number[];
   fixed_numbers: number[];
   variable_numbers: number[];
@@ -100,45 +107,64 @@ export class PostgresGameRepository {
     return saved;
   }
 
+  private async findBatches(ids: number[]): Promise<GeneratedGameBatchRecord[]> {
+    if (ids.length === 0) return [];
+    const uniqueIds = [...new Set(ids)];
+    const [batchResult, gamesResult] = await Promise.all([
+      this.pool.query<BatchRow>(
+        `
+          SELECT
+            batch.*,
+            EXISTS (
+              SELECT 1 FROM real_bets bet WHERE bet.batch_id = batch.id
+            ) AS has_real_bet
+          FROM generated_game_batches batch
+          WHERE batch.id = ANY($1::bigint[])
+        `,
+        [uniqueIds],
+      ),
+      this.pool.query<GameRow>(
+        `
+          SELECT batch_id, numbers, fixed_numbers, variable_numbers, lucky_month, metadata
+          FROM generated_games
+          WHERE batch_id = ANY($1::bigint[])
+          ORDER BY batch_id, position
+        `,
+        [uniqueIds],
+      ),
+    ]);
+
+    const gamesByBatch = new Map<number, GameRow[]>();
+    for (const row of gamesResult.rows) {
+      const batchId = Number(row.batch_id);
+      const rows = gamesByBatch.get(batchId) ?? [];
+      rows.push(row);
+      gamesByBatch.set(batchId, rows);
+    }
+
+    const byId = new Map<number, GeneratedGameBatchRecord>();
+    for (const batch of batchResult.rows) {
+      const id = Number(batch.id);
+      byId.set(id, {
+        id,
+        lottery: batch.lottery,
+        ...(batch.strategy_id ? { strategyId: Number(batch.strategy_id) } : {}),
+        ...(batch.target_contest_number !== null
+          ? { targetContestNumber: batch.target_contest_number }
+          : {}),
+        generatorOptions: batch.generator_options,
+        createdAt: batch.created_at.toISOString(),
+        ...(batch.archived_at ? { archivedAt: batch.archived_at.toISOString() } : {}),
+        hasRealBet: Boolean(batch.has_real_bet),
+        games: (gamesByBatch.get(id) ?? []).map((row) => mapGame(batch.lottery, row)),
+      });
+    }
+
+    return ids.map((id) => byId.get(id)).filter((item): item is GeneratedGameBatchRecord => item !== undefined);
+  }
+
   async findBatch(id: number): Promise<GeneratedGameBatchRecord | undefined> {
-    const batchResult = await this.pool.query<BatchRow>(
-      `
-        SELECT
-          batch.*,
-          EXISTS (
-            SELECT 1 FROM real_bets bet WHERE bet.batch_id = batch.id
-          ) AS has_real_bet
-        FROM generated_game_batches batch
-        WHERE batch.id = $1
-      `,
-      [id],
-    );
-    const batch = batchResult.rows[0];
-    if (!batch) return undefined;
-
-    const gamesResult = await this.pool.query<GameRow>(
-      `
-        SELECT numbers, fixed_numbers, variable_numbers, lucky_month, metadata
-        FROM generated_games
-        WHERE batch_id = $1
-        ORDER BY position
-      `,
-      [id],
-    );
-
-    return {
-      id: Number(batch.id),
-      lottery: batch.lottery,
-      ...(batch.strategy_id ? { strategyId: Number(batch.strategy_id) } : {}),
-      ...(batch.target_contest_number !== null
-        ? { targetContestNumber: batch.target_contest_number }
-        : {}),
-      generatorOptions: batch.generator_options,
-      createdAt: batch.created_at.toISOString(),
-      ...(batch.archived_at ? { archivedAt: batch.archived_at.toISOString() } : {}),
-      hasRealBet: Boolean(batch.has_real_bet),
-      games: gamesResult.rows.map((row) => mapGame(batch.lottery, row)),
-    };
+    return (await this.findBatches([id]))[0];
   }
 
   async listRecent(
@@ -163,8 +189,33 @@ export class PostgresGameRepository {
       [lottery, limit],
     );
 
-    const batches = await Promise.all(result.rows.map((row) => this.findBatch(Number(row.id))));
-    return batches.filter((batch): batch is GeneratedGameBatchRecord => batch !== undefined);
+    return this.findBatches(result.rows.map((row) => Number(row.id)));
+  }
+
+  async counts(lottery: LotteryId): Promise<GeneratedBatchCounts> {
+    const result = await this.pool.query<{
+      active: string;
+      archived: string;
+      real_bets: string;
+    }>(
+      `
+        SELECT
+          COUNT(*) FILTER (WHERE batch.archived_at IS NULL)::text AS active,
+          COUNT(*) FILTER (WHERE batch.archived_at IS NOT NULL)::text AS archived,
+          COUNT(*) FILTER (
+            WHERE EXISTS (SELECT 1 FROM real_bets bet WHERE bet.batch_id = batch.id)
+          )::text AS real_bets
+        FROM generated_game_batches batch
+        WHERE batch.lottery = $1
+      `,
+      [lottery],
+    );
+    const row = result.rows[0]!;
+    return {
+      active: Number(row.active),
+      archived: Number(row.archived),
+      realBets: Number(row.real_bets),
+    };
   }
 
   async setArchived(id: number, archived: boolean): Promise<GeneratedGameBatchRecord | undefined> {
