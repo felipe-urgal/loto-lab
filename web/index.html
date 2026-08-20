@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b1117" />
+    <meta name="description" content="Loto Lab — análise, geração e backtest estruturado de loterias." />
+    <title>Loto Lab</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegação principal">
+        <a class="brand" href="#dashboard" aria-label="Loto Lab - Dashboard">
+          <span class="brand-mark" aria-hidden="true">L</span>
+          <span class="brand-copy">
+            <strong>Loto Lab</strong>
+            <small>Strategy console</small>
+          </span>
+        </a>
+
+        <nav class="main-nav" id="main-nav">
+          <button class="nav-item is-active" data-view="dashboard" type="button">
+            <span class="nav-icon" data-icon="dashboard"></span>
+            <span>Dashboard</span>
+          </button>
+          <button class="nav-item" data-view="analysis" type="button">
+            <span class="nav-icon" data-icon="analysis"></span>
+            <span>Análises</span>
+          </button>
+          <button class="nav-item" data-view="generate" type="button">
+            <span class="nav-icon" data-icon="spark"></span>
+            <span>Gerar jogos</span>
+          </button>
+          <button class="nav-item" data-view="games" type="button">
+            <span class="nav-icon" data-icon="ticket"></span>
+            <span>Meus jogos</span>
+          </button>
+          <button class="nav-item" data-view="backtests" type="button">
+            <span class="nav-icon" data-icon="history"></span>
+            <span>Backtests</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="status-row" id="api-status" aria-live="polite">
+            <span class="status-dot"></span>
+            <span>Verificando API</span>
+          </div>
+          <p>Algoritmo calcula.<br />IA interpreta.</p>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <div class="topbar-copy">
+            <h1 id="view-title">Dashboard</h1>
+            <p id="view-subtitle">Visão geral dos concursos, jogos e desempenho.</p>
+          </div>
+          <div class="topbar-actions">
+            <label class="select-control" for="lottery-select">
+              <span>Loteria</span>
+              <select id="lottery-select">
+                <option value="mega-sena">Mega-Sena</option>
+                <option value="lotofacil">Lotofácil</option>
+                <option value="dia-de-sorte">Dia de Sorte</option>
+              </select>
+            </label>
+            <button class="icon-button" id="refresh-view" type="button" aria-label="Atualizar tela" title="Atualizar">
+              <span data-icon="refresh"></span>
+            </button>
+          </div>
+        </header>
+
+        <section class="content" id="content" aria-live="polite">
+          <div class="loading-state">
+            <span class="spinner"></span>
+            <span>Carregando Loto Lab...</span>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast-root" id="toast-root" aria-live="assertive"></div>
+    <script type="module" src="/assets/app.js"></script>
+  </body>
+</html>
