@@ -1,5 +1,5 @@
 import { createPostgresPool } from "../db/client.js";
-import { createApiServer } from "../api/app.js";
+import { createLotoLabServer } from "../api/server.js";
 
 function parsePort(value: string | undefined): number {
   const port = Number(value ?? 3000);
@@ -12,20 +12,20 @@ function parsePort(value: string | undefined): number {
 const pool = createPostgresPool();
 const port = parsePort(process.env.API_PORT);
 const host = process.env.API_HOST ?? "127.0.0.1";
-const server = createApiServer({
+const server = createLotoLabServer({
   pool,
   corsOrigin: process.env.API_CORS_ORIGIN,
 });
 
 server.listen(port, host, () => {
-  console.log(`Loto Lab API listening on http://${host}:${port}`);
+  console.log(`Loto Lab listening on http://${host}:${port}`);
 });
 
 let shuttingDown = false;
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.log(`Received ${signal}; shutting down Loto Lab API`);
+  console.log(`Received ${signal}; shutting down Loto Lab`);
 
   await new Promise<void>((resolve, reject) => {
     server.close((error) => {

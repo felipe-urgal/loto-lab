@@ -27,3 +27,4 @@ export * from "./backtest/compare.js";
 export * from "./api/http.js";
 export * from "./api/services.js";
 export * from "./api/app.js";
+export * from "./api/server.js";
