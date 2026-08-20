@@ -12,6 +12,14 @@ interface ContestRow {
   prize_tiers: ContestPrizeTier[];
 }
 
+interface ContestStatusRow {
+  contest_count: string;
+  first_contest: number | null;
+  last_contest: number | null;
+  financial_contest_count: string;
+  last_updated_at: Date | null;
+}
+
 function mapContest(row: ContestRow): Contest {
   return {
     lottery: row.lottery,
@@ -30,6 +38,17 @@ export interface ContestListOptions {
   endContest?: number;
   limit?: number;
   order?: "asc" | "desc";
+}
+
+export interface ContestDataStatus {
+  lottery: LotteryId;
+  contestCount: number;
+  firstContest?: number;
+  lastContest?: number;
+  missingContestCount: number;
+  financialContestCount: number;
+  financialCoverage: number;
+  lastUpdatedAt?: string;
 }
 
 export class PostgresContestRepository {
@@ -101,6 +120,74 @@ export class PostgresContestRepository {
 
   async list(options: ContestListOptions = {}): Promise<Contest[]> {
     return this.queryContests(options);
+  }
+
+  async listContestNumbers(
+    lottery: LotteryId,
+    startContest: number,
+    endContest: number,
+  ): Promise<number[]> {
+    if (
+      !Number.isInteger(startContest) ||
+      !Number.isInteger(endContest) ||
+      startContest < 1 ||
+      endContest < startContest
+    ) {
+      throw new Error("Invalid contest-number range");
+    }
+
+    const result = await this.pool.query<{ contest_number: number }>(
+      `
+        SELECT contest_number
+        FROM contests
+        WHERE lottery = $1
+          AND contest_number BETWEEN $2 AND $3
+        ORDER BY contest_number
+      `,
+      [lottery, startContest, endContest],
+    );
+    return result.rows.map((row) => row.contest_number);
+  }
+
+  async getDataStatus(lottery: LotteryId): Promise<ContestDataStatus> {
+    const result = await this.pool.query<ContestStatusRow>(
+      `
+        SELECT
+          COUNT(*)::text AS contest_count,
+          MIN(c.contest_number) AS first_contest,
+          MAX(c.contest_number) AS last_contest,
+          COUNT(*) FILTER (
+            WHERE EXISTS (
+              SELECT 1
+              FROM contest_prize_tiers p
+              WHERE p.contest_id = c.id
+            )
+          )::text AS financial_contest_count,
+          MAX(c.updated_at) AS last_updated_at
+        FROM contests c
+        WHERE c.lottery = $1
+      `,
+      [lottery],
+    );
+
+    const row = result.rows[0]!;
+    const contestCount = Number(row.contest_count);
+    const financialContestCount = Number(row.financial_contest_count);
+    const lastContest = row.last_contest ?? undefined;
+    const missingContestCount = lastContest === undefined
+      ? 0
+      : Math.max(0, lastContest - contestCount);
+
+    return {
+      lottery,
+      contestCount,
+      ...(row.first_contest !== null ? { firstContest: row.first_contest } : {}),
+      ...(lastContest !== undefined ? { lastContest } : {}),
+      missingContestCount,
+      financialContestCount,
+      financialCoverage: contestCount === 0 ? 0 : financialContestCount / contestCount,
+      ...(row.last_updated_at ? { lastUpdatedAt: row.last_updated_at.toISOString() } : {}),
+    };
   }
 
   private async queryContests(options: ContestListOptions): Promise<Contest[]> {

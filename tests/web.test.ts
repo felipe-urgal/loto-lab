@@ -4,8 +4,21 @@ import type { AddressInfo } from "node:net";
 import type { Pool } from "pg";
 import { createLotoLabServer } from "../src/api/server.js";
 
-test("web application shell and assets are served by the Loto Lab process", async (t) => {
-  const server = createLotoLabServer({ pool: {} as Pool });
+test("web application shell, coverage status and assets are served by the Loto Lab process", async (t) => {
+  const pool = {
+    async query() {
+      return {
+        rows: [{
+          contest_count: "10",
+          first_contest: 1,
+          last_contest: 10,
+          financial_contest_count: "8",
+          last_updated_at: new Date("2026-08-20T15:00:00.000Z"),
+        }],
+      };
+    },
+  } as unknown as Pool;
+  const server = createLotoLabServer({ pool });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", resolve);
@@ -23,7 +36,9 @@ test("web application shell and assets are served by the Loto Lab process", asyn
   assert.match(html, /Loto Lab/);
   assert.match(html, /Dashboard/);
   assert.match(html, /Gerar jogos/);
+  assert.match(html, /data-status-bar/);
   assert.match(html, /\/assets\/app\.js/);
+  assert.match(html, /\/assets\/data-status\.js/);
 
   const javascript = await fetch(`${baseUrl}/assets/app.js`);
   assert.equal(javascript.status, 200);
@@ -33,8 +48,26 @@ test("web application shell and assets are served by the Loto Lab process", asyn
   assert.match(source, /games\/generate/);
   assert.match(source, /backtests\/run/);
 
+  const dataStatusJavascript = await fetch(`${baseUrl}/assets/data-status.js`);
+  assert.equal(dataStatusJavascript.status, 200);
+  assert.match(await dataStatusJavascript.text(), /data\/status/);
+
   const stylesheet = await fetch(`${baseUrl}/assets/styles.css`);
   assert.equal(stylesheet.status, 200);
   assert.match(stylesheet.headers.get("content-type") ?? "", /^text\/css/);
   assert.match(await stylesheet.text(), /\.app-shell/);
+
+  const dataStatusStyles = await fetch(`${baseUrl}/assets/data-status.css`);
+  assert.equal(dataStatusStyles.status, 200);
+  assert.match(await dataStatusStyles.text(), /\.data-status-bar/);
+
+  const status = await fetch(`${baseUrl}/api/v1/data/status`);
+  assert.equal(status.status, 200);
+  const payload = (await status.json()) as {
+    items: Array<{ contestCount: number; missingContestCount: number; financialCoverage: number }>;
+  };
+  assert.equal(payload.items.length, 3);
+  assert.ok(payload.items.every((item) => item.contestCount === 10));
+  assert.ok(payload.items.every((item) => item.missingContestCount === 0));
+  assert.ok(payload.items.every((item) => item.financialCoverage === 0.8));
 });
