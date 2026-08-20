@@ -7,12 +7,13 @@ import {
   parsePositiveInt,
   readJsonBody,
   sendJson,
+  sendNoContent,
 } from "./http.js";
 
 function parseActualCost(value: unknown): number {
   const parsed = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1_000_000_000) {
-    throw new ApiError(400, "INVALID_ARGUMENT", "actualCost must be a non-negative number");
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 1_000_000_000) {
+    throw new ApiError(400, "INVALID_ARGUMENT", "actualCost must be a positive number");
   }
   return Math.round(parsed * 100) / 100;
 }
@@ -68,6 +69,11 @@ export async function serveRealBets(
   const service = new RealBetService(options.pool);
 
   try {
+    if (method === "OPTIONS") {
+      sendNoContent(response, corsOrigin);
+      return true;
+    }
+
     if (method === "POST" && pathname === "/api/v1/real-bets") {
       const body = await readJsonBody(request);
       const batchId = parsePositiveInt(body.batchId, "batchId");
