@@ -1,6 +1,6 @@
 {
   "name": "loto-lab",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,10 +14,16 @@
     "backtest:mega": "npm run build && node dist/src/cli/backtestMega.js",
     "backtest:lotofacil": "npm run build && node dist/src/cli/backtestLotofacil.js",
     "backtest:dia": "npm run build && node dist/src/cli/backtestDiaDeSorte.js",
-    "backtest:compare": "npm run build && node dist/src/cli/compareStrategies.js"
+    "backtest:compare": "npm run build && node dist/src/cli/compareStrategies.js",
+    "db:migrate": "npm run build && node dist/src/cli/dbMigrate.js",
+    "db:import-json": "npm run build && node dist/src/cli/dbImportJson.js"
+  },
+  "dependencies": {
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "@types/pg": "^8.23.0",
     "typescript": "^5.9.2"
   }
 }
