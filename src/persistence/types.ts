@@ -26,6 +26,8 @@ export interface GeneratedGameBatchRecord {
   targetContestNumber?: number;
   generatorOptions: Record<string, unknown>;
   createdAt: string;
+  archivedAt?: string;
+  hasRealBet: boolean;
   games: GeneratedGame[];
 }
 
