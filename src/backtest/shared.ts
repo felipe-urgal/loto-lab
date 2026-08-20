@@ -12,6 +12,8 @@ export interface BacktestSummary {
   prizeGames: number;
   prizeRate: number;
   totalCost: number;
+  pricedGames: number;
+  costCoverage: number;
   financialCost: number;
   totalPrizeValue: number;
   financialGames: number;
@@ -43,6 +45,7 @@ export function summarizeBacktestRounds(rounds: SummarizableRound[]): BacktestSu
   let maxHits = 0;
   let prizeGames = 0;
   let totalCost = 0;
+  let pricedGames = 0;
   let financialCost = 0;
   let totalPrizeValue = 0;
   let financialGames = 0;
@@ -59,12 +62,21 @@ export function summarizeBacktestRounds(rounds: SummarizableRound[]): BacktestSu
       totalHits += check.hits;
       totalGames += 1;
       maxHits = Math.max(maxHits, check.hits);
-      totalCost += check.ticketCost;
+
+      if (check.ticketCost !== undefined) {
+        totalCost += check.ticketCost;
+        pricedGames += 1;
+      }
+
       if (check.prizeTier) {
         incrementString(prizeTierDistribution, check.prizeTier);
         prizeGames += 1;
       }
-      if (check.totalPrizeValue !== undefined) {
+
+      // Financial metrics require both a known ticket price and real rateio.
+      // Older contests with unknown historical price still participate in
+      // statistical metrics, but never receive a fabricated cost.
+      if (check.totalPrizeValue !== undefined && check.ticketCost !== undefined) {
         totalPrizeValue += check.totalPrizeValue;
         financialCost += check.ticketCost;
         financialGames += 1;
@@ -72,6 +84,7 @@ export function summarizeBacktestRounds(rounds: SummarizableRound[]): BacktestSu
     }
   }
 
+  const costCoverage = totalGames === 0 ? 0 : pricedGames / totalGames;
   const financialCoverage = totalGames === 0 ? 0 : financialGames / totalGames;
   const netResult = totalPrizeValue - financialCost;
   const returnRate = financialCost === 0 ? 0 : totalPrizeValue / financialCost;
@@ -89,6 +102,8 @@ export function summarizeBacktestRounds(rounds: SummarizableRound[]): BacktestSu
     prizeGames,
     prizeRate: totalGames === 0 ? 0 : prizeGames / totalGames,
     totalCost,
+    pricedGames,
+    costCoverage,
     financialCost,
     totalPrizeValue,
     financialGames,
