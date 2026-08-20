@@ -18,6 +18,8 @@ Arquivos principais:
 - healthchecks existem para aplicação e banco;
 - migrations são aplicadas automaticamente no startup;
 - o scheduler operacional continua sincronizando concursos e reconciliando apostas;
+- toda a UI/API, exceto healthchecks, exige autenticação HTTP Basic em produção;
+- endpoints caros possuem limites e rate limiting para reduzir risco de indisponibilidade;
 - segredos ficam somente em `.env.production`, que não deve ser commitado.
 
 ## Requisitos do host
@@ -35,17 +37,24 @@ Node/npm no host são opcionais se os comandos Docker Compose forem executados d
 cp .env.production.example .env.production
 ```
 
-Gere uma senha longa para o PostgreSQL, por exemplo:
+Gere segredos diferentes e longos para PostgreSQL e para o acesso ao Loto Lab, por exemplo:
 
 ```bash
+openssl rand -hex 32
 openssl rand -hex 32
 ```
 
 Edite `.env.production` e substitua:
 
 ```env
+APP_AUTH_USER=loto-admin
+APP_AUTH_PASSWORD=...
 POSTGRES_PASSWORD=...
 ```
+
+`APP_AUTH_PASSWORD` deve possuir pelo menos 12 caracteres. O Compose de produção não inicia sem usuário/senha da aplicação e senha do PostgreSQL.
+
+Ao abrir o Loto Lab no navegador, o próprio navegador solicitará as credenciais HTTP Basic. Use HTTPS sempre que esse acesso passar por uma rede não confiável.
 
 Se houver um domínio público, configure também:
 
@@ -60,7 +69,7 @@ OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.6-luna
 ```
 
-Sem chave ou sem billing da API, somente a geração de interpretações de IA fica indisponível.
+Sem chave ou sem billing da API, somente a geração de interpretações de IA fica indisponível. Chamadas de interpretação possuem timeout e rate limiting no servidor para limitar consumo acidental ou abusivo.
 
 ## Exposição de rede
 
@@ -137,6 +146,26 @@ Resposta esperada:
 ```json
 {"status":"ok","database":"ready"}
 ```
+
+Os endpoints `/health`, `/health/live` e `/health/ready` não exigem autenticação para permitir healthchecks do Docker/reverse proxy. Todo o restante exige credenciais quando `APP_AUTH_USER` e `APP_AUTH_PASSWORD` estão configurados.
+
+Para validar uma rota protegida via terminal:
+
+```bash
+curl -u "$APP_AUTH_USER:$APP_AUTH_PASSWORD" http://127.0.0.1:3000/api/v1/lotteries
+```
+
+## Limites operacionais HTTP
+
+Para evitar que uma chamada web monopolize CPU/memória:
+
+- geração de jogos aceita no máximo 10 jogos por chamada;
+- backtests via HTTP aceitam no máximo 10 jogos por concurso e 500 concursos por execução;
+- Laboratório aceita no máximo 10 jogos, 500 concursos de aquecimento/lookback e bucket máximo de 100;
+- geração, backtests, Laboratório, IA e sincronização manual possuem rate limiting em memória;
+- backtests persistidos guardam apenas o artefato compacto de cada rodada; o resumo completo continua preservado.
+
+Backtests maiores devem ser segmentados por intervalo de concursos. O limite web não altera os cálculos determinísticos do core.
 
 ## Logs
 
@@ -228,6 +257,8 @@ OPS_STALE_AFTER_MINUTES=180
 
 A aplicação usa advisory lock no PostgreSQL para impedir duas sincronizações simultâneas. O botão do Dashboard, scheduler e comandos manuais compartilham a mesma trava.
 
+No encerramento por `SIGINT`/`SIGTERM`, a aplicação para de aceitar novas conexões, aguarda uma sincronização operacional já iniciada terminar e só então encerra o pool do PostgreSQL.
+
 ## Reverse proxy e HTTPS
 
 O compose não escolhe um provedor de TLS. Em produção pública, coloque um reverse proxy na frente de `127.0.0.1:3000` e use HTTPS.
@@ -238,7 +269,9 @@ Depois ajuste:
 PUBLIC_ORIGIN=https://seu-dominio
 ```
 
-Não coloque `OPENAI_API_KEY`, senha do PostgreSQL ou qualquer outro segredo no proxy, frontend ou repositório.
+O Loto Lab envia CSP, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` e políticas same-origin nos assets web. O reverse proxy deve adicionar HSTS quando HTTPS estiver estabilizado.
+
+Não coloque `OPENAI_API_KEY`, senha do PostgreSQL ou qualquer outro segredo no frontend ou repositório. As credenciais HTTP Basic podem ficar no `.env.production` ou ser substituídas posteriormente por um provedor de autenticação mais completo.
 
 ## CI
 
@@ -247,5 +280,7 @@ O CI valida produção em três níveis:
 1. suíte TypeScript/PostgreSQL existente;
 2. `docker compose config` da stack de produção;
 3. build da imagem e smoke test real do container contra PostgreSQL, aguardando `/health/ready`.
+
+A imagem de runtime é construída com `tsconfig.build.json`, contendo somente o código de `src/`; testes não são copiados para o artefato final.
 
 Assim uma alteração só fica verde quando o artefato que será executado em produção também consegue iniciar.
