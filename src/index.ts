@@ -34,4 +34,5 @@ export * from "./api/app.js";
 export * from "./api/dataStatus.js";
 export * from "./api/strategyLab.js";
 export * from "./api/realBets.js";
+export * from "./api/gameBatchManagement.js";
 export * from "./api/server.js";
