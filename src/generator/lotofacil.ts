@@ -42,7 +42,13 @@ export function generateLotofacilGames(
     .sort((a, b) => a.number - b.number);
   const lastContest = scoped.at(-1);
   const analysis = buildNumberAnalysis(scoped, config);
-  const fixedNumbers = selectProfiledFixedNumbers(analysis, fixedCount, lastContest);
+  const fixedNumbers = selectProfiledFixedNumbers(
+    analysis,
+    fixedCount,
+    lastContest,
+    fixedCount,
+    random,
+  );
   const fixedSet = new Set(fixedNumbers);
   const scores = scoreMap(analysis);
   const variableCount = config.drawSize - fixedCount;
