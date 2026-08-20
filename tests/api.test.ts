@@ -25,8 +25,12 @@ function makeMegaContest(offset: number): Contest {
   };
 }
 
+function gameFingerprint(games: Array<{ numbers: number[] }>): string {
+  return games.map((game) => game.numbers.join("-")).sort().join("|");
+}
+
 test(
-  "HTTP API exposes contests, analysis, generation, real bets, checking, strategies, backtests and lab",
+  "HTTP API exposes contests, analysis, diversified generation, real bets, checking, strategies, backtests and lab",
   { skip: !process.env.DATABASE_URL },
   async (t) => {
     const pool = createPostgresPool({ max: 4 });
@@ -118,11 +122,49 @@ test(
       batchId: number;
       targetContestNumber: number;
       games: Array<{ numbers: number[] }>;
+      generatorOptions: { generationMode: string; seed: string };
     };
     assert.ok(generated.batchId > 0);
     assert.equal(generated.targetContestNumber, 2624);
     assert.equal(generated.games.length, 2);
     assert.ok(generated.games.every((game) => game.numbers.length === 6));
+    assert.equal(generated.generatorOptions.generationMode, "diversified");
+    assert.ok(generated.generatorOptions.seed.length > 8);
+
+    const secondGenerateResponse = await fetch(`${baseUrl}/api/v1/games/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lottery: "mega-sena",
+        gameCount: 2,
+        targetContestNumber: 2624,
+      }),
+    });
+    assert.equal(secondGenerateResponse.status, 201);
+    const secondGenerated = (await secondGenerateResponse.json()) as {
+      batchId: number;
+      games: Array<{ numbers: number[] }>;
+      generatorOptions: { generationMode: string; seed: string };
+    };
+    assert.notEqual(secondGenerated.batchId, generated.batchId);
+    assert.notEqual(gameFingerprint(secondGenerated.games), gameFingerprint(generated.games));
+    assert.notEqual(secondGenerated.generatorOptions.seed, generated.generatorOptions.seed);
+
+    const replayResponse = await fetch(`${baseUrl}/api/v1/games/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lottery: "mega-sena",
+        gameCount: 2,
+        targetContestNumber: 2624,
+        generationMode: "diversified",
+        seed: generated.generatorOptions.seed,
+        persist: false,
+      }),
+    });
+    assert.equal(replayResponse.status, 200);
+    const replay = (await replayResponse.json()) as { games: Array<{ numbers: number[] }> };
+    assert.equal(gameFingerprint(replay.games), gameFingerprint(generated.games));
 
     const checkResponse = await fetch(`${baseUrl}/api/v1/games/check`, {
       method: "POST",
