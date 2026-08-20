@@ -36,7 +36,7 @@ export interface StrategyLabVariant {
   key: string;
   label: string;
   fixedCount: number;
-  summary: BacktestSummary & Record<string, unknown>;
+  summary: BacktestSummary;
   series: StrategyLabPoint[];
 }
 
@@ -116,7 +116,7 @@ function toVariant(
   label: string,
   fixedCount: number,
   rounds: LabRound[],
-  summary: BacktestSummary & Record<string, unknown>,
+  summary: BacktestSummary,
   bucketSize: number,
 ): StrategyLabVariant {
   return {
