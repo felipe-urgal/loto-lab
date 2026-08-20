@@ -1,0 +1,96 @@
+import type { Pool } from "pg";
+import type { LotteryId } from "../domain/types.js";
+import { evaluateGames } from "../checker/evaluate.js";
+import { PostgresContestRepository } from "../persistence/contestRepository.js";
+import { PostgresGameRepository } from "../persistence/gameRepository.js";
+import {
+  PostgresRealBetRepository,
+  type RealBetRecord,
+  type RealBetSummary,
+} from "../persistence/realBetRepository.js";
+
+export interface CreateRealBetRequest {
+  batchId: number;
+  contestNumber?: number;
+  gamePositions?: number[];
+  actualCost: number;
+  playedAt?: string;
+}
+
+export class RealBetService {
+  readonly contests: PostgresContestRepository;
+  readonly batches: PostgresGameRepository;
+  readonly realBets: PostgresRealBetRepository;
+
+  constructor(pool: Pool) {
+    this.contests = new PostgresContestRepository(pool);
+    this.batches = new PostgresGameRepository(pool);
+    this.realBets = new PostgresRealBetRepository(pool);
+  }
+
+  async create(input: CreateRealBetRequest): Promise<RealBetRecord> {
+    const batch = await this.batches.findBatch(input.batchId);
+    if (!batch) throw new Error(`BATCH_NOT_FOUND:${input.batchId}`);
+
+    const existing = await this.realBets.findByBatchId(input.batchId);
+    if (existing) throw new Error(`REAL_BET_ALREADY_EXISTS:${existing.id}`);
+
+    const contestNumber = input.contestNumber ?? batch.targetContestNumber;
+    if (!contestNumber) throw new Error("CONTEST_NUMBER_REQUIRED");
+
+    const positions = input.gamePositions?.length
+      ? [...new Set(input.gamePositions)]
+      : batch.games.map((_, index) => index + 1);
+    if (positions.length === 0 || positions.some((position) => !Number.isInteger(position) || position < 1 || position > batch.games.length)) {
+      throw new Error("INVALID_GAME_POSITIONS");
+    }
+
+    const games = positions
+      .sort((a, b) => a - b)
+      .map((position) => ({ batchPosition: position, game: batch.games[position - 1]! }));
+    const playedAt = input.playedAt ?? new Date().toISOString();
+    if (!Number.isFinite(new Date(playedAt).getTime())) throw new Error("INVALID_PLAYED_AT");
+
+    const created = await this.realBets.create({
+      batchId: batch.id,
+      lottery: batch.lottery,
+      contestNumber,
+      actualCost: input.actualCost,
+      playedAt,
+      games,
+    });
+
+    return (await this.reconcile(created.id)) ?? created;
+  }
+
+  async reconcile(id: number): Promise<RealBetRecord | undefined> {
+    const bet = await this.realBets.findById(id);
+    if (!bet) return undefined;
+    if (bet.status === "checked") return bet;
+
+    const contest = await this.contests.findByNumber(bet.lottery, bet.contestNumber);
+    if (!contest) return bet;
+
+    const checks = evaluateGames(bet.games.map((item) => item.game), contest);
+    return this.realBets.markChecked(id, checks);
+  }
+
+  async reconcilePending(lottery?: LotteryId): Promise<number> {
+    const pending = await this.realBets.listPending(lottery);
+    let checked = 0;
+    for (const bet of pending) {
+      const after = await this.reconcile(bet.id);
+      if (after?.status === "checked") checked += 1;
+    }
+    return checked;
+  }
+
+  async list(lottery: LotteryId, limit = 50): Promise<{ items: RealBetRecord[]; summary: RealBetSummary }> {
+    await this.reconcilePending(lottery);
+    const [items, summary] = await Promise.all([
+      this.realBets.listRecent(lottery, limit),
+      this.realBets.summary(lottery),
+    ]);
+    return { items, summary };
+  }
+}
