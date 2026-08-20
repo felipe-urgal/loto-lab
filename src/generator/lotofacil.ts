@@ -4,9 +4,12 @@ import { getLotteryConfig } from "../lotteries/config.js";
 import {
   buildMetadata,
   combinations,
+  generationRandom,
   gridExtremePenalty,
   scoreMap,
   selectProfiledFixedNumbers,
+  selectRankedCandidate,
+  type GenerationMode,
 } from "./shared.js";
 
 const config = getLotteryConfig("lotofacil");
@@ -14,6 +17,8 @@ const config = getLotteryConfig("lotofacil");
 export interface LotofacilGeneratorOptions {
   gameCount?: number;
   fixedCount?: 8 | 9 | 10;
+  generationMode?: GenerationMode;
+  seed?: string;
 }
 
 export function generateLotofacilGames(
@@ -22,6 +27,8 @@ export function generateLotofacilGames(
 ): GeneratedGame[] {
   const gameCount = options.gameCount ?? 2;
   const fixedCount = options.fixedCount ?? 8;
+  const generationMode = options.generationMode ?? "deterministic";
+  const random = generationRandom(generationMode, options.seed);
 
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
@@ -93,7 +100,7 @@ export function generateLotofacilGames(
           a.numbers.join("-").localeCompare(b.numbers.join("-")),
       );
 
-    const winner = ranked[0];
+    const winner = selectRankedCandidate(ranked, generationMode, random, 6);
     if (!winner) throw new Error("Unable to generate a Lotofacil game");
 
     for (const number of winner.variableNumbers) {
