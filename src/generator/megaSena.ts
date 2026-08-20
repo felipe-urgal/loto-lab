@@ -4,6 +4,7 @@ import { buildNumberAnalysis } from "../analysis/scoring.js";
 import {
   generationRandom,
   selectRankedCandidate,
+  selectWeightedItem,
   type GenerationMode,
 } from "./shared.js";
 
@@ -22,10 +23,12 @@ function bestUnused(
   analysis: NumberAnalysis[],
   selected: Set<number>,
   value: (row: NumberAnalysis) => number,
+  random?: () => number,
 ): number {
-  const candidate = [...analysis]
+  const ranked = [...analysis]
     .filter((row) => !selected.has(row.number))
-    .sort((a, b) => value(b) - value(a) || b.score - a.score || a.number - b.number)[0];
+    .sort((a, b) => value(b) - value(a) || b.score - a.score || a.number - b.number);
+  const candidate = random ? selectWeightedItem(ranked, random, 6) : ranked[0];
 
   if (!candidate) throw new Error("Unable to select a Mega-Sena fixed number");
   selected.add(candidate.number);
@@ -35,6 +38,7 @@ function bestUnused(
 export function selectMegaSenaFixedNumbers(
   analysis: NumberAnalysis[],
   count: MegaSenaFixedCount = 3,
+  random?: () => number,
 ): number[] {
   if (![0, 2, 3].includes(count)) {
     throw new Error("Mega-Sena fixedCount must be 0, 2 or 3");
@@ -42,12 +46,12 @@ export function selectMegaSenaFixedNumbers(
   if (count === 0) return [];
 
   const selected = new Set<number>();
-  bestUnused(analysis, selected, (row) => row.year);
+  bestUnused(analysis, selected, (row) => row.year, random);
   if (selected.size < count) {
-    bestUnused(analysis, selected, (row) => row.historical * 0.5 + row.year * 0.5);
+    bestUnused(analysis, selected, (row) => row.historical * 0.5 + row.year * 0.5, random);
   }
   if (selected.size < count) {
-    bestUnused(analysis, selected, (row) => row.recent10 * 0.6 + row.month * 0.4);
+    bestUnused(analysis, selected, (row) => row.recent10 * 0.6 + row.month * 0.4, random);
   }
 
   return [...selected].sort((a, b) => a - b);
@@ -124,7 +128,7 @@ export function generateMegaSenaGames(
     .filter((contest) => contest.lottery === "mega-sena")
     .sort((a, b) => a.number - b.number);
   const analysis = buildNumberAnalysis(scoped, config);
-  const fixedNumbers = selectMegaSenaFixedNumbers(analysis, fixedCount);
+  const fixedNumbers = selectMegaSenaFixedNumbers(analysis, fixedCount, random);
   const fixedSet = new Set(fixedNumbers);
   const lastContest = scoped.at(-1);
   const scoreByNumber = new Map(analysis.map((row) => [row.number, row.score]));

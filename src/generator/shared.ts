@@ -59,11 +59,30 @@ export function scoreMap(analysis: NumberAnalysis[]): Map<number, number> {
   return new Map(analysis.map((row) => [row.number, row.score]));
 }
 
+export function selectWeightedItem<T>(
+  ranked: T[],
+  random: () => number,
+  poolSize = 6,
+): T | undefined {
+  if (ranked.length === 0) return undefined;
+  const pool = ranked.slice(0, Math.max(1, Math.min(poolSize, ranked.length)));
+  const totalWeight = pool.reduce((sum, _candidate, index) => sum + (pool.length - index), 0);
+  let cursor = random() * totalWeight;
+
+  for (let index = 0; index < pool.length; index += 1) {
+    cursor -= pool.length - index;
+    if (cursor < 0) return pool[index];
+  }
+
+  return pool[0];
+}
+
 export function selectProfiledFixedNumbers(
   analysis: NumberAnalysis[],
   count: number,
   lastContest?: Contest,
   maxRepeatedFromLastContest = count,
+  random?: () => number,
 ): number[] {
   if (!Number.isInteger(count) || count < 1 || count > analysis.length) {
     throw new Error("Invalid fixed-number count");
@@ -82,14 +101,15 @@ export function selectProfiledFixedNumbers(
     const selectedRepeats = lastContest
       ? [...selected].filter((number) => lastContest.numbers.includes(number)).length
       : 0;
-    const candidate = [...analysis]
+    const ranked = [...analysis]
       .filter((row) => {
         if (selected.has(row.number)) return false;
         if (!lastContest) return true;
         if (selectedRepeats < maxRepeatedFromLastContest) return true;
         return !lastContest.numbers.includes(row.number);
       })
-      .sort((a, b) => value(b) - value(a) || b.score - a.score || a.number - b.number)[0];
+      .sort((a, b) => value(b) - value(a) || b.score - a.score || a.number - b.number);
+    const candidate = random ? selectWeightedItem(ranked, random, 6) : ranked[0];
 
     if (!candidate) throw new Error("Unable to select fixed number");
     selected.add(candidate.number);

@@ -11,6 +11,15 @@ function fingerprint(games: GeneratedGame[]): string {
     .join("|");
 }
 
+function coreFingerprint(games: GeneratedGame[]): string {
+  return games[0]?.fixedNumbers.join("-") ?? "";
+}
+
+function sharesOneCore(games: GeneratedGame[]): boolean {
+  const core = coreFingerprint(games);
+  return games.every((game) => game.fixedNumbers.join("-") === core);
+}
+
 function megaContests(): Contest[] {
   return Array.from({ length: 30 }, (_, index) => ({
     lottery: "mega-sena" as const,
@@ -46,7 +55,9 @@ function diaContests(): Contest[] {
   }));
 }
 
-test("diversified Mega-Sena generation is reproducible by seed and varies across seeds", () => {
+const SEEDS = ["seed-a", "seed-b", "seed-c", "seed-d", "seed-e", "seed-f", "seed-g", "seed-h"];
+
+test("diversified Mega-Sena generation is reproducible and diversifies the shared core", () => {
   const contests = megaContests();
   const first = generateMegaSenaGames(contests, {
     gameCount: 3,
@@ -58,53 +69,85 @@ test("diversified Mega-Sena generation is reproducible by seed and varies across
     generationMode: "diversified",
     seed: "mega-seed-a",
   });
-  const variants = ["mega-seed-a", "mega-seed-b", "mega-seed-c", "mega-seed-d"].map((seed) =>
-    generateMegaSenaGames(contests, { gameCount: 3, generationMode: "diversified", seed }),
+  const variants = SEEDS.map((seed) =>
+    generateMegaSenaGames(contests, { gameCount: 3, generationMode: "diversified", seed: `mega-${seed}` }),
   );
 
   assert.deepEqual(first, replay);
   assert.ok(new Set(variants.map(fingerprint)).size > 1);
-  assert.ok(variants.every((games) =>
-    games.every((game) => JSON.stringify(game.fixedNumbers) === JSON.stringify(first[0]!.fixedNumbers)),
-  ));
+  assert.ok(new Set(variants.map(coreFingerprint)).size > 1);
+  assert.ok(variants.every(sharesOneCore));
+  assert.ok(variants.every((games) => games[0]!.fixedNumbers.length === 3));
 });
 
-test("diversified Lotofacil generation varies variables while preserving the fixed core", () => {
+test("diversified Lotofacil generation diversifies the shared core and preserves its size", () => {
   const contests = lotofacilContests();
-  const variants = ["loto-a", "loto-b", "loto-c", "loto-d"].map((seed) =>
+  const replaySeed = "loto-replay";
+  const first = generateLotofacilGames(contests, {
+    gameCount: 2,
+    fixedCount: 8,
+    generationMode: "diversified",
+    seed: replaySeed,
+  });
+  const replay = generateLotofacilGames(contests, {
+    gameCount: 2,
+    fixedCount: 8,
+    generationMode: "diversified",
+    seed: replaySeed,
+  });
+  const variants = SEEDS.map((seed) =>
     generateLotofacilGames(contests, {
       gameCount: 2,
       fixedCount: 8,
       generationMode: "diversified",
-      seed,
+      seed: `loto-${seed}`,
     }),
   );
 
+  assert.deepEqual(first, replay);
   assert.ok(new Set(variants.map(fingerprint)).size > 1);
-  const core = variants[0]![0]!.fixedNumbers;
+  assert.ok(new Set(variants.map(coreFingerprint)).size > 1);
+  assert.ok(variants.every(sharesOneCore));
   assert.ok(variants.every((games) => games.every((game) => {
     assert.equal(game.numbers.length, 15);
+    assert.equal(game.fixedNumbers.length, 8);
     assert.equal(game.variableNumbers.length, 7);
-    return JSON.stringify(game.fixedNumbers) === JSON.stringify(core);
+    return true;
   })));
 });
 
-test("diversified Dia de Sorte generation varies variables while preserving the fixed core", () => {
+test("diversified Dia de Sorte generation diversifies the shared core and keeps repeat limits", () => {
   const contests = diaContests();
-  const variants = ["dia-a", "dia-b", "dia-c", "dia-d"].map((seed) =>
+  const lastContest = contests.at(-1)!;
+  const replaySeed = "dia-replay";
+  const first = generateDiaDeSorteGames(contests, {
+    gameCount: 3,
+    generationMode: "diversified",
+    seed: replaySeed,
+  });
+  const replay = generateDiaDeSorteGames(contests, {
+    gameCount: 3,
+    generationMode: "diversified",
+    seed: replaySeed,
+  });
+  const variants = SEEDS.map((seed) =>
     generateDiaDeSorteGames(contests, {
       gameCount: 3,
       generationMode: "diversified",
-      seed,
+      seed: `dia-${seed}`,
     }),
   );
 
+  assert.deepEqual(first, replay);
   assert.ok(new Set(variants.map(fingerprint)).size > 1);
-  const core = variants[0]![0]!.fixedNumbers;
+  assert.ok(new Set(variants.map(coreFingerprint)).size > 1);
+  assert.ok(variants.every(sharesOneCore));
   assert.ok(variants.every((games) => games.every((game) => {
     assert.equal(game.numbers.length, 7);
+    assert.equal(game.fixedNumbers.length, 3);
     assert.equal(game.variableNumbers.length, 4);
-    return JSON.stringify(game.fixedNumbers) === JSON.stringify(core);
+    assert.ok(game.fixedNumbers.filter((number) => lastContest.numbers.includes(number)).length <= 1);
+    return true;
   })));
 });
 
