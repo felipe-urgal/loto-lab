@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: loto_lab
+      POSTGRES_USER: loto_lab
+      POSTGRES_PASSWORD: loto_lab
+    ports:
+      - "5432:5432"
+    volumes:
+      - loto_lab_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loto_lab -d loto_lab"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  loto_lab_postgres:
