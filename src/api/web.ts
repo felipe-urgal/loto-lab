@@ -6,6 +6,8 @@ const ASSETS: Record<string, { file: string; contentType: string; cache: string 
   "/": { file: "index.html", contentType: "text/html; charset=utf-8", cache: "no-cache" },
   "/assets/styles.css": { file: "styles.css", contentType: "text/css; charset=utf-8", cache: "public, max-age=300" },
   "/assets/app.js": { file: "app.js", contentType: "text/javascript; charset=utf-8", cache: "no-cache" },
+  "/assets/data-status.css": { file: "data-status.css", contentType: "text/css; charset=utf-8", cache: "public, max-age=300" },
+  "/assets/data-status.js": { file: "data-status.js", contentType: "text/javascript; charset=utf-8", cache: "no-cache" },
   "/favicon.svg": { file: "favicon.svg", contentType: "image/svg+xml; charset=utf-8", cache: "public, max-age=86400" },
 };
 
