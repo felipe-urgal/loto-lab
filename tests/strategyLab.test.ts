@@ -64,10 +64,38 @@ test("strategy lab compares the expected presets over the same period", () => {
       result.variants.map((variant) => variant.fixedCount).sort((a, b) => a - b),
       fixture.expected,
     );
+    assert.equal(result.experiment, "fixed-core");
     assert.equal(result.startContest, 9);
     assert.equal(result.endContest, 18);
     assert.ok(result.winner);
     assert.ok(result.variants.every((variant) => variant.summary.testedContests === 10));
     assert.ok(result.variants.every((variant) => variant.series.length === 2));
   }
+});
+
+test("strategy lab exposes external Mega-Sena rules as a separate experiment", () => {
+  const contests = contestsFor("mega-sena", 24, 6, 60);
+  const result = compareStrategyLab(contests, {
+    lottery: "mega-sena",
+    experiment: "external-rules",
+    gameCount: 1,
+    warmupContests: 5,
+    lookbackContests: 10,
+    bucketSize: 5,
+  });
+
+  const keys = new Set(result.variants.map((variant) => variant.key));
+  assert.equal(result.experiment, "external-rules");
+  assert.equal(result.variants.length, 9);
+  assert.ok(keys.has("mega-rules-baseline"));
+  assert.ok(keys.has("mega-rules-group-2"));
+  assert.ok(keys.has("mega-rules-group-3"));
+  assert.ok(keys.has("mega-rules-no-consecutive"));
+  assert.ok(keys.has("mega-rules-columns"));
+  assert.ok(keys.has("mega-rules-parity"));
+  assert.ok(keys.has("mega-rules-quadrants"));
+  assert.ok(keys.has("mega-rules-article-2"));
+  assert.ok(keys.has("mega-rules-article-3"));
+  assert.ok(result.variants.every((variant) => variant.fixedCount === 0));
+  assert.ok(result.variants.every((variant) => variant.summary.testedContests === 10));
 });
