@@ -51,8 +51,8 @@ function decorateForm() {
     card.innerHTML = `
       <div class="generation-mode-badge">Modo real · diversificado</div>
       <div>
-        <strong>Cada nova geração explora outras combinações de alta pontuação.</strong>
-        <p>O núcleo da estratégia permanece calculado pelo mesmo histórico. As variáveis são escolhidas de forma ponderada entre as melhores combinações válidas. Backtests e Laboratório continuam determinísticos.</p>
+        <strong>Cada nova geração explora outros núcleos e combinações de alta pontuação.</strong>
+        <p>O núcleo compartilhado também varia de forma ponderada entre as melhores candidatas da análise. Todos os jogos do mesmo lote continuam compartilhando o mesmo núcleo. Backtests e Laboratório continuam determinísticos.</p>
       </div>`;
     actions?.insertAdjacentElement("beforebegin", card);
   }
