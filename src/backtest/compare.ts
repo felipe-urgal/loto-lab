@@ -10,6 +10,12 @@ export interface StrategyComparisonRow {
   prizeRate: number;
   testedContests: number;
   totalGames: number;
+  totalCost: number;
+  totalPrizeValue: number;
+  netResult: number;
+  returnRate: number;
+  roi: number;
+  financialCoverage: number;
 }
 
 export interface LotofacilComparisonOptions {
@@ -41,10 +47,18 @@ export function compareLotofacilFixedCores(
         prizeRate: result.summary.prizeRate,
         testedContests: result.summary.testedContests,
         totalGames: result.summary.totalGames,
+        totalCost: result.summary.totalCost,
+        totalPrizeValue: result.summary.totalPrizeValue,
+        netResult: result.summary.netResult,
+        returnRate: result.summary.returnRate,
+        roi: result.summary.roi,
+        financialCoverage: result.summary.financialCoverage,
       };
     })
     .sort(
       (a, b) =>
+        b.financialCoverage - a.financialCoverage ||
+        b.roi - a.roi ||
         b.prizeRate - a.prizeRate ||
         b.averageHitsPerGame - a.averageHitsPerGame ||
         b.maxHits - a.maxHits ||
