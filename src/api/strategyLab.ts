@@ -1,5 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { compareStrategyLab } from "../lab/strategyLab.js";
+import {
+  compareStrategyLab,
+  type StrategyLabExperiment,
+} from "../lab/strategyLab.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import type { ApiServerOptions } from "./app.js";
 import {
@@ -10,6 +13,12 @@ import {
   readJsonBody,
   sendJson,
 } from "./http.js";
+
+function parseExperiment(value: unknown): StrategyLabExperiment {
+  if (value === undefined || value === null || value === "") return "fixed-core";
+  if (value === "fixed-core" || value === "external-rules") return value;
+  throw new ApiError(400, "INVALID_ARGUMENT", "experiment must be fixed-core or external-rules");
+}
 
 export async function serveStrategyLab(
   request: IncomingMessage,
@@ -25,6 +34,10 @@ export async function serveStrategyLab(
   try {
     const body = await readJsonBody(request);
     const lottery = parseLottery(body.lottery);
+    const experiment = parseExperiment(body.experiment);
+    if (experiment === "external-rules" && lottery !== "mega-sena") {
+      throw new ApiError(400, "INVALID_ARGUMENT", "external-rules experiment is available only for Mega-Sena");
+    }
     const gameCount = parsePositiveInt(body.gameCount, "gameCount", {
       min: 1,
       max: 20,
@@ -67,6 +80,7 @@ export async function serveStrategyLab(
 
     const result = compareStrategyLab(contests, {
       lottery,
+      experiment,
       gameCount,
       warmupContests,
       lookbackContests,
