@@ -110,7 +110,13 @@ export function generateDiaDeSorteGames(
   const analysis = buildNumberAnalysis(scoped, config);
   const fixedNumbers = fixedCount === 0
     ? []
-    : selectProfiledFixedNumbers(analysis, fixedCount, lastContest, Math.min(1, fixedCount));
+    : selectProfiledFixedNumbers(
+      analysis,
+      fixedCount,
+      lastContest,
+      Math.min(1, fixedCount),
+      random,
+    );
   const fixedSet = new Set(fixedNumbers);
   const scores = scoreMap(analysis);
   const variableCount = config.drawSize - fixedCount;
