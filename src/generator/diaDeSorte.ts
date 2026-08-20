@@ -4,8 +4,11 @@ import { getLotteryConfig } from "../lotteries/config.js";
 import {
   buildMetadata,
   combinations,
+  generationRandom,
   scoreMap,
   selectProfiledFixedNumbers,
+  selectRankedCandidate,
+  type GenerationMode,
 } from "./shared.js";
 
 const config = getLotteryConfig("dia-de-sorte");
@@ -15,6 +18,8 @@ export type DiaDeSorteFixedCount = 0 | 2 | 3;
 export interface DiaDeSorteGeneratorOptions {
   gameCount?: number;
   fixedCount?: DiaDeSorteFixedCount;
+  generationMode?: GenerationMode;
+  seed?: string;
 }
 
 const LUCKY_MONTHS = [
@@ -64,13 +69,24 @@ export function rankLuckyMonths(contests: Contest[]): string[] {
   });
 }
 
+interface NormalizedDiaDeSorteGeneratorOptions {
+  gameCount: number;
+  fixedCount: DiaDeSorteFixedCount;
+  generationMode: GenerationMode;
+  seed?: string;
+}
+
 function normalizeOptions(
   value: number | DiaDeSorteGeneratorOptions,
-): Required<DiaDeSorteGeneratorOptions> {
-  if (typeof value === "number") return { gameCount: value, fixedCount: 3 };
+): NormalizedDiaDeSorteGeneratorOptions {
+  if (typeof value === "number") {
+    return { gameCount: value, fixedCount: 3, generationMode: "deterministic" };
+  }
   return {
     gameCount: value.gameCount ?? 2,
     fixedCount: value.fixedCount ?? 3,
+    generationMode: value.generationMode ?? "deterministic",
+    ...(value.seed !== undefined ? { seed: value.seed } : {}),
   };
 }
 
@@ -78,7 +94,7 @@ export function generateDiaDeSorteGames(
   contests: Contest[],
   options: number | DiaDeSorteGeneratorOptions = 2,
 ): GeneratedGame[] {
-  const { gameCount, fixedCount } = normalizeOptions(options);
+  const { gameCount, fixedCount, generationMode, seed } = normalizeOptions(options);
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
   }
@@ -86,6 +102,7 @@ export function generateDiaDeSorteGames(
     throw new Error("Dia de Sorte fixedCount must be 0, 2 or 3");
   }
 
+  const random = generationRandom(generationMode, seed);
   const scoped = contests
     .filter((contest) => contest.lottery === "dia-de-sorte")
     .sort((a, b) => a.number - b.number);
@@ -151,7 +168,7 @@ export function generateDiaDeSorteGames(
           a.numbers.join("-").localeCompare(b.numbers.join("-")),
       );
 
-    const winner = ranked[0];
+    const winner = selectRankedCandidate(ranked, generationMode, random, 6);
     if (!winner) throw new Error("Unable to generate a Dia de Sorte game");
 
     for (const number of winner.variableNumbers) {

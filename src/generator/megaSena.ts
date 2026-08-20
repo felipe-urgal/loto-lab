@@ -1,6 +1,11 @@
 import type { Contest, GeneratedGame, NumberAnalysis } from "../domain/types.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { buildNumberAnalysis } from "../analysis/scoring.js";
+import {
+  generationRandom,
+  selectRankedCandidate,
+  type GenerationMode,
+} from "./shared.js";
 
 const config = getLotteryConfig("mega-sena");
 
@@ -9,6 +14,8 @@ export type MegaSenaFixedCount = 0 | 2 | 3;
 export interface MegaSenaGeneratorOptions {
   gameCount?: number;
   fixedCount?: MegaSenaFixedCount;
+  generationMode?: GenerationMode;
+  seed?: string;
 }
 
 function bestUnused(
@@ -79,13 +86,24 @@ function buildMetadata(numbers: number[], lastContest?: Contest): GeneratedGame[
   };
 }
 
+interface NormalizedMegaSenaGeneratorOptions {
+  gameCount: number;
+  fixedCount: MegaSenaFixedCount;
+  generationMode: GenerationMode;
+  seed?: string;
+}
+
 function normalizeOptions(
   value: number | MegaSenaGeneratorOptions,
-): Required<MegaSenaGeneratorOptions> {
-  if (typeof value === "number") return { gameCount: value, fixedCount: 3 };
+): NormalizedMegaSenaGeneratorOptions {
+  if (typeof value === "number") {
+    return { gameCount: value, fixedCount: 3, generationMode: "deterministic" };
+  }
   return {
     gameCount: value.gameCount ?? 2,
     fixedCount: value.fixedCount ?? 3,
+    generationMode: value.generationMode ?? "deterministic",
+    ...(value.seed !== undefined ? { seed: value.seed } : {}),
   };
 }
 
@@ -93,7 +111,7 @@ export function generateMegaSenaGames(
   contests: Contest[],
   options: number | MegaSenaGeneratorOptions = 2,
 ): GeneratedGame[] {
-  const { gameCount, fixedCount } = normalizeOptions(options);
+  const { gameCount, fixedCount, generationMode, seed } = normalizeOptions(options);
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
   }
@@ -101,6 +119,7 @@ export function generateMegaSenaGames(
     throw new Error("Mega-Sena fixedCount must be 0, 2 or 3");
   }
 
+  const random = generationRandom(generationMode, seed);
   const scoped = contests
     .filter((contest) => contest.lottery === "mega-sena")
     .sort((a, b) => a.number - b.number);
@@ -150,7 +169,7 @@ export function generateMegaSenaGames(
       })
       .sort((a, b) => b.rank - a.rank || a.numbers.join("-").localeCompare(b.numbers.join("-")));
 
-    const winner = ranked[0];
+    const winner = selectRankedCandidate(ranked, generationMode, random, 6);
     if (!winner) throw new Error("Unable to generate a Mega-Sena game");
 
     for (const number of winner.variableNumbers) {

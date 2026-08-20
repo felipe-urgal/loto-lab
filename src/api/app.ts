@@ -1,6 +1,7 @@
 import { createServer, type RequestListener, type Server } from "node:http";
 import type { Pool } from "pg";
 import { LOTTERY_CONFIGS } from "../lotteries/config.js";
+import type { GenerationMode } from "../generator/shared.js";
 import { LotoLabApiServices } from "./services.js";
 import {
   ApiError,
@@ -24,6 +25,19 @@ function requiredString(value: unknown, field: string, maxLength = 160): string 
     throw new ApiError(400, "INVALID_ARGUMENT", `${field} must be a non-empty string up to ${maxLength} characters`);
   }
   return value.trim();
+}
+
+function optionalString(value: unknown, field: string, maxLength = 160): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  return requiredString(value, field, maxLength);
+}
+
+function parseGenerationMode(value: unknown): GenerationMode {
+  if (value === undefined || value === null || value === "") return "diversified";
+  if (value !== "deterministic" && value !== "diversified") {
+    throw new ApiError(400, "INVALID_ARGUMENT", "generationMode must be deterministic or diversified");
+  }
+  return value;
 }
 
 function parseFixedCount(value: unknown): 8 | 9 | 10 {
@@ -145,11 +159,15 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
         const targetContestNumber = parseOptionalPositiveInt(body.targetContestNumber, "targetContestNumber");
         const persist = parseBoolean(body.persist, "persist", true);
         const fixedCount = lottery === "lotofacil" ? parseFixedCount(body.fixedCount) : undefined;
+        const generationMode = parseGenerationMode(body.generationMode);
+        const seed = optionalString(body.seed, "seed", 160);
         const result = await services.generate({
           lottery,
           gameCount,
           ...(fixedCount !== undefined ? { fixedCount } : {}),
           ...(targetContestNumber !== undefined ? { targetContestNumber } : {}),
+          generationMode,
+          ...(seed !== undefined ? { seed } : {}),
           persist,
         });
         sendJson(response, persist ? 201 : 200, result, corsOrigin);

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import type { LotteryId } from "../domain/types.js";
 import { buildNumberAnalysis, DEFAULT_WEIGHTS } from "../analysis/scoring.js";
@@ -5,6 +6,7 @@ import { getLotteryConfig } from "../lotteries/config.js";
 import { generateMegaSenaGames } from "../generator/megaSena.js";
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { generateDiaDeSorteGames } from "../generator/diaDeSorte.js";
+import type { GenerationMode } from "../generator/shared.js";
 import { evaluateGames } from "../checker/evaluate.js";
 import { backtestMegaSena } from "../backtest/megaSena.js";
 import { backtestLotofacil } from "../backtest/lotofacil.js";
@@ -26,6 +28,8 @@ export interface GenerateGamesRequest {
   gameCount: number;
   fixedCount?: 8 | 9 | 10;
   targetContestNumber?: number;
+  generationMode?: GenerationMode;
+  seed?: string;
   persist: boolean;
 }
 
@@ -54,6 +58,13 @@ export interface RunBacktestResponse {
   summary: Record<string, unknown>;
   roundCount: number;
   createdAt?: string;
+}
+
+function gameFingerprint(games: GeneratedGameBatchRecord["games"]): string {
+  return games
+    .map((game) => `${game.numbers.join("-")}:${game.luckyMonth ?? ""}`)
+    .sort((a, b) => a.localeCompare(b))
+    .join("|");
 }
 
 export class LotoLabApiServices {
@@ -96,21 +107,66 @@ export class LotoLabApiServices {
       : contests.filter((contest) => contest.number < input.targetContestNumber!);
     const targetContestNumber = input.targetContestNumber ??
       (latestContest ? latestContest.number + 1 : undefined);
+    const generationMode = input.generationMode ?? "diversified";
+    const fixedCount = input.lottery === "lotofacil" ? input.fixedCount ?? 8 : undefined;
+    const recentBatches = input.persist && generationMode === "diversified" && input.seed === undefined
+      ? await this.games.listRecent(input.lottery, 100)
+      : [];
+    const existingFingerprints = new Set(
+      recentBatches
+        .filter((batch) => batch.targetContestNumber === targetContestNumber)
+        .map((batch) => gameFingerprint(batch.games)),
+    );
 
-    let generatedGames: GeneratedGameBatchRecord["games"];
-    const generatorOptions: Record<string, unknown> = { gameCount: input.gameCount };
+    let generatedGames: GeneratedGameBatchRecord["games"] = [];
+    let seed = generationMode === "diversified" ? input.seed ?? randomUUID() : undefined;
+    let generatorOptions: Record<string, unknown> = {};
+    let unique = false;
 
-    if (input.lottery === "mega-sena") {
-      generatedGames = generateMegaSenaGames(history, input.gameCount);
-    } else if (input.lottery === "lotofacil") {
-      const fixedCount = input.fixedCount ?? 8;
-      generatorOptions.fixedCount = fixedCount;
-      generatedGames = generateLotofacilGames(history, {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      generatorOptions = {
         gameCount: input.gameCount,
-        fixedCount,
-      });
-    } else {
-      generatedGames = generateDiaDeSorteGames(history, input.gameCount);
+        generationMode,
+        ...(seed !== undefined ? { seed } : {}),
+        ...(fixedCount !== undefined ? { fixedCount } : {}),
+      };
+
+      if (input.lottery === "mega-sena") {
+        generatedGames = generateMegaSenaGames(history, {
+          gameCount: input.gameCount,
+          generationMode,
+          ...(seed !== undefined ? { seed } : {}),
+        });
+      } else if (input.lottery === "lotofacil") {
+        generatedGames = generateLotofacilGames(history, {
+          gameCount: input.gameCount,
+          fixedCount: fixedCount!,
+          generationMode,
+          ...(seed !== undefined ? { seed } : {}),
+        });
+      } else {
+        generatedGames = generateDiaDeSorteGames(history, {
+          gameCount: input.gameCount,
+          generationMode,
+          ...(seed !== undefined ? { seed } : {}),
+        });
+      }
+
+      if (
+        !input.persist ||
+        generationMode === "deterministic" ||
+        input.seed !== undefined ||
+        !existingFingerprints.has(gameFingerprint(generatedGames))
+      ) {
+        unique = true;
+        break;
+      }
+
+      seed = randomUUID();
+    }
+
+    if (!unique) {
+      throw new Error("Unable to generate a distinct diversified batch after multiple attempts");
     }
 
     if (!input.persist) {
