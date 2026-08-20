@@ -22,12 +22,25 @@ test("UI refinement assets are served for the main app and strategy lab", async 
   assert.match(html, /refinements\.css/);
   assert.match(html, /refinements\.js/);
 
+  const app = await fetch(`${baseUrl}/assets/app.js`);
+  assert.equal(app.status, 200);
+  const appSource = await app.text();
+  assert.match(appSource, /new AbortController\(\)/);
+  assert.match(appSource, /isCurrentRender/);
+
   const mainRefinements = await fetch(`${baseUrl}/assets/refinements.js`);
   assert.equal(mainRefinements.status, 200);
   const mainSource = await mainRefinements.text();
   assert.match(mainSource, /Como o score é calculado/);
   assert.match(mainSource, /Aguardando resultado do concurso/);
   assert.match(mainSource, /últimos 100 concursos/i);
+
+  const generationDiversity = await fetch(`${baseUrl}/assets/generation-diversity.js`);
+  assert.equal(generationDiversity.status, 200);
+  const diversitySource = await generationDiversity.text();
+  assert.match(diversitySource, /code\.textContent/);
+  assert.match(diversitySource, /code\.title = seed/);
+  assert.doesNotMatch(diversitySource, /title="\$\{seed\}"/);
 
   const labPage = await fetch(`${baseUrl}/lab`);
   assert.equal(labPage.status, 200);
