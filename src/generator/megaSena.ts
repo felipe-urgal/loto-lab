@@ -2,7 +2,10 @@ import type { Contest, GeneratedGame, NumberAnalysis } from "../domain/types.js"
 import { getLotteryConfig } from "../lotteries/config.js";
 import { buildNumberAnalysis } from "../analysis/scoring.js";
 import {
+  GUILHERMINO_HIGH_FREQUENCY_GROUP,
   matchesMegaSenaRules,
+  megaSenaColumn,
+  megaSenaQuadrant,
   type MegaSenaGameRules,
 } from "./megaSenaRules.js";
 import {
@@ -12,6 +15,7 @@ import {
 } from "./shared.js";
 
 const config = getLotteryConfig("mega-sena");
+const preferredGroup = new Set<number>(GUILHERMINO_HIGH_FREQUENCY_GROUP);
 
 export type MegaSenaFixedCount = 0 | 2 | 3;
 
@@ -118,6 +122,89 @@ function hasRules(rules: MegaSenaGameRules): boolean {
   return Object.values(rules).some((value) => value !== undefined && value !== false);
 }
 
+function addTop(
+  selected: Set<number>,
+  rows: NumberAnalysis[],
+  count: number,
+): void {
+  for (const row of rows) {
+    selected.add(row.number);
+    if (selected.size >= count) return;
+  }
+}
+
+function buildCandidatePool(
+  analysis: NumberAnalysis[],
+  fixedSet: Set<number>,
+  fixedCount: MegaSenaFixedCount,
+  rules: MegaSenaGameRules,
+): number[] {
+  const ranked = [...analysis]
+    .filter((row) => !fixedSet.has(row.number))
+    .sort((a, b) => b.score - a.score || a.number - b.number);
+
+  if (fixedCount !== 0 || !hasRules(rules)) {
+    const poolSize = fixedCount === 0 ? 14 : fixedCount === 2 ? 18 : 24;
+    return ranked.slice(0, poolSize).map((row) => row.number);
+  }
+
+  const selected = new Set<number>();
+
+  if (rules.minPreferredGroup !== undefined) {
+    const wanted = rules.minPreferredGroup + 3;
+    let added = 0;
+    for (const row of ranked) {
+      if (!preferredGroup.has(row.number)) continue;
+      selected.add(row.number);
+      added += 1;
+      if (added >= wanted) break;
+    }
+  }
+
+  if (rules.minQuadrants !== undefined) {
+    for (const quadrant of [1, 2, 3, 4] as const) {
+      let added = 0;
+      for (const row of ranked) {
+        if (megaSenaQuadrant(row.number) !== quadrant) continue;
+        selected.add(row.number);
+        added += 1;
+        if (added >= 2) break;
+      }
+    }
+  }
+
+  if (rules.equalParity) {
+    for (const parity of [0, 1] as const) {
+      let added = 0;
+      for (const row of ranked) {
+        if (row.number % 2 !== parity) continue;
+        selected.add(row.number);
+        added += 1;
+        if (added >= 4) break;
+      }
+    }
+  }
+
+  if (rules.avoidSameColumn) {
+    const represented = new Set<number>();
+    for (const row of ranked) {
+      const column = megaSenaColumn(row.number);
+      if (represented.has(column)) continue;
+      selected.add(row.number);
+      represented.add(column);
+      if (represented.size >= 6) break;
+    }
+  }
+
+  const targetSize = Math.max(18, selected.size);
+  for (const row of ranked) {
+    selected.add(row.number);
+    if (selected.size >= targetSize) break;
+  }
+
+  return [...selected];
+}
+
 export function generateMegaSenaGames(
   contests: Contest[],
   options: number | MegaSenaGeneratorOptions = 2,
@@ -140,16 +227,7 @@ export function generateMegaSenaGames(
   const lastContest = scoped.at(-1);
   const scoreByNumber = new Map(analysis.map((row) => [row.number, row.score]));
   const variableCount = config.drawSize - fixedCount;
-  const poolSize = fixedCount === 0
-    ? (hasRules(rules) ? 18 : 14)
-    : fixedCount === 2
-      ? 18
-      : 24;
-  const candidatePool = [...analysis]
-    .filter((row) => !fixedSet.has(row.number))
-    .sort((a, b) => b.score - a.score || a.number - b.number)
-    .slice(0, poolSize)
-    .map((row) => row.number);
+  const candidatePool = buildCandidatePool(analysis, fixedSet, fixedCount, rules);
 
   const variableOptions = combinations(candidatePool, variableCount);
   const usedVariables = new Map<number, number>();
