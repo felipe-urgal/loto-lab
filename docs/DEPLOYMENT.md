@@ -1,0 +1,251 @@
+# Deploy de produção
+
+O Loto Lab possui uma stack Docker de produção separada do ambiente local de desenvolvimento.
+
+Arquivos principais:
+
+- `Dockerfile` — imagem multi-stage da aplicação;
+- `docker-compose.prod.yml` — aplicação + PostgreSQL persistente;
+- `.env.production.example` — template de configuração;
+- `docker-compose.yml` — continua sendo o compose local de desenvolvimento.
+
+## Princípios
+
+- PostgreSQL não publica porta no host em produção;
+- a aplicação roda como usuário não-root;
+- o filesystem do container da aplicação é somente leitura;
+- capabilities Linux são removidas da aplicação;
+- healthchecks existem para aplicação e banco;
+- migrations são aplicadas automaticamente no startup;
+- o scheduler operacional continua sincronizando concursos e reconciliando apostas;
+- segredos ficam somente em `.env.production`, que não deve ser commitado.
+
+## Requisitos do host
+
+- Docker Engine;
+- Docker Compose v2;
+- Git para atualizar o código;
+- espaço persistente suficiente para o volume PostgreSQL.
+
+Node/npm no host são opcionais se os comandos Docker Compose forem executados diretamente. Os atalhos `npm run prod:*` exigem npm no host.
+
+## Primeira configuração
+
+```bash
+cp .env.production.example .env.production
+```
+
+Gere uma senha longa para o PostgreSQL, por exemplo:
+
+```bash
+openssl rand -hex 32
+```
+
+Edite `.env.production` e substitua:
+
+```env
+POSTGRES_PASSWORD=...
+```
+
+Se houver um domínio público, configure também:
+
+```env
+PUBLIC_ORIGIN=https://loto.exemplo.com
+```
+
+A integração da OpenAI é opcional:
+
+```env
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5.6-luna
+```
+
+Sem chave ou sem billing da API, somente a geração de interpretações de IA fica indisponível.
+
+## Exposição de rede
+
+Por segurança o template usa:
+
+```env
+APP_BIND=127.0.0.1
+APP_PORT=3000
+```
+
+Isso deixa a aplicação acessível apenas no próprio servidor e é o modo recomendado quando Caddy, Nginx, Traefik ou outro reverse proxy termina HTTPS no mesmo host.
+
+Para exposição direta, altere deliberadamente para:
+
+```env
+APP_BIND=0.0.0.0
+```
+
+Nesse caso configure firewall e TLS adequadamente. Não exponha PostgreSQL na internet.
+
+## Validar configuração
+
+Com npm:
+
+```bash
+npm run prod:config
+```
+
+Ou diretamente:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml config
+```
+
+Faça essa validação antes de cada primeira subida após mudança de configuração.
+
+## Subir a stack
+
+```bash
+npm run prod:up
+```
+
+Equivalente a:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+A ordem de startup é:
+
+1. PostgreSQL inicia;
+2. healthcheck do PostgreSQL fica saudável;
+3. aplicação inicia;
+4. migrations pendentes são aplicadas;
+5. API começa a responder;
+6. scheduler operacional inicia e executa a sincronização inicial.
+
+Em uma base vazia, a primeira sincronização pode levar mais tempo porque precisa preencher o histórico faltante.
+
+## Verificar saúde
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml ps
+```
+
+Com o bind padrão:
+
+```bash
+curl -f http://127.0.0.1:3000/health/ready
+```
+
+Resposta esperada:
+
+```json
+{"status":"ok","database":"ready"}
+```
+
+## Logs
+
+```bash
+npm run prod:logs
+```
+
+Todos os serviços:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml logs -f
+```
+
+## Atualização de versão
+
+Antes de atualizar, faça backup do banco.
+
+Depois:
+
+```bash
+git pull
+npm run prod:config
+npm run prod:up
+```
+
+`up -d --build` reconstrói a imagem e recria a aplicação quando necessário. O volume PostgreSQL é preservado.
+
+As migrations são forward-only. Por isso o backup antes de mudanças de schema é parte do procedimento de atualização.
+
+## Backup do PostgreSQL
+
+Crie um diretório fora do repositório para backups e execute:
+
+```bash
+mkdir -p backups
+
+docker compose --env-file .env.production -f docker-compose.prod.yml \
+  exec -T postgres sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
+  > "backups/loto-lab-$(date +%Y%m%d-%H%M%S).dump"
+```
+
+Valide que o arquivo foi criado e possui tamanho maior que zero.
+
+Backups devem ser copiados para armazenamento fora do servidor quando o Loto Lab for usado como serviço contínuo.
+
+## Restore
+
+Restore é destrutivo para o estado atual do banco. Pare a aplicação primeiro:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml stop app
+```
+
+Restaure o dump desejado:
+
+```bash
+cat backups/loto-lab-YYYYMMDD-HHMMSS.dump | \
+  docker compose --env-file .env.production -f docker-compose.prod.yml \
+  exec -T postgres sh -lc 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists'
+```
+
+Suba a aplicação novamente:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d app
+```
+
+Confirme `/health/ready` e o Dashboard antes de considerar o restore concluído.
+
+## Parar a stack
+
+```bash
+npm run prod:down
+```
+
+Esse comando remove os containers e a rede, mas **não remove o volume do PostgreSQL**.
+
+Não use `docker compose down -v` em produção salvo quando a intenção for realmente apagar os dados persistidos.
+
+## Scheduler operacional
+
+Valores padrão:
+
+```env
+OPS_AUTO_SYNC=true
+OPS_INTERVAL_MINUTES=30
+OPS_STALE_AFTER_MINUTES=180
+```
+
+A aplicação usa advisory lock no PostgreSQL para impedir duas sincronizações simultâneas. O botão do Dashboard, scheduler e comandos manuais compartilham a mesma trava.
+
+## Reverse proxy e HTTPS
+
+O compose não escolhe um provedor de TLS. Em produção pública, coloque um reverse proxy na frente de `127.0.0.1:3000` e use HTTPS.
+
+Depois ajuste:
+
+```env
+PUBLIC_ORIGIN=https://seu-dominio
+```
+
+Não coloque `OPENAI_API_KEY`, senha do PostgreSQL ou qualquer outro segredo no proxy, frontend ou repositório.
+
+## CI
+
+O CI valida produção em três níveis:
+
+1. suíte TypeScript/PostgreSQL existente;
+2. `docker compose config` da stack de produção;
+3. build da imagem e smoke test real do container contra PostgreSQL, aguardando `/health/ready`.
+
+Assim uma alteração só fica verde quando o artefato que será executado em produção também consegue iniciar.
