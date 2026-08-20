@@ -61,7 +61,7 @@ test("random control is reproducible for the same period and seed", () => {
   assert.ok(first.rounds.every((round) => round.checks.every((check) => check.fixedHits === 0)));
 });
 
-test("strategy lab compares the expected presets and a random control over the same period", () => {
+test("strategy lab compares the expected presets and exposes a random benchmark", () => {
   const fixtures = [
     { lottery: "mega-sena" as const, drawSize: 6, maxNumber: 60, expected: [0, 2, 3] },
     { lottery: "lotofacil" as const, drawSize: 15, maxNumber: 25, expected: [8, 9, 10] },
@@ -79,27 +79,27 @@ test("strategy lab compares the expected presets and a random control over the s
     });
 
     assert.deepEqual(
-      result.variants.filter((variant) => !variant.isControl).map((variant) => variant.fixedCount).sort((a, b) => a - b),
+      result.variants.map((variant) => variant.fixedCount).sort((a, b) => a - b),
       fixture.expected,
     );
     assert.equal(result.experiment, "fixed-core");
-    assert.equal(result.variants.length, 4);
+    assert.equal(result.variants.length, 3);
     assert.equal(result.startContest, 9);
     assert.equal(result.endContest, 18);
     assert.ok(result.winner);
     assert.ok(result.variants.every((variant) => variant.summary.testedContests === 10));
     assert.ok(result.variants.every((variant) => variant.series.length === 2));
 
-    const control = result.variants.find((variant) => variant.isControl);
-    assert.ok(control);
-    assert.equal(control.key, "random-control");
     assert.equal(result.benchmark.controlKey, "random-control");
+    assert.equal(result.benchmark.control.key, "random-control");
+    assert.equal(result.benchmark.control.summary.testedContests, 10);
+    assert.equal(result.benchmark.control.series.length, 2);
     assert.equal(result.benchmark.basis, result.rankingBasis);
     assert.equal(result.benchmark.beatsRandom, result.benchmark.delta > 0);
   }
 });
 
-test("strategy lab exposes external Mega-Sena rules plus random control", () => {
+test("strategy lab exposes external Mega-Sena rules and a separate random benchmark", () => {
   const contests = contestsFor("mega-sena", 24, 6, 60);
   const result = compareStrategyLab(contests, {
     lottery: "mega-sena",
@@ -112,7 +112,7 @@ test("strategy lab exposes external Mega-Sena rules plus random control", () => 
 
   const keys = new Set(result.variants.map((variant) => variant.key));
   assert.equal(result.experiment, "external-rules");
-  assert.equal(result.variants.length, 10);
+  assert.equal(result.variants.length, 9);
   assert.ok(keys.has("mega-rules-baseline"));
   assert.ok(keys.has("mega-rules-group-2"));
   assert.ok(keys.has("mega-rules-group-3"));
@@ -122,8 +122,8 @@ test("strategy lab exposes external Mega-Sena rules plus random control", () => 
   assert.ok(keys.has("mega-rules-quadrants"));
   assert.ok(keys.has("mega-rules-article-2"));
   assert.ok(keys.has("mega-rules-article-3"));
-  assert.ok(keys.has("random-control"));
   assert.ok(result.variants.every((variant) => variant.fixedCount === 0));
   assert.ok(result.variants.every((variant) => variant.summary.testedContests === 10));
   assert.equal(result.benchmark.controlKey, "random-control");
+  assert.equal(result.benchmark.control.summary.testedContests, 10);
 });
