@@ -159,7 +159,8 @@ export function selectRankedCandidate<T extends RankedCandidate>(
   if (mode === "deterministic") return ranked[0];
   if (!random) throw new Error("Diversified generation requires a seeded random source");
 
-  const pool = ranked.slice(0, Math.max(1, Math.min(poolSize, ranked.length)));
+  const diversifiedPoolSize = Math.max(poolSize, 24);
+  const pool = ranked.slice(0, Math.max(1, Math.min(diversifiedPoolSize, ranked.length)));
   const totalWeight = pool.reduce((sum, _candidate, index) => sum + (pool.length - index), 0);
   let cursor = random() * totalWeight;
 
