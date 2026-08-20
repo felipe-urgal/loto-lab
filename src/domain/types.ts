@@ -34,11 +34,14 @@ export interface GeneratedGame {
   numbers: number[];
   fixedNumbers: number[];
   variableNumbers: number[];
+  luckyMonth?: string;
   metadata: {
     odd: number;
     even: number;
     sum: number;
     repeatedFromLastContest: number[];
+    lineDistribution?: number[];
+    columnDistribution?: number[];
   };
 }
 
