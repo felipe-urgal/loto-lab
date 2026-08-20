@@ -1,3 +1,11 @@
+.main-nav a.nav-item,
+.main-nav a.nav-item:link,
+.main-nav a.nav-item:visited,
+.main-nav a.nav-item:hover,
+.main-nav a.nav-item:active {
+  text-decoration: none !important;
+}
+
 .agenda-content {
   max-width: 1280px;
   width: 100%;
