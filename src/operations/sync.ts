@@ -1,14 +1,17 @@
 import type { Pool } from "pg";
 import type { LotteryId } from "../domain/types.js";
 import type { ContestSource } from "../data/source.js";
+import { isLotteryAgendaSource } from "../data/source.js";
 import { CaixaContestSource } from "../data/caixa.js";
 import { bootstrapLotteryHistory } from "../data/bootstrap.js";
+import { PostgresAgendaRepository } from "../persistence/agendaRepository.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import {
   PostgresOperationRepository,
   type OperationRunRecord,
   type OperationStatus,
 } from "../persistence/operationRepository.js";
+import { NotificationService } from "../notifications/service.js";
 import { RealBetService } from "../realBets/service.js";
 
 const LOTTERIES: LotteryId[] = ["mega-sena", "lotofacil", "dia-de-sorte"];
@@ -24,6 +27,8 @@ export interface LotteryOperationResult {
   lottery: LotteryId;
   status: "success" | "partial" | "failed";
   latestOfficialContest?: number;
+  nextContest?: number;
+  nextDrawDate?: string;
   missingBefore?: number;
   fetched?: number;
   failedContests?: number;
@@ -72,6 +77,7 @@ export async function runOperationalSync(
   try {
     run = await operations.create("sync-all");
     const contests = new PostgresContestRepository(pool);
+    const agenda = new PostgresAgendaRepository(pool);
     const realBets = new RealBetService(pool);
     const lotteries: LotteryOperationResult[] = [];
 
@@ -83,16 +89,24 @@ export async function runOperationalSync(
           retryDelayMs: options.retryDelayMs ?? 300,
         });
 
-        // Refresh the current contest even when it already exists so late rateio
-        // updates from Caixa are persisted without requiring a full bootstrap.
         const latest = await source.fetchContest(lottery);
         await contests.upsertMany([latest]);
+        let nextContest: number | undefined;
+        let nextDrawDate: string | undefined;
+        if (isLotteryAgendaSource(source)) {
+          const snapshot = await source.fetchAgenda(lottery);
+          await agenda.upsert(snapshot);
+          nextContest = snapshot.nextContest;
+          nextDrawDate = snapshot.nextDrawDate;
+        }
         const reconciledRealBets = await realBets.reconcilePending(lottery);
 
         lotteries.push({
           lottery,
           status: bootstrap.failed > 0 ? "partial" : "success",
           latestOfficialContest: bootstrap.latestOfficialContest,
+          ...(nextContest !== undefined ? { nextContest } : {}),
+          ...(nextDrawDate !== undefined ? { nextDrawDate } : {}),
           missingBefore: bootstrap.missingBefore,
           fetched: bootstrap.fetched,
           failedContests: bootstrap.failed,
@@ -116,7 +130,9 @@ export async function runOperationalSync(
       reconciledRealBets: lotteries.reduce((sum, item) => sum + (item.reconciledRealBets ?? 0), 0),
     };
 
-    return await operations.finish(run.id, status, details);
+    const finished = await operations.finish(run.id, status, details);
+    await new NotificationService(pool).refresh().catch(() => undefined);
+    return finished;
   } catch (error) {
     if (run) {
       const details: SyncAllDetails = {
@@ -126,6 +142,7 @@ export async function runOperationalSync(
         reconciledRealBets: 0,
       };
       await operations.finish(run.id, "failed", details).catch(() => undefined);
+      await new NotificationService(pool).refresh().catch(() => undefined);
     }
     throw error;
   } finally {
