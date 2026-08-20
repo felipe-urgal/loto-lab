@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b1117" />
+    <meta name="description" content="Loto Lab — interpretação de evidências calculadas pelo motor." />
+    <title>IA · Loto Lab</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <link rel="stylesheet" href="/assets/refinements.css" />
+    <link rel="stylesheet" href="/assets/ai.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegação principal">
+        <a class="brand" href="/#dashboard" aria-label="Loto Lab - Dashboard">
+          <span class="brand-mark" aria-hidden="true">L</span>
+          <span class="brand-copy"><strong>Loto Lab</strong><small>Strategy console</small></span>
+        </a>
+        <nav class="main-nav">
+          <a class="nav-item" href="/#dashboard"><span class="nav-icon">▦</span><span>Dashboard</span></a>
+          <a class="nav-item" href="/#analysis"><span class="nav-icon">▥</span><span>Análises</span></a>
+          <a class="nav-item" href="/#generate"><span class="nav-icon">✦</span><span>Gerar jogos</span></a>
+          <a class="nav-item" href="/#games"><span class="nav-icon">▤</span><span>Meus jogos</span></a>
+          <a class="nav-item" href="/#backtests"><span class="nav-icon">↶</span><span>Backtests</span></a>
+          <a class="nav-item" href="/lab"><span class="nav-icon">♧</span><span>Laboratório</span></a>
+          <a class="nav-item is-active" href="/ai" aria-current="page"><span class="nav-icon">◇</span><span>IA</span></a>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="status-row" id="ai-api-status" aria-live="polite"><span class="status-dot"></span><span>Verificando IA</span></div>
+          <p>Algoritmo calcula.<br />IA interpreta.</p>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <div class="topbar-copy">
+            <h1>IA</h1>
+            <p>Interprete evidências calculadas sem transformar frequência em previsão.</p>
+          </div>
+          <div class="topbar-actions">
+            <label class="select-control" for="ai-lottery">
+              <span>Loteria</span>
+              <select id="ai-lottery">
+                <option value="mega-sena">Mega-Sena</option>
+                <option value="lotofacil">Lotofácil</option>
+                <option value="dia-de-sorte">Dia de Sorte</option>
+              </select>
+            </label>
+          </div>
+        </header>
+
+        <section class="content ai-content">
+          <div class="stack">
+            <section class="panel ai-principle">
+              <div><h2>Algoritmo calcula. IA interpreta.</h2><p>A IA recebe um resumo auditável de análise, backtest, Laboratório e apostas reais. Ela não escolhe dezenas nem recalcula métricas.</p></div>
+              <div class="ai-provider-status" id="ai-provider-status">Verificando configuração...</div>
+            </section>
+
+            <section class="panel form-panel">
+              <form id="ai-form">
+                <div class="form-grid ai-form-grid">
+                  <label class="field" for="ai-focus"><span>Foco da interpretação</span>
+                    <select id="ai-focus">
+                      <option value="overview">Visão geral</option>
+                      <option value="analysis">Análise das dezenas</option>
+                      <option value="strategy">Estratégias e backtests</option>
+                      <option value="real-performance">Desempenho real</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="form-actions">
+                  <span class="form-note">A interpretação usa somente fatos calculados e salva o snapshot usado para auditoria.</span>
+                  <button class="button primary" id="ai-run" type="submit">Gerar interpretação</button>
+                </div>
+              </form>
+            </section>
+
+            <section class="panel ai-message" id="ai-message">
+              <strong>Pronto para interpretar</strong>
+              <p>Escolha o foco. Nenhuma interpretação altera a metodologia ou os jogos gerados.</p>
+            </section>
+
+            <section id="ai-result" hidden></section>
+
+            <section>
+              <div class="section-head"><div><h2>Histórico de interpretações</h2><p>Snapshots anteriores da loteria selecionada.</p></div></div>
+              <div class="panel ai-history" id="ai-history"><div class="loading-state"><span class="spinner"></span><span>Carregando histórico...</span></div></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div class="toast-root" id="toast-root" aria-live="assertive"></div>
+    <script type="module" src="/assets/ai.js"></script>
+  </body>
+</html>
