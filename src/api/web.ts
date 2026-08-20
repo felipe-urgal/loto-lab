@@ -32,6 +32,19 @@ const ASSETS: Record<string, { file: string; contentType: string; cache: string 
   "/favicon.svg": { file: "favicon.svg", contentType: "image/svg+xml; charset=utf-8", cache: "public, max-age=86400" },
 };
 
+function setSecurityHeaders(response: ServerResponse): void {
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("X-Frame-Options", "DENY");
+  response.setHeader("Referrer-Policy", "no-referrer");
+  response.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  response.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  response.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'",
+  );
+}
+
 export async function serveWebAsset(pathname: string, response: ServerResponse): Promise<boolean> {
   const asset = ASSETS[pathname];
   if (!asset) return false;
@@ -43,13 +56,14 @@ export async function serveWebAsset(pathname: string, response: ServerResponse):
     response.setHeader("Content-Type", asset.contentType);
     response.setHeader("Content-Length", body.byteLength);
     response.setHeader("Cache-Control", asset.cache);
-    response.setHeader("X-Content-Type-Options", "nosniff");
+    setSecurityHeaders(response);
     response.end(body);
     return true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       response.statusCode = 404;
       response.setHeader("Content-Type", "text/plain; charset=utf-8");
+      setSecurityHeaders(response);
       response.end("Web asset not found");
       return true;
     }
