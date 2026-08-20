@@ -45,7 +45,6 @@ export interface StrategyLabVariant {
   key: string;
   label: string;
   fixedCount: number;
-  isControl: boolean;
   rules?: MegaSenaGameRules;
   summary: BacktestSummary;
   series: StrategyLabPoint[];
@@ -57,6 +56,7 @@ export interface StrategyLabBenchmark {
   basis: "roi" | "prizeRate";
   delta: number;
   beatsRandom: boolean;
+  control: StrategyLabVariant;
 }
 
 export interface StrategyLabResult {
@@ -147,14 +147,13 @@ function toVariant(
   rounds: LabRound[],
   summary: BacktestSummary,
   bucketSize: number,
-  metadata: { rules?: MegaSenaGameRules; isControl?: boolean } = {},
+  rules?: MegaSenaGameRules,
 ): StrategyLabVariant {
   return {
     key,
     label,
     fixedCount,
-    isControl: metadata.isControl ?? false,
-    ...(metadata.rules ? { rules: metadata.rules } : {}),
+    ...(rules ? { rules } : {}),
     summary,
     series: seriesFor(rounds, bucketSize),
   };
@@ -167,12 +166,8 @@ function compareMegaExternalRules(
 ): StrategyLabVariant[] {
   return MEGA_EXTERNAL_VARIANTS.map((variant) => {
     const result = backtestMegaSena(contests, { ...common, fixedCount: 0, rules: variant.rules });
-    return toVariant(variant.key, variant.label, 0, result.rounds, result.summary, bucketSize, { rules: variant.rules });
+    return toVariant(variant.key, variant.label, 0, result.rounds, result.summary, bucketSize, variant.rules);
   });
-}
-
-function tieBreakFixedCount(variant: StrategyLabVariant): number {
-  return variant.isControl ? Number.MAX_SAFE_INTEGER : variant.fixedCount;
 }
 
 export function compareStrategyLab(contests: Contest[], options: StrategyLabOptions): StrategyLabResult {
@@ -213,19 +208,25 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
   }
 
   const randomControl = backtestRandomControl(contests, { lottery: options.lottery, ...common });
-  variants.push(toVariant("random-control", "Controle aleatório", 0, randomControl.rounds, randomControl.summary, bucketSize, { isControl: true }));
+  const control = toVariant(
+    "random-control",
+    "Controle aleatório",
+    0,
+    randomControl.rounds,
+    randomControl.summary,
+    bucketSize,
+  );
 
-  const hasReliableFinance = variants.every((variant) => variant.summary.financialCoverage >= 0.8);
+  const hasReliableFinance = [...variants, control].every((variant) => variant.summary.financialCoverage >= 0.8);
   const rankingBasis = hasReliableFinance ? "roi" : "prizeRate";
   variants.sort((a, b) => {
     if (rankingBasis === "roi") {
-      return b.summary.roi - a.summary.roi || b.summary.prizeRate - a.summary.prizeRate || b.summary.averageHitsPerGame - a.summary.averageHitsPerGame || tieBreakFixedCount(a) - tieBreakFixedCount(b);
+      return b.summary.roi - a.summary.roi || b.summary.prizeRate - a.summary.prizeRate || b.summary.averageHitsPerGame - a.summary.averageHitsPerGame || a.fixedCount - b.fixedCount;
     }
-    return b.summary.prizeRate - a.summary.prizeRate || b.summary.averageHitsPerGame - a.summary.averageHitsPerGame || b.summary.maxHits - a.summary.maxHits || tieBreakFixedCount(a) - tieBreakFixedCount(b);
+    return b.summary.prizeRate - a.summary.prizeRate || b.summary.averageHitsPerGame - a.summary.averageHitsPerGame || b.summary.maxHits - a.summary.maxHits || a.fixedCount - b.fixedCount;
   });
 
-  const control = variants.find((variant) => variant.isControl)!;
-  const bestStrategy = variants.find((variant) => !variant.isControl);
+  const bestStrategy = variants[0];
   const controlValue = rankingBasis === "roi" ? control.summary.roi : control.summary.prizeRate;
   const strategyValue = bestStrategy ? (rankingBasis === "roi" ? bestStrategy.summary.roi : bestStrategy.summary.prizeRate) : controlValue;
   const delta = strategyValue - controlValue;
@@ -238,13 +239,14 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
     warmupContests,
     bucketSize,
     rankingBasis,
-    ...(variants[0] ? { winner: variants[0].key } : {}),
+    ...(bestStrategy ? { winner: bestStrategy.key } : {}),
     benchmark: {
       controlKey: control.key,
       ...(bestStrategy ? { bestStrategyKey: bestStrategy.key } : {}),
       basis: rankingBasis,
       delta,
       beatsRandom: delta > 0,
+      control,
     },
     variants,
   };
