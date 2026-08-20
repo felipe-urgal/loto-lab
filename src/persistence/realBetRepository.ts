@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
-import type { GeneratedGame, LotteryId } from "../domain/types.js";
+import type { LotteryId } from "../domain/types.js";
+import type { GeneratedGame } from "../domain/types.js";
 import type { GameCheckResult } from "../checker/evaluate.js";
 
 export type RealBetStatus = "planned" | "placed" | "awaiting_result" | "checked";
@@ -70,6 +71,7 @@ interface BetRow {
 }
 
 interface BetGameRow {
+  real_bet_id: string;
   batch_position: number;
   numbers: number[];
   fixed_numbers: number[];
@@ -94,6 +96,15 @@ function mapGame(lottery: LotteryId, row: BetGameRow): RealBetGameRecord {
     ...(row.check_result ? { checkResult: row.check_result } : {}),
     ...(row.prize_value !== null ? { prizeValue: Number(row.prize_value) } : {}),
   };
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return Boolean(
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { code?: string }).code === "23505",
+  );
 }
 
 export class PostgresRealBetRepository {
@@ -145,6 +156,7 @@ export class PostgresRealBetRepository {
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");
+      if (isUniqueViolation(error)) throw new Error("REAL_BET_ALREADY_EXISTS");
       throw error;
     } finally {
       client.release();
@@ -155,51 +167,70 @@ export class PostgresRealBetRepository {
     return saved;
   }
 
+  private async findMany(ids: number[]): Promise<RealBetRecord[]> {
+    if (ids.length === 0) return [];
+    const uniqueIds = [...new Set(ids)];
+    const [bets, games] = await Promise.all([
+      this.pool.query<BetRow>(
+        `
+          SELECT
+            id, batch_id, lottery, contest_number, status,
+            actual_cost::float8 AS actual_cost,
+            played_at, checked_at,
+            total_prize_value::float8 AS total_prize_value,
+            net_result::float8 AS net_result,
+            created_at, updated_at
+          FROM real_bets
+          WHERE id = ANY($1::bigint[])
+        `,
+        [uniqueIds],
+      ),
+      this.pool.query<BetGameRow>(
+        `
+          SELECT
+            real_bet_id, batch_position, numbers, fixed_numbers, variable_numbers,
+            lucky_month, metadata, check_result, prize_value::float8 AS prize_value
+          FROM real_bet_games
+          WHERE real_bet_id = ANY($1::bigint[])
+          ORDER BY real_bet_id, batch_position
+        `,
+        [uniqueIds],
+      ),
+    ]);
+
+    const gamesByBet = new Map<number, BetGameRow[]>();
+    for (const game of games.rows) {
+      const id = Number(game.real_bet_id);
+      const rows = gamesByBet.get(id) ?? [];
+      rows.push(game);
+      gamesByBet.set(id, rows);
+    }
+
+    const byId = new Map<number, RealBetRecord>();
+    for (const row of bets.rows) {
+      const id = Number(row.id);
+      byId.set(id, {
+        id,
+        batchId: Number(row.batch_id),
+        lottery: row.lottery,
+        contestNumber: row.contest_number,
+        status: row.status,
+        actualCost: Number(row.actual_cost),
+        playedAt: row.played_at.toISOString(),
+        ...(row.checked_at ? { checkedAt: row.checked_at.toISOString() } : {}),
+        ...(row.total_prize_value !== null ? { totalPrizeValue: Number(row.total_prize_value) } : {}),
+        ...(row.net_result !== null ? { netResult: Number(row.net_result) } : {}),
+        createdAt: row.created_at.toISOString(),
+        updatedAt: row.updated_at.toISOString(),
+        games: (gamesByBet.get(id) ?? []).map((game) => mapGame(row.lottery, game)),
+      });
+    }
+
+    return ids.map((id) => byId.get(id)).filter((item): item is RealBetRecord => item !== undefined);
+  }
+
   async findById(id: number): Promise<RealBetRecord | undefined> {
-    const result = await this.pool.query<BetRow>(
-      `
-        SELECT
-          id, batch_id, lottery, contest_number, status,
-          actual_cost::float8 AS actual_cost,
-          played_at, checked_at,
-          total_prize_value::float8 AS total_prize_value,
-          net_result::float8 AS net_result,
-          created_at, updated_at
-        FROM real_bets
-        WHERE id = $1
-      `,
-      [id],
-    );
-    const row = result.rows[0];
-    if (!row) return undefined;
-
-    const games = await this.pool.query<BetGameRow>(
-      `
-        SELECT
-          batch_position, numbers, fixed_numbers, variable_numbers, lucky_month, metadata,
-          check_result, prize_value::float8 AS prize_value
-        FROM real_bet_games
-        WHERE real_bet_id = $1
-        ORDER BY batch_position
-      `,
-      [id],
-    );
-
-    return {
-      id: Number(row.id),
-      batchId: Number(row.batch_id),
-      lottery: row.lottery,
-      contestNumber: row.contest_number,
-      status: row.status,
-      actualCost: Number(row.actual_cost),
-      playedAt: row.played_at.toISOString(),
-      ...(row.checked_at ? { checkedAt: row.checked_at.toISOString() } : {}),
-      ...(row.total_prize_value !== null ? { totalPrizeValue: Number(row.total_prize_value) } : {}),
-      ...(row.net_result !== null ? { netResult: Number(row.net_result) } : {}),
-      createdAt: row.created_at.toISOString(),
-      updatedAt: row.updated_at.toISOString(),
-      games: games.rows.map((game) => mapGame(row.lottery, game)),
-    };
+    return (await this.findMany([id]))[0];
   }
 
   async findByBatchId(batchId: number): Promise<RealBetRecord | undefined> {
@@ -222,8 +253,7 @@ export class PostgresRealBetRepository {
       `,
       [lottery, limit],
     );
-    const items = await Promise.all(result.rows.map((row) => this.findById(Number(row.id))));
-    return items.filter((item): item is RealBetRecord => item !== undefined);
+    return this.findMany(result.rows.map((row) => Number(row.id)));
   }
 
   async listPending(lottery?: LotteryId): Promise<RealBetRecord[]> {
@@ -237,8 +267,7 @@ export class PostgresRealBetRepository {
       `,
       [lottery ?? null],
     );
-    const items = await Promise.all(result.rows.map((row) => this.findById(Number(row.id))));
-    return items.filter((item): item is RealBetRecord => item !== undefined);
+    return this.findMany(result.rows.map((row) => Number(row.id)));
   }
 
   async markChecked(id: number, checks: GameCheckResult[]): Promise<RealBetRecord> {
