@@ -3,3 +3,8 @@ export * from "./lotteries/config.js";
 export * from "./analysis/frequency.js";
 export * from "./analysis/scoring.js";
 export * from "./generator/megaSena.js";
+export * from "./data/source.js";
+export * from "./data/caixa.js";
+export * from "./data/jsonStore.js";
+export * from "./data/sync.js";
+export * from "./backtest/megaSena.js";
