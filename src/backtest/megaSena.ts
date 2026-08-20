@@ -1,10 +1,14 @@
 import type { Contest, GeneratedGame } from "../domain/types.js";
 import { evaluateGames, type GameCheckResult } from "../checker/evaluate.js";
-import { generateMegaSenaGames } from "../generator/megaSena.js";
+import {
+  generateMegaSenaGames,
+  type MegaSenaFixedCount,
+} from "../generator/megaSena.js";
 import { summarizeBacktestRounds, type BacktestSummary } from "./shared.js";
 
 export interface MegaSenaBacktestOptions {
   gameCount?: number;
+  fixedCount?: MegaSenaFixedCount;
   warmupContests?: number;
   startContest?: number;
   endContest?: number;
@@ -24,6 +28,11 @@ export interface MegaSenaBacktestRound {
 export interface MegaSenaBacktestResult {
   rounds: MegaSenaBacktestRound[];
   summary: BacktestSummary;
+  strategy: {
+    gameCount: number;
+    fixedCount: MegaSenaFixedCount;
+    warmupContests: number;
+  };
 }
 
 export function backtestMegaSena(
@@ -31,10 +40,14 @@ export function backtestMegaSena(
   options: MegaSenaBacktestOptions = {},
 ): MegaSenaBacktestResult {
   const gameCount = options.gameCount ?? 2;
+  const fixedCount = options.fixedCount ?? 3;
   const warmupContests = options.warmupContests ?? 20;
 
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
+  }
+  if (![0, 2, 3].includes(fixedCount)) {
+    throw new Error("Mega-Sena fixedCount must be 0, 2 or 3");
   }
   if (!Number.isInteger(warmupContests) || warmupContests < 1) {
     throw new Error("warmupContests must be a positive integer");
@@ -52,7 +65,7 @@ export function backtestMegaSena(
 
     // Anti-leakage: only draws before the target are visible to the generator.
     const history = scoped.slice(0, index);
-    const generatedGames = generateMegaSenaGames(history, gameCount);
+    const generatedGames = generateMegaSenaGames(history, { gameCount, fixedCount });
     const checks = evaluateGames(generatedGames, target);
     const hitsByGame = checks.map((check) => check.hits);
 
@@ -71,5 +84,6 @@ export function backtestMegaSena(
   return {
     rounds,
     summary: summarizeBacktestRounds(rounds),
+    strategy: { gameCount, fixedCount, warmupContests },
   };
 }
