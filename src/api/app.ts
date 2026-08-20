@@ -2,7 +2,11 @@ import { createServer, type RequestListener, type Server } from "node:http";
 import type { Pool } from "pg";
 import { LOTTERY_CONFIGS } from "../lotteries/config.js";
 import type { GenerationMode } from "../generator/shared.js";
-import { LotoLabApiServices } from "./services.js";
+import {
+  BacktestRoundLimitError,
+  InsufficientGenerationHistoryError,
+  LotoLabApiServices,
+} from "./services.js";
 import {
   ApiError,
   isRecord,
@@ -14,11 +18,15 @@ import {
   sendJson,
   sendNoContent,
 } from "./http.js";
+import { enforceRateLimit, FixedWindowRateLimiter } from "./rateLimit.js";
 
 export interface ApiServerOptions {
   pool: Pool;
   corsOrigin?: string;
 }
+
+const generationLimiter = new FixedWindowRateLimiter({ limit: 30, windowMs: 60_000 });
+const backtestLimiter = new FixedWindowRateLimiter({ limit: 4, windowMs: 10 * 60_000 });
 
 function requiredString(value: unknown, field: string, maxLength = 160): string {
   if (typeof value !== "string" || value.trim().length === 0 || value.length > maxLength) {
@@ -148,12 +156,13 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
       }
 
       if (method === "POST" && pathname === "/api/v1/games/generate") {
+        if (!enforceRateLimit(request, response, generationLimiter, "generate-games")) return;
         const body = await readJsonBody(request);
         const lottery = parseLottery(body.lottery);
         const defaultGameCount = lottery === "mega-sena" ? 2 : 4;
         const gameCount = parsePositiveInt(body.gameCount, "gameCount", {
           min: 1,
-          max: 20,
+          max: 10,
           defaultValue: defaultGameCount,
         });
         const targetContestNumber = parseOptionalPositiveInt(body.targetContestNumber, "targetContestNumber");
@@ -236,17 +245,18 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
       }
 
       if (method === "POST" && pathname === "/api/v1/backtests/run") {
+        if (!enforceRateLimit(request, response, backtestLimiter, "backtest")) return;
         const body = await readJsonBody(request);
         const lottery = parseLottery(body.lottery);
         const defaultGameCount = lottery === "mega-sena" ? 2 : 4;
         const gameCount = parsePositiveInt(body.gameCount, "gameCount", {
           min: 1,
-          max: 20,
+          max: 10,
           defaultValue: defaultGameCount,
         });
         const warmupContests = parsePositiveInt(body.warmupContests, "warmupContests", {
           min: 1,
-          max: 5000,
+          max: 500,
           defaultValue: 20,
         });
         const startContest = parseOptionalPositiveInt(body.startContest, "startContest");
@@ -291,6 +301,28 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
       if (error instanceof ApiError) {
         sendJson(response, error.statusCode, {
           error: { code: error.code, message: error.message },
+        }, corsOrigin);
+        return;
+      }
+      if (error instanceof InsufficientGenerationHistoryError) {
+        sendJson(response, 409, {
+          error: {
+            code: "INSUFFICIENT_HISTORY",
+            message: error.message,
+            available: error.available,
+            required: error.required,
+          },
+        }, corsOrigin);
+        return;
+      }
+      if (error instanceof BacktestRoundLimitError) {
+        sendJson(response, 422, {
+          error: {
+            code: "BACKTEST_LIMIT_EXCEEDED",
+            message: error.message,
+            requested: error.requested,
+            maximum: error.maximum,
+          },
         }, corsOrigin);
         return;
       }
