@@ -8,6 +8,8 @@ const ASSETS: Record<string, { file: string; contentType: string; cache: string 
   "/lab/": { file: "lab.html", contentType: "text/html; charset=utf-8", cache: "no-cache" },
   "/ai": { file: "ai.html", contentType: "text/html; charset=utf-8", cache: "no-cache" },
   "/ai/": { file: "ai.html", contentType: "text/html; charset=utf-8", cache: "no-cache" },
+  "/agenda": { file: "agenda.html", contentType: "text/html; charset=utf-8", cache: "no-cache" },
+  "/agenda/": { file: "agenda.html", contentType: "text/html; charset=utf-8", cache: "no-cache" },
   "/assets/styles.css": { file: "styles.css", contentType: "text/css; charset=utf-8", cache: "public, max-age=300" },
   "/assets/app.js": { file: "app.js", contentType: "text/javascript; charset=utf-8", cache: "no-cache" },
   "/assets/data-status.css": { file: "data-status.css", contentType: "text/css; charset=utf-8", cache: "public, max-age=300" },
@@ -25,6 +27,8 @@ const ASSETS: Record<string, { file: string; contentType: string; cache: string 
   "/assets/lab-refinements.js": { file: "lab-refinements.js", contentType: "text/javascript; charset=utf-8", cache: "no-cache" },
   "/assets/ai.css": { file: "ai.css", contentType: "text/css; charset=utf-8", cache: "public, max-age=300" },
   "/assets/ai.js": { file: "ai.js", contentType: "text/javascript; charset=utf-8", cache: "no-cache" },
+  "/assets/agenda.css": { file: "agenda.css", contentType: "text/css; charset=utf-8", cache: "public, max-age=300" },
+  "/assets/agenda.js": { file: "agenda.js", contentType: "text/javascript; charset=utf-8", cache: "no-cache" },
   "/favicon.svg": { file: "favicon.svg", contentType: "image/svg+xml; charset=utf-8", cache: "public, max-age=86400" },
 };
 
