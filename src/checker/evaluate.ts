@@ -1,5 +1,5 @@
 import type { Contest, GeneratedGame, LotteryId } from "../domain/types.js";
-import { simpleBetPriceForContest } from "../finance/pricing.js";
+import { trySimpleBetPriceForContest } from "../finance/pricing.js";
 import { resolvePrizeValue } from "../finance/prizes.js";
 
 export interface GameCheckResult {
@@ -13,7 +13,7 @@ export interface GameCheckResult {
   variableMatchedNumbers: number[];
   prizeTier?: string;
   luckyMonthHit?: boolean;
-  ticketCost: number;
+  ticketCost?: number;
   numberPrizeValue?: number;
   luckyMonthPrizeValue?: number;
   totalPrizeValue?: number;
@@ -51,9 +51,9 @@ export function evaluateGame(game: GeneratedGame, target: Contest): GameCheckRes
   const luckyMonthHit = game.lottery === "dia-de-sorte"
     ? canonical(game.luckyMonth) !== undefined && canonical(game.luckyMonth) === canonical(target.luckyMonth)
     : undefined;
-  const ticketCost = simpleBetPriceForContest(target);
+  const ticketCost = trySimpleBetPriceForContest(target);
   const prize = resolvePrizeValue(target, matchedNumbers.length, luckyMonthHit ?? false);
-  const netResult = prize.totalPrizeValue !== undefined
+  const netResult = prize.totalPrizeValue !== undefined && ticketCost !== undefined
     ? prize.totalPrizeValue - ticketCost
     : undefined;
 
@@ -68,7 +68,7 @@ export function evaluateGame(game: GeneratedGame, target: Contest): GameCheckRes
     variableMatchedNumbers,
     prizeTier: prizeTierFor(game.lottery, matchedNumbers.length),
     ...(luckyMonthHit !== undefined ? { luckyMonthHit } : {}),
-    ticketCost,
+    ...(ticketCost !== undefined ? { ticketCost } : {}),
     ...prize,
     ...(netResult !== undefined ? { netResult } : {}),
   };
