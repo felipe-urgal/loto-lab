@@ -12,6 +12,7 @@ export interface BacktestSummary {
   prizeGames: number;
   prizeRate: number;
   totalCost: number;
+  financialCost: number;
   totalPrizeValue: number;
   financialGames: number;
   financialCoverage: number;
@@ -42,6 +43,7 @@ export function summarizeBacktestRounds(rounds: SummarizableRound[]): BacktestSu
   let maxHits = 0;
   let prizeGames = 0;
   let totalCost = 0;
+  let financialCost = 0;
   let totalPrizeValue = 0;
   let financialGames = 0;
 
@@ -64,15 +66,16 @@ export function summarizeBacktestRounds(rounds: SummarizableRound[]): BacktestSu
       }
       if (check.totalPrizeValue !== undefined) {
         totalPrizeValue += check.totalPrizeValue;
+        financialCost += check.ticketCost;
         financialGames += 1;
       }
     }
   }
 
   const financialCoverage = totalGames === 0 ? 0 : financialGames / totalGames;
-  const netResult = totalPrizeValue - totalCost;
-  const returnRate = totalCost === 0 ? 0 : totalPrizeValue / totalCost;
-  const roi = totalCost === 0 ? 0 : netResult / totalCost;
+  const netResult = totalPrizeValue - financialCost;
+  const returnRate = financialCost === 0 ? 0 : totalPrizeValue / financialCost;
+  const roi = financialCost === 0 ? 0 : netResult / financialCost;
 
   return {
     testedContests: rounds.length,
@@ -86,6 +89,7 @@ export function summarizeBacktestRounds(rounds: SummarizableRound[]): BacktestSu
     prizeGames,
     prizeRate: totalGames === 0 ? 0 : prizeGames / totalGames,
     totalCost,
+    financialCost,
     totalPrizeValue,
     financialGames,
     financialCoverage,
