@@ -1,6 +1,6 @@
 {
   "name": "loto-lab",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,11 @@
     "check": "npm test",
     "data:sync": "npm run build && node dist/src/cli/sync.js",
     "games:generate": "npm run build && node dist/src/cli/generateGames.js",
-    "backtest:mega": "npm run build && node dist/src/cli/backtestMega.js"
+    "games:check": "npm run build && node dist/src/cli/checkGames.js",
+    "backtest:mega": "npm run build && node dist/src/cli/backtestMega.js",
+    "backtest:lotofacil": "npm run build && node dist/src/cli/backtestLotofacil.js",
+    "backtest:dia": "npm run build && node dist/src/cli/backtestDiaDeSorte.js",
+    "backtest:compare": "npm run build && node dist/src/cli/compareStrategies.js"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
