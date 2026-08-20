@@ -8,6 +8,7 @@ import {
   type SyncAllDetails,
 } from "../operations/sync.js";
 import { sendJson } from "./http.js";
+import { enforceRateLimit, FixedWindowRateLimiter } from "./rateLimit.js";
 
 export interface OperationsApiOptions {
   pool: Pool;
@@ -15,6 +16,8 @@ export interface OperationsApiOptions {
   operationSource?: ContestSource;
   staleAfterMinutes?: number;
 }
+
+const syncLimiter = new FixedWindowRateLimiter({ limit: 2, windowMs: 10 * 60_000 });
 
 function positiveMinutes(value: string | undefined, fallback: number): number {
   const parsed = Number(value ?? fallback);
@@ -54,6 +57,7 @@ export async function serveOperations(
   }
 
   if (method === "POST" && url.pathname === "/api/v1/operations/sync") {
+    if (!enforceRateLimit(request, response, syncLimiter, "operations-sync")) return true;
     try {
       const run = await runOperationalSync(options.pool, {
         ...(options.operationSource ? { source: options.operationSource } : {}),

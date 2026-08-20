@@ -17,7 +17,7 @@ async function decorateAudit(result) {
     const batch = await response.json();
     const mode = batch.generatorOptions?.generationMode;
     const seed = batch.generatorOptions?.seed;
-    if (mode !== "diversified" || !seed || !result.isConnected) {
+    if (mode !== "diversified" || typeof seed !== "string" || !seed || !result.isConnected) {
       result.dataset.generationAudit = "done";
       return;
     }
@@ -26,12 +26,19 @@ async function decorateAudit(result) {
       const target = result.querySelector(".generation-summary") || result.querySelector(".game-grid");
       const audit = document.createElement("div");
       audit.className = "generation-audit";
-      audit.innerHTML = `
-        <div>
-          <strong>Lote diversificado e reproduzível</strong>
-          <span>A seed registrada permite reconstruir exatamente este lote.</span>
-        </div>
-        <code title="${seed}">${seed.slice(0, 8)}…${seed.slice(-6)}</code>`;
+
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = "Lote diversificado e reproduzível";
+      const description = document.createElement("span");
+      description.textContent = "A seed registrada permite reconstruir exatamente este lote.";
+      copy.append(title, description);
+
+      const code = document.createElement("code");
+      code.title = seed;
+      code.textContent = `${seed.slice(0, 8)}…${seed.slice(-6)}`;
+
+      audit.append(copy, code);
       target?.insertAdjacentElement("afterend", audit);
     }
     result.dataset.generationAudit = "done";

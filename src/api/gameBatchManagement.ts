@@ -47,12 +47,10 @@ export async function serveGameBatchManagement(
         defaultValue: 100,
       });
       const scope = parseScope(url.searchParams.get("scope"));
-      const items = await repository.listRecent(lottery, limit, scope);
-      const counts = {
-        active: items.filter((item) => !item.archivedAt).length,
-        archived: items.filter((item) => Boolean(item.archivedAt)).length,
-        realBets: items.filter((item) => item.hasRealBet).length,
-      };
+      const [items, counts] = await Promise.all([
+        repository.listRecent(lottery, limit, scope),
+        repository.counts(lottery),
+      ]);
       sendJson(response, 200, { items, counts, scope }, corsOrigin);
       return true;
     }

@@ -7,6 +7,7 @@ import type {
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_MODEL = "gpt-5.6-luna";
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 const SYSTEM_INSTRUCTIONS = `Você é a camada interpretativa do Loto Lab.
 Regra central: o algoritmo calcula; a IA interpreta.
@@ -114,6 +115,7 @@ export interface OpenAiInterpretationProviderOptions {
   apiKey?: string;
   model?: string;
   fetchImpl?: typeof fetch;
+  timeoutMs?: number;
 }
 
 export class OpenAiInterpretationProvider implements AiInterpretationProvider {
@@ -121,11 +123,16 @@ export class OpenAiInterpretationProvider implements AiInterpretationProvider {
   private readonly apiKey?: string;
   private readonly modelName: string;
   private readonly fetchImpl: typeof fetch;
+  private readonly timeoutMs: number;
 
   constructor(options: OpenAiInterpretationProviderOptions = {}) {
     this.apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
     this.modelName = options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_MODEL;
     this.fetchImpl = options.fetchImpl ?? fetch;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    if (!Number.isFinite(this.timeoutMs) || this.timeoutMs < 1000 || this.timeoutMs > 120_000) {
+      throw new Error("OpenAI timeout must be between 1000 and 120000 ms");
+    }
   }
 
   isConfigured(): boolean {
@@ -141,22 +148,35 @@ export class OpenAiInterpretationProvider implements AiInterpretationProvider {
       throw new OpenAiProviderError("AI_NOT_CONFIGURED", "OPENAI_API_KEY is not configured");
     }
 
-    const response = await this.fetchImpl(OPENAI_RESPONSES_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.modelName,
-        instructions: SYSTEM_INSTRUCTIONS,
-        input: JSON.stringify({
-          focus: request.focus,
-          evidence: request.evidence,
+    let response: Response;
+    try {
+      response = await this.fetchImpl(OPENAI_RESPONSES_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.modelName,
+          instructions: SYSTEM_INSTRUCTIONS,
+          input: JSON.stringify({
+            focus: request.focus,
+            evidence: request.evidence,
+          }),
+          max_output_tokens: 1400,
         }),
-        max_output_tokens: 1400,
-      }),
-    });
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+    } catch (error) {
+      if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+        throw new OpenAiProviderError("AI_PROVIDER_TIMEOUT", "OpenAI request timed out", 504);
+      }
+      throw new OpenAiProviderError(
+        "AI_PROVIDER_UNAVAILABLE",
+        error instanceof Error ? error.message : "OpenAI request failed before receiving a response",
+        502,
+      );
+    }
 
     const payload = (await response.json().catch(() => ({}))) as OpenAiResponse;
     if (!response.ok) {

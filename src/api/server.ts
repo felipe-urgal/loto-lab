@@ -10,6 +10,7 @@ import { serveAiInsights } from "./aiInsights.js";
 import { serveOperations } from "./operations.js";
 import { serveAgenda } from "./agenda.js";
 import { serveWebAsset } from "./web.js";
+import { loadAppAuthConfig, requireAppAuthentication } from "./auth.js";
 
 export interface LotoLabServerOptions extends ApiServerOptions {
   aiProvider?: AiInterpretationProvider;
@@ -17,13 +18,23 @@ export interface LotoLabServerOptions extends ApiServerOptions {
   staleAfterMinutes?: number;
 }
 
+function isHealthPath(pathname: string): boolean {
+  return pathname === "/health" || pathname === "/health/live" || pathname === "/health/ready";
+}
+
 export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const apiHandler = createApiRequestHandler(options);
+  const auth = loadAppAuthConfig();
 
   return createServer(async (request, response) => {
     try {
       const method = request.method ?? "GET";
       const url = new URL(request.url ?? "/", "http://localhost");
+
+      if (!isHealthPath(url.pathname) && !requireAppAuthentication(request, response, auth)) {
+        return;
+      }
+
       if (await serveDataStatus(request, response, options)) return;
       if (await serveStrategyLab(request, response, options)) return;
       if (await serveRealBets(request, response, options)) return;

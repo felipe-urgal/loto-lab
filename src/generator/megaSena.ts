@@ -9,9 +9,11 @@ import {
   type MegaSenaGameRules,
 } from "./megaSenaRules.js";
 import {
+  combinationIterator,
   generationRandom,
   selectRankedCandidate,
   selectWeightedItem,
+  topRankedCandidates,
   type GenerationMode,
 } from "./shared.js";
 
@@ -64,25 +66,6 @@ export function selectMegaSenaFixedNumbers(
   }
 
   return [...selected].sort((a, b) => a - b);
-}
-
-function combinations<T>(items: T[], size: number): T[][] {
-  const result: T[][] = [];
-
-  function walk(start: number, current: T[]): void {
-    if (current.length === size) {
-      result.push([...current]);
-      return;
-    }
-    for (let index = start; index < items.length; index += 1) {
-      current.push(items[index]!);
-      walk(index + 1, current);
-      current.pop();
-    }
-  }
-
-  walk(0, []);
-  return result;
 }
 
 function buildMetadata(numbers: number[], lastContest?: Contest): GeneratedGame["metadata"] {
@@ -221,8 +204,6 @@ export function generateMegaSenaGames(
   const scoreByNumber = new Map(analysis.map((row) => [row.number, row.score]));
   const variableCount = config.drawSize - fixedCount;
   const candidatePool = buildCandidatePool(analysis, fixedSet, fixedCount, rules);
-
-  const variableOptions = combinations(candidatePool, variableCount);
   const usedVariables = new Map<number, number>();
   const parityTargets = [3, 4, 2];
   const games: GeneratedGame[] = [];
@@ -230,10 +211,10 @@ export function generateMegaSenaGames(
   for (let gameIndex = 0; gameIndex < gameCount; gameIndex += 1) {
     const targetOdd = rules.equalParity ? 3 : parityTargets[gameIndex % parityTargets.length]!;
 
-    const ranked = variableOptions
-      .map((variableNumbers) => {
+    const candidates = function* () {
+      for (const variableNumbers of combinationIterator(candidatePool, variableCount)) {
         const numbers = [...fixedNumbers, ...variableNumbers].sort((a, b) => a - b);
-        if (!matchesMegaSenaRules(numbers, rules)) return undefined;
+        if (!matchesMegaSenaRules(numbers, rules)) continue;
 
         const metadata = buildMetadata(numbers, lastContest);
         const baseScore = variableNumbers.reduce(
@@ -248,16 +229,20 @@ export function generateMegaSenaGames(
         const repeatPenalty = Math.max(0, metadata.repeatedFromLastContest.length - 2) * 30;
         const reusePenalty = reused * 80;
 
-        return {
+        yield {
           variableNumbers,
           numbers,
           metadata,
           rank: baseScore - parityPenalty - repeatPenalty - reusePenalty,
         };
-      })
-      .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== undefined)
-      .sort((a, b) => b.rank - a.rank || a.numbers.join("-").localeCompare(b.numbers.join("-")));
+      }
+    };
 
+    const ranked = topRankedCandidates(
+      candidates(),
+      24,
+      (a, b) => b.rank - a.rank || a.numbers.join("-").localeCompare(b.numbers.join("-")),
+    );
     const winner = selectRankedCandidate(ranked, generationMode, random, 6);
     if (!winner) {
       throw new Error("Unable to generate a Mega-Sena game with the requested experimental rules");

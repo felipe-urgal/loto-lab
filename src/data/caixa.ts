@@ -3,6 +3,7 @@ import { getLotteryConfig } from "../lotteries/config.js";
 import type { ContestSource, LotteryAgendaSnapshot, LotteryAgendaSource } from "./source.js";
 
 const BASE_URL = "https://servicebus2.caixa.gov.br/portaldeloterias/api";
+const DEFAULT_TIMEOUT_MS = 12_000;
 
 const endpointByLottery: Record<LotteryId, string> = {
   "mega-sena": "megasena",
@@ -106,7 +107,17 @@ export function normalizeCaixaAgenda(lottery: LotteryId, payload: CaixaContestRe
 }
 
 export class CaixaContestSource implements ContestSource, LotteryAgendaSource {
-  constructor(private readonly fetchImpl: FetchLike = fetch) {}
+  private readonly timeoutMs: number;
+
+  constructor(
+    private readonly fetchImpl: FetchLike = fetch,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+  ) {
+    if (!Number.isFinite(timeoutMs) || timeoutMs < 1000 || timeoutMs > 60_000) {
+      throw new Error("Caixa timeout must be between 1000 and 60000 ms");
+    }
+    this.timeoutMs = timeoutMs;
+  }
 
   private async fetchPayload(lottery: LotteryId, contestNumber?: number): Promise<CaixaContestResponse> {
     if (contestNumber !== undefined && (!Number.isInteger(contestNumber) || contestNumber < 1)) {
@@ -114,7 +125,20 @@ export class CaixaContestSource implements ContestSource, LotteryAgendaSource {
     }
     const endpoint = endpointByLottery[lottery];
     const url = `${BASE_URL}/${endpoint}${contestNumber ? `/${contestNumber}` : ""}`;
-    const response = await this.fetchImpl(url, { headers: { Accept: "application/json" } });
+
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+    } catch (error) {
+      if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+        throw new Error(`Caixa request timed out for ${lottery}`);
+      }
+      throw error;
+    }
+
     if (!response.ok) throw new Error(`Caixa request failed (${response.status}) for ${lottery}`);
     return (await response.json()) as CaixaContestResponse;
   }

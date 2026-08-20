@@ -23,6 +23,25 @@ import type {
   UpsertStrategyInput,
 } from "../persistence/types.js";
 
+export const MIN_GENERATION_HISTORY = 20;
+export const MAX_HTTP_BACKTEST_ROUNDS = 500;
+
+export class InsufficientGenerationHistoryError extends Error {
+  constructor(
+    readonly lottery: LotteryId,
+    readonly available: number,
+    readonly required = MIN_GENERATION_HISTORY,
+  ) {
+    super(`At least ${required} historical contests are required to generate games for ${lottery}; ${available} available`);
+  }
+}
+
+export class BacktestRoundLimitError extends Error {
+  constructor(readonly requested: number, readonly maximum = MAX_HTTP_BACKTEST_ROUNDS) {
+    super(`Backtest would process ${requested} contests; the HTTP limit is ${maximum}`);
+  }
+}
+
 export interface GenerateGamesRequest {
   lottery: LotteryId;
   gameCount: number;
@@ -67,6 +86,14 @@ function gameFingerprint(games: GeneratedGameBatchRecord["games"]): string {
     .join("|");
 }
 
+function compactBacktestRound(round: BacktestRoundArtifact): BacktestRoundArtifact {
+  const compact: BacktestRoundArtifact = { contest: round.contest };
+  for (const key of ["date", "targetNumbers", "hitsByGame", "bestHits", "fixedHits"] as const) {
+    if (round[key] !== undefined) compact[key] = round[key];
+  }
+  return compact;
+}
+
 export class LotoLabApiServices {
   readonly contests: PostgresContestRepository;
   readonly games: PostgresGameRepository;
@@ -105,6 +132,10 @@ export class LotoLabApiServices {
     const history = input.targetContestNumber === undefined
       ? contests
       : contests.filter((contest) => contest.number < input.targetContestNumber!);
+    if (history.length < MIN_GENERATION_HISTORY) {
+      throw new InsufficientGenerationHistoryError(input.lottery, history.length);
+    }
+
     const targetContestNumber = input.targetContestNumber ??
       (latestContest ? latestContest.number + 1 : undefined);
     const generationMode = input.generationMode ?? "diversified";
@@ -209,6 +240,15 @@ export class LotoLabApiServices {
 
   async runBacktest(input: RunBacktestRequest): Promise<RunBacktestResponse> {
     const contests = await this.contests.list({ lottery: input.lottery, order: "asc" });
+    const eligibleRoundCount = contests
+      .slice(input.warmupContests)
+      .filter((contest) => input.startContest === undefined || contest.number >= input.startContest)
+      .filter((contest) => input.endContest === undefined || contest.number <= input.endContest)
+      .length;
+    if (eligibleRoundCount > MAX_HTTP_BACKTEST_ROUNDS) {
+      throw new BacktestRoundLimitError(eligibleRoundCount);
+    }
+
     const options: Record<string, unknown> = {
       gameCount: input.gameCount,
       warmupContests: input.warmupContests,
@@ -263,7 +303,7 @@ export class LotoLabApiServices {
       lottery: input.lottery,
       options,
       summary,
-      rounds,
+      rounds: rounds.map(compactBacktestRound),
     });
 
     return {

@@ -5,12 +5,14 @@ import { AiInsightService } from "../ai/service.js";
 import { OpenAiInterpretationProvider, OpenAiProviderError } from "../ai/openai.js";
 import type { AiInsightFocus, AiInterpretationProvider } from "../ai/types.js";
 import { AI_DISCLAIMER } from "../ai/types.js";
+import { enforceRateLimit, FixedWindowRateLimiter } from "./rateLimit.js";
 
 export interface AiApiOptions extends ApiServerOptions {
   aiProvider?: AiInterpretationProvider;
 }
 
 const FOCUSES: AiInsightFocus[] = ["overview", "analysis", "strategy", "real-performance"];
+const insightLimiter = new FixedWindowRateLimiter({ limit: 6, windowMs: 10 * 60_000 });
 
 function parseFocus(value: unknown): AiInsightFocus {
   const focus = value ?? "overview";
@@ -41,6 +43,7 @@ export async function serveAiInsights(
     }
 
     if (method === "POST" && pathname === "/api/v1/ai/insights") {
+      if (!enforceRateLimit(request, response, insightLimiter, "ai-insights")) return true;
       if (!provider.isConfigured()) {
         throw new ApiError(503, "AI_NOT_CONFIGURED", "Configure OPENAI_API_KEY to enable AI interpretation");
       }
@@ -72,7 +75,11 @@ export async function serveAiInsights(
       return true;
     }
     if (error instanceof OpenAiProviderError) {
-      const status = error.code === "AI_NOT_CONFIGURED" ? 503 : 502;
+      const status = error.code === "AI_NOT_CONFIGURED"
+        ? 503
+        : error.code === "AI_PROVIDER_TIMEOUT"
+          ? 504
+          : 502;
       sendJson(response, status, { error: { code: error.code, message: error.message } }, corsOrigin);
       return true;
     }
