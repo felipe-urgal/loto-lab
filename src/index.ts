@@ -9,6 +9,8 @@ export * from "./data/source.js";
 export * from "./data/caixa.js";
 export * from "./data/jsonStore.js";
 export * from "./data/sync.js";
+export * from "./finance/pricing.js";
+export * from "./finance/prizes.js";
 export * from "./checker/evaluate.js";
 export * from "./backtest/shared.js";
 export * from "./backtest/megaSena.js";

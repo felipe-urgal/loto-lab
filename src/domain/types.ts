@@ -8,12 +8,20 @@ export interface LotteryConfig {
   drawSize: number;
 }
 
+export interface ContestPrizeTier {
+  description: string;
+  winners: number;
+  prizeValue: number;
+}
+
 export interface Contest {
   lottery: LotteryId;
   number: number;
   date: string;
   numbers: number[];
   luckyMonth?: string;
+  prizeTiers?: ContestPrizeTier[];
+  amountCollected?: number;
 }
 
 export type NumberTier = "strong" | "balanced" | "cold";

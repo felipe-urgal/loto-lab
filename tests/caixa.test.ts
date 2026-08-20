@@ -7,6 +7,12 @@ const megaPayload = {
   dataApuracao: "18/08/2026",
   listaDezenas: ["16", "23", "24", "33", "36", "52"],
   nomeTimeCoracaoMesSorte: "\0\0\0",
+  listaRateioPremio: [
+    { descricaoFaixa: "6 acertos", numeroDeGanhadores: 0, valorPremio: 0 },
+    { descricaoFaixa: "5 acertos", numeroDeGanhadores: 38, valorPremio: 55819.16 },
+    { descricaoFaixa: "4 acertos", numeroDeGanhadores: 3290, valorPremio: 921.02 },
+  ],
+  valorArrecadado: 44677284,
 };
 
 test("normalizeCaixaContest converts Caixa payload to domain contest", () => {
@@ -17,6 +23,12 @@ test("normalizeCaixaContest converts Caixa payload to domain contest", () => {
     number: 3046,
     date: "2026-08-18",
     numbers: [16, 23, 24, 33, 36, 52],
+    prizeTiers: [
+      { description: "6 acertos", winners: 0, prizeValue: 0 },
+      { description: "5 acertos", winners: 38, prizeValue: 55819.16 },
+      { description: "4 acertos", winners: 3290, prizeValue: 921.02 },
+    ],
+    amountCollected: 44677284,
   });
 });
 
@@ -48,6 +60,7 @@ test("CaixaContestSource requests the expected contest endpoint", async () => {
     "https://servicebus2.caixa.gov.br/portaldeloterias/api/megasena/3046",
   );
   assert.equal(contest.number, 3046);
+  assert.equal(contest.prizeTiers?.[1]?.prizeValue, 55819.16);
 });
 
 test("normalizeCaixaContest rejects invalid draw sizes", () => {
