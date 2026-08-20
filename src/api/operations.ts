@@ -22,7 +22,8 @@ function positiveMinutes(value: string | undefined, fallback: number): number {
 }
 
 function enabled(value: string | undefined): boolean {
-  return value === "1" || value?.toLowerCase() === "true";
+  if (value === undefined || value === "") return true;
+  return value === "1" || value.toLowerCase() === "true";
 }
 
 export async function serveOperations(
