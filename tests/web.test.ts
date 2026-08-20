@@ -57,6 +57,7 @@ test("web application shell, Strategy Lab and assets are served by the Loto Lab 
   assert.match(labHtml, /Executar comparação/);
   assert.match(labHtml, /\/assets\/lab\.js/);
   assert.match(labHtml, /\/assets\/lab\.css/);
+  assert.match(labHtml, /<span class="nav-icon"[^>]*><svg/);
 
   const aiPage = await fetch(`${baseUrl}/ai`);
   assert.equal(aiPage.status, 200);
@@ -64,6 +65,8 @@ test("web application shell, Strategy Lab and assets are served by the Loto Lab 
   assert.match(aiHtml, /Laboratório/);
   assert.match(aiHtml, /Agenda/);
   assert.match(aiHtml, />IA</);
+  assert.match(aiHtml, /<span class="nav-icon"[^>]*><svg/);
+  assert.doesNotMatch(aiHtml, /[▦▥✦▤↶♧◷◇]/);
 
   const agendaPage = await fetch(`${baseUrl}/agenda`);
   assert.equal(agendaPage.status, 200);
@@ -71,6 +74,8 @@ test("web application shell, Strategy Lab and assets are served by the Loto Lab 
   assert.match(agendaHtml, /Laboratório/);
   assert.match(agendaHtml, /Agenda/);
   assert.match(agendaHtml, />IA</);
+  assert.match(agendaHtml, /<span class="nav-icon"[^>]*><svg/);
+  assert.doesNotMatch(agendaHtml, /[▦▥✦▤↶♧◷◇]/);
 
   const javascript = await fetch(`${baseUrl}/assets/app.js`);
   assert.equal(javascript.status, 200);
@@ -128,6 +133,10 @@ test("web application shell, Strategy Lab and assets are served by the Loto Lab 
   assert.equal(stylesheet.status, 200);
   assert.match(stylesheet.headers.get("content-type") ?? "", /^text\/css/);
   assert.match(await stylesheet.text(), /\.app-shell/);
+
+  const refinementsStyles = await fetch(`${baseUrl}/assets/refinements.css`);
+  assert.equal(refinementsStyles.status, 200);
+  assert.match(await refinementsStyles.text(), /a\.nav-item\s*\{\s*text-decoration:\s*none/);
 
   const labStyles = await fetch(`${baseUrl}/assets/lab.css`);
   assert.equal(labStyles.status, 200);
