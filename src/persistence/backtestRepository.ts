@@ -3,6 +3,7 @@ import type { LotteryId } from "../domain/types.js";
 import type {
   BacktestRoundArtifact,
   BacktestRunRecord,
+  BacktestRunSummaryRecord,
   SaveBacktestRunInput,
 } from "./types.js";
 
@@ -15,12 +16,28 @@ interface BacktestRunRow {
   created_at: Date;
 }
 
+interface BacktestRunSummaryRow extends BacktestRunRow {
+  round_count: string;
+}
+
 function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function nonNegativeInt(value: unknown): number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
+function mapSummary(row: BacktestRunSummaryRow): BacktestRunSummaryRecord {
+  return {
+    id: Number(row.id),
+    lottery: row.lottery,
+    ...(row.strategy_id ? { strategyId: Number(row.strategy_id) } : {}),
+    options: row.options,
+    summary: row.summary,
+    roundCount: Number(row.round_count),
+    createdAt: row.created_at.toISOString(),
+  };
 }
 
 export class PostgresBacktestRepository {
@@ -141,5 +158,32 @@ export class PostgresBacktestRepository {
 
     const runs = await Promise.all(result.rows.map((row) => this.findById(Number(row.id))));
     return runs.filter((run): run is BacktestRunRecord => run !== undefined);
+  }
+
+  async listRecentSummaries(
+    lottery: LotteryId,
+    limit = 20,
+  ): Promise<BacktestRunSummaryRecord[]> {
+    const result = await this.pool.query<BacktestRunSummaryRow>(
+      `
+        SELECT
+          b.id,
+          b.lottery,
+          b.strategy_id,
+          b.options,
+          b.summary,
+          b.created_at,
+          COUNT(r.id)::text AS round_count
+        FROM backtest_runs b
+        LEFT JOIN backtest_rounds r ON r.backtest_run_id = b.id
+        WHERE b.lottery = $1
+        GROUP BY b.id
+        ORDER BY b.created_at DESC, b.id DESC
+        LIMIT $2
+      `,
+      [lottery, limit],
+    );
+
+    return result.rows.map(mapSummary);
   }
 }
