@@ -79,25 +79,44 @@ Para isolar o efeito dessas regras, todas as variantes desse experimento usam `f
 
 Essas definições tornam as regras testáveis e auditáveis. Se outra interpretação do artigo for desejada no futuro, ela deve entrar como uma nova variante, não substituir silenciosamente a existente.
 
+## Controle aleatório
+
+Toda execução do Laboratório também calcula um **controle aleatório reproduzível** como benchmark separado do ranking das estratégias.
+
+O controle:
+
+- usa a mesma loteria, o mesmo período e a mesma quantidade de jogos por concurso;
+- escolhe as dezenas uniformemente sem reposição dentro de cada jogo;
+- não consulta score, frequência, núcleo ou regras experimentais;
+- não recebe o resultado do concurso alvo antes da geração;
+- usa seed estável para que a comparação seja reproduzível;
+- passa pelo mesmo checker financeiro e estatístico das estratégias.
+
+A resposta inclui a melhor estratégia do ranking comparada ao controle pela mesma métrica principal (`ROI` quando a cobertura financeira é suficiente, caso contrário taxa de premiação).
+
+O campo `benchmark.delta` é a diferença entre a melhor estratégia e o controle. `benchmark.beatsRandom` indica apenas se a estratégia ficou acima daquele controle reproduzível no recorte analisado.
+
+Uma única amostra aleatória **não é prova estatística**. O benchmark existe como referência mínima e como base para evoluções futuras com múltiplas seeds, intervalos de confiança e validação walk-forward.
+
 ## Recorte histórico
 
 A interface usa os últimos 100 concursos por padrão.
 
 É possível comparar outros horizontes pela própria tela. O backend aceita até 5.000 concursos no `lookbackContests`.
 
-Todos os presets de uma execução recebem:
+Todos os presets e o controle de uma execução recebem:
 
 - a mesma quantidade de jogos por concurso;
 - o mesmo aquecimento (`warmupContests`);
 - o mesmo concurso inicial/final;
-- a mesma base histórica disponível antes de cada alvo;
+- a mesma base histórica disponível antes de cada alvo quando a estratégia usa histórico;
 - o mesmo tamanho de bloco para a série temporal.
 
 ## Ranking
 
 O laboratório não escolhe uma estratégia apenas por um resultado isolado.
 
-Se todas as variantes tiverem pelo menos 80% de cobertura financeira no período, o ranking principal usa:
+Se todas as variantes e o controle tiverem pelo menos 80% de cobertura financeira no período, o ranking principal usa:
 
 1. ROI;
 2. taxa de premiação;
@@ -110,6 +129,8 @@ Se a cobertura financeira estiver incompleta, o ranking evita privilegiar um ROI
 2. média de acertos por jogo;
 3. melhor número de acertos;
 4. tamanho do núcleo como desempate quando aplicável.
+
+O controle não ocupa posição no ranking: ele aparece como benchmark separado para não mudar a semântica do “vencedor” entre as estratégias testadas.
 
 A cobertura financeira continua visível na tabela.
 
@@ -126,7 +147,7 @@ Os rounds são agrupados em blocos (25 concursos por padrão). Para cada bloco s
 
 Isso permite verificar consistência e evitar concluir que uma estratégia é superior apenas por causa de um pico isolado.
 
-No experimento de regras externas, a tabela mantém todas as variantes e o gráfico mostra apenas o Top 3 do ranking atual para preservar legibilidade.
+No experimento de regras externas, a tabela mantém todas as variantes e o gráfico mostra o Top 3 do ranking atual mais o controle aleatório para preservar legibilidade.
 
 ## API
 
@@ -170,10 +191,11 @@ A resposta contém:
 - experimento executado;
 - período efetivo;
 - critério usado no ranking;
-- vencedor do período;
+- vencedor do período entre as estratégias;
 - resumo completo de cada variante;
 - regras aplicadas quando existirem;
-- pontos temporais por blocos.
+- pontos temporais por blocos;
+- `benchmark`, contendo o controle aleatório, a melhor estratégia, o delta e se ela superou o controle.
 
 ## Interface
 
@@ -192,9 +214,17 @@ A tela oferece:
 - aquecimento;
 - tamanho dos blocos;
 - ranking das variantes;
-- tabela comparativa;
+- card de benchmark com vantagem/desvantagem contra o aleatório;
+- controle aleatório na tabela comparativa;
+- controle aleatório como linha tracejada no gráfico;
 - gráfico alternável entre acertos, taxa de premiação, ROI e resultado líquido;
 - indicação da cobertura histórica/financeira da base.
+
+## Próxima etapa: validação fora da amostra
+
+O benchmark aleatório é a fundação para a próxima evolução: otimização de parâmetros com validação walk-forward.
+
+Pesos de score, metas de repetição, paridade e penalidades não devem ser promovidos apenas porque melhoraram o mesmo período em que foram escolhidos. O fluxo correto é selecionar parâmetros em uma janela de treino e medir o resultado em uma janela posterior que não participou da escolha.
 
 ## Interpretação correta
 
