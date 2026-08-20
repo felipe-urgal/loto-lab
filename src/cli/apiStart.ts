@@ -1,7 +1,5 @@
-import { createServer } from "node:http";
 import { createPostgresPool } from "../db/client.js";
-import { createApiRequestHandler } from "../api/app.js";
-import { serveWebAsset } from "../api/web.js";
+import { createLotoLabServer } from "../api/server.js";
 
 function parsePort(value: string | undefined): number {
   const port = Number(value ?? 3000);
@@ -14,25 +12,9 @@ function parsePort(value: string | undefined): number {
 const pool = createPostgresPool();
 const port = parsePort(process.env.API_PORT);
 const host = process.env.API_HOST ?? "127.0.0.1";
-const apiHandler = createApiRequestHandler({
+const server = createLotoLabServer({
   pool,
   corsOrigin: process.env.API_CORS_ORIGIN,
-});
-
-const server = createServer(async (request, response) => {
-  try {
-    const method = request.method ?? "GET";
-    const url = new URL(request.url ?? "/", "http://localhost");
-    if (method === "GET" && await serveWebAsset(url.pathname, response)) return;
-    apiHandler(request, response);
-  } catch (error) {
-    console.error("Loto Lab web request failed", error);
-    if (!response.headersSent) {
-      response.statusCode = 500;
-      response.setHeader("Content-Type", "text/plain; charset=utf-8");
-    }
-    response.end("Unexpected server error");
-  }
 });
 
 server.listen(port, host, () => {
