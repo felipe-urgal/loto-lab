@@ -70,7 +70,7 @@ export function generateDiaDeSorteGames(
     .sort((a, b) => a.number - b.number);
   const lastContest = scoped.at(-1);
   const analysis = buildNumberAnalysis(scoped, config);
-  const fixedNumbers = selectProfiledFixedNumbers(analysis, 3, lastContest);
+  const fixedNumbers = selectProfiledFixedNumbers(analysis, 3, lastContest, 1);
   const fixedSet = new Set(fixedNumbers);
   const scores = scoreMap(analysis);
   const candidatePool = analysis
