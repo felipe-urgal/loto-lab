@@ -24,3 +24,6 @@ export * from "./backtest/megaSena.js";
 export * from "./backtest/lotofacil.js";
 export * from "./backtest/diaDeSorte.js";
 export * from "./backtest/compare.js";
+export * from "./api/http.js";
+export * from "./api/services.js";
+export * from "./api/app.js";

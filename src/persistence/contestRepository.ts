@@ -28,6 +28,8 @@ export interface ContestListOptions {
   lottery?: LotteryId;
   startContest?: number;
   endContest?: number;
+  limit?: number;
+  order?: "asc" | "desc";
 }
 
 export class PostgresContestRepository {
@@ -92,6 +94,7 @@ export class PostgresContestRepository {
       lottery,
       startContest: contestNumber,
       endContest: contestNumber,
+      limit: 1,
     });
     return rows[0];
   }
@@ -117,6 +120,19 @@ export class PostgresContestRepository {
       clauses.push(`c.contest_number <= $${values.length}`);
     }
 
+    let limit = "";
+    if (options.limit !== undefined) {
+      if (!Number.isInteger(options.limit) || options.limit < 1) {
+        throw new Error("Contest list limit must be a positive integer");
+      }
+      values.push(options.limit);
+      limit = `LIMIT $${values.length}`;
+    }
+
+    const direction = options.order === "desc" ? "DESC" : "ASC";
+    const orderBy = options.lottery
+      ? `c.contest_number ${direction}`
+      : `c.lottery ASC, c.contest_number ${direction}`;
     const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
     const result = await this.pool.query<ContestRow>(
       `
@@ -142,7 +158,8 @@ export class PostgresContestRepository {
         LEFT JOIN contest_prize_tiers p ON p.contest_id = c.id
         ${where}
         GROUP BY c.id
-        ORDER BY c.lottery, c.contest_number
+        ORDER BY ${orderBy}
+        ${limit}
       `,
       values,
     );

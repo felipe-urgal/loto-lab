@@ -4,7 +4,7 @@ Este documento descreve a camada de persistência do Loto Lab.
 
 ## Objetivo
 
-O PostgreSQL passa a ser a base persistente do aplicativo. O JSON local continua existindo como formato de importação, exportação e desenvolvimento legado, mas novas camadas de API e frontend devem consumir os repositórios PostgreSQL.
+O PostgreSQL passa a ser a base persistente do aplicativo. O JSON local continua existindo como formato de importação, exportação e desenvolvimento legado, mas a API HTTP e o futuro frontend consomem os repositórios PostgreSQL.
 
 ## Configuração
 
@@ -13,7 +13,7 @@ A conexão usa a variável de ambiente `DATABASE_URL`.
 Exemplo local:
 
 ```text
-postgresql://loto_lab:loto_lab@localhost:5432/loto_lab
+postgresql://loto_lab:loto_lab@localhost:5433/loto_lab
 ```
 
 Nunca versionar credenciais reais. O repositório contém somente `.env.example`.
@@ -26,10 +26,12 @@ Subir o PostgreSQL:
 docker compose up -d postgres
 ```
 
+O container continua ouvindo em `5432` internamente, mas o Docker Compose publica `5433` na máquina para evitar conflito com PostgreSQL local.
+
 Definir a URL no shell:
 
 ```bash
-export DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5432/loto_lab
+export DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5433/loto_lab
 ```
 
 Aplicar migrations:
@@ -168,7 +170,7 @@ Operações com múltiplas escritas usam uma única conexão e transação.
 - idle timeout de 30 segundos;
 - `application_name = loto-lab`.
 
-O pool deve ser criado uma vez por processo na futura API, não uma vez por request.
+O pool é criado uma vez pelo processo da API, não uma vez por request.
 
 ## Testes
 
@@ -179,10 +181,13 @@ O CI sobe um PostgreSQL real e testa:
 3. preservação de enriquecimento financeiro;
 4. estratégia versionada;
 5. persistência de lote de jogos;
-6. persistência de backtest e rodadas.
+6. persistência de backtest e rodadas;
+7. endpoints HTTP consumindo os mesmos repositórios.
 
-Localmente, o teste de integração PostgreSQL é ignorado quando `DATABASE_URL` não está definida.
+Localmente, os testes de integração PostgreSQL/API são ignorados quando `DATABASE_URL` não está definida.
 
-## Próxima integração
+## API HTTP
 
-A futura API HTTP deve depender destes repositórios. O arquivo JSON não deve virar dependência direta dos endpoints de produção.
+A API em `src/api/` depende diretamente desta camada de persistência. Endpoints de produção não leem `data/*.json`.
+
+Consulte [`API.md`](API.md) para rotas e exemplos.

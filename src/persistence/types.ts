@@ -54,3 +54,13 @@ export interface BacktestRunRecord extends SaveBacktestRunInput {
   id: number;
   createdAt: string;
 }
+
+export interface BacktestRunSummaryRecord {
+  id: number;
+  lottery: LotteryId;
+  strategyId?: number;
+  options: Record<string, unknown>;
+  summary: Record<string, unknown>;
+  roundCount: number;
+  createdAt: string;
+}

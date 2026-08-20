@@ -62,6 +62,22 @@ Detalhes em [`docs/FINANCIALS.md`](docs/FINANCIALS.md).
 
 Detalhes em [`docs/DATABASE.md`](docs/DATABASE.md).
 
+### Milestone 7 — API HTTP
+
+- API versionada em `/api/v1`;
+- health checks de liveness e readiness;
+- consultas de concursos com paginação limitada e ordenação no SQL;
+- análise estatística por loteria;
+- geração de jogos com persistência em lote;
+- conferência de lotes contra concursos armazenados;
+- cadastro/listagem de estratégias;
+- execução e persistência de backtests;
+- listagem leve de backtests sem carregar todas as rodadas;
+- CORS configurável para o futuro frontend;
+- testes HTTP de integração usando PostgreSQL real no CI.
+
+Detalhes em [`docs/API.md`](docs/API.md).
+
 ## Requisitos
 
 - Node.js 22+
@@ -80,7 +96,7 @@ npm install
 npm test
 ```
 
-Sem `DATABASE_URL`, os testes unitários rodam normalmente e o teste PostgreSQL é ignorado. No CI, um PostgreSQL real é iniciado automaticamente.
+Sem `DATABASE_URL`, os testes unitários rodam normalmente e os testes PostgreSQL/API são ignorados. No CI, um PostgreSQL real é iniciado automaticamente.
 
 ## Build
 
@@ -96,10 +112,12 @@ Subir o banco:
 docker compose up -d postgres
 ```
 
+O compose publica PostgreSQL na porta **5433** da máquina para não conflitar com instalações locais em 5432.
+
 Configurar a conexão:
 
 ```bash
-export DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5432/loto_lab
+export DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5433/loto_lab
 ```
 
 Aplicar migrations:
@@ -114,11 +132,58 @@ Importar o histórico JSON já existente:
 npm run db:import-json -- data/contests.json
 ```
 
-O JSON continua disponível durante a transição, mas a futura API deve usar os repositórios PostgreSQL.
+Sincronizar a CAIXA diretamente com PostgreSQL:
 
-## Dados JSON
+```bash
+npm run db:sync -- mega-sena
+npm run db:sync -- lotofacil
+npm run db:sync -- dia-de-sorte
+```
 
-Por padrão os resultados legados ficam em `data/contests.json`. Arquivos JSON da pasta `data/` são locais e não são versionados.
+## API HTTP
+
+Configuração local recomendada:
+
+```bash
+export API_HOST=127.0.0.1
+export API_PORT=3000
+export API_CORS_ORIGIN=http://localhost:5173
+```
+
+Iniciar:
+
+```bash
+npm run api:start
+```
+
+Health check:
+
+```bash
+curl http://127.0.0.1:3000/health/ready
+```
+
+Alguns endpoints:
+
+```text
+GET  /api/v1/lotteries
+GET  /api/v1/contests/:lottery
+GET  /api/v1/contests/:lottery/latest
+GET  /api/v1/analysis/:lottery
+POST /api/v1/games/generate
+POST /api/v1/games/check
+GET  /api/v1/game-batches/:lottery
+GET  /api/v1/strategies
+POST /api/v1/strategies
+POST /api/v1/backtests/run
+GET  /api/v1/backtests/:lottery
+GET  /api/v1/backtest-runs/:id
+```
+
+Veja exemplos completos em [`docs/API.md`](docs/API.md).
+
+## Dados JSON legados
+
+Os comandos baseados em JSON continuam disponíveis durante a transição e os arquivos da pasta `data/` não são versionados.
 
 Buscar o concurso mais recente:
 
@@ -142,13 +207,9 @@ npm run data:refresh -- lotofacil 3500 3767
 npm run data:refresh -- dia-de-sorte 1000 1277
 ```
 
-## Gerar jogos
+## CLI de geração e conferência
 
-```text
-npm run games:generate -- <lottery> [dataPath] [gameCount] [lotofacilFixedCount]
-```
-
-Exemplos:
+Gerar:
 
 ```bash
 npm run games:generate -- mega-sena data/contests.json 2
@@ -156,15 +217,13 @@ npm run games:generate -- lotofacil data/contests.json 4 8
 npm run games:generate -- dia-de-sorte data/contests.json 4
 ```
 
-## Conferir jogos
+Conferir:
 
 ```bash
 npm run games:check -- data/games.json data/contests.json 3767
 ```
 
-A saída pode incluir acertos, núcleo/variáveis, faixa premiada, Mês da Sorte, custo, prêmio e resultado líquido.
-
-## Backtests
+## Backtests por CLI
 
 Mega-Sena:
 
@@ -204,6 +263,8 @@ npm run backtest:compare -- data/contests.json 4 20 3500 3767
 
 Ao testar o concurso `N`, o gerador recebe **somente os concursos anteriores a N**. O resultado do próprio concurso e todos os concursos futuros ficam invisíveis para o algoritmo.
 
+Quando `targetContestNumber` é passado para a API de geração, a mesma regra é aplicada: apenas concursos anteriores ao alvo são usados.
+
 ## Estrutura
 
 ```text
@@ -212,26 +273,24 @@ db/
 
 src/
 ├── analysis/
+├── api/
+│   ├── app.ts
+│   ├── http.ts
+│   └── services.ts
 ├── backtest/
 ├── checker/
 ├── cli/
 ├── data/
 ├── db/
-│   ├── client.ts
-│   └── migrations.ts
 ├── domain/
 ├── finance/
 ├── generator/
 ├── lotteries/
 ├── persistence/
-│   ├── backtestRepository.ts
-│   ├── contestRepository.ts
-│   ├── gameRepository.ts
-│   ├── strategyRepository.ts
-│   └── types.ts
 └── index.ts
 
 docs/
+├── API.md
 ├── DATABASE.md
 ├── FINANCIALS.md
 └── METHODOLOGY.md
@@ -239,10 +298,10 @@ docs/
 
 ## Próximos milestones
 
-1. API HTTP da aplicação;
-2. integração completa dos fluxos de sync/generator/backtest com PostgreSQL;
-3. interface web;
-4. dashboards de estratégia, jogos e desempenho;
+1. interface web;
+2. dashboard com próximos concursos, análises e jogos ativos;
+3. telas de geração, conferência e histórico;
+4. laboratório visual de backtests e estratégias;
 5. camada de interpretação por IA.
 
 ## Aviso

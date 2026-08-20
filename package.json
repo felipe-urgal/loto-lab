@@ -7,6 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/tests/*.test.js",
     "check": "npm test",
+    "api:start": "npm run build && node dist/src/cli/apiStart.js",
     "data:sync": "npm run build && node dist/src/cli/sync.js",
     "data:refresh": "npm run build && node dist/src/cli/refresh.js",
     "games:generate": "npm run build && node dist/src/cli/generateGames.js",
