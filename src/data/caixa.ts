@@ -1,6 +1,6 @@
 import type { Contest, ContestPrizeTier, LotteryId } from "../domain/types.js";
 import { getLotteryConfig } from "../lotteries/config.js";
-import type { ContestSource } from "./source.js";
+import type { ContestSource, LotteryAgendaSnapshot, LotteryAgendaSource } from "./source.js";
 
 const BASE_URL = "https://servicebus2.caixa.gov.br/portaldeloterias/api";
 
@@ -23,6 +23,10 @@ interface CaixaContestResponse {
   nomeTimeCoracaoMesSorte?: string | null;
   listaRateioPremio?: CaixaPrizeTierResponse[] | null;
   valorArrecadado?: number | null;
+  dataProximoConcurso?: string | null;
+  numeroConcursoProximo?: number | null;
+  valorEstimadoProximoConcurso?: number | null;
+  acumulado?: boolean | null;
 }
 
 export type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -42,8 +46,7 @@ function sanitizeLuckyMonth(value?: string | null): string | undefined {
 
 function normalizePrizeTiers(value?: CaixaPrizeTierResponse[] | null): ContestPrizeTier[] | undefined {
   if (!value?.length) return undefined;
-
-  const tiers = value.map((tier) => {
+  return value.map((tier) => {
     const description = tier.descricaoFaixa?.trim();
     if (!description) throw new Error("Invalid prize-tier description returned by Caixa");
     if (!Number.isInteger(tier.numeroDeGanhadores) || tier.numeroDeGanhadores < 0) {
@@ -52,58 +55,25 @@ function normalizePrizeTiers(value?: CaixaPrizeTierResponse[] | null): ContestPr
     if (!Number.isFinite(tier.valorPremio) || tier.valorPremio < 0) {
       throw new Error("Invalid prize-tier value returned by Caixa");
     }
-
-    return {
-      description,
-      winners: tier.numeroDeGanhadores,
-      prizeValue: tier.valorPremio,
-    };
+    return { description, winners: tier.numeroDeGanhadores, prizeValue: tier.valorPremio };
   });
-
-  return tiers;
 }
 
-export function normalizeCaixaContest(
-  lottery: LotteryId,
-  payload: CaixaContestResponse,
-): Contest {
+export function normalizeCaixaContest(lottery: LotteryId, payload: CaixaContestResponse): Contest {
   const config = getLotteryConfig(lottery);
   const numbers = payload.listaDezenas.map(Number).sort((a, b) => a - b);
-
-  if (!Number.isInteger(payload.numero) || payload.numero < 1) {
-    throw new Error("Invalid contest number returned by Caixa");
-  }
-  if (numbers.length !== config.drawSize) {
-    throw new Error(
-      `Expected ${config.drawSize} numbers for ${lottery}, received ${numbers.length}`,
-    );
-  }
-  if (
-    numbers.some(
-      (number) =>
-        !Number.isInteger(number) ||
-        number < config.minNumber ||
-        number > config.maxNumber,
-    )
-  ) {
+  if (!Number.isInteger(payload.numero) || payload.numero < 1) throw new Error("Invalid contest number returned by Caixa");
+  if (numbers.length !== config.drawSize) throw new Error(`Expected ${config.drawSize} numbers for ${lottery}, received ${numbers.length}`);
+  if (numbers.some((number) => !Number.isInteger(number) || number < config.minNumber || number > config.maxNumber)) {
     throw new Error(`Invalid drawn number returned by Caixa for ${lottery}`);
   }
-  if (new Set(numbers).size !== numbers.length) {
-    throw new Error(`Duplicated drawn number returned by Caixa for ${lottery}`);
-  }
+  if (new Set(numbers).size !== numbers.length) throw new Error(`Duplicated drawn number returned by Caixa for ${lottery}`);
 
-  const luckyMonth =
-    lottery === "dia-de-sorte"
-      ? sanitizeLuckyMonth(payload.nomeTimeCoracaoMesSorte)
-      : undefined;
+  const luckyMonth = lottery === "dia-de-sorte" ? sanitizeLuckyMonth(payload.nomeTimeCoracaoMesSorte) : undefined;
   const prizeTiers = normalizePrizeTiers(payload.listaRateioPremio);
-  const amountCollected =
-    payload.valorArrecadado !== undefined &&
-    payload.valorArrecadado !== null &&
-    Number.isFinite(payload.valorArrecadado) &&
-    payload.valorArrecadado >= 0
-      ? payload.valorArrecadado
-      : undefined;
+  const amountCollected = payload.valorArrecadado !== undefined && payload.valorArrecadado !== null && Number.isFinite(payload.valorArrecadado) && payload.valorArrecadado >= 0
+    ? payload.valorArrecadado
+    : undefined;
 
   return {
     lottery,
@@ -116,49 +86,53 @@ export function normalizeCaixaContest(
   };
 }
 
-export class CaixaContestSource implements ContestSource {
+export function normalizeCaixaAgenda(lottery: LotteryId, payload: CaixaContestResponse): LotteryAgendaSnapshot {
+  const nextContest = payload.numeroConcursoProximo;
+  if (!Number.isInteger(payload.numero) || payload.numero < 1 || !Number.isInteger(nextContest) || Number(nextContest) < 1) {
+    throw new Error(`Invalid agenda returned by Caixa for ${lottery}`);
+  }
+  const nextDrawDate = payload.dataProximoConcurso ? toIsoDate(payload.dataProximoConcurso) : undefined;
+  const estimatedPrize = payload.valorEstimadoProximoConcurso !== undefined && payload.valorEstimadoProximoConcurso !== null && Number.isFinite(payload.valorEstimadoProximoConcurso) && payload.valorEstimadoProximoConcurso >= 0
+    ? payload.valorEstimadoProximoConcurso
+    : undefined;
+  return {
+    lottery,
+    currentContest: payload.numero,
+    nextContest: Number(nextContest),
+    ...(nextDrawDate ? { nextDrawDate } : {}),
+    ...(estimatedPrize !== undefined ? { estimatedPrize } : {}),
+    accumulated: Boolean(payload.acumulado),
+  };
+}
+
+export class CaixaContestSource implements ContestSource, LotteryAgendaSource {
   constructor(private readonly fetchImpl: FetchLike = fetch) {}
 
-  async fetchContest(lottery: LotteryId, contestNumber?: number): Promise<Contest> {
-    if (
-      contestNumber !== undefined &&
-      (!Number.isInteger(contestNumber) || contestNumber < 1)
-    ) {
+  private async fetchPayload(lottery: LotteryId, contestNumber?: number): Promise<CaixaContestResponse> {
+    if (contestNumber !== undefined && (!Number.isInteger(contestNumber) || contestNumber < 1)) {
       throw new Error("contestNumber must be a positive integer");
     }
-
     const endpoint = endpointByLottery[lottery];
     const url = `${BASE_URL}/${endpoint}${contestNumber ? `/${contestNumber}` : ""}`;
-    const response = await this.fetchImpl(url, {
-      headers: { Accept: "application/json" },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Caixa request failed (${response.status}) for ${lottery}`);
-    }
-
-    const payload = (await response.json()) as CaixaContestResponse;
-    return normalizeCaixaContest(lottery, payload);
+    const response = await this.fetchImpl(url, { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`Caixa request failed (${response.status}) for ${lottery}`);
+    return (await response.json()) as CaixaContestResponse;
   }
 
-  async fetchContestRange(
-    lottery: LotteryId,
-    startContest: number,
-    endContest: number,
-  ): Promise<Contest[]> {
-    if (
-      !Number.isInteger(startContest) ||
-      !Number.isInteger(endContest) ||
-      startContest < 1 ||
-      endContest < startContest
-    ) {
+  async fetchContest(lottery: LotteryId, contestNumber?: number): Promise<Contest> {
+    return normalizeCaixaContest(lottery, await this.fetchPayload(lottery, contestNumber));
+  }
+
+  async fetchAgenda(lottery: LotteryId): Promise<LotteryAgendaSnapshot> {
+    return normalizeCaixaAgenda(lottery, await this.fetchPayload(lottery));
+  }
+
+  async fetchContestRange(lottery: LotteryId, startContest: number, endContest: number): Promise<Contest[]> {
+    if (!Number.isInteger(startContest) || !Number.isInteger(endContest) || startContest < 1 || endContest < startContest) {
       throw new Error("Invalid contest range");
     }
-
     const contests: Contest[] = [];
-    for (let contest = startContest; contest <= endContest; contest += 1) {
-      contests.push(await this.fetchContest(lottery, contest));
-    }
+    for (let contest = startContest; contest <= endContest; contest += 1) contests.push(await this.fetchContest(lottery, contest));
     return contests;
   }
 }
