@@ -1,12 +1,14 @@
 {
   "name": "loto-lab",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/tests/*.test.js",
-    "check": "npm run build && npm test"
+    "check": "npm test",
+    "data:sync": "npm run build && node dist/src/cli/sync.js",
+    "backtest:mega": "npm run build && node dist/src/cli/backtestMega.js"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
