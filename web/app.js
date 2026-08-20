@@ -29,6 +29,8 @@ const state = {
   view: location.hash.replace("#", "") || "dashboard",
   lottery: localStorage.getItem("loto-lab:lottery") || "mega-sena",
   loading: false,
+  renderToken: 0,
+  renderController: null,
 };
 
 const content = document.querySelector("#content");
@@ -69,8 +71,11 @@ async function api(path, options = {}) {
   return payload;
 }
 
-async function safeApi(path) {
-  try { return await api(path); } catch { return null; }
+async function safeApi(path, options = {}) {
+  try { return await api(path, options); } catch (error) {
+    if (error?.name === "AbortError") throw error;
+    return null;
+  }
 }
 
 function formatDate(value) {
@@ -134,6 +139,13 @@ function errorState(error) {
   content.querySelector("[data-retry]")?.addEventListener("click", renderCurrentView);
 }
 
+function isCurrentRender(render) {
+  return !render.signal.aborted
+    && render.token === state.renderToken
+    && render.view === state.view
+    && render.lottery === state.lottery;
+}
+
 async function checkHealth() {
   try {
     const response = await fetch("/health/ready");
@@ -167,13 +179,15 @@ function metric(label, value, detail = "", tone = "") {
   return `<article class="panel metric-card"><span class="metric-label">${escapeHtml(label)}</span><strong class="metric-value ${tone}">${value}</strong><span class="metric-detail">${escapeHtml(detail)}</span></article>`;
 }
 
-async function renderDashboard() {
+async function renderDashboard(render) {
   const ids = Object.keys(LOTTERIES);
-  const latest = await Promise.all(ids.map((id) => safeApi(`/contests/${id}/latest`)));
+  const latest = await Promise.all(ids.map((id) => safeApi(`/contests/${id}/latest`, { signal: render.signal })));
   const [recentBacktests, recentBatches] = await Promise.all([
-    safeApi(`/backtests/${state.lottery}?limit=1`),
-    safeApi(`/game-batches/${state.lottery}?limit=5`),
+    safeApi(`/backtests/${render.lottery}?limit=1`, { signal: render.signal }),
+    safeApi(`/game-batches/${render.lottery}?limit=5`, { signal: render.signal }),
   ]);
+  if (!isCurrentRender(render)) return;
+
   const lastBacktest = recentBacktests?.items?.[0];
   const summary = lastBacktest?.summary || {};
 
@@ -198,7 +212,7 @@ async function renderDashboard() {
 
   content.innerHTML = `<div class="stack">
     <section><div class="section-head"><div><h2>Últimos concursos</h2><p>Base atual armazenada no PostgreSQL.</p></div></div><div class="grid cols-3">${lotteryCards}</div></section>
-    <section><div class="section-head"><div><h2>Desempenho recente · ${lotteryLabel(state.lottery)}</h2><p>Resumo do último backtest persistido.</p></div><button class="link-button" data-go="backtests">Ver backtests</button></div>
+    <section><div class="section-head"><div><h2>Desempenho recente · ${lotteryLabel(render.lottery)}</h2><p>Resumo do último backtest persistido.</p></div><button class="link-button" data-go="backtests">Ver backtests</button></div>
       <div class="grid cols-4">
         ${metric("ROI", formatPercent(summary.roi), lastBacktest ? `Backtest #${lastBacktest.id}` : "Sem backtest", typeof summary.roi === "number" ? (summary.roi >= 0 ? "positive" : "negative") : "")}
         ${metric("Cobertura financeira", formatPercent(summary.financialCoverage), "Concursos com rateio conhecido")}
@@ -206,7 +220,7 @@ async function renderDashboard() {
         ${metric("Prêmios", formatCurrency(summary.totalPrizeValue), "Retorno bruto conhecido")}
       </div>
     </section>
-    <section><div class="section-head"><div><h2>Jogos recentes · ${lotteryLabel(state.lottery)}</h2><p>Últimos lotes gerados e persistidos.</p></div><button class="link-button" data-go="games">Abrir meus jogos</button></div><div class="panel list">${batchesMarkup}</div></section>
+    <section><div class="section-head"><div><h2>Jogos recentes · ${lotteryLabel(render.lottery)}</h2><p>Últimos lotes gerados e persistidos.</p></div><button class="link-button" data-go="games">Abrir meus jogos</button></div><div class="panel list">${batchesMarkup}</div></section>
   </div>`;
 
   installIcons(content);
@@ -219,8 +233,9 @@ async function renderDashboard() {
   content.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.go)));
 }
 
-async function renderAnalysis() {
-  const data = await api(`/analysis/${state.lottery}`);
+async function renderAnalysis(render) {
+  const data = await api(`/analysis/${render.lottery}`, { signal: render.signal });
+  if (!isCurrentRender(render)) return;
   const latest = data.latestContest;
   const ranked = [...data.numbers].sort((a, b) => b.score - a.score).slice(0, 18);
 
@@ -243,16 +258,17 @@ async function renderAnalysis() {
   </div>`;
 }
 
-async function renderGenerate() {
-  const latest = await safeApi(`/contests/${state.lottery}/latest`);
-  const config = LOTTERIES[state.lottery];
+async function renderGenerate(render) {
+  const latest = await safeApi(`/contests/${render.lottery}/latest`, { signal: render.signal });
+  if (!isCurrentRender(render)) return;
+  const config = LOTTERIES[render.lottery];
   content.innerHTML = `<div class="stack">
     <section><div class="section-head"><div><h2>Configurar lote</h2><p>O algoritmo usa somente dados anteriores ao concurso alvo.</p></div></div>
       <form class="panel form-panel" id="generate-form">
         <div class="form-grid">
           <div class="field"><label>Loteria</label><input value="${escapeHtml(config.label)}" disabled /></div>
-          <div class="field"><label for="game-count">Quantidade de jogos</label><input id="game-count" name="gameCount" type="number" min="1" max="20" value="${config.defaultGames}" /></div>
-          <div class="field" id="fixed-field" ${state.lottery !== "lotofacil" ? 'style="display:none"' : ""}><label for="fixed-count">Núcleo fixo</label><select id="fixed-count" name="fixedCount"><option value="8">8 dezenas</option><option value="9">9 dezenas</option><option value="10">10 dezenas</option></select></div>
+          <div class="field"><label for="game-count">Quantidade de jogos</label><input id="game-count" name="gameCount" type="number" min="1" max="10" value="${config.defaultGames}" /></div>
+          <div class="field" id="fixed-field" ${render.lottery !== "lotofacil" ? 'style="display:none"' : ""}><label for="fixed-count">Núcleo fixo</label><select id="fixed-count" name="fixedCount"><option value="8">8 dezenas</option><option value="9">9 dezenas</option><option value="10">10 dezenas</option></select></div>
           <div class="field"><label for="target-contest">Concurso alvo</label><input id="target-contest" name="targetContestNumber" type="number" min="1" value="${latest ? latest.number + 1 : ""}" placeholder="Automático" /></div>
         </div>
         <div class="form-actions"><div><label class="checkbox"><input type="checkbox" name="persist" checked /> Salvar lote em Meus jogos</label><div class="form-note">As dezenas são calculadas pelo core. O frontend apenas envia a configuração.</div></div><button class="button primary" type="submit"><span class="button-icon" data-icon="spark"></span>Gerar jogos</button></div>
@@ -301,8 +317,9 @@ function gameCard(game, index) {
   return `<article class="panel game-card"><div class="game-head"><strong>Jogo ${index + 1}</strong><span>${game.fixedNumbers.length} fixas · ${game.variableNumbers.length} variáveis</span></div><div class="draw-numbers">${balls(game.numbers, { fixed: game.fixedNumbers })}</div><div class="game-meta"><span>Pares <strong>${game.metadata?.even ?? "—"}</strong></span><span>Ímpares <strong>${game.metadata?.odd ?? "—"}</strong></span><span>Soma <strong>${game.metadata?.sum ?? "—"}</strong></span><span>Repetidas <strong>${repeated}</strong></span></div>${game.luckyMonth ? `<div class="game-month">Mês da Sorte · ${escapeHtml(game.luckyMonth)}</div>` : ""}</article>`;
 }
 
-async function renderGames() {
-  const data = await api(`/game-batches/${state.lottery}?limit=20`);
+async function renderGames(render) {
+  const data = await api(`/game-batches/${render.lottery}?limit=20`, { signal: render.signal });
+  if (!isCurrentRender(render)) return;
   const batches = data.items || [];
   if (!batches.length) {
     content.innerHTML = emptyState("Nenhum jogo salvo", "Gere um lote para ele aparecer aqui.", '<button class="button primary" type="button" data-go-generate>Gerar agora</button>');
@@ -310,7 +327,7 @@ async function renderGames() {
     return;
   }
 
-  content.innerHTML = `<div class="stack"><div class="section-head"><div><h2>Lotes salvos · ${lotteryLabel(state.lottery)}</h2><p>Os números verdes pertencem ao núcleo compartilhado do lote.</p></div></div>${batches.map(batchMarkup).join("")}<section id="check-result"></section></div>`;
+  content.innerHTML = `<div class="stack"><div class="section-head"><div><h2>Lotes salvos · ${lotteryLabel(render.lottery)}</h2><p>Os números verdes pertencem ao núcleo compartilhado do lote.</p></div></div>${batches.map(batchMarkup).join("")}<section id="check-result"></section></div>`;
   content.querySelectorAll("[data-check-batch]").forEach((button) => button.addEventListener("click", handleCheckBatch));
 }
 
@@ -342,21 +359,22 @@ async function handleCheckBatch(event) {
   }
 }
 
-async function renderBacktests() {
-  const data = await api(`/backtests/${state.lottery}?limit=20`);
+async function renderBacktests(render) {
+  const data = await api(`/backtests/${render.lottery}?limit=20`, { signal: render.signal });
   const runs = data.items || [];
-  const latest = await safeApi(`/contests/${state.lottery}/latest`);
+  const latest = await safeApi(`/contests/${render.lottery}/latest`, { signal: render.signal });
+  if (!isCurrentRender(render)) return;
 
   content.innerHTML = `<div class="stack">
     <section><div class="section-head"><div><h2>Executar backtest</h2><p>Cada concurso é simulado usando somente o histórico disponível antes dele.</p></div></div><form class="panel form-panel" id="backtest-form"><div class="form-grid">
-      <div class="field"><label for="bt-games">Jogos por concurso</label><input id="bt-games" name="gameCount" type="number" min="1" max="20" value="${LOTTERIES[state.lottery].defaultGames}" /></div>
-      <div class="field"><label for="bt-warmup">Aquecimento</label><input id="bt-warmup" name="warmupContests" type="number" min="1" value="20" /></div>
-      <div class="field" ${state.lottery !== "lotofacil" ? 'style="display:none"' : ""}><label for="bt-fixed">Núcleo fixo</label><select id="bt-fixed" name="fixedCount"><option value="8">8 dezenas</option><option value="9">9 dezenas</option><option value="10">10 dezenas</option></select></div>
+      <div class="field"><label for="bt-games">Jogos por concurso</label><input id="bt-games" name="gameCount" type="number" min="1" max="10" value="${LOTTERIES[render.lottery].defaultGames}" /></div>
+      <div class="field"><label for="bt-warmup">Aquecimento</label><input id="bt-warmup" name="warmupContests" type="number" min="1" max="500" value="20" /></div>
+      <div class="field" ${render.lottery !== "lotofacil" ? 'style="display:none"' : ""}><label for="bt-fixed">Núcleo fixo</label><select id="bt-fixed" name="fixedCount"><option value="8">8 dezenas</option><option value="9">9 dezenas</option><option value="10">10 dezenas</option></select></div>
       <div class="field"><label for="bt-start">Concurso inicial</label><input id="bt-start" name="startContest" type="number" min="1" placeholder="Opcional" /></div>
       <div class="field"><label for="bt-end">Concurso final</label><input id="bt-end" name="endContest" type="number" min="1" value="${latest?.number || ""}" placeholder="Opcional" /></div>
-    </div><div class="form-actions"><div><label class="checkbox"><input type="checkbox" name="persist" checked /> Salvar execução</label><div class="form-note">Backtests maiores rodam de forma síncrona nesta versão.</div></div><button class="button primary" type="submit"><span class="button-icon" data-icon="play"></span>Executar backtest</button></div></form></section>
+    </div><div class="form-actions"><div><label class="checkbox"><input type="checkbox" name="persist" checked /> Salvar execução</label><div class="form-note">Cada execução HTTP é limitada a 500 concursos para proteger a aplicação.</div></div><button class="button primary" type="submit"><span class="button-icon" data-icon="play"></span>Executar backtest</button></div></form></section>
     <section id="backtest-result"></section>
-    <section><div class="section-head"><div><h2>Execuções recentes</h2><p>Histórico persistido para ${lotteryLabel(state.lottery)}.</p></div></div><div class="panel list">${runs.length ? runs.map(backtestRow).join("") : emptyState("Nenhum backtest salvo", "Execute a primeira simulação para criar seu histórico.")}</div></section>
+    <section><div class="section-head"><div><h2>Execuções recentes</h2><p>Histórico persistido para ${lotteryLabel(render.lottery)}.</p></div></div><div class="panel list">${runs.length ? runs.map(backtestRow).join("") : emptyState("Nenhum backtest salvo", "Execute a primeira simulação para criar seu histórico.")}</div></section>
   </div>`;
   installIcons(content);
   content.querySelector("#backtest-form").addEventListener("submit", handleBacktest);
@@ -403,21 +421,32 @@ async function handleBacktest(event) {
 }
 
 async function renderCurrentView() {
-  if (state.loading) return;
+  state.renderController?.abort();
+  const controller = new AbortController();
+  state.renderController = controller;
+  const render = {
+    token: ++state.renderToken,
+    view: state.view,
+    lottery: state.lottery,
+    signal: controller.signal,
+  };
+
   state.loading = true;
   loading();
   refreshButton.classList.add("is-spinning");
   try {
-    if (state.view === "dashboard") await renderDashboard();
-    else if (state.view === "analysis") await renderAnalysis();
-    else if (state.view === "generate") await renderGenerate();
-    else if (state.view === "games") await renderGames();
-    else if (state.view === "backtests") await renderBacktests();
+    if (render.view === "dashboard") await renderDashboard(render);
+    else if (render.view === "analysis") await renderAnalysis(render);
+    else if (render.view === "generate") await renderGenerate(render);
+    else if (render.view === "games") await renderGames(render);
+    else if (render.view === "backtests") await renderBacktests(render);
   } catch (error) {
-    errorState(error);
+    if (error?.name !== "AbortError" && isCurrentRender(render)) errorState(error);
   } finally {
-    state.loading = false;
-    refreshButton.classList.remove("is-spinning");
+    if (render.token === state.renderToken) {
+      state.loading = false;
+      refreshButton.classList.remove("is-spinning");
+    }
   }
 }
 
