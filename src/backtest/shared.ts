@@ -11,6 +11,13 @@ export interface BacktestSummary {
   prizeTierDistribution: Record<string, number>;
   prizeGames: number;
   prizeRate: number;
+  totalCost: number;
+  totalPrizeValue: number;
+  financialGames: number;
+  financialCoverage: number;
+  netResult: number;
+  returnRate: number;
+  roi: number;
 }
 
 export interface SummarizableRound {
@@ -34,6 +41,9 @@ export function summarizeBacktestRounds(rounds: SummarizableRound[]): BacktestSu
   let totalGames = 0;
   let maxHits = 0;
   let prizeGames = 0;
+  let totalCost = 0;
+  let totalPrizeValue = 0;
+  let financialGames = 0;
 
   for (const round of rounds) {
     if (round.checks.length === 0) continue;
@@ -47,12 +57,22 @@ export function summarizeBacktestRounds(rounds: SummarizableRound[]): BacktestSu
       totalHits += check.hits;
       totalGames += 1;
       maxHits = Math.max(maxHits, check.hits);
+      totalCost += check.ticketCost;
       if (check.prizeTier) {
         incrementString(prizeTierDistribution, check.prizeTier);
         prizeGames += 1;
       }
+      if (check.totalPrizeValue !== undefined) {
+        totalPrizeValue += check.totalPrizeValue;
+        financialGames += 1;
+      }
     }
   }
+
+  const financialCoverage = totalGames === 0 ? 0 : financialGames / totalGames;
+  const netResult = totalPrizeValue - totalCost;
+  const returnRate = totalCost === 0 ? 0 : totalPrizeValue / totalCost;
+  const roi = totalCost === 0 ? 0 : netResult / totalCost;
 
   return {
     testedContests: rounds.length,
@@ -65,5 +85,12 @@ export function summarizeBacktestRounds(rounds: SummarizableRound[]): BacktestSu
     prizeTierDistribution,
     prizeGames,
     prizeRate: totalGames === 0 ? 0 : prizeGames / totalGames,
+    totalCost,
+    totalPrizeValue,
+    financialGames,
+    financialCoverage,
+    netResult,
+    returnRate,
+    roi,
   };
 }
