@@ -26,6 +26,15 @@ import type {
 
 export const MIN_GENERATION_HISTORY = 20;
 export const MAX_HTTP_BACKTEST_ROUNDS = 500;
+const ADVANCED_ANALYSIS_CACHE_MS = 2_000;
+
+type AdvancedAnalysis = ReturnType<typeof buildAdvancedAnalysis>;
+
+interface AdvancedAnalysisCacheEntry {
+  signature: string;
+  expiresAt: number;
+  value: AdvancedAnalysis;
+}
 
 export class InsufficientGenerationHistoryError extends Error {
   constructor(
@@ -100,6 +109,7 @@ export class LotoLabApiServices {
   readonly games: PostgresGameRepository;
   readonly strategies: PostgresStrategyRepository;
   readonly backtests: PostgresBacktestRepository;
+  private readonly advancedAnalysisCache = new Map<LotteryId, AdvancedAnalysisCacheEntry>();
 
   constructor(pool: Pool) {
     this.contests = new PostgresContestRepository(pool);
@@ -113,6 +123,19 @@ export class LotoLabApiServices {
     const config = getLotteryConfig(lottery);
     const rows = buildNumberAnalysis(contests, config);
     const latestContest = contests.at(-1);
+    const signature = `${contests.length}:${latestContest?.number ?? 0}:${latestContest?.date ?? ""}`;
+    const cached = this.advancedAnalysisCache.get(lottery);
+    let advanced: AdvancedAnalysis;
+    if (cached && cached.signature === signature && cached.expiresAt > Date.now()) {
+      advanced = cached.value;
+    } else {
+      advanced = buildAdvancedAnalysis(contests, config);
+      this.advancedAnalysisCache.set(lottery, {
+        signature,
+        expiresAt: Date.now() + ADVANCED_ANALYSIS_CACHE_MS,
+        value: advanced,
+      });
+    }
 
     return {
       lottery,
@@ -124,7 +147,7 @@ export class LotoLabApiServices {
         cold: rows.filter((row) => row.tier === "cold").map((row) => row.number),
       },
       numbers: rows,
-      advanced: buildAdvancedAnalysis(contests, config),
+      advanced,
     };
   }
 
