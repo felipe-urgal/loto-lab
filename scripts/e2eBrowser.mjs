@@ -242,6 +242,35 @@ try {
   assert(home.content, "Main application content root is missing");
   assert(home.text.includes("Dashboard"), "Main application rendered no meaningful navigation content");
 
+  await navigate(client, "/#analysis");
+  await waitFor(client, "Boolean(document.querySelector('.a2-shell'))", "Analyses 2.0 shell");
+  const analysisTabs = await evaluate(client, `[...document.querySelectorAll('[data-a2-tab]')].map((node) => node.textContent.trim())`);
+  assert(analysisTabs.length === 5, "Analyses 2.0 did not render five modes");
+  assert(
+    ["Ranking", "Estrutura", "Dinâmica", "Combinações", "Validação"].every((label) => analysisTabs.includes(label)),
+    "Analyses 2.0 is missing one or more modes",
+  );
+  assert(
+    await evaluate(client, "document.body.innerText.includes('Observado × esperado')"),
+    "Analyses 2.0 is missing the observed-vs-expected principle",
+  );
+  await evaluate(client, "document.querySelector('[data-a2-tab=structure]').click(); true");
+  await waitFor(client, "document.body.innerText.includes('Estrutura do sorteio')", "structure analysis");
+  await evaluate(client, "document.querySelector('[data-a2-tab=validation]').click(); true");
+  await waitFor(client, "document.body.innerText.includes('Teste fora da amostra')", "rolling validation analysis");
+  assert(
+    await evaluate(client, "document.body.innerText.includes('Sensibilidade dos pesos')"),
+    "Analyses 2.0 is missing weight-sensitivity validation",
+  );
+  await evaluate(client, "document.querySelector('[data-a2-tab=ranking]').click(); true");
+  await waitFor(client, "Boolean(document.querySelector('[data-a2-number]'))", "auditable ranking numbers");
+  await evaluate(client, "document.querySelector('[data-a2-number]').click(); true");
+  await waitFor(client, "!document.querySelector('#a2-detail').hidden", "number detail drawer");
+  assert(
+    await evaluate(client, "document.querySelector('#a2-detail').innerText.includes('Decomposição do score')"),
+    "Number detail is missing score decomposition",
+  );
+
   await navigate(client, "/strategies");
   await waitFor(client, "Boolean(document.querySelector('#strategy-form'))", "strategies form");
   assert(await evaluate(client, "document.querySelector('h1')?.textContent === 'Estratégias'"), "Strategies page identity mismatch");
@@ -285,7 +314,7 @@ try {
   assert(severeLogs.length === 0, `Browser console errors: ${severeLogs.join(" | ")}`);
   assert(networkErrors.length === 0, `Browser resource/server failures: ${networkErrors.join(" | ")}`);
 
-  console.log("Browser E2E passed: main, strategies, mobile nav, jobs, agenda and AI");
+  console.log("Browser E2E passed: main, Analyses 2.0, strategies, mobile nav, jobs, agenda and AI");
 } finally {
   client?.close();
   await stopBrowser(browser);
