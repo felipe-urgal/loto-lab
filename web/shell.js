@@ -39,17 +39,22 @@ function hrefFor(item) {
   return isMainApp ? `#${item.view}` : `/#${item.view}`;
 }
 
+function agendaBadge(item) {
+  return item.key === "agenda"
+    ? '<span class="agenda-nav-badge" data-agenda-nav-badge hidden></span>'
+    : "";
+}
+
 function desktopItem(item) {
   const extraClass = item.extra ? " nav-desktop-extra" : "";
-  const agendaBadge = item.key === "agenda" ? '<span class="agenda-nav-badge" id="agenda-nav-badge" hidden></span>' : "";
   if (isMainApp && item.view) {
-    return `<button class="nav-item${extraClass}" data-view="${item.view}" data-nav-key="${item.key}" type="button">${icon(item.key)}<span class="nav-label">${item.label}</span>${agendaBadge}</button>`;
+    return `<button class="nav-item${extraClass}" data-view="${item.view}" data-nav-key="${item.key}" type="button" aria-label="${item.label}">${icon(item.key)}<span class="nav-label">${item.label}</span>${agendaBadge(item)}</button>`;
   }
-  return `<a class="nav-link${extraClass}" data-nav-key="${item.key}" href="${hrefFor(item)}">${icon(item.key)}<span class="nav-label">${item.label}</span>${agendaBadge}</a>`;
+  return `<a class="nav-link${extraClass}" data-nav-key="${item.key}" href="${hrefFor(item)}" aria-label="${item.label}">${icon(item.key)}<span class="nav-label">${item.label}</span>${agendaBadge(item)}</a>`;
 }
 
 function menuItem(item) {
-  return `<a class="nav-more-link" data-nav-key="${item.key}" href="${hrefFor(item)}">${icon(item.key)}<span class="nav-label">${item.label}</span></a>`;
+  return `<a class="nav-more-link" data-nav-key="${item.key}" href="${hrefFor(item)}" aria-label="${item.label}">${icon(item.key)}<span class="nav-label">${item.label}</span>${agendaBadge(item)}</a>`;
 }
 
 function updateActive() {
@@ -64,34 +69,43 @@ function updateActive() {
   more?.classList.toggle("is-active", ITEMS.some((item) => item.extra && item.key === active));
 }
 
-function closeMore() {
+function closeMore(restoreFocus = false) {
   const button = document.querySelector("[data-nav-more]");
-  const menu = document.querySelector("[data-nav-more-menu]");
-  if (!button || !menu) return;
+  const panel = document.querySelector("[data-nav-more-menu]");
+  if (!button || !panel) return;
+  const wasOpen = button.getAttribute("aria-expanded") === "true";
   button.setAttribute("aria-expanded", "false");
-  menu.hidden = true;
+  panel.hidden = true;
+  if (restoreFocus && wasOpen) button.focus();
 }
 
 if (nav) {
   const extras = ITEMS.filter((item) => item.extra);
   nav.innerHTML = `${ITEMS.map(desktopItem).join("")}
-    <button class="nav-more" data-nav-more type="button" aria-haspopup="menu" aria-expanded="false">${icon("more")}<span class="nav-label">Mais</span></button>
-    <div class="nav-more-menu" data-nav-more-menu role="menu" hidden>${extras.map(menuItem).join("")}</div>`;
+    <button class="nav-more" data-nav-more type="button" aria-label="Mais opções" aria-expanded="false" aria-controls="nav-more-panel">${icon("more")}<span class="nav-label">Mais</span></button>
+    <div class="nav-more-menu" id="nav-more-panel" data-nav-more-menu hidden>${extras.map(menuItem).join("")}</div>`;
 
   const moreButton = nav.querySelector("[data-nav-more]");
-  const moreMenu = nav.querySelector("[data-nav-more-menu]");
+  const morePanel = nav.querySelector("[data-nav-more-menu]");
   moreButton?.addEventListener("click", () => {
     const open = moreButton.getAttribute("aria-expanded") === "true";
-    moreButton.setAttribute("aria-expanded", String(!open));
-    if (moreMenu) moreMenu.hidden = open;
+    if (open) {
+      closeMore();
+      return;
+    }
+    moreButton.setAttribute("aria-expanded", "true");
+    if (morePanel) morePanel.hidden = false;
   });
-  moreMenu?.addEventListener("click", closeMore);
+  morePanel?.addEventListener("click", () => closeMore());
   document.addEventListener("click", (event) => {
     if (!nav.contains(event.target)) closeMore();
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeMore();
+    if (event.key === "Escape") closeMore(true);
   });
-  window.addEventListener("hashchange", updateActive);
+  window.addEventListener("hashchange", () => {
+    closeMore();
+    updateActive();
+  });
   updateActive();
 }
