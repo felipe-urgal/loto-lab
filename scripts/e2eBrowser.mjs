@@ -36,6 +36,44 @@ async function waitForJson(url, attempts = 80) {
   throw lastError || new Error(`Timed out waiting for ${url}`);
 }
 
+function waitForProcessExit(child, timeoutMs) {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      child.removeListener("exit", onExit);
+      resolve(false);
+    }, timeoutMs);
+    const onExit = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
+    child.once("exit", onExit);
+  });
+}
+
+async function stopBrowser(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  child.kill("SIGTERM");
+  if (await waitForProcessExit(child, 2500)) return;
+  child.kill("SIGKILL");
+  await waitForProcessExit(child, 1500);
+}
+
+async function cleanupProfile(path) {
+  try {
+    await rm(path, {
+      recursive: true,
+      force: true,
+      maxRetries: 8,
+      retryDelay: 125,
+    });
+  } catch (error) {
+    // The GitHub runner is ephemeral. A late Chrome helper must never turn a
+    // successful browser suite into a failed CI run during best-effort cleanup.
+    console.warn(`Could not fully remove Chrome E2E profile ${path}:`, error);
+  }
+}
+
 class CdpClient {
   constructor(url) {
     this.socket = new WebSocket(url);
@@ -218,6 +256,6 @@ try {
   console.log("Browser E2E passed: main, strategies, mobile nav, jobs, agenda and AI");
 } finally {
   client?.close();
-  browser.kill("SIGTERM");
-  await rm(userDataDir, { recursive: true, force: true });
+  await stopBrowser(browser);
+  await cleanupProfile(userDataDir);
 }
