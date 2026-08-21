@@ -32,6 +32,11 @@ interface ComputedBacktest {
   rounds: BacktestRoundArtifact[];
 }
 
+type StrategyBacktestRequest = RunBacktestRequest & {
+  strategyId?: number;
+  strategyVersionId?: number;
+};
+
 export class AnalysisCancelledError extends Error {
   constructor() {
     super("Analysis was cancelled");
@@ -105,7 +110,7 @@ export interface RunBacktestWorkerOptions {
 
 export async function runBacktestInWorker(
   services: LotoLabApiServices,
-  input: RunBacktestRequest,
+  input: StrategyBacktestRequest,
   options: RunBacktestWorkerOptions = {},
 ): Promise<RunBacktestResponse> {
   const contests = await services.contests.list({ lottery: input.lottery, order: "asc" });
