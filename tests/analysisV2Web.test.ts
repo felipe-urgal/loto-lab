@@ -25,5 +25,6 @@ test("Analyses 2.0 is lazy-loaded and exposes the five analysis modes", async ()
   assert.match(css, /\.a2-tabs/);
   assert.match(css, /\.a2-detail/);
   assert.match(css, /\.a2-heatmap/);
-  assert.match(services, /advanced: buildAdvancedAnalysis\(contests, config\)/);
+  assert.match(services, /buildAdvancedAnalysis\(contests, config\)/);
+  assert.match(services, /\n\s+advanced,\n/);
 });
