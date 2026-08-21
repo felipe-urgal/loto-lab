@@ -17,10 +17,21 @@ test("dashboard operational controls are served by the web process", async (t) =
   assert.ok(address && typeof address !== "string");
   const baseUrl = `http://127.0.0.1:${(address as AddressInfo).port}`;
 
-  const response = await fetch(`${baseUrl}/assets/data-status.js`);
-  assert.equal(response.status, 200);
-  const source = await response.text();
-  assert.match(source, /\/api\/v1\/operations\/status/);
-  assert.match(source, /\/api\/v1\/operations\/sync/);
-  assert.match(source, /Sincronizar agora/);
+  const [statusResponse, dashboardResponse] = await Promise.all([
+    fetch(`${baseUrl}/assets/data-status.js`),
+    fetch(`${baseUrl}/assets/dashboard-scope.js`),
+  ]);
+  assert.equal(statusResponse.status, 200);
+  assert.equal(dashboardResponse.status, 200);
+
+  const [statusSource, dashboardSource] = await Promise.all([
+    statusResponse.text(),
+    dashboardResponse.text(),
+  ]);
+
+  assert.match(statusSource, /\/api\/v1\/operations\/status/);
+  assert.doesNotMatch(statusSource, /Sincronizar agora/);
+  assert.match(dashboardSource, /api\("\/operations\/sync", \{ method: "POST" \}\)/);
+  assert.match(dashboardSource, /Atualizar dados/);
+  assert.match(dashboardSource, /loto-lab:data-synced/);
 });
