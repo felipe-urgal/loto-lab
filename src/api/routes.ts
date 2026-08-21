@@ -6,6 +6,8 @@ import { serveGameBatchManagement } from "./gameBatchManagement.js";
 import { serveAiInsights } from "./aiInsights.js";
 import { serveOperations } from "./operations.js";
 import { serveAgenda } from "./agenda.js";
+import { serveStrategies } from "./strategies.js";
+import { serveAnalysisJobs } from "./analysisJobs.js";
 import type { LotoLabServerOptions } from "./server.js";
 
 type FeatureRouteHandler = (
@@ -16,6 +18,8 @@ type FeatureRouteHandler = (
 
 const featureRoutes: FeatureRouteHandler[] = [
   serveDataStatus,
+  serveStrategies,
+  serveAnalysisJobs,
   serveStrategyLab,
   serveRealBets,
   serveGameBatchManagement,
