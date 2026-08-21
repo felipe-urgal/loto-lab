@@ -35,6 +35,17 @@ function number(value) {
   return String(value).padStart(2, "0");
 }
 
+function hitText(value) {
+  const hits = Number(value) || 0;
+  return `${hits} acerto${hits === 1 ? "" : "s"}`;
+}
+
+function contestDate(value) {
+  if (!value) return "";
+  const date = new Date(`${value}T12:00:00`);
+  return Number.isFinite(date.getTime()) ? date.toLocaleDateString("pt-BR") : value;
+}
+
 function latestBetByBatch(items) {
   const map = new Map();
   for (const bet of items || []) {
@@ -55,11 +66,15 @@ function batchMeta(batch) {
   return `${batch.games.length} jogo${batch.games.length === 1 ? "" : "s"} · alvo ${batch.targetContestNumber ? `#${batch.targetContestNumber}` : "não definido"} · ${formatDateTime(batch.createdAt)}`;
 }
 
-function gameNumbers(game) {
+function gameNumbers(game, options = {}) {
   const fixed = new Set(game.fixedNumbers || []);
-  return (game.numbers || []).map((value) => `
-    <span class="mg2-number ${fixed.has(value) ? "is-fixed" : ""}">${number(value)}</span>
-  `).join("");
+  const matched = new Set(options.matchedNumbers || []);
+  return (game.numbers || []).map((value) => {
+    const classes = ["mg2-number"];
+    if (fixed.has(value)) classes.push("is-fixed");
+    if (matched.has(value)) classes.push("is-match");
+    return `<span class="${classes.join(" ")}">${number(value)}</span>`;
+  }).join("");
 }
 
 function gameRow(game, index) {
@@ -84,10 +99,53 @@ function batchTrailing(batch, bet) {
   return `<div class="mg2-trailing-copy"><strong>${money(bet.actualCost)}</strong><span>valor apostado</span></div>`;
 }
 
+function officialBetMarkup(bet) {
+  if (!bet) return "";
+
+  if (bet.status !== "checked") {
+    return `<section class="mg2-official is-pending" data-mg2-official>
+      <div class="mg2-official-head">
+        <div><strong>Resultado da aposta</strong><p>Concurso #${bet.contestNumber} · custo real ${money(bet.actualCost)}</p></div>
+        <span class="mg2-status is-warning">Aguardando resultado</span>
+      </div>
+      <div class="mg2-official-pending">
+        <p>A conferência financeira só será registrada quando o resultado oficial desse concurso estiver disponível.</p>
+        <button class="button" type="button" data-mg2-refresh-bet="${bet.id}">Atualizar resultado</button>
+      </div>
+    </section>`;
+  }
+
+  const checkedGames = (bet.games || []).filter((item) => item.checkResult);
+  const best = checkedGames.length ? Math.max(...checkedGames.map((item) => Number(item.checkResult.hits || 0))) : 0;
+  const prize = Number(bet.totalPrizeValue || 0);
+  const net = Number(bet.netResult || 0);
+  return `<section class="mg2-official" data-mg2-official>
+    <div class="mg2-official-head">
+      <div><strong>Resultado da aposta · concurso #${bet.contestNumber}</strong><p>${checkedGames.length} jogo${checkedGames.length === 1 ? "" : "s"} efetivamente apostado${checkedGames.length === 1 ? "" : "s"}</p></div>
+      <span class="mg2-status is-success">Conferência oficial</span>
+    </div>
+    <div class="mg2-result-metrics">
+      <div><span>Melhor jogo</span><strong>${hitText(best)}</strong></div>
+      <div><span>Custo real</span><strong>${money(bet.actualCost)}</strong></div>
+      <div><span>Prêmio</span><strong>${money(prize)}</strong></div>
+      <div><span>Resultado</span><strong class="${net >= 0 ? "is-positive" : "is-negative"}">${money(net)}</strong></div>
+    </div>
+    <details class="mg2-result-details">
+      <summary>Ver jogos apostados</summary>
+      <div class="mg2-official-games">
+        ${checkedGames.map((item) => `<div class="mg2-official-game">
+          <div class="mg2-official-game-head"><strong>Jogo ${item.batchPosition}</strong><span>${hitText(item.checkResult.hits)} · ${money(item.prizeValue || 0)}</span></div>
+          <div class="mg2-numbers">${gameNumbers(item.game, { matchedNumbers: item.checkResult.matchedNumbers })}</div>
+          ${item.game.luckyMonth ? `<span class="mg2-month">Mês da Sorte: ${escapeHtml(item.game.luckyMonth)}${item.checkResult.luckyMonthHit ? " · acertou" : ""}</span>` : ""}
+        </div>`).join("")}
+      </div>
+    </details>
+  </section>`;
+}
+
 function batchMarkup(batch, bet) {
   const status = statusFor(batch, bet);
   const expanded = ui.expandedBatchId === batch.id;
-  const contestNumber = bet?.contestNumber || batch.targetContestNumber || "";
   return `<article class="mg2-batch ${expanded ? "is-expanded" : ""}" data-mg2-batch="${batch.id}">
     <button class="mg2-summary" type="button" data-mg2-toggle="${batch.id}" aria-expanded="${expanded}" aria-controls="mg2-detail-${batch.id}">
       <div class="mg2-summary-main">
@@ -101,20 +159,18 @@ function batchMarkup(batch, bet) {
     </button>
     <div class="mg2-detail" id="mg2-detail-${batch.id}" ${expanded ? "" : "hidden"}>
       <div class="mg2-games">${batch.games.map(gameRow).join("")}</div>
+      ${officialBetMarkup(bet)}
       <div class="mg2-detail-actions">
         ${batch.archivedAt ? `
           <button class="button" type="button" data-mg2-show="${batch.id}">Mostrar novamente</button>
         ` : `
           ${bet ? "" : `<button class="button primary" type="button" data-mg2-mark-bet="${batch.id}">Marcar como apostado</button>`}
-          <div class="mg2-check-control">
-            <label for="mg2-contest-${batch.id}">Concurso</label>
-            <input id="mg2-contest-${batch.id}" type="number" min="1" value="${escapeHtml(contestNumber)}" data-mg2-contest="${batch.id}" />
-            <button class="button" type="button" data-mg2-check="${batch.id}">${bet?.status === "checked" ? "Rever conferência" : "Conferir resultado"}</button>
-          </div>
+          <button class="button" type="button" data-mg2-compare="${batch.id}">Comparar concursos</button>
           <button class="button ghost mg2-hide-action" type="button" data-mg2-hide="${batch.id}">Ocultar lote</button>
         `}
       </div>
       <div class="mg2-inline-host" data-mg2-inline="${batch.id}"></div>
+      <div class="mg2-comparison-host" data-mg2-comparison-host="${batch.id}"></div>
     </div>
   </article>`;
 }
@@ -188,15 +244,17 @@ function rerender(data, betData) {
 }
 
 function renderBetForm(host, batch) {
+  const minimumContest = Number(batch.targetContestNumber || 1);
   host.innerHTML = `<form class="mg2-form" data-mg2-bet-form>
-    <div class="mg2-form-head"><strong>Registrar aposta do lote #${batch.id}</strong><p>Marque somente os jogos que realmente foram apostados.</p></div>
+    <div class="mg2-form-head"><strong>Registrar aposta do lote #${batch.id}</strong><p>Marque somente os jogos realmente apostados. O financeiro ficará vinculado apenas a esse concurso.</p></div>
     <div class="mg2-bet-games">
       ${batch.games.map((game, index) => `<label class="mg2-bet-game"><input type="checkbox" name="gamePosition" value="${index + 1}" checked /><span>Jogo ${index + 1}</span><div class="mg2-mini-numbers">${(game.numbers || []).map((value) => `<b>${number(value)}</b>`).join("")}</div></label>`).join("")}
     </div>
     <div class="mg2-form-grid">
-      <label><span>Concurso</span><input name="contestNumber" type="number" min="1" required value="${escapeHtml(batch.targetContestNumber || "")}" /></label>
+      <label><span>Concurso apostado</span><input name="contestNumber" type="number" min="${minimumContest}" required value="${escapeHtml(batch.targetContestNumber || "")}" /></label>
       <label><span>Valor gasto</span><input name="actualCost" type="number" min="0.01" step="0.01" required placeholder="Ex.: 12,00" /></label>
     </div>
+    ${batch.targetContestNumber ? `<p class="mg2-form-note">Para preservar o contexto da geração, o concurso apostado não pode ser anterior ao alvo #${batch.targetContestNumber}.</p>` : ""}
     <div class="mg2-form-actions"><button class="button ghost" type="button" data-mg2-cancel-form>Cancelar</button><button class="button primary" type="submit">Confirmar aposta</button></div>
   </form>`;
 
@@ -211,6 +269,11 @@ function renderBetForm(host, batch) {
       toast("Selecione ao menos um jogo apostado.", "error");
       return;
     }
+    const contestNumber = Number(values.get("contestNumber"));
+    if (batch.targetContestNumber && contestNumber < batch.targetContestNumber) {
+      toast(`Use o concurso alvo #${batch.targetContestNumber} ou um concurso posterior.`, "error");
+      return;
+    }
     submit.disabled = true;
     submit.textContent = "Salvando...";
     try {
@@ -218,7 +281,7 @@ function renderBetForm(host, batch) {
         method: "POST",
         body: JSON.stringify({
           batchId: batch.id,
-          contestNumber: Number(values.get("contestNumber")),
+          contestNumber,
           actualCost: Number(values.get("actualCost")),
           gamePositions,
         }),
@@ -233,22 +296,102 @@ function renderBetForm(host, batch) {
   });
 }
 
-function checkResultMarkup(result, contestNumber) {
-  const checks = result.checks || [];
-  const prize = checks.reduce((sum, check) => sum + Number(check.totalPrizeValue || 0), 0);
-  const cost = checks.reduce((sum, check) => sum + Number(check.ticketCost || 0), 0);
-  const best = checks.length ? Math.max(...checks.map((check) => Number(check.hits || 0))) : 0;
-  const net = prize - cost;
-  return `<section class="mg2-result">
-    <div class="mg2-result-head"><div><strong>Concurso #${contestNumber}</strong><p>${checks.length} jogo${checks.length === 1 ? "" : "s"} conferido${checks.length === 1 ? "" : "s"}</p></div><span class="mg2-status ${net >= 0 ? "is-success" : "is-muted"}">Conferência concluída</span></div>
-    <div class="mg2-result-metrics">
-      <div><span>Melhor jogo</span><strong>${best} acerto${best === 1 ? "" : "s"}</strong></div>
-      <div><span>Custo</span><strong>${money(cost)}</strong></div>
-      <div><span>Prêmio</span><strong>${money(prize)}</strong></div>
-      <div><span>Resultado</span><strong class="${net >= 0 ? "is-positive" : "is-negative"}">${money(net)}</strong></div>
+function comparisonDrawNumbers(item) {
+  const matched = new Set(item.matchedAnyNumbers || []);
+  return (item.numbers || []).map((value) => `<span class="mg2-draw-number ${matched.has(value) ? "is-used" : ""}">${number(value)}</span>`).join("");
+}
+
+function comparisonGameMarkup(batch, item) {
+  return item.games.map((check) => {
+    const game = batch.games[check.position - 1];
+    if (!game) return "";
+    return `<div class="mg2-compare-game">
+      <div class="mg2-compare-game-head"><strong>Jogo ${check.position}</strong><span>${check.hits}/${item.numbers.length} · ${hitText(check.hits)}</span></div>
+      <div class="mg2-numbers">${gameNumbers(game, { matchedNumbers: check.matchedNumbers })}</div>
+      ${game.luckyMonth ? `<span class="mg2-month">Mês da Sorte: ${escapeHtml(game.luckyMonth)}${check.luckyMonthHit ? " · acertou" : ""}</span>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function comparisonContestMarkup(batch, item, index) {
+  return `<details class="mg2-compare-contest" ${index === 0 ? "open" : ""}>
+    <summary>
+      <div class="mg2-compare-contest-meta"><strong>#${item.contestNumber}</strong><span>${contestDate(item.date)}</span></div>
+      <div class="mg2-draw-numbers">${comparisonDrawNumbers(item)}</div>
+      <div class="mg2-compare-hit-summary">${item.games.map((check) => `<span class="${check.hits === item.bestHits && check.hits > 0 ? "is-best" : ""}">J${check.position} · ${check.hits}/${item.numbers.length}</span>`).join("")}</div>
+    </summary>
+    <div class="mg2-compare-detail">
+      ${item.luckyMonth ? `<p class="mg2-compare-month">Mês da Sorte sorteado: <strong>${escapeHtml(item.luckyMonth)}</strong></p>` : ""}
+      ${comparisonGameMarkup(batch, item)}
     </div>
-    <details class="mg2-result-details"><summary>Ver resultado por jogo</summary><div class="mg2-result-games">${checks.map((check, index) => `<div><span>Jogo ${index + 1} · ${check.hits} acerto${check.hits === 1 ? "" : "s"}</span><strong>${money(check.totalPrizeValue || 0)}</strong></div>`).join("")}</div></details>
+  </details>`;
+}
+
+function comparisonPanelMarkup(batch, result, count) {
+  const summary = result.summary || {};
+  const minimum = Number(result.scope?.minimumContestNumber || 1);
+  const counts = [3, 5, 10, 20];
+  const hasItems = (result.items || []).length > 0;
+  return `<section class="mg2-comparison" data-mg2-comparison>
+    <div class="mg2-comparison-head">
+      <div>
+        <strong>Comparar concursos</strong>
+        <p>Veja como este mesmo lote se comporta em resultados a partir do alvo. Esta análise não altera apostas nem histórico financeiro.</p>
+      </div>
+      <button class="button ghost" type="button" data-mg2-close-comparison>Fechar</button>
+    </div>
+    <div class="mg2-comparison-controls">
+      <label><span>A partir do concurso</span><input type="number" min="${minimum}" value="${result.startContestNumber}" data-mg2-compare-start /></label>
+      <div class="mg2-counts" role="group" aria-label="Quantidade de concursos">
+        ${counts.map((value) => `<button type="button" class="mg2-count ${count === value ? "is-active" : ""}" data-mg2-compare-count="${value}" aria-pressed="${count === value}">${value}</button>`).join("")}
+      </div>
+      <button class="button" type="button" data-mg2-compare-load>Atualizar</button>
+    </div>
+    ${result.scope?.note ? `<p class="mg2-comparison-note">${escapeHtml(result.scope.note)}</p>` : ""}
+    ${hasItems ? `
+      <div class="mg2-comparison-summary">
+        <div><span>Concursos</span><strong>${summary.contestCount}</strong></div>
+        <div><span>Melhor resultado</span><strong>${hitText(summary.bestHits)}</strong></div>
+        <div><span>Melhor concurso</span><strong>${summary.bestContestNumber ? `#${summary.bestContestNumber}` : "—"}</strong></div>
+        <div><span>Média do melhor jogo</span><strong>${Number(summary.averageBestHits || 0).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</strong></div>
+      </div>
+      <div class="mg2-comparison-legend"><span><i class="is-hit"></i> acerto</span><span><i class="is-fixed"></i> núcleo fixo</span><span>Abra um concurso para ver jogo por jogo.</span></div>
+      <div class="mg2-comparison-list">${result.items.map((item, index) => comparisonContestMarkup(batch, item, index)).join("")}</div>
+    ` : `<div class="mg2-comparison-empty"><strong>Nenhum resultado disponível ainda</strong><p>Não há concursos armazenados a partir de #${result.startContestNumber}. Quando novos resultados forem sincronizados, eles aparecerão aqui.</p></div>`}
   </section>`;
+}
+
+async function loadComparison(batch, count = 5, startContest) {
+  const host = root.querySelector(`[data-mg2-comparison-host="${batch.id}"]`);
+  if (!host) return;
+  const query = new URLSearchParams({ count: String(count) });
+  if (startContest) query.set("startContest", String(startContest));
+  host.innerHTML = '<div class="mg2-inline-loading">Carregando comparação...</div>';
+  try {
+    const result = await api(`/game-batches/${batch.id}/comparison?${query.toString()}`);
+    host.innerHTML = comparisonPanelMarkup(batch, result, count);
+    bindComparisonPanel(host, batch, count);
+    const trigger = root.querySelector(`[data-mg2-compare="${batch.id}"]`);
+    if (trigger) trigger.textContent = "Fechar comparação";
+  } catch (error) {
+    host.innerHTML = `<div class="mg2-inline-error"><strong>Comparação indisponível</strong><p>${escapeHtml(error.message)}</p></div>`;
+  }
+}
+
+function bindComparisonPanel(host, batch, currentCount) {
+  host.querySelector("[data-mg2-close-comparison]")?.addEventListener("click", () => {
+    host.innerHTML = "";
+    const trigger = root.querySelector(`[data-mg2-compare="${batch.id}"]`);
+    if (trigger) trigger.textContent = "Comparar concursos";
+  });
+
+  const readStart = () => Number(host.querySelector("[data-mg2-compare-start]")?.value || 0) || undefined;
+  host.querySelectorAll("[data-mg2-compare-count]").forEach((button) => button.addEventListener("click", () => {
+    void loadComparison(batch, Number(button.dataset.mg2CompareCount), readStart());
+  }));
+  host.querySelector("[data-mg2-compare-load]")?.addEventListener("click", () => {
+    void loadComparison(batch, currentCount, readStart());
+  });
 }
 
 async function hideBatch(batchId) {
@@ -309,30 +452,30 @@ function bindScreen(data, betData) {
     if (batch && host) renderBetForm(host, batch);
   }));
 
-  root.querySelectorAll("[data-mg2-check]").forEach((button) => button.addEventListener("click", async () => {
-    const batchId = Number(button.dataset.mg2Check);
-    const input = root.querySelector(`[data-mg2-contest="${batchId}"]`);
-    const contestNumber = Number(input?.value || 0);
-    const host = root.querySelector(`[data-mg2-inline="${batchId}"]`);
-    if (!Number.isInteger(contestNumber) || contestNumber < 1) {
-      toast("Informe um concurso válido para conferir.", "error");
-      input?.focus();
+  root.querySelectorAll("[data-mg2-compare]").forEach((button) => button.addEventListener("click", () => {
+    const batchId = Number(button.dataset.mg2Compare);
+    const batch = batchById.get(batchId);
+    const host = root.querySelector(`[data-mg2-comparison-host="${batchId}"]`);
+    if (!batch || !host) return;
+    if (host.querySelector("[data-mg2-comparison]")) {
+      host.innerHTML = "";
+      button.textContent = "Comparar concursos";
       return;
     }
+    void loadComparison(batch, 5);
+  }));
+
+  root.querySelectorAll("[data-mg2-refresh-bet]").forEach((button) => button.addEventListener("click", async () => {
     button.disabled = true;
-    button.textContent = "Conferindo...";
-    if (host) host.innerHTML = '<div class="mg2-inline-loading">Conferindo resultado...</div>';
+    button.textContent = "Atualizando...";
     try {
-      const result = await api("/games/check", {
-        method: "POST",
-        body: JSON.stringify({ batchId, contestNumber }),
-      });
-      if (host) host.innerHTML = checkResultMarkup(result, contestNumber);
+      await api(`/real-bets/${button.dataset.mg2RefreshBet}/check`, { method: "POST" });
+      toast("Resultado da aposta atualizado.");
+      await mount({ preserveExpanded: ui.expandedBatchId });
     } catch (error) {
-      if (host) host.innerHTML = `<div class="mg2-inline-error"><strong>Resultado indisponível</strong><p>${escapeHtml(error.message)}</p></div>`;
-    } finally {
       button.disabled = false;
-      button.textContent = "Rever conferência";
+      button.textContent = "Atualizar resultado";
+      toast(error.message, "error");
     }
   }));
 }
