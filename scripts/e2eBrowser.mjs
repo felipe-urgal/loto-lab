@@ -238,14 +238,14 @@ try {
   assert(home.title.includes("Loto Lab"), "Main page title is invalid");
   assert(home.build.length === 12, "Built page is missing its 12-character build version");
   assert(home.content, "Main application content root is missing");
-  assert(home.text.includes("Dashboard"), "Main application rendered no meaningful navigation content");
+  assert(home.text.includes("Painel"), "Main application rendered no meaningful navigation content");
 
   await navigate(client, "/#analysis");
   await waitFor(client, "Boolean(document.querySelector('.a2-shell'))", "Analyses 2.0 shell");
   const analysisTabs = await evaluate(client, `[...document.querySelectorAll('[data-a2-tab]')].map((node) => node.textContent.trim())`);
   assert(analysisTabs.length === 5, "Analyses 2.0 did not render five modes");
   assert(
-    ["Ranking", "Estrutura", "Dinâmica", "Combinações", "Validação"].every((label) => analysisTabs.includes(label)),
+    ["Classificação", "Estrutura", "Dinâmica", "Combinações", "Validação"].every((label) => analysisTabs.includes(label)),
     "Analyses 2.0 is missing one or more modes",
   );
   assert(
@@ -269,7 +269,7 @@ try {
   await evaluate(client, "document.querySelector('[data-a2-number]').click(); true");
   await waitFor(client, "document.querySelector('#a2-detail')?.open === true", "number detail modal");
   assert(
-    await evaluate(client, "document.querySelector('#a2-detail').innerText.includes('Decomposição do score')"),
+    await evaluate(client, "document.querySelector('#a2-detail').innerText.includes('Decomposição da pontuação')"),
     "Number detail is missing score decomposition",
   );
   assert(
