@@ -48,9 +48,14 @@ function formatDateTime(value) {
 }
 
 function safeActionHref(value) {
-  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//")
-    ? value
-    : undefined;
+  if (typeof value !== "string" || !value) return undefined;
+  try {
+    const url = new URL(value, location.origin);
+    if (url.origin !== location.origin) return undefined;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return undefined;
+  }
 }
 
 function renderAgenda(items) {
