@@ -243,14 +243,14 @@ try {
 
     const antiLeakage = await evaluate(client, `(() => ({
       hasTieredNumbers: document.querySelectorAll('.g2-number.is-strong,.g2-number.is-balanced,.g2-number.is-cold').length > 0,
-      funnel: document.querySelector('[data-g2-plan]')?.innerText || '',
-      baseline: document.querySelector('[data-g2-baseline]')?.innerText || '',
+      funnel: document.querySelector('[data-g2-plan]')?.textContent || '',
+      baseline: document.querySelector('[data-g2-baseline]')?.textContent || '',
       target: Number(document.querySelector('#g2-target')?.value || 0)
     }))()`);
     assert(antiLeakage.hasTieredNumbers, `${lottery.id} has no target-scoped number tiers`);
     assert(antiLeakage.target === 9041, `${lottery.id} did not use the deterministic target #9041: ${JSON.stringify(antiLeakage)}`);
     assert(antiLeakage.funnel.includes("Pool explorado pelo motor"), `${lottery.id} does not expose algorithm space`);
-    assert(antiLeakage.baseline.includes("Baseline condicionado"), `${lottery.id} does not expose conditioned baseline`);
+    assert(antiLeakage.baseline.includes("Baseline condicionado"), `${lottery.id} does not expose conditioned baseline: ${JSON.stringify(antiLeakage)}`);
 
     await evaluate(client, "document.querySelector('[data-g2-preview]').click(); true");
     await waitFor(client, "Boolean(document.querySelector('.g2-preview'))", `${lottery.id} auditable preview`, 400);
