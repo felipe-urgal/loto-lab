@@ -151,7 +151,7 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
     try {
       const method = request.method ?? "GET";
       const url = new URL(request.url ?? "/", "http://localhost");
-      const pathname = url.pathname.length > 1 ? request.url && url.pathname.replace(/\/$/, "") : url.pathname;
+      const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/$/, "") : url.pathname;
 
       if (method === "OPTIONS") {
         sendNoContent(response, corsOrigin);
