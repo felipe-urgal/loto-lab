@@ -83,6 +83,7 @@ function serializeError(error: unknown) {
     name: error instanceof Error ? error.name : "Error",
     message,
     ...(typeof codeValue === "string" ? { code: codeValue } : {}),
+    ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
   };
 }
 
