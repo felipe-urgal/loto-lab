@@ -17,6 +17,7 @@ interface WorkerErrorPayload {
   name: string;
   message: string;
   code?: string;
+  stack?: string;
 }
 
 interface WorkerMessage<T> {
@@ -47,7 +48,14 @@ function runWorker<T>(workerData: unknown): Promise<T> {
       const error = new Error(payload.message) as Error & { code?: string };
       error.name = payload.name;
       if (payload.code) error.code = payload.code;
+      if (payload.stack) error.stack = payload.stack;
       reject(error);
+    });
+    worker.once("messageerror", (error) => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
     });
     worker.once("error", (error) => {
       if (!settled) {
