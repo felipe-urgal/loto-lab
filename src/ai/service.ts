@@ -75,7 +75,7 @@ export class AiInsightService {
           focus,
           model: result.model,
           ...(result.providerResponseId ? { providerResponseId: result.providerResponseId } : {}),
-          evidenceHash: hash,
+          ...(!force ? { evidenceHash: hash } : {}),
           evidence,
           insight: result.insight,
           ...(result.usage ? { usage: result.usage } : {}),
