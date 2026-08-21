@@ -6,16 +6,24 @@ O build web é feito por `npm run web:build` sem adicionar dependências de runt
 
 - copia os assets para `web-dist`;
 - calcula uma versão SHA-256 do conjunto web;
+- grava a versão em `build-manifest.json`;
 - adiciona `?v=<hash>` nos assets referenciados pelo HTML;
-- permite `Cache-Control: public, max-age=31536000, immutable` para URLs versionadas;
+- entrega `Cache-Control: public, max-age=31536000, immutable` somente quando `v` corresponde ao build atual;
+- responde `no-store` para uma URL com versão inválida/stale, evitando cache permanente incorreto;
 - mantém HTML com `no-cache`;
+- mantém assets sem versão com cache curto;
+- mantém os corpos dos assets do build em memória depois da primeira leitura do processo;
 - carrega refinamentos e funcionalidades secundárias sob demanda por view.
 
 A navegação e os ícones ficam centralizados em `web/shell.js`. A home carrega apenas o shell, o core `app.js` e o loader; CSS/JS de status, geração e gestão de jogos são carregados quando necessários.
 
+O loader compartilha as Promises de carregamento e aguarda o stylesheet de cada feature antes de executar seu módulo. Isso evita downloads/imports duplicados e reduz o risco de conteúdo temporariamente sem estilo e layout shift.
+
 ## CPU / análises pesadas
 
 Backtests HTTP e comparações do Laboratório executam o cálculo CPU-bound em `worker_threads` (`src/api/analysisWorker.ts`). A thread principal continua responsável por HTTP, validação, leitura e persistência PostgreSQL.
+
+O backtest compacta as rodadas ainda dentro do worker antes de `postMessage`. Estruturas grandes usadas somente durante o cálculo, como jogos gerados e checks completos, não atravessam a fronteira da thread nem são persistidas. O cliente do worker também trata saída prematura como erro explícito para não deixar uma requisição pendurada.
 
 O `expensiveAnalysisGate` continua limitando a uma análise pesada por processo para controlar CPU e memória.
 
@@ -39,4 +47,4 @@ Para medições no navegador, use como guardrails no percentil 75:
 - INP <= 200 ms;
 - CLS <= 0,1.
 
-Além dos números, valide teclado, foco visível, `prefers-reduced-motion`, desktop, tablet e mobile.
+Além dos números, valide teclado, foco visível, nomes acessíveis em controles icon-only, `prefers-reduced-motion`, desktop, tablet e mobile.
