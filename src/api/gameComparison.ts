@@ -142,13 +142,6 @@ export async function serveGameComparison(
       "This legacy batch has no target contest; choose a starting contest to compare it safely",
     );
   }
-  if (minimumContest !== undefined && startContest < minimumContest) {
-    throw new ApiError(
-      400,
-      "COMPARISON_BEFORE_TARGET",
-      `Comparison starts at contest ${minimumContest} because earlier contests belong to the generation context`,
-    );
-  }
 
   const selected = await contests.list({
     lottery: batch.lottery,
@@ -158,36 +151,33 @@ export async function serveGameComparison(
   });
 
   const comparison = buildBatchComparison(batch, selected);
-  const lastAvailable = selected.length > 0
-    ? selected[0]!.number
-    : (await contests.list({
-      lottery: batch.lottery,
-      endContest: startContest - 1,
-      order: "desc",
-      limit: 1,
-    }))[0]?.number;
-  const available = selected.length > 0;
+  const lastSelectedContest = selected.at(-1);
+  const lastAvailable = lastSelectedContest?.number ?? (await contests.list({
+    lottery: batch.lottery,
+    endContest: startContest - 1,
+    order: "desc",
+    limit: 1,
+  }))[0]?.number;
+  const status = selected.length > 0 ? "available" : "pending";
 
   sendJson(response, 200, {
     ...comparison,
     startContestNumber: startContest,
     requestedCount: count,
     availability: {
-      status: available ? "available" : "pending",
-      available,
-      targetContestNumber: startContest,
+      status,
       ...(lastAvailable !== undefined ? { lastAvailableContestNumber: lastAvailable } : {}),
-      message: available
-        ? undefined
-        : `O resultado do concurso #${startContest} ainda não está disponível no histórico sincronizado.`,
+      targetContestNumber: startContest,
     },
     scope: {
-      kind: minimumContest === undefined ? "manual-anchor" : "post-target",
+      kind: minimumContest !== undefined && startContest < minimumContest ? "backtest" : "post-target",
       minimumContestNumber: minimumContest,
       financial: false,
-      note: minimumContest === undefined
-        ? "Comparação exploratória a partir do concurso escolhido; nenhum valor financeiro é registrado."
-        : "Somente concursos a partir do alvo são comparados; resultados anteriores faziam parte do contexto usado para gerar o lote.",
+      note: minimumContest !== undefined && startContest < minimumContest
+        ? "Backtest histórico dos jogos gerados contra concursos anteriores ao alvo; nenhum valor financeiro é registrado."
+        : minimumContest === undefined
+          ? "Comparação exploratória a partir do concurso escolhido; nenhum valor financeiro é registrado."
+          : "Comparação dos jogos a partir do concurso-alvo; nenhum valor financeiro é registrado.",
     },
   }, corsOrigin);
   return true;
