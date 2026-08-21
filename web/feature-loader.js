@@ -61,6 +61,11 @@ async function ensureViewFeatures() {
     return;
   }
 
+  if (view === "analysis") {
+    await loadStyledModule("analysis-v2");
+    return;
+  }
+
   await loadStyledModule("refinements");
 
   if (view === "generate") {
