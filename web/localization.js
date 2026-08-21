@@ -33,6 +33,7 @@ const EXACT_PHRASES = new Map([
   ["Esses parâmetros alimentam a fila de Backtests/Laboratório. O histórico guarda o ID exato da versão usada.", "Esses parâmetros alimentam a fila de testes históricos e do Laboratório. O histórico guarda o ID exato da versão usada."],
   ["A IA recebe um resumo auditável de análise, backtest, Laboratório e apostas reais. Ela não escolhe dezenas nem recalcula métricas.", "A IA recebe um resumo auditável de análise, teste histórico, Laboratório e apostas reais. Ela não escolhe dezenas nem recalcula métricas."],
   ["Snapshots anteriores da loteria selecionada.", "Registros anteriores da loteria selecionada."],
+  ["Sem marcar, evidência idêntica reutiliza o snapshot anterior e evita custo desnecessário.", "Sem marcar, evidência idêntica reutiliza o registro anterior e evita custo desnecessário."],
   ["Backtests e laboratório\nfora da requisição HTTP.", "Testes históricos e laboratório\nfora da requisição HTTP."],
 ]);
 
@@ -50,6 +51,8 @@ function replaceOperationalTerms(value) {
     .replace(/\bBacktest #/g, "Teste histórico #")
     .replace(/\bBacktest concluído\b/g, "Teste histórico concluído")
     .replace(/\bSem backtest\b/g, "Sem teste histórico")
+    .replace(/\bSnapshot\b/g, "Registro")
+    .replace(/\bsnapshot\b/g, "registro")
     .replace(/\bwarmup\s+(\d+)/gi, "aquecimento $1")
     .replace(/\branking por\s+prizeRate\b/g, "classificação por taxa de premiação")
     .replace(/\branking por\s+averageHitsPerGame\b/g, "classificação por média de acertos")
@@ -59,6 +62,8 @@ function replaceOperationalTerms(value) {
 
 function replaceAnalysisTerms(value) {
   return replaceOperationalTerms(value)
+    .replace(/\bBacktest\b/g, "Teste histórico")
+    .replace(/\bbacktest\b/g, "teste histórico")
     .replace(/\bRanking\b/g, "Classificação")
     .replace(/\branking\b/g, "classificação")
     .replace(/\bScore\b/g, "Pontuação")
@@ -67,8 +72,6 @@ function replaceAnalysisTerms(value) {
     .replace(/\bheatmap\b/g, "mapa de calor")
     .replace(/\bBaseline\b/g, "Referência")
     .replace(/\bbaseline\b/g, "referência")
-    .replace(/\bSnapshot\b/g, "Registro")
-    .replace(/\bsnapshot\b/g, "registro")
     .replace(/\bWalk-forward\b/gi, "validação progressiva")
     .replace(/\bLift\b/g, "Razão obs./esp.")
     .replace(/\bp-value\b/gi, "valor-p")
@@ -100,6 +103,7 @@ function shouldUseOperationalVocabulary(node) {
     ".experiment-meta",
     ".status-pill",
     ".form-inline-note",
+    ".form-note",
     ".ai-principle",
     ".ai-history",
     ".sidebar",
