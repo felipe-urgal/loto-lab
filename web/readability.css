@@ -1,118 +1,160 @@
-/* Camada global de legibilidade.
- * Mantém a hierarquia visual existente, mas evita textos funcionais em 9–11 px.
+/* Piso global de legibilidade.
+ * Regra de produto: nenhum texto funcional visível deve renderizar abaixo de 16 px.
+ * Títulos, números de destaque e métricas continuam maiores.
  */
 
+:root { --loto-font-min: 16px; }
 html { font-size: 16px; }
-body { font-size: 14px; line-height: 1.5; }
+body { font-size: 16px; line-height: 1.55; }
 
-.brand-copy strong { font-size: 16px !important; }
-.brand-copy small { font-size: 12px !important; line-height: 1.35; }
+/* Fallback aplicado pela auditoria runtime quando outro stylesheet tentar usar < 16 px. */
+.readability-min-text { font-size: 16px !important; line-height: 1.45; }
+
+/* Shell e navegação. */
+.brand-copy strong { font-size: 18px !important; }
+.brand-copy small,
 .nav-item,
 .nav-link,
 .nav-more,
-.nav-more-link { font-size: 14px !important; }
+.nav-more-link,
 .sidebar-footer p,
-.status-row { font-size: 12px !important; }
+.status-row { font-size: 16px !important; line-height: 1.45; }
 
-.topbar-copy h1 { font-size: 24px !important; }
-.topbar-copy p { font-size: 14px !important; line-height: 1.45; }
-.select-control span { font-size: 11px !important; }
-.select-control select { font-size: 14px !important; }
+.topbar-copy h1 { font-size: 26px !important; }
+.topbar-copy p,
+.select-control span,
+.select-control select { font-size: 16px !important; line-height: 1.45; }
+.select-control { min-height: 52px; }
 
-.section-head h2 { font-size: 17px !important; }
-.section-head p { font-size: 13px !important; line-height: 1.5; }
+.section-head h2 { font-size: 20px !important; }
+.section-head p { font-size: 16px !important; line-height: 1.5; }
 
-.metric-label { font-size: 13px !important; }
-.metric-detail { font-size: 12px !important; line-height: 1.45; }
-.lottery-name { font-size: 14px !important; }
+/* Painel, cards, listas e controles. */
+.metric-label,
+.metric-detail,
+.lottery-name,
 .contest-number,
-.target-copy { font-size: 12px !important; }
-.ball { font-size: 12px !important; }
-
+.target-copy,
+.ball,
 .button,
-.link-button { font-size: 13px !important; }
-.button.compact { font-size: 12px !important; }
-
+.link-button,
+.button.compact,
 .list-row-main strong,
-.list-row-value strong { font-size: 14px !important; }
-.list-row-main p { font-size: 12px !important; line-height: 1.45; }
-.list-row-value small { font-size: 11px !important; }
-
-.analysis-group-head strong { font-size: 14px !important; }
-.analysis-group-head span { font-size: 12px !important; }
-
-th { font-size: 11px !important; }
-td { font-size: 13px !important; }
-
+.list-row-main p,
+.list-row-value strong,
+.list-row-value small,
+.analysis-group-head strong,
+.analysis-group-head span,
+th,
+td,
 .field label,
-.field > span { font-size: 12px !important; }
+.field > span,
 .field input,
-.field select { font-size: 13px !important; }
+.field select,
 .form-note,
 .form-inline-note,
-.checkbox { font-size: 12px !important; line-height: 1.5; }
+.checkbox,
+.game-head strong,
+.game-head span,
+.content small,
+.content p { font-size: 16px !important; }
 
-.game-head strong { font-size: 14px !important; }
-.game-head span { font-size: 11px !important; }
-.content small { font-size: 12px !important; line-height: 1.45; }
-.content p { line-height: 1.55; }
+.metric-value { font-size: 28px !important; }
+.button,
+.link-button { min-height: 42px; padding-inline: 14px; }
+.button.compact { min-height: 38px; }
+.field input,
+.field select { min-height: 46px; }
+.ball { width: 38px; height: 38px; }
+th, td { padding-top: 14px; padding-bottom: 14px; line-height: 1.45; }
+.list-row { min-height: 70px; }
+.content p,
+.list-row-main p,
+.form-note,
+.form-inline-note { line-height: 1.55; }
 
-/* Análises 2.0: a primeira versão priorizava densidade e ficou pequena demais. */
-.a2-shell { font-size: 14px; }
+/* Análises 2.0: densidade nunca deve vencer legibilidade. */
+.a2-shell,
+.a2-detail { font-size: 16px; }
 .a2-metric > span,
-.a2-metric > small { font-size: 12px !important; }
+.a2-metric > small,
 .a2-principle,
 .a2-warning,
-.a2-validation-principle { font-size: 13px !important; line-height: 1.5 !important; }
-.a2-tabs button { font-size: 13px !important; }
-.a2-panel-head strong { font-size: 14px !important; }
+.a2-validation-principle,
+.a2-tabs button,
+.a2-panel-head strong,
 .a2-panel-head span,
-.a2-panel-head small { font-size: 12px !important; }
-.a2-ball { font-size: 12px !important; }
-.a2-tier-chip { font-size: 11px !important; }
+.a2-panel-head small,
+.a2-ball,
+.a2-tier-chip,
 .a2-compare-controls select,
 .a2-pair-controls select,
-.a2-window-control select { font-size: 12px !important; }
-.a2-compare-table > div { font-size: 12px !important; }
-.a2-structure-title strong { font-size: 13px !important; }
-.a2-structure-title span { font-size: 12px !important; }
-.a2-observed-expected small { font-size: 11px !important; }
-.a2-observed-expected strong { font-size: 13px !important; }
+.a2-window-control select,
+.a2-compare-table > div,
+.a2-structure-title strong,
+.a2-structure-title span,
+.a2-observed-expected small,
+.a2-observed-expected strong,
 .a2-dist-column strong,
-.a2-dist-column small { font-size: 11px !important; }
-.a2-grid-profile > strong { font-size: 13px !important; }
+.a2-dist-column small,
+.a2-grid-profile > strong,
 .a2-grid-profile > span,
-.a2-grid-profile small { font-size: 11px !important; }
+.a2-grid-profile small,
 .a2-filter-rules span,
+.a2-filter-rules strong,
+.a2-filter-rules small,
 .a2-filter-numbers small,
-.a2-filter-numbers em { font-size: 11px !important; }
-.a2-filter-rules strong { font-size: 13px !important; }
-.a2-filter-validation > p { font-size: 12px !important; }
-.a2-mover-list strong { font-size: 13px !important; }
+.a2-filter-numbers em,
+.a2-filter-validation > p,
+.a2-mover-list strong,
 .a2-mover-list span,
-.a2-mover-list em { font-size: 11px !important; }
-.a2-cycle-copy > strong { font-size: 14px !important; }
-.a2-cycle-copy > small { font-size: 12px !important; }
-.a2-delay-list strong { font-size: 13px !important; }
+.a2-mover-list em,
+.a2-cycle-copy > strong,
+.a2-cycle-copy > small,
+.a2-delay-list strong,
 .a2-delay-list span,
-.a2-delay-list em { font-size: 11px !important; }
+.a2-delay-list em,
 .a2-heat-corner,
 .a2-heat-head,
-.a2-heat-contest { font-size: 11px !important; }
-.a2-pair-result:empty::before { font-size: 12px !important; }
-.a2-pair-stat small { font-size: 11px !important; }
-.a2-pair-stat b { font-size: 13px !important; }
-.a2-pair-stat em { font-size: 12px !important; }
+.a2-heat-contest,
+.a2-pair-result:empty::before,
+.a2-pair-stat small,
+.a2-pair-stat b,
+.a2-pair-stat em,
 .a2-association-row,
-.a2-association-row strong { font-size: 12px !important; }
-.a2-similarity strong { font-size: 12px !important; }
+.a2-association-row strong,
+.a2-similarity strong,
 .a2-similarity span,
 .a2-similarity small,
 .a2-similarity em,
-.a2-window-control { font-size: 11px !important; }
-.a2-detail { font-size: 14px; }
+.a2-window-control { font-size: 16px !important; line-height: 1.45; }
 
-/* Páginas auxiliares. */
+.a2-metric > strong { font-size: 28px !important; }
+.a2-structure-current { font-size: 30px !important; }
+.a2-filter-numbers strong { font-size: 24px !important; }
+.a2-grid-profile b { font-size: 20px !important; }
+.a2-pair-stat > strong { font-size: 18px !important; }
+.a2-ball { width: 40px; height: 40px; }
+.a2-tier-chip { min-height: 30px; padding-inline: 10px; }
+.a2-tabs button { min-height: 44px; padding-inline: 16px; }
+.a2-compare-controls select,
+.a2-pair-controls select,
+.a2-window-control select { min-height: 44px; }
+.a2-observed-expected span,
+.a2-grid-profile > span,
+.a2-filter-rules span,
+.a2-filter-numbers span,
+.a2-pair-stat > span { padding: 10px; }
+.a2-mover-list button,
+.a2-delay-list button { min-height: 46px; }
+.a2-heatmap { gap: 4px; }
+.a2-heat-cell { width: 20px; height: 20px; }
+.a2-heat-head,
+.a2-heat-contest { min-width: 28px; }
+.a2-association-row { min-height: 46px; }
+.a2-similarity > div { min-height: 46px; }
+
+/* Páginas auxiliares: Execuções, Estratégias, IA, Agenda e Laboratório. */
 .experiment-card p,
 .experiment-meta,
 .job-result,
@@ -122,14 +164,20 @@ td { font-size: 13px !important; }
 .agenda-card p,
 .agenda-notification p,
 .lab-basis,
-.lab-history-status { font-size: 12px !important; line-height: 1.5; }
+.lab-history-status { font-size: 16px !important; line-height: 1.55; }
 .experiment-card h3,
-.agenda-card h3 { font-size: 15px !important; }
+.agenda-card h3 { font-size: 19px !important; }
+
+/* Pseudo-elementos textuais herdam o piso do elemento pai. */
+body *::before,
+body *::after { font-size: inherit; }
 
 @media (max-width: 680px) {
-  body { font-size: 14px; }
-  .topbar-copy h1 { font-size: 22px !important; }
-  .topbar-copy p { font-size: 13px !important; }
+  body { font-size: 16px; }
+  .topbar-copy h1 { font-size: 24px !important; }
+  .topbar-copy p { font-size: 16px !important; }
   .content { padding-left: 16px; padding-right: 16px; }
-  .a2-tabs button { font-size: 13px !important; }
+  .a2-tabs button { font-size: 16px !important; }
+  .a2-structure-grid,
+  .a2-validation-grid { grid-template-columns: 1fr; }
 }
