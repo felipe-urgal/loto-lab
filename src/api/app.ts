@@ -153,16 +153,8 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
       match = pathMatch(pathname, /^\/api\/v1\/analysis\/([^/]+)\/advanced$/);
       if (method === "GET" && match) {
         const lottery = parseLottery(match[1]);
-        const release = expensiveAnalysisGate.acquire();
-        if (!release) {
-          throw new ApiError(429, "ANALYSIS_BUSY", "Another expensive analysis is already running");
-        }
-        try {
-          sendJson(response, 200, await services.analyzeAdvanced(lottery), corsOrigin);
-          return;
-        } finally {
-          release();
-        }
+        sendJson(response, 200, await services.analyzeAdvanced(lottery), corsOrigin);
+        return;
       }
 
       match = pathMatch(pathname, /^\/api\/v1\/analysis\/([^/]+)$/);
