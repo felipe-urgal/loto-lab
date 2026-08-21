@@ -1,7 +1,8 @@
 const agendaGrid = document.querySelector("#agenda-grid");
 const inbox = document.querySelector("#agenda-inbox");
 const unreadCopy = document.querySelector("#agenda-unread-copy");
-const badge = document.querySelector("#agenda-nav-badge");
+const badges = [...document.querySelectorAll("[data-agenda-nav-badge]")];
+const agendaNavItems = [...document.querySelectorAll('[data-nav-key="agenda"]')];
 const refreshButton = document.querySelector("#agenda-refresh");
 const readAllButton = document.querySelector("#agenda-read-all");
 const filterButtons = [...document.querySelectorAll("[data-agenda-filter]")];
@@ -65,10 +66,15 @@ function renderNotifications(items, unreadCount) {
   unreadCopy.textContent = unreadCount === 0
     ? "Nenhuma notificação não lida."
     : `${unreadCount} notificação(ões) não lida(s).`;
-  if (badge) {
+
+  for (const badge of badges) {
     badge.hidden = unreadCount === 0;
     badge.textContent = String(unreadCount > 99 ? "99+" : unreadCount);
   }
+  const agendaLabel = unreadCount === 0
+    ? "Agenda"
+    : `Agenda, ${unreadCount} ${unreadCount === 1 ? "notificação não lida" : "notificações não lidas"}`;
+  for (const navItem of agendaNavItems) navItem.setAttribute("aria-label", agendaLabel);
 
   if (!items.length) {
     inbox.innerHTML = `<div class="panel agenda-empty">${filter === "unread" ? "Nenhuma notificação não lida." : "Nenhuma notificação registrada."}</div>`;
