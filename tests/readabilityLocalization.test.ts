@@ -51,5 +51,10 @@ test("localization keeps product vocabulary in Portuguese and scopes dynamic rep
   assert.match(js, /\.job-result/);
   assert.match(js, /\.status-pill/);
   assert.match(js, /function replaceAnalysisTerms/);
-  assert.doesNotMatch(js, /function replaceKnownPhrases[\s\S]*?replace\(\/\\bBacktests/, "broad Backtests replacement must not run on arbitrary user text");
+
+  const knownStart = js.indexOf("function replaceKnownPhrases");
+  const knownEnd = js.indexOf("function replaceOperationalTerms");
+  assert.ok(knownStart >= 0 && knownEnd > knownStart);
+  const knownFunction = js.slice(knownStart, knownEnd);
+  assert.doesNotMatch(knownFunction, /\\bBacktests/, "broad Backtests replacement must not run on arbitrary user text");
 });
