@@ -250,7 +250,7 @@ try {
     assert(antiLeakage.hasTieredNumbers, `${lottery.id} has no target-scoped number tiers`);
     assert(antiLeakage.target === 9041, `${lottery.id} did not use the deterministic target #9041: ${JSON.stringify(antiLeakage)}`);
     assert(antiLeakage.funnel.includes("Pool explorado pelo motor"), `${lottery.id} does not expose algorithm space`);
-    assert(antiLeakage.baseline.includes("Baseline condicionado"), `${lottery.id} does not expose conditioned baseline: ${JSON.stringify(antiLeakage)}`);
+    assert(antiLeakage.baseline.includes("Referência condicionada"), `${lottery.id} does not expose the conditioned reference in Portuguese: ${JSON.stringify(antiLeakage)}`);
 
     await evaluate(client, "document.querySelector('[data-g2-preview]').click(); true");
     await waitFor(client, "Boolean(document.querySelector('.g2-preview'))", `${lottery.id} auditable preview`, 400);
