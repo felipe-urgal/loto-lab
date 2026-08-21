@@ -166,6 +166,29 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function classifyHttpFailure(response, type) {
+  const status = Number(response?.status || 0);
+  if (status < 400) return undefined;
+  let url;
+  try {
+    url = new URL(response.url);
+  } catch {
+    return `${status} ${type || "resource"} ${response?.url || "unknown URL"}`;
+  }
+
+  const base = new URL(baseUrl);
+  const sameOrigin = url.origin === base.origin;
+  const isApi = sameOrigin && url.pathname.startsWith("/api/");
+
+  // Empty-state API 404s are part of the product contract (for example when a
+  // lottery has no stored latest contest yet). Server errors must still fail.
+  if (isApi) return status >= 500 ? `${status} API ${url.pathname}` : undefined;
+
+  // Documents, scripts, styles, icons and every other first-party asset must
+  // never fail to load during the real-browser smoke flow.
+  return `${status} ${type || "resource"} ${url.pathname}`;
+}
+
 const chrome = findChrome();
 const userDataDir = await mkdtemp(join(tmpdir(), "loto-lab-e2e-"));
 const browser = spawn(chrome, [
@@ -186,16 +209,24 @@ try {
   client = await createPage();
   const runtimeErrors = [];
   const severeLogs = [];
+  const networkErrors = [];
   client.on("Runtime.exceptionThrown", ({ exceptionDetails }) => {
     runtimeErrors.push(exceptionDetails?.exception?.description || exceptionDetails?.text || "Runtime exception");
   });
   client.on("Log.entryAdded", ({ entry }) => {
-    if (entry?.level === "error") severeLogs.push(entry.text || "Browser log error");
+    if (entry?.level === "error" && entry?.source !== "network") {
+      severeLogs.push(`${entry.source || "console"}: ${entry.text || "Browser log error"}`);
+    }
+  });
+  client.on("Network.responseReceived", ({ response, type }) => {
+    const failure = classifyHttpFailure(response, type);
+    if (failure) networkErrors.push(failure);
   });
   await Promise.all([
     client.send("Page.enable"),
     client.send("Runtime.enable"),
     client.send("Log.enable"),
+    client.send("Network.enable"),
   ]);
 
   await navigate(client, "/");
@@ -252,6 +283,7 @@ try {
   await sleep(200);
   assert(runtimeErrors.length === 0, `Browser runtime exceptions: ${runtimeErrors.join(" | ")}`);
   assert(severeLogs.length === 0, `Browser console errors: ${severeLogs.join(" | ")}`);
+  assert(networkErrors.length === 0, `Browser resource/server failures: ${networkErrors.join(" | ")}`);
 
   console.log("Browser E2E passed: main, strategies, mobile nav, jobs, agenda and AI");
 } finally {
