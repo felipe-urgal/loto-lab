@@ -1,18 +1,6 @@
 # Interface Web
 
-A interface web do Loto Lab é servida pelo mesmo processo da API HTTP.
-
-## Objetivo
-
-Transformar o motor já validado em uma aplicação operacional sem duplicar regra de negócio no navegador.
-
-O frontend:
-
-- consulta concursos e análises pela API `/api/v1`;
-- envia configurações para o gerador;
-- exibe e confere lotes persistidos;
-- executa e consulta backtests;
-- nunca recalcula score, prêmio, ROI ou regras de geração por conta própria.
+A interface web do Loto Lab é servida pelo mesmo processo da API HTTP e mantém toda regra estatística no backend. O navegador consulta `/api/v1`; score, geração, conferência, ROI e regras de backtest continuam no core.
 
 ## Execução local
 
@@ -43,115 +31,85 @@ Inicie a aplicação:
 npm run api:start
 ```
 
-Abra:
+Abra `http://127.0.0.1:3000`. A API continua disponível no mesmo processo em `/api/v1`.
 
-```text
-http://127.0.0.1:3000
-```
+## Arquitetura atual
 
-A API continua disponível no mesmo processo em `/api/v1`.
-
-## Telas
-
-### Dashboard
-
-- último concurso das três loterias;
-- próximo número de concurso alvo estimado pelo histórico armazenado;
-- atalho para gerar jogos;
-- resumo do backtest mais recente da loteria selecionada;
-- últimos lotes salvos.
-
-### Análises
-
-- concurso de referência;
-- grupos `strong`, `balanced` e `cold`;
-- ranking por score;
-- componentes de ano, mês, últimos 10, últimos 20 e histórico.
-
-### Gerar jogos
-
-- loteria selecionada globalmente;
-- quantidade de jogos;
-- núcleo de 8, 9 ou 10 fixas para Lotofácil;
-- concurso alvo opcional;
-- persistência do lote habilitada por padrão;
-- fixas destacadas visualmente nos jogos gerados.
-
-A geração continua aplicando anti-leakage quando um concurso alvo é informado.
-
-### Meus jogos
-
-- lotes persistidos;
-- data, concurso alvo e quantidade de jogos;
-- núcleo fixo destacado;
-- Mês da Sorte quando aplicável;
-- conferência do lote contra um concurso armazenado;
-- custo, prêmio conhecido, resultado líquido e melhor pontuação.
-
-### Backtests
-
-- quantidade de jogos por concurso;
-- aquecimento;
-- núcleo configurável da Lotofácil;
-- intervalo opcional de concursos;
-- persistência da execução;
-- ROI, custo, prêmios e cobertura financeira;
-- histórico das execuções persistidas.
-
-## Arquitetura
-
-A interface não adiciona framework ou nova cadeia de build neste milestone.
-
-Arquivos estáticos:
+O frontend continua leve e sem framework, mas deixou de ser um único bloco global:
 
 ```text
 web/
 ├── index.html
-├── styles.css
-├── app.js
-└── favicon.svg
+├── lab.html
+├── agenda.html
+├── ai.html
+├── shell.js              # navegação e ícones compartilhados
+├── feature-loader.js     # lazy loading por view
+├── app.js                # fluxo principal
+├── ui-foundation.css     # tipografia, foco e responsividade
+└── *.js / *.css          # features específicas
 ```
 
-Servidor:
+`npm run web:build` gera `web-dist/` e um `build-manifest.json`. O hash do build é aplicado aos URLs dos assets. Somente URLs cujo `?v=` corresponde ao build atual recebem cache imutável; versões inválidas usam `no-store`. HTML permanece com `no-cache`.
 
-- `src/api/web.ts`: resolve apenas assets conhecidos e define MIME/cache;
-- `src/api/server.ts`: combina assets web com o handler da API;
-- `src/cli/apiStart.ts`: inicia um único processo HTTP.
+## Telas
 
-Essa decisão mantém o milestone pequeno e permite validar navegação, densidade e fluxos antes de adotar um framework de frontend. Uma migração futura para React/Vue/Vite pode reutilizar a mesma API sem mover regra de negócio.
+A aplicação principal mantém as views:
 
-## Design system
+- Dashboard: concursos, estado operacional e atalhos;
+- Análises: ranking e componentes do score;
+- Gerar jogos: configuração e geração auditável;
+- Meus jogos: lotes persistidos, apostas reais e conferência;
+- Backtests: simulação histórica e execuções salvas.
 
-Direção visual:
+As áreas dedicadas continuam em rotas próprias:
 
-- tema escuro de baixa distração;
-- verde como cor de ação e destaque do núcleo fixo;
-- painéis com borda discreta em vez de excesso de cards decorativos;
-- tipografia de sistema para não depender de CDN;
-- navegação lateral no desktop;
-- navegação compacta no tablet;
-- barra inferior no mobile;
-- tabelas preservadas para dados densos;
-- bolas numéricas somente quando ajudam a leitura do jogo/análise.
+- `/lab`: comparação controlada de estratégias;
+- `/agenda`: próximos concursos e notificações;
+- `/ai`: interpretação de evidências já calculadas.
+
+## Navegação
+
+Desktop mantém todas as áreas visíveis. No mobile a barra inferior contém:
+
+- Dashboard;
+- Análises;
+- Gerar jogos;
+- Meus jogos;
+- Mais.
+
+`Mais` concentra Backtests, Laboratório, Agenda e IA, evitando oito itens comprimidos na barra inferior. Os itens icon-only mantêm nomes acessíveis, o disclosure pode ser fechado com `Escape` e o contador da Agenda é preservado no menu compacto.
+
+## Carregamento sob demanda
+
+A home não baixa todas as extensões na primeira navegação. `feature-loader.js` carrega sob demanda:
+
+- status operacional no Dashboard;
+- refinamentos nas views analíticas;
+- auditoria de diversidade em Gerar jogos;
+- apostas reais e gestão de lotes em Meus jogos.
+
+O loader reutiliza Promises para evitar downloads duplicados e aguarda a tentativa de carregamento do CSS da feature antes de executar seu módulo, evitando renderização temporariamente sem estilo no caminho normal. Se o stylesheet falhar, o JavaScript ainda é carregado para preservar a funcionalidade.
+
+## Acessibilidade
+
+A fundação visual inclui:
+
+- foco visível consistente para teclado;
+- nomes acessíveis mesmo quando labels ficam visualmente ocultos;
+- alvos interativos de tamanho confortável;
+- escala tipográfica maior para tabelas, labels e metadados;
+- suporte a `prefers-reduced-motion`;
+- navegação mobile sem overflow.
+
+## Cálculo pesado
+
+Backtests e Laboratório preservam os mesmos contratos HTTP, mas o trabalho CPU-bound roda em `worker_threads`, mantendo o event loop disponível para health checks, navegação e outras requisições.
+
+O backtest compacta cada rodada dentro do próprio worker antes de transferi-la à thread HTTP. Assim `generatedGames` e `checks`, usados apenas durante o cálculo, não são clonados nem persistidos.
 
 ## Testes
 
-`tests/web.test.ts` verifica que o mesmo processo serve:
+`npm test` compila backend e testes, gera `web-dist` e valida API, PostgreSQL e assets. O CI também valida o Compose, constrói a imagem Docker de produção e executa smoke test do container.
 
-- o shell HTML;
-- JavaScript da aplicação;
-- CSS;
-- referências aos endpoints principais.
-
-Os testes existentes continuam cobrindo a API e PostgreSQL separadamente.
-
-## Limitações atuais
-
-- sem autenticação/usuários;
-- sem atualização em tempo real;
-- sem gráficos de séries temporais avançados;
-- backtests continuam síncronos;
-- sem camada de interpretação por IA;
-- sem bundle/minificação de assets.
-
-Esses itens ficam para milestones posteriores depois de validarmos o fluxo principal da aplicação.
+Detalhes adicionais em [`PERFORMANCE.md`](PERFORMANCE.md).

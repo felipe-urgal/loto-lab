@@ -82,7 +82,11 @@ async function refineDashboard() {
   } catch {
     return;
   }
-  if (currentView() !== "dashboard" || currentLottery() !== lottery) return;
+  if (
+    currentView() !== "dashboard"
+    || currentLottery() !== lottery
+    || root.querySelector(".real-performance-section")
+  ) return;
 
   const sections = [...root.querySelectorAll(":scope > .stack > section")];
   if (sections.length < 2) return;
@@ -136,6 +140,7 @@ function compactGameMarkup(row, index) {
 
 function openBetForm(card, batchId) {
   card.querySelector(".real-bet-form")?.remove();
+  const lottery = currentLottery();
   const gameRows = [...card.querySelectorAll(".compact-game")];
   const contestInput = card.querySelector(`[data-contest-input="${batchId}"]`);
   const contestNumber = Number(contestInput?.value || 0);
@@ -159,11 +164,12 @@ function openBetForm(card, batchId) {
     const gamePositions = data.getAll("gamePosition").map(Number);
     if (!gamePositions.length) {
       submit.textContent = "Selecione ao menos um jogo";
-      setTimeout(() => { submit.textContent = "Confirmar aposta"; }, 1800);
+      setTimeout(() => { if (submit.isConnected) submit.textContent = "Confirmar aposta"; }, 1800);
       return;
     }
     submit.disabled = true;
     submit.textContent = "Salvando...";
+    form.querySelector("[data-real-bet-error]")?.remove();
     try {
       await api("/real-bets", {
         method: "POST",
@@ -174,13 +180,17 @@ function openBetForm(card, batchId) {
           gamePositions,
         }),
       });
-      cache.delete(currentLottery());
-      document.querySelector("#refresh-view")?.click();
+      cache.delete(lottery);
+      if (form.isConnected && currentView() === "games" && currentLottery() === lottery) {
+        document.querySelector("#refresh-view")?.click();
+      }
     } catch (error) {
+      if (!form.isConnected) return;
       submit.disabled = false;
       submit.textContent = error.code === "REAL_BET_ALREADY_EXISTS" ? "Lote já marcado" : "Tentar novamente";
       const message = document.createElement("p");
       message.className = "form-note";
+      message.dataset.realBetError = "true";
       message.textContent = error.message;
       form.querySelector(".real-bet-form-actions")?.insertAdjacentElement("beforebegin", message);
     }
@@ -202,7 +212,7 @@ async function refineGames() {
 
   const byBatch = new Map((data.items || []).map((bet) => [bet.batchId, bet]));
   for (const card of cards) {
-    if (card.dataset.realBetRefined === "true") continue;
+    if (!card.isConnected || card.dataset.realBetRefined === "true") continue;
     card.dataset.realBetRefined = "true";
     const checkButton = card.querySelector("[data-check-batch]");
     const batchId = Number(checkButton?.dataset.checkBatch);
@@ -247,12 +257,19 @@ function scheduleRefine() {
   }, 0);
 }
 
-if (root) new MutationObserver(scheduleRefine).observe(root, { childList: true, subtree: true });
-window.addEventListener("hashchange", () => {
+function invalidateCurrentLottery() {
   cache.delete(currentLottery());
   scheduleRefine();
-});
+}
+
+if (root) new MutationObserver(scheduleRefine).observe(root, { childList: true, subtree: true });
+window.addEventListener("hashchange", invalidateCurrentLottery);
 lotterySelect?.addEventListener("change", () => {
+  cache.clear();
+  scheduleRefine();
+});
+document.querySelector("#refresh-view")?.addEventListener("click", invalidateCurrentLottery);
+window.addEventListener("loto-lab:data-synced", () => {
   cache.clear();
   scheduleRefine();
 });

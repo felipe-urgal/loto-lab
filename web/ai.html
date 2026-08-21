@@ -8,116 +8,29 @@
     <title>IA · Loto Lab</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/assets/styles.css" />
-    <link rel="stylesheet" href="/assets/refinements.css" />
+    <link rel="stylesheet" href="/assets/ui-foundation.css" />
     <link rel="stylesheet" href="/assets/ai.css" />
   </head>
-  <body>
+  <body data-active-nav="ai">
     <div class="app-shell">
       <aside class="sidebar" aria-label="Navegação principal">
-        <a class="brand" href="/#dashboard" aria-label="Loto Lab - Dashboard">
-          <span class="brand-mark" aria-hidden="true">L</span>
-          <span class="brand-copy"><strong>Loto Lab</strong><small>Strategy console</small></span>
-        </a>
-        <nav class="main-nav">
-          <a class="nav-item" href="/#dashboard">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></span>
-            <span>Dashboard</span>
-          </a>
-          <a class="nav-item" href="/#analysis">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19V3"/><path d="M2 19h20"/></svg></span>
-            <span>Análises</span>
-          </a>
-          <a class="nav-item" href="/#generate">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3Z"/><path d="m19 15 .9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15Z"/></svg></span>
-            <span>Gerar jogos</span>
-          </a>
-          <a class="nav-item" href="/#games">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a3 3 0 0 0 0 6v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a3 3 0 0 0 0-6V6Z"/><path d="M12 7v2M12 11v2M12 15v2"/></svg></span>
-            <span>Meus jogos</span>
-          </a>
-          <a class="nav-item" href="/#backtests">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg></span>
-            <span>Backtests</span>
-          </a>
-          <a class="nav-item" href="/lab">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3h6"/><path d="M10 3v5l-5 9a2.5 2.5 0 0 0 2.2 4h9.6A2.5 2.5 0 0 0 19 17l-5-9V3"/><path d="M8 14h8"/></svg></span>
-            <span>Laboratório</span>
-          </a>
-          <a class="nav-item" href="/agenda">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/><path d="M7 3v3M17 3v3"/></svg></span>
-            <span>Agenda</span>
-          </a>
-          <a class="nav-item is-active" href="/ai" aria-current="page">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a5 5 0 0 0-5 5c0 .7.1 1.3.4 1.9A4.5 4.5 0 0 0 9 18.6V21h6v-2.4a4.5 4.5 0 0 0 1.6-8.7A5 5 0 0 0 12 3Z"/><path d="M9 10h6M10 14h4"/></svg></span>
-            <span>IA</span>
-          </a>
-        </nav>
-        <div class="sidebar-footer">
-          <div class="status-row" id="ai-api-status" aria-live="polite"><span class="status-dot"></span><span>Verificando IA</span></div>
-          <p>Algoritmo calcula.<br />IA interpreta.</p>
-        </div>
+        <a class="brand" href="/#dashboard" aria-label="Loto Lab - Dashboard"><span class="brand-mark" aria-hidden="true">L</span><span class="brand-copy"><strong>Loto Lab</strong><small>Strategy console</small></span></a>
+        <nav class="main-nav" data-shell-nav aria-label="Seções do Loto Lab"></nav>
+        <div class="sidebar-footer"><div class="status-row" id="ai-api-status" aria-live="polite"><span class="status-dot"></span><span>Verificando IA</span></div><p>Algoritmo calcula.<br />IA interpreta.</p></div>
       </aside>
-
       <main class="main-area">
-        <header class="topbar">
-          <div class="topbar-copy">
-            <h1>IA</h1>
-            <p>Interprete evidências calculadas sem transformar frequência em previsão.</p>
-          </div>
-          <div class="topbar-actions">
-            <label class="select-control" for="ai-lottery">
-              <span>Loteria</span>
-              <select id="ai-lottery">
-                <option value="mega-sena">Mega-Sena</option>
-                <option value="lotofacil">Lotofácil</option>
-                <option value="dia-de-sorte">Dia de Sorte</option>
-              </select>
-            </label>
-          </div>
-        </header>
-
-        <section class="content ai-content">
-          <div class="stack">
-            <section class="panel ai-principle">
-              <div><h2>Algoritmo calcula. IA interpreta.</h2><p>A IA recebe um resumo auditável de análise, backtest, Laboratório e apostas reais. Ela não escolhe dezenas nem recalcula métricas.</p></div>
-              <div class="ai-provider-status" id="ai-provider-status">Verificando configuração...</div>
-            </section>
-
-            <section class="panel form-panel">
-              <form id="ai-form">
-                <div class="form-grid ai-form-grid">
-                  <label class="field" for="ai-focus"><span>Foco da interpretação</span>
-                    <select id="ai-focus">
-                      <option value="overview">Visão geral</option>
-                      <option value="analysis">Análise das dezenas</option>
-                      <option value="strategy">Estratégias e backtests</option>
-                      <option value="real-performance">Desempenho real</option>
-                    </select>
-                  </label>
-                </div>
-                <div class="form-actions">
-                  <span class="form-note">A interpretação usa somente fatos calculados e salva o snapshot usado para auditoria.</span>
-                  <button class="button primary" id="ai-run" type="submit">Gerar interpretação</button>
-                </div>
-              </form>
-            </section>
-
-            <section class="panel ai-message" id="ai-message">
-              <strong>Pronto para interpretar</strong>
-              <p>Escolha o foco. Nenhuma interpretação altera a metodologia ou os jogos gerados.</p>
-            </section>
-
-            <section id="ai-result" hidden></section>
-
-            <section>
-              <div class="section-head"><div><h2>Histórico de interpretações</h2><p>Snapshots anteriores da loteria selecionada.</p></div></div>
-              <div class="panel ai-history" id="ai-history"><div class="loading-state"><span class="spinner"></span><span>Carregando histórico...</span></div></div>
-            </section>
-          </div>
-        </section>
+        <header class="topbar"><div class="topbar-copy"><h1>IA</h1><p>Interprete evidências calculadas sem transformar frequência em previsão.</p></div><div class="topbar-actions"><label class="select-control" for="ai-lottery"><span>Loteria</span><select id="ai-lottery"><option value="mega-sena">Mega-Sena</option><option value="lotofacil">Lotofácil</option><option value="dia-de-sorte">Dia de Sorte</option></select></label></div></header>
+        <section class="content ai-content"><div class="stack">
+          <section class="panel ai-principle"><div><h2>Algoritmo calcula. IA interpreta.</h2><p>A IA recebe um resumo auditável de análise, backtest, Laboratório e apostas reais. Ela não escolhe dezenas nem recalcula métricas.</p></div><div class="ai-provider-status" id="ai-provider-status">Verificando configuração...</div></section>
+          <section class="panel form-panel"><form id="ai-form"><div class="form-grid ai-form-grid"><label class="field" for="ai-focus"><span>Foco da interpretação</span><select id="ai-focus"><option value="overview">Visão geral</option><option value="analysis">Análise das dezenas</option><option value="strategy">Estratégias e backtests</option><option value="real-performance">Desempenho real</option></select></label></div><div class="form-actions"><span class="form-note">A interpretação usa somente fatos calculados e salva o snapshot usado para auditoria.</span><button class="button primary" id="ai-run" type="submit">Gerar interpretação</button></div></form></section>
+          <section class="panel ai-message" id="ai-message"><strong>Pronto para interpretar</strong><p>Escolha o foco. Nenhuma interpretação altera a metodologia ou os jogos gerados.</p></section>
+          <section id="ai-result" hidden></section>
+          <section><div class="section-head"><div><h2>Histórico de interpretações</h2><p>Snapshots anteriores da loteria selecionada.</p></div></div><div class="panel ai-history" id="ai-history"><div class="loading-state"><span class="spinner"></span><span>Carregando histórico...</span></div></div></section>
+        </div></section>
       </main>
     </div>
     <div class="toast-root" id="toast-root" aria-live="assertive"></div>
+    <script type="module" src="/assets/shell.js"></script>
     <script type="module" src="/assets/ai.js"></script>
   </body>
 </html>

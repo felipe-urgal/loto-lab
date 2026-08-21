@@ -41,20 +41,23 @@ async function api(path, options = {}) {
   return payload;
 }
 
-async function loadManagement(force = false) {
+function loadManagement(force = false) {
   const lottery = currentLottery();
   if (force || !managementCache || managementCache.lottery !== lottery) {
-    const data = await api(`/game-batches/manage/${lottery}?scope=all&limit=200`);
-    managementCache = { lottery, data };
+    const pending = api(`/game-batches/manage/${lottery}?scope=all&limit=200`).catch((error) => {
+      if (managementCache?.promise === pending) managementCache = undefined;
+      throw error;
+    });
+    managementCache = { lottery, promise: pending };
   }
-  return managementCache.data;
+  return managementCache.promise;
 }
 
 function batchSignature(batch) {
   const games = (batch.games || []).map((game) => {
     const numbers = [...(game.numbers || [])].sort((a, b) => a - b).join("-");
     return `${numbers}:${game.luckyMonth || ""}`;
-  }).join("|");
+  }).sort().join("|");
   return `${batch.targetContestNumber || 0}:${games}`;
 }
 
@@ -111,13 +114,19 @@ function bindCardControls(stack, metadata) {
     const actions = card.querySelector(".batch-actions");
     if (!actions) return;
 
+    const games = card.querySelector(".batch-games");
+    if (games && !games.id) games.id = `batch-games-${batchId}`;
+
     const toggle = document.createElement("button");
     toggle.className = "button compact ghost batch-toggle";
     toggle.type = "button";
     toggle.textContent = "Ver jogos";
+    toggle.setAttribute("aria-expanded", "false");
+    if (games?.id) toggle.setAttribute("aria-controls", games.id);
     toggle.addEventListener("click", () => {
       const collapsed = card.classList.toggle("is-collapsed");
       toggle.textContent = collapsed ? "Ver jogos" : "Ocultar jogos";
+      toggle.setAttribute("aria-expanded", String(!collapsed));
     });
     actions.prepend(toggle);
 
@@ -162,7 +171,12 @@ async function enhanceGames() {
   } catch {
     return;
   }
-  if (currentView() !== "games" || currentLottery() !== lottery || !stack.isConnected) return;
+  if (
+    currentView() !== "games"
+    || currentLottery() !== lottery
+    || !stack.isConnected
+    || stack.dataset.gamesManagement === "true"
+  ) return;
 
   stack.dataset.gamesManagement = "true";
   const metadata = new Map((data.items || []).map((batch) => [batch.id, batch]));
@@ -185,11 +199,11 @@ async function enhanceGames() {
       <p>Mostramos os lotes recentes de forma compacta. Arquivar não apaga histórico e pode ser desfeito.</p>
     </div>
     <div class="my-games-management-row">
-      <div class="batch-filter-tabs" role="tablist" aria-label="Filtrar lotes">
-        <button class="batch-filter is-active" type="button" data-batch-filter="active">Ativos <span>${activeCount}</span></button>
-        <button class="batch-filter" type="button" data-batch-filter="real">Apostados <span>${realCount}</span></button>
-        <button class="batch-filter" type="button" data-batch-filter="generated">Só gerados <span>${generatedCount}</span></button>
-        <button class="batch-filter" type="button" data-batch-filter="archived">Arquivados <span>${archivedCount}</span></button>
+      <div class="batch-filter-tabs" role="group" aria-label="Filtrar lotes">
+        <button class="batch-filter is-active" type="button" data-batch-filter="active" aria-pressed="true">Ativos <span>${activeCount}</span></button>
+        <button class="batch-filter" type="button" data-batch-filter="real" aria-pressed="false">Apostados <span>${realCount}</span></button>
+        <button class="batch-filter" type="button" data-batch-filter="generated" aria-pressed="false">Só gerados <span>${generatedCount}</span></button>
+        <button class="batch-filter" type="button" data-batch-filter="archived" aria-pressed="false">Arquivados <span>${archivedCount}</span></button>
       </div>
       <div class="batch-management-actions">
         <input class="batch-search" type="search" placeholder="Lote ou concurso" aria-label="Buscar lote ou concurso" />
@@ -236,7 +250,11 @@ async function enhanceGames() {
 
   toolbar.querySelectorAll("[data-batch-filter]").forEach((button) => button.addEventListener("click", () => {
     filter = button.dataset.batchFilter;
-    toolbar.querySelectorAll("[data-batch-filter]").forEach((item) => item.classList.toggle("is-active", item === button));
+    toolbar.querySelectorAll("[data-batch-filter]").forEach((item) => {
+      const selected = item === button;
+      item.classList.toggle("is-active", selected);
+      item.setAttribute("aria-pressed", String(selected));
+    });
     apply();
   }));
   search.addEventListener("input", apply);
@@ -274,13 +292,14 @@ function scheduleEnhance() {
   }, 0);
 }
 
+function invalidateManagement() {
+  managementCache = undefined;
+  scheduleEnhance();
+}
+
 if (root) new MutationObserver(scheduleEnhance).observe(root, { childList: true, subtree: true });
-window.addEventListener("hashchange", () => {
-  managementCache = undefined;
-  scheduleEnhance();
-});
-lotterySelect?.addEventListener("change", () => {
-  managementCache = undefined;
-  scheduleEnhance();
-});
+window.addEventListener("hashchange", invalidateManagement);
+lotterySelect?.addEventListener("change", invalidateManagement);
+document.querySelector("#refresh-view")?.addEventListener("click", invalidateManagement);
+window.addEventListener("loto-lab:data-synced", invalidateManagement);
 scheduleEnhance();

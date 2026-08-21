@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import {
-  compareStrategyLab,
-  type StrategyLabExperiment,
+import type {
+  StrategyLabExperiment,
+  StrategyLabOptions,
 } from "../lab/strategyLab.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import type { ApiServerOptions } from "./app.js";
@@ -15,6 +15,7 @@ import {
 } from "./http.js";
 import { enforceRateLimit, FixedWindowRateLimiter } from "./rateLimit.js";
 import { expensiveAnalysisGate } from "./workGate.js";
+import { runStrategyLabInWorker } from "./workerClient.js";
 
 const labLimiter = new FixedWindowRateLimiter({ limit: 4, windowMs: 10 * 60_000 });
 
@@ -89,7 +90,7 @@ export async function serveStrategyLab(
         );
       }
 
-      const result = compareStrategyLab(contests, {
+      const workerInput: StrategyLabOptions = {
         lottery,
         experiment,
         gameCount,
@@ -98,7 +99,8 @@ export async function serveStrategyLab(
         bucketSize,
         ...(startContest !== undefined ? { startContest } : {}),
         ...(endContest !== undefined ? { endContest } : {}),
-      });
+      };
+      const result = await runStrategyLabInWorker(contests, workerInput);
 
       sendJson(response, 200, result, corsOrigin);
       return true;

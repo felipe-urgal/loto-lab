@@ -2,13 +2,7 @@ import { createServer, type Server } from "node:http";
 import { createApiRequestHandler, type ApiServerOptions } from "./app.js";
 import type { AiInterpretationProvider } from "../ai/types.js";
 import type { ContestSource } from "../data/source.js";
-import { serveDataStatus } from "./dataStatus.js";
-import { serveStrategyLab } from "./strategyLab.js";
-import { serveRealBets } from "./realBets.js";
-import { serveGameBatchManagement } from "./gameBatchManagement.js";
-import { serveAiInsights } from "./aiInsights.js";
-import { serveOperations } from "./operations.js";
-import { serveAgenda } from "./agenda.js";
+import { serveFeatureRoutes } from "./routes.js";
 import { serveWebAsset } from "./web.js";
 import { loadAppAuthConfig, requireAppAuthentication } from "./auth.js";
 
@@ -35,14 +29,8 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
         return;
       }
 
-      if (await serveDataStatus(request, response, options)) return;
-      if (await serveStrategyLab(request, response, options)) return;
-      if (await serveRealBets(request, response, options)) return;
-      if (await serveGameBatchManagement(request, response, options)) return;
-      if (await serveAiInsights(request, response, options)) return;
-      if (await serveOperations(request, response, options)) return;
-      if (await serveAgenda(request, response, options)) return;
-      if (method === "GET" && await serveWebAsset(url.pathname, response)) return;
+      if (await serveFeatureRoutes(request, response, options)) return;
+      if ((method === "GET" || method === "HEAD") && await serveWebAsset(url, response, method === "HEAD")) return;
       apiHandler(request, response);
     } catch (error) {
       console.error("Loto Lab web request failed", error);

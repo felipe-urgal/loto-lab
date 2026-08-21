@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import type { Pool } from "pg";
 import { createLotoLabServer } from "../src/api/server.js";
 
-test("UI refinement assets are served for the main app and strategy lab", async (t) => {
+test("UI refinement assets are lazy-loaded for the main app and served for strategy lab", async (t) => {
   const server = createLotoLabServer({ pool: {} as Pool });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -19,8 +19,16 @@ test("UI refinement assets are served for the main app and strategy lab", async 
   const page = await fetch(`${baseUrl}/`);
   assert.equal(page.status, 200);
   const html = await page.text();
-  assert.match(html, /refinements\.css/);
-  assert.match(html, /refinements\.js/);
+  assert.doesNotMatch(html, /<link[^>]+refinements\.css/);
+  assert.doesNotMatch(html, /<script[^>]+refinements\.js/);
+  assert.match(html, /feature-loader\.js/);
+
+  const loader = await fetch(`${baseUrl}/assets/feature-loader.js`);
+  assert.equal(loader.status, 200);
+  const loaderSource = await loader.text();
+  assert.match(loaderSource, /loadStyledModule\("refinements"\)/);
+  assert.match(loaderSource, /await loadStyle\(name\)/);
+  assert.match(loaderSource, /return loadModule\(name\)/);
 
   const app = await fetch(`${baseUrl}/assets/app.js`);
   assert.equal(app.status, 200);

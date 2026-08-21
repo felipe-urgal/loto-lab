@@ -20,11 +20,19 @@ function currentLottery() {
   return lotterySelect?.value || "mega-sena";
 }
 
-async function getLatest(lottery) {
+function getLatest(lottery, force = false) {
+  if (force) latestCache.delete(lottery);
   if (!latestCache.has(lottery)) {
-    latestCache.set(lottery, fetch(`/api/v1/contests/${lottery}/latest`)
-      .then(async (response) => response.ok ? response.json() : undefined)
-      .catch(() => undefined));
+    const pending = fetch(`/api/v1/contests/${lottery}/latest`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .catch(() => {
+        latestCache.delete(lottery);
+        return undefined;
+      });
+    latestCache.set(lottery, pending);
   }
   return latestCache.get(lottery);
 }
@@ -39,20 +47,25 @@ function tierBadgeClass(tier) {
 
 async function refineAnalysis() {
   const table = root?.querySelector(".table-wrap table");
-  if (!table || table.dataset.analysisRefined === "true") return;
-  table.dataset.analysisRefined = "true";
+  if (!table || table.dataset.analysisRefined === "true" || table.dataset.analysisRefined === "loading") return;
+  table.dataset.analysisRefined = "loading";
 
   const lottery = currentLottery();
   let data;
   try {
     const response = await fetch(`/api/v1/analysis/${lottery}`);
-    if (!response.ok) return;
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     data = await response.json();
   } catch {
+    if (table.isConnected) delete table.dataset.analysisRefined;
     return;
   }
 
-  if (currentView() !== "analysis" || currentLottery() !== lottery || !table.isConnected) return;
+  if (currentView() !== "analysis" || currentLottery() !== lottery || !table.isConnected) {
+    if (table.isConnected) delete table.dataset.analysisRefined;
+    return;
+  }
+  table.dataset.analysisRefined = "true";
 
   const topByScore = new Set([...data.numbers]
     .sort((a, b) => b.score - a.score || a.number - b.number)
@@ -195,7 +208,7 @@ async function refineGames() {
   }
 
   for (const card of cards) {
-    if (card.dataset.pendingRefined === "true") continue;
+    if (!card.isConnected || card.dataset.pendingRefined === "true") continue;
     card.dataset.pendingRefined = "true";
     const input = card.querySelector("[data-contest-input]");
     const button = card.querySelector("[data-check-batch]");
@@ -270,7 +283,15 @@ if (root) {
 }
 window.addEventListener("hashchange", scheduleRefine);
 lotterySelect?.addEventListener("change", () => {
+  latestCache.clear();
+  scheduleRefine();
+});
+document.querySelector("#refresh-view")?.addEventListener("click", () => {
   latestCache.delete(currentLottery());
+  scheduleRefine();
+});
+window.addEventListener("loto-lab:data-synced", () => {
+  latestCache.clear();
   scheduleRefine();
 });
 scheduleRefine();
