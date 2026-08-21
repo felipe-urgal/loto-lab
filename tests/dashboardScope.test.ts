@@ -19,6 +19,8 @@ test("dashboard scope keeps comparison mode separate from the active lottery", a
   assert.match(scopeSource, /localStorage\.getItem\(LOTTERY_KEY\)/);
   assert.match(scopeSource, /loadAllData/);
   assert.match(scopeSource, /loadFocusedData/);
+  assert.match(scopeSource, /nextContestNumber/);
+  assert.match(scopeSource, /Number\.isFinite\(numeric\) \? numeric \+ 1 : null/);
   assert.match(scopeSource, /\/backtests\/\$\{lottery\}\?limit=1/);
   assert.match(scopeSource, /\/real-bets\/\$\{lottery\}\?limit=50/);
   assert.match(scopeSource, /\/game-batches\/\$\{lottery\}\?limit=3/);
