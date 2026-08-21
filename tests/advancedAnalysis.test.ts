@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { Contest, LotteryId } from "../src/domain/types.js";
-import { buildAdvancedAnalysis, combination, hypergeometricDistribution } from "../src/analysis/advanced.js";
+import {
+  buildAdvancedAnalysis,
+  combination,
+  exactBinomialTwoSidedP,
+  hypergeometricDistribution,
+} from "../src/analysis/advanced.js";
 import { getLotteryConfig } from "../src/lotteries/config.js";
 
 function syntheticContests(lottery: LotteryId, count: number): Contest[] {
@@ -41,10 +46,23 @@ test("combinatorial helpers reproduce known lottery universe sizes and overlap m
   assert.ok(megaNaturalRange > 0.98);
 });
 
+test("rare Mega-Sena triples use an exact binomial p-value before Bonferroni", () => {
+  const trials = 3047;
+  const tripleProbability = combination(6, 3) / combination(60, 3);
+  const exactNine = exactBinomialTwoSidedP(9, trials, tripleProbability);
+  const exactTen = exactBinomialTwoSidedP(10, trials, tripleProbability);
+
+  assert.ok(exactNine > 0.00009 && exactNine < 0.00012);
+  assert.equal(Math.min(1, exactNine * combination(60, 3)), 1);
+  assert.ok(exactTen > 0.000015 && exactTen < 0.00002);
+  assert.ok(Math.min(1, exactTen * combination(60, 3)) > 0.5);
+});
+
 test("advanced Lotofacil analysis compares observed structure with exact mathematical baselines", () => {
   const result = buildAdvancedAnalysis(syntheticContests("lotofacil", 80), getLotteryConfig("lotofacil"));
 
   assert.equal(result.model.baseline, "uniform-without-replacement");
+  assert.equal(result.dataQuality.continuous, true);
   assert.equal(result.ranking.dynamics.items.length, 25);
   assert.equal(result.ranking.dynamics.items[0]?.weightRobustness.scenarioCount, 243);
   assert.equal(result.structure.metrics.repeated.expectedMean, 9);
@@ -52,9 +70,9 @@ test("advanced Lotofacil analysis compares observed structure with exact mathema
   assert.equal(result.structure.metrics.frame?.expectedMean, 9.6);
   assert.ok((result.structure.metrics.odd.expectedMean ?? 0) > 7.7);
   assert.ok((result.structure.metrics.odd.expectedMean ?? 0) < 7.9);
-  assert.equal(result.structure.methodologyFilter.exactUniverse.total, 3_268_760);
-  assert.ok(result.structure.methodologyFilter.exactUniverse.coverage > 0);
-  assert.ok(result.structure.methodologyFilter.exactUniverse.coverage < 1);
+  assert.equal(result.structure.methodologyFilter.exactUniverse?.total, 3_268_760);
+  assert.ok((result.structure.methodologyFilter.exactUniverse?.coverage ?? 0) > 0);
+  assert.ok((result.structure.methodologyFilter.exactUniverse?.coverage ?? 1) < 1);
   assert.deepEqual(result.structure.methodologyFilter.rules.repeated, {
     min: 7,
     max: 11,
@@ -63,6 +81,7 @@ test("advanced Lotofacil analysis compares observed structure with exact mathema
   });
 
   assert.equal(result.combinations.pairs.length, 300);
+  assert.equal(result.combinations.methodology.test, "exact-binomial-two-sided");
   assert.equal(result.combinations.methodology.pairComparisons, 300);
   assert.equal(result.combinations.methodology.tripleComparisons, 2300);
   assert.ok(result.similarity.closest.length > 0);
@@ -70,18 +89,40 @@ test("advanced Lotofacil analysis compares observed structure with exact mathema
   assert.equal(result.validation.availableRounds, 60);
   assert.equal(result.validation.periods[0]?.rounds, 60);
   assert.equal(result.validation.methodology.leakageProtection, true);
+  assert.equal(result.validation.methodology.correction, "bonferroni-9-tests");
   assert.equal(
     result.validation.periods[0]?.tiers.reduce((sum, tier) => sum + tier.observedHits, 0),
     60 * 15,
   );
 });
 
-test("advanced analysis degrades safely with no history", () => {
+test("sequence-dependent metrics do not bridge missing contest numbers", () => {
+  const contests = syntheticContests("lotofacil", 80).filter((contest) => contest.number !== 1078);
+  const result = buildAdvancedAnalysis(contests, getLotteryConfig("lotofacil"));
+
+  assert.equal(result.dataQuality.continuous, false);
+  assert.equal(result.dataQuality.missingContestCount, 1);
+  assert.equal(result.dataQuality.latestContinuousContests, 1);
+  assert.deepEqual(result.dataQuality.gaps.at(-1), { after: 1077, before: 1079, missing: 1 });
+  assert.equal(result.structure.metrics.repeated.current, null);
+  assert.equal(result.structure.methodologyFilter.historical.total, 77);
+  assert.equal(result.validation.availableRounds, 0);
+  assert.equal(result.validation.sourceContests, 1);
+  assert.equal(result.dynamics.cycles.available, false);
+});
+
+test("advanced analysis exposes unavailable values instead of fake zeros with no history", () => {
   const result = buildAdvancedAnalysis([], getLotteryConfig("mega-sena"));
   assert.equal(result.latestContest, null);
   assert.equal(result.historySize, 0);
+  assert.equal(result.dataQuality.continuous, true);
   assert.equal(result.ranking.dynamics.items.length, 60);
   assert.equal(result.validation.availableRounds, 0);
   assert.equal(result.dynamics.heatmap.length, 0);
   assert.equal(result.structure.current, null);
+  assert.equal(result.structure.methodologyFilter.exactUniverse, null);
+  assert.equal(result.structure.methodologyFilter.historical.coverage, null);
+  assert.equal(result.ranking.dynamics.items[0]?.delay.current, null);
+  assert.equal(result.ranking.dynamics.items[0]?.weightRobustness.scenarioCount, 0);
+  assert.equal(result.dynamics.cycles.available, false);
 });
