@@ -35,6 +35,7 @@ export class AnalysisJobManager {
   private running?: Promise<void>;
   private stopped = false;
   private retryTimer?: NodeJS.Timeout;
+  private rerunRequested = false;
   private readonly activeControllers = new Map<number, AbortController>();
   private readonly explicitCancels = new Set<number>();
 
@@ -83,9 +84,16 @@ export class AnalysisJobManager {
   }
 
   private kick(): void {
-    if (this.stopped || this.running) return;
+    if (this.stopped) return;
+    if (this.running) {
+      this.rerunRequested = true;
+      return;
+    }
+
+    this.rerunRequested = false;
     this.running = this.drain().finally(() => {
       this.running = undefined;
+      if (this.rerunRequested && !this.stopped) this.kick();
     });
   }
 
@@ -152,6 +160,7 @@ export class AnalysisJobManager {
 
   async stopAndDrain(): Promise<void> {
     this.stopped = true;
+    this.rerunRequested = false;
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);
       this.retryTimer = undefined;
