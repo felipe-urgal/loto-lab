@@ -30,12 +30,18 @@ function currentScope() {
 }
 
 function statusCopy(operations, items, scope) {
+  const latestStatus = operations?.latest?.status;
+  const running = latestStatus === "running";
+  const latestFailed = latestStatus && !["success", "running"].includes(latestStatus);
   const stale = Boolean(operations?.stale);
-  const latestFailed = operations?.latest && operations.latest.status !== "success";
   const missing = items.reduce((total, item) => total + Number(item.missingContestCount || 0), 0);
-  const warning = stale || latestFailed || missing > 0;
+  const warning = !running && (stale || latestFailed || missing > 0);
   const age = formatAge(operations?.ageMinutes);
-  const title = warning ? "Dados precisam de atenção" : `Dados atualizados ${age}`;
+  const title = running
+    ? "Sincronização em andamento"
+    : warning
+      ? "Dados precisam de atenção"
+      : `Dados atualizados ${age}`;
 
   if (scope !== "all") {
     const item = items[0];
@@ -51,13 +57,10 @@ function statusCopy(operations, items, scope) {
   }
 
   const contests = items.reduce((total, item) => total + Number(item.contestCount || 0), 0);
-  const coverage = items.length
-    ? items.reduce((total, item) => total + Number(item.financialCoverage || 0), 0) / items.length
-    : 0;
   return {
     warning,
     title,
-    detail: `${items.length} loterias · ${formatCount(contests)} concursos · cobertura média ${formatPercent(coverage)}`,
+    detail: `${items.length} loterias · ${formatCount(contests)} concursos`,
   };
 }
 
