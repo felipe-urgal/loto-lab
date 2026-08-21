@@ -28,7 +28,7 @@ coverage
 # nyc test coverage
 .nyc_output
 
-# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-files)
 .grunt
 
 # Bower dependency directory (https://bower.io/)
@@ -85,6 +85,7 @@ out
 # Nuxt.js build / generate output
 .nuxt
 dist
+web-dist/
 .output
 
 # Gatsby files
@@ -112,7 +113,7 @@ dist
 .serverless/
 
 # FuseBox cache
-.fusebox/
+.fusebox
 
 # DynamoDB Local files
 .dynamodb/
