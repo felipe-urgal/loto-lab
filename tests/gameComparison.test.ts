@@ -52,6 +52,25 @@ test("batch comparison highlights matches and summarizes the best game per conte
   assert.equal(serialized.includes("netResult"), false);
 });
 
+test("empty comparison remains a valid result while contest history is unavailable", () => {
+  const input = batch("lotofacil", [{
+    lottery: "lotofacil",
+    numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    fixedNumbers: [1, 2, 3, 4, 5, 6, 7, 8],
+    variableNumbers: [9, 10, 11, 12, 13, 14, 15],
+    metadata: { odd: 8, even: 7, sum: 120, repeatedFromLastContest: [] },
+  }]);
+
+  const result = buildBatchComparison(input, []);
+
+  assert.deepEqual(result.items, []);
+  assert.equal(result.summary.contestCount, 0);
+  assert.equal(result.summary.bestHits, 0);
+  assert.equal(result.summary.averageBestHits, 0);
+  assert.equal(result.summary.bestContestNumber, undefined);
+  assert.equal(result.drawSize, 15);
+});
+
 test("Lotofacil comparison preserves the 15-number game denominator and exact matches", () => {
   const input = batch("lotofacil", [{
     lottery: "lotofacil",
