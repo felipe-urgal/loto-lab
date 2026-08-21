@@ -1,3 +1,5 @@
+import { api, escapeHtml, formatDateTime, onViewRendered } from "./runtime.js";
+
 const root = document.querySelector("#content");
 const lotterySelect = document.querySelector("#lottery-select");
 let scheduled = false;
@@ -9,36 +11,6 @@ function currentView() {
 
 function currentLottery() {
   return lotterySelect?.value || "mega-sena";
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function formatDateTime(value) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
-}
-
-async function api(path, options = {}) {
-  const response = await fetch(`/api/v1${path}`, {
-    ...options,
-    headers: options.body
-      ? { "Content-Type": "application/json", ...(options.headers || {}) }
-      : options.headers,
-  });
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = new Error(payload?.error?.message || `Erro HTTP ${response.status}`);
-    error.code = payload?.error?.code || "HTTP_ERROR";
-    throw error;
-  }
-  return payload;
 }
 
 function loadManagement(force = false) {
@@ -294,12 +266,13 @@ function scheduleEnhance() {
 
 function invalidateManagement() {
   managementCache = undefined;
-  scheduleEnhance();
 }
 
-if (root) new MutationObserver(scheduleEnhance).observe(root, { childList: true, subtree: true });
-window.addEventListener("hashchange", invalidateManagement);
+onViewRendered(scheduleEnhance);
 lotterySelect?.addEventListener("change", invalidateManagement);
 document.querySelector("#refresh-view")?.addEventListener("click", invalidateManagement);
-window.addEventListener("loto-lab:data-synced", invalidateManagement);
+window.addEventListener("loto-lab:data-synced", () => {
+  invalidateManagement();
+  scheduleEnhance();
+});
 scheduleEnhance();
