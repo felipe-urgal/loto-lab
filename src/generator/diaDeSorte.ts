@@ -1,6 +1,7 @@
 import type { Contest, GeneratedGame } from "../domain/types.js";
 import { buildNumberAnalysis } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
+import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
 import {
   buildMetadata,
   combinationIterator,
@@ -21,6 +22,10 @@ export interface DiaDeSorteGeneratorOptions {
   fixedCount?: DiaDeSorteFixedCount;
   generationMode?: GenerationMode;
   seed?: string;
+  fixedNumbers?: number[];
+  excludedNumbers?: number[];
+  constraints?: GenerationConstraints;
+  referenceContestNumber?: number | null;
 }
 
 const LUCKY_MONTHS = [
@@ -75,19 +80,27 @@ interface NormalizedDiaDeSorteGeneratorOptions {
   fixedCount: DiaDeSorteFixedCount;
   generationMode: GenerationMode;
   seed?: string;
+  fixedNumbers: number[];
+  excludedNumbers: number[];
+  constraints?: GenerationConstraints;
+  referenceContestNumber?: number | null;
 }
 
 function normalizeOptions(
   value: number | DiaDeSorteGeneratorOptions,
 ): NormalizedDiaDeSorteGeneratorOptions {
   if (typeof value === "number") {
-    return { gameCount: value, fixedCount: 3, generationMode: "deterministic" };
+    return { gameCount: value, fixedCount: 3, generationMode: "deterministic", fixedNumbers: [], excludedNumbers: [] };
   }
   return {
     gameCount: value.gameCount ?? 2,
     fixedCount: value.fixedCount ?? 3,
     generationMode: value.generationMode ?? "deterministic",
     ...(value.seed !== undefined ? { seed: value.seed } : {}),
+    fixedNumbers: value.fixedNumbers ?? [],
+    excludedNumbers: value.excludedNumbers ?? [],
+    ...(value.constraints !== undefined ? { constraints: value.constraints } : {}),
+    ...(value.referenceContestNumber !== undefined ? { referenceContestNumber: value.referenceContestNumber } : {}),
   };
 }
 
@@ -95,20 +108,39 @@ export function generateDiaDeSorteGames(
   contests: Contest[],
   options: number | DiaDeSorteGeneratorOptions = 2,
 ): GeneratedGame[] {
-  const { gameCount, fixedCount, generationMode, seed } = normalizeOptions(options);
+  const {
+    gameCount,
+    fixedCount,
+    generationMode,
+    seed,
+    fixedNumbers: manualFixed,
+    excludedNumbers,
+    constraints,
+    referenceContestNumber,
+  } = normalizeOptions(options);
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
   }
   if (![0, 2, 3].includes(fixedCount)) {
     throw new Error("Dia de Sorte fixedCount must be 0, 2 or 3");
   }
+  if (manualFixed.length > fixedCount) {
+    throw new Error("Manual fixed numbers exceed the configured fixed core");
+  }
 
   const random = generationRandom(generationMode, seed);
   const scoped = contests
     .filter((contest) => contest.lottery === "dia-de-sorte")
     .sort((a, b) => a.number - b.number);
-  const lastContest = scoped.at(-1);
+  const lastContest = referenceContestNumber === undefined
+    ? scoped.at(-1)
+    : referenceContestNumber === null
+      ? undefined
+      : scoped.find((contest) => contest.number === referenceContestNumber);
   const analysis = buildNumberAnalysis(scoped, config);
+  if (fixedCount === 0 && manualFixed.length > 0) {
+    throw new Error("Manual fixed numbers require a fixed core");
+  }
   const fixedNumbers = fixedCount === 0
     ? []
     : selectProfiledFixedNumbers(
@@ -117,13 +149,16 @@ export function generateDiaDeSorteGames(
       lastContest,
       Math.min(1, fixedCount),
       random,
+      manualFixed,
+      excludedNumbers,
     );
   const fixedSet = new Set(fixedNumbers);
+  const excludedSet = new Set(excludedNumbers);
   const scores = scoreMap(analysis);
   const variableCount = config.drawSize - fixedCount;
   const poolSize = fixedCount === 0 ? 13 : fixedCount === 2 ? 14 : 18;
   const candidatePool = analysis
-    .filter((row) => !fixedSet.has(row.number))
+    .filter((row) => !fixedSet.has(row.number) && !excludedSet.has(row.number))
     .sort((a, b) => b.score - a.score || a.number - b.number)
     .slice(0, poolSize)
     .map((row) => row.number);
@@ -141,6 +176,16 @@ export function generateDiaDeSorteGames(
       for (const variableNumbers of combinationIterator(candidatePool, variableCount)) {
         const numbers = [...fixedNumbers, ...variableNumbers].sort((a, b) => a - b);
         const metadata = buildMetadata(numbers, lastContest);
+        const game: GeneratedGame = {
+          lottery: "dia-de-sorte",
+          numbers,
+          fixedNumbers,
+          variableNumbers,
+          luckyMonth: luckyMonths[gameIndex % luckyMonths.length],
+          metadata,
+        };
+        if (!matchesGenerationConstraints(game, constraints)) continue;
+
         const variableScore = variableNumbers.reduce(
           (total, number) => total + (scores.get(number) ?? 0),
           0,
@@ -178,7 +223,7 @@ export function generateDiaDeSorteGames(
         a.numbers.join("-").localeCompare(b.numbers.join("-")),
     );
     const winner = selectRankedCandidate(ranked, generationMode, random, 6);
-    if (!winner) throw new Error("Unable to generate a Dia de Sorte game");
+    if (!winner) throw new Error("Unable to generate a Dia de Sorte game with the requested constraints");
 
     for (const number of winner.variableNumbers) {
       usedVariables.set(number, (usedVariables.get(number) ?? 0) + 1);

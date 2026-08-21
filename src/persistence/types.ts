@@ -1,4 +1,5 @@
 import type { GeneratedGame, LotteryId } from "../domain/types.js";
+import type { GenerationPlan } from "../generator/planning.js";
 
 export interface StrategyVersionRecord {
   id: number;
@@ -50,6 +51,34 @@ export interface SaveGeneratedGameBatchInput {
   targetContestNumber?: number;
   generatorOptions?: Record<string, unknown>;
   games: GeneratedGame[];
+}
+
+export interface GenerationPreviewRecord {
+  previewId: string;
+  lottery: LotteryId;
+  seed: string;
+  targetContestNumber?: number;
+  historySignature: string;
+  configSignature: string;
+  gameFingerprint: string;
+  generatorOptions: Record<string, unknown>;
+  games: GeneratedGame[];
+  plan: GenerationPlan;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface SaveGenerationPreviewInput {
+  previewId: string;
+  lottery: LotteryId;
+  seed: string;
+  targetContestNumber?: number;
+  historySignature: string;
+  configSignature: string;
+  gameFingerprint: string;
+  generatorOptions: Record<string, unknown>;
+  games: GeneratedGame[];
+  plan: GenerationPlan;
 }
 
 export interface BacktestRoundArtifact {

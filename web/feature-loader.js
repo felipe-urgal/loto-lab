@@ -71,7 +71,9 @@ async function ensureViewFeatures() {
   await loadStyledModule("refinements");
 
   if (view === "generate") {
-    await loadStyledModule("generation-diversity");
+    // Generator 2.0 owns the advanced workspace. The basic generator rendered
+    // by app.js remains the fallback when this optional module cannot mount.
+    await loadStyledModule("generation-v2");
   } else if (view === "games") {
     await Promise.all([
       loadStyle("real-bets"),

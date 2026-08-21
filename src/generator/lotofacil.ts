@@ -1,6 +1,7 @@
 import type { Contest, GeneratedGame } from "../domain/types.js";
 import { buildNumberAnalysis } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
+import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
 import {
   buildMetadata,
   combinationIterator,
@@ -20,6 +21,10 @@ export interface LotofacilGeneratorOptions {
   fixedCount?: 8 | 9 | 10;
   generationMode?: GenerationMode;
   seed?: string;
+  fixedNumbers?: number[];
+  excludedNumbers?: number[];
+  constraints?: GenerationConstraints;
+  referenceContestNumber?: number | null;
 }
 
 export function generateLotofacilGames(
@@ -30,6 +35,8 @@ export function generateLotofacilGames(
   const fixedCount = options.fixedCount ?? 8;
   const generationMode = options.generationMode ?? "deterministic";
   const random = generationRandom(generationMode, options.seed);
+  const manualFixed = options.fixedNumbers ?? [];
+  const excludedNumbers = options.excludedNumbers ?? [];
 
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
@@ -37,11 +44,18 @@ export function generateLotofacilGames(
   if (![8, 9, 10].includes(fixedCount)) {
     throw new Error("Lotofacil fixedCount must be 8, 9 or 10");
   }
+  if (manualFixed.length > fixedCount) {
+    throw new Error("Manual fixed numbers exceed the configured fixed core");
+  }
 
   const scoped = contests
     .filter((contest) => contest.lottery === "lotofacil")
     .sort((a, b) => a.number - b.number);
-  const lastContest = scoped.at(-1);
+  const lastContest = options.referenceContestNumber === undefined
+    ? scoped.at(-1)
+    : options.referenceContestNumber === null
+      ? undefined
+      : scoped.find((contest) => contest.number === options.referenceContestNumber);
   const analysis = buildNumberAnalysis(scoped, config);
   const fixedNumbers = selectProfiledFixedNumbers(
     analysis,
@@ -49,12 +63,15 @@ export function generateLotofacilGames(
     lastContest,
     fixedCount,
     random,
+    manualFixed,
+    excludedNumbers,
   );
   const fixedSet = new Set(fixedNumbers);
+  const excludedSet = new Set(excludedNumbers);
   const scores = scoreMap(analysis);
   const variableCount = config.drawSize - fixedCount;
   const candidatePool = analysis
-    .filter((row) => !fixedSet.has(row.number))
+    .filter((row) => !fixedSet.has(row.number) && !excludedSet.has(row.number))
     .sort((a, b) => b.score - a.score || a.number - b.number)
     .map((row) => row.number);
 
@@ -71,6 +88,15 @@ export function generateLotofacilGames(
       for (const variableNumbers of combinationIterator(candidatePool, variableCount)) {
         const numbers = [...fixedNumbers, ...variableNumbers].sort((a, b) => a - b);
         const metadata = buildMetadata(numbers, lastContest, true);
+        const game: GeneratedGame = {
+          lottery: "lotofacil",
+          numbers,
+          fixedNumbers,
+          variableNumbers,
+          metadata,
+        };
+        if (!matchesGenerationConstraints(game, options.constraints)) continue;
+
         const variableScore = variableNumbers.reduce(
           (total, number) => total + (scores.get(number) ?? 0),
           0,
@@ -110,7 +136,7 @@ export function generateLotofacilGames(
         a.numbers.join("-").localeCompare(b.numbers.join("-")),
     );
     const winner = selectRankedCandidate(ranked, generationMode, random, 6);
-    if (!winner) throw new Error("Unable to generate a Lotofacil game");
+    if (!winner) throw new Error("Unable to generate a Lotofacil game with the requested constraints");
 
     for (const number of winner.variableNumbers) {
       usedVariables.set(number, (usedVariables.get(number) ?? 0) + 1);
