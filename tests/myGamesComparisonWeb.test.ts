@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import test from "node:test";
 
-const source = await readFile(new URL("../web/my-games-v2.js", import.meta.url), "utf8");
+const source = await readFile(resolve(process.cwd(), "web/my-games-v2.js"), "utf8");
 
 test("My Games keeps exploratory comparison separate from real financial accounting", () => {
   assert.match(source, /Comparar concursos/);
