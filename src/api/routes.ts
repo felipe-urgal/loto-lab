@@ -3,6 +3,7 @@ import { serveDataStatus } from "./dataStatus.js";
 import { serveStrategyLab } from "./strategyLab.js";
 import { serveRealBets } from "./realBets.js";
 import { serveGameBatchManagement } from "./gameBatchManagement.js";
+import { serveGameComparison } from "./gameComparison.js";
 import { serveAiInsights } from "./aiInsights.js";
 import { serveOperations } from "./operations.js";
 import { serveAgenda } from "./agenda.js";
@@ -23,6 +24,7 @@ const featureRoutes: FeatureRouteHandler[] = [
   serveStrategyLab,
   serveRealBets,
   serveGameBatchManagement,
+  serveGameComparison,
   serveAiInsights,
   serveOperations,
   serveAgenda,
