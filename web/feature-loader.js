@@ -46,7 +46,7 @@ function loadModule(name) {
 }
 
 async function loadStyledModule(name) {
-  if (!await loadStyle(name)) return false;
+  await loadStyle(name);
   return loadModule(name);
 }
 
@@ -57,21 +57,19 @@ async function ensureViewFeatures() {
     return;
   }
 
-  if (!await loadStyledModule("refinements")) return;
+  await loadStyledModule("refinements");
 
   if (view === "generate") {
     await loadStyledModule("generation-diversity");
   } else if (view === "games") {
-    const stylesReady = await Promise.all([
+    await Promise.all([
       loadStyle("real-bets"),
       loadStyle("my-games-management"),
     ]);
-    if (stylesReady.every(Boolean)) {
-      await Promise.all([
-        loadModule("real-bets"),
-        loadModule("my-games-management"),
-      ]);
-    }
+    await Promise.all([
+      loadModule("real-bets"),
+      loadModule("my-games-management"),
+    ]);
   }
 }
 
