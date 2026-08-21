@@ -56,7 +56,7 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.equal(shell.status, 200);
   const shellSource = await shell.text();
   assert.match(shellSource, /nav-more/);
-  assert.match(shellSource, /Backtests/);
+  assert.match(shellSource, /Testes históricos/);
   assert.match(shellSource, /Laboratório/);
   assert.match(shellSource, /Agenda/);
   assert.match(shellSource, /aria-label="\$\{item\.label\}"/);

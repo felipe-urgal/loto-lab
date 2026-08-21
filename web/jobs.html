@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0b1117" />
-    <meta name="description" content="Loto Lab — fila persistente de Backtests e Laboratório." />
+    <meta name="description" content="Loto Lab — fila persistente de testes históricos e Laboratório." />
     <title>Execuções · Loto Lab</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/assets/styles.css" />
@@ -14,9 +14,9 @@
   <body data-active-nav="jobs">
     <div class="app-shell">
       <aside class="sidebar" aria-label="Navegação principal">
-        <a class="brand" href="/#dashboard" aria-label="Loto Lab - Dashboard"><span class="brand-mark" aria-hidden="true">L</span><span class="brand-copy"><strong>Loto Lab</strong><small>Strategy console</small></span></a>
+        <a class="brand" href="/#dashboard" aria-label="Loto Lab - Painel"><span class="brand-mark" aria-hidden="true">L</span><span class="brand-copy"><strong>Loto Lab</strong><small>Console de estratégias</small></span></a>
         <nav class="main-nav" data-shell-nav aria-label="Seções do Loto Lab"></nav>
-        <div class="sidebar-footer"><div class="status-row is-ok"><span class="status-dot"></span><span>Fila persistente</span></div><p>Backtests e laboratório<br />fora da requisição HTTP.</p></div>
+        <div class="sidebar-footer"><div class="status-row is-ok"><span class="status-dot"></span><span>Fila persistente</span></div><p>Testes históricos e laboratório<br />fora da requisição HTTP.</p></div>
       </aside>
       <main class="main-area">
         <header class="topbar">
@@ -26,9 +26,9 @@
         <section class="content experiment-content">
           <div class="experiment-grid">
             <form class="panel experiment-form" id="job-form">
-              <div class="section-head"><div><h2>Nova execução</h2><p>Jobs são serializados para preservar CPU e memória.</p></div></div>
+              <div class="section-head"><div><h2>Nova execução</h2><p>As execuções são serializadas para preservar CPU e memória.</p></div></div>
               <div class="form-grid">
-                <div class="field"><label for="job-kind">Tipo</label><select id="job-kind" name="kind"><option value="backtest">Backtest</option><option value="strategy-lab">Laboratório</option></select></div>
+                <div class="field"><label for="job-kind">Tipo</label><select id="job-kind" name="kind"><option value="backtest">Teste histórico</option><option value="strategy-lab">Laboratório</option></select></div>
                 <div class="field"><label for="job-lottery">Loteria</label><select id="job-lottery" name="lottery"><option value="mega-sena">Mega-Sena</option><option value="lotofacil">Lotofácil</option><option value="dia-de-sorte">Dia de Sorte</option></select></div>
                 <div class="field is-wide"><label for="job-strategy">Versão de estratégia</label><select id="job-strategy" name="strategyVersionId"><option value="">Configuração manual</option></select></div>
                 <div class="field"><label for="job-games">Jogos</label><input id="job-games" name="gameCount" type="number" min="1" max="20" value="4" /></div>
@@ -37,10 +37,10 @@
                 <div class="field"><label for="job-start">Concurso inicial</label><input id="job-start" name="startContest" type="number" min="1" placeholder="Opcional" /></div>
                 <div class="field"><label for="job-end">Concurso final</label><input id="job-end" name="endContest" type="number" min="1" placeholder="Mais recente" /></div>
                 <div class="field" data-lab-field><label for="job-experiment">Experimento</label><select id="job-experiment" name="experiment"><option value="fixed-core">Núcleo fixo</option><option value="external-rules">Regras externas · Mega</option></select></div>
-                <div class="field" data-lab-field><label for="job-lookback">Lookback</label><input id="job-lookback" name="lookbackContests" type="number" min="10" max="2000" value="200" /></div>
-                <div class="field" data-lab-field><label for="job-bucket">Bucket</label><input id="job-bucket" name="bucketSize" type="number" min="5" max="250" value="25" /></div>
+                <div class="field" data-lab-field><label for="job-lookback">Janela histórica</label><input id="job-lookback" name="lookbackContests" type="number" min="10" max="2000" value="200" /></div>
+                <div class="field" data-lab-field><label for="job-bucket">Bloco</label><input id="job-bucket" name="bucketSize" type="number" min="5" max="250" value="25" /></div>
               </div>
-              <div class="form-inline-note">Uma estratégia selecionada fornece os defaults; valores preenchidos neste formulário têm prioridade.</div>
+              <div class="form-inline-note">Uma estratégia selecionada fornece os valores padrão; valores preenchidos neste formulário têm prioridade.</div>
               <div class="form-actions"><a class="button ghost" href="/strategies">Gerenciar estratégias</a><button class="button primary" type="submit">Enfileirar</button></div>
             </form>
             <section>

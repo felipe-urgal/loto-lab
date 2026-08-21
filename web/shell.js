@@ -13,11 +13,11 @@ const ICONS = {
 };
 
 const ITEMS = [
-  { key: "dashboard", label: "Dashboard", view: "dashboard" },
+  { key: "dashboard", label: "Painel", view: "dashboard" },
   { key: "analysis", label: "Análises", view: "analysis" },
   { key: "generate", label: "Gerar jogos", view: "generate" },
   { key: "games", label: "Meus jogos", view: "games" },
-  { key: "backtests", label: "Backtests", view: "backtests", extra: true },
+  { key: "backtests", label: "Testes históricos", view: "backtests", extra: true },
   { key: "lab", label: "Laboratório", href: "/lab", extra: true },
   { key: "strategies", label: "Estratégias", href: "/strategies", extra: true },
   { key: "jobs", label: "Execuções", href: "/jobs", extra: true },
@@ -33,74 +33,16 @@ const lotteries = new Set(["mega-sena", "lotofacil", "dia-de-sorte"]);
 const storedLottery = localStorage.getItem("loto-lab:lottery");
 if (storedLottery && !lotteries.has(storedLottery)) localStorage.removeItem("loto-lab:lottery");
 
-function requestedMainView() {
-  return location.hash.replace("#", "");
-}
-
-function normalizeMainHash() {
-  if (!isMainApp) return true;
-  const requested = requestedMainView();
-  if (requested && mainViews.has(requested)) return true;
-  location.hash = "dashboard";
-  return false;
-}
-
-function currentKey() {
-  if (isMainApp) {
-    const requested = requestedMainView();
-    return mainViews.has(requested) ? requested : "dashboard";
-  }
-  return configuredActive;
-}
-
-function icon(key) {
-  return `<span class="nav-icon" aria-hidden="true">${ICONS[key]}</span>`;
-}
-
-function hrefFor(item) {
-  if (item.href) return item.href;
-  return isMainApp ? `#${item.view}` : `/#${item.view}`;
-}
-
-function agendaBadge(item) {
-  return item.key === "agenda"
-    ? '<span class="agenda-nav-badge" data-agenda-nav-badge hidden></span>'
-    : "";
-}
-
-function desktopItem(item) {
-  const extraClass = item.extra ? " nav-desktop-extra" : "";
-  if (isMainApp && item.view) {
-    return `<button class="nav-item${extraClass}" data-view="${item.view}" data-nav-key="${item.key}" type="button" aria-label="${item.label}">${icon(item.key)}<span class="nav-label">${item.label}</span>${agendaBadge(item)}</button>`;
-  }
-  return `<a class="nav-link${extraClass}" data-nav-key="${item.key}" href="${hrefFor(item)}" aria-label="${item.label}">${icon(item.key)}<span class="nav-label">${item.label}</span>${agendaBadge(item)}</a>`;
-}
-
-function menuItem(item) {
-  return `<a class="nav-more-link" data-nav-key="${item.key}" href="${hrefFor(item)}" aria-label="${item.label}">${icon(item.key)}<span class="nav-label">${item.label}</span>${agendaBadge(item)}</a>`;
-}
-
-function updateActive() {
-  const active = currentKey();
-  document.querySelectorAll("[data-nav-key]").forEach((item) => {
-    const selected = item.dataset.navKey === active;
-    item.classList.toggle("is-active", selected);
-    if (selected) item.setAttribute("aria-current", "page");
-    else item.removeAttribute("aria-current");
-  });
-  const more = document.querySelector("[data-nav-more]");
-  more?.classList.toggle("is-active", ITEMS.some((item) => item.extra && item.key === active));
-}
-
-function closeMore(restoreFocus = false) {
-  const button = document.querySelector("[data-nav-more]");
-  const panel = document.querySelector("[data-nav-more-menu]");
-  if (!button || !panel) return;
-  const wasOpen = button.getAttribute("aria-expanded") === "true";
-  button.setAttribute("aria-expanded", "false");
-  panel.hidden = true;
-  if (restoreFocus && wasOpen) button.focus();
-}
+function requestedMainView() { return location.hash.replace("#", ""); }
+function normalizeMainHash() { if (!isMainApp) return true; const requested = requestedMainView(); if (requested && mainViews.has(requested)) return true; location.hash = "dashboard"; return false; }
+function currentKey() { if (isMainApp) { const requested = requestedMainView(); return mainViews.has(requested) ? requested : "dashboard"; } return configuredActive; }
+function icon(key) { return `<span class="nav-icon" aria-hidden="true">${ICONS[key]}</span>`; }
+function hrefFor(item) { if (item.href) return item.href; return isMainApp ? `#${item.view}` : `/#${item.view}`; }
+function agendaBadge(item) { return item.key === "agenda" ? '<span class="agenda-nav-badge" data-agenda-nav-badge hidden></span>' : ""; }
+function desktopItem(item) { const extraClass = item.extra ? " nav-desktop-extra" : ""; if (isMainApp && item.view) return `<button class="nav-item${extraClass}" data-view="${item.view}" data-nav-key="${item.key}" type="button" aria-label="${item.label}">${icon(item.key)}<span class="nav-label">${item.label}</span>${agendaBadge(item)}</button>`; return `<a class="nav-link${extraClass}" data-nav-key="${item.key}" href="${hrefFor(item)}" aria-label="${item.label}">${icon(item.key)}<span class="nav-label">${item.label}</span>${agendaBadge(item)}</a>`; }
+function menuItem(item) { return `<a class="nav-more-link" data-nav-key="${item.key}" href="${hrefFor(item)}" aria-label="${item.label}">${icon(item.key)}<span class="nav-label">${item.label}</span>${agendaBadge(item)}</a>`; }
+function updateActive() { const active = currentKey(); document.querySelectorAll("[data-nav-key]").forEach((item) => { const selected = item.dataset.navKey === active; item.classList.toggle("is-active", selected); if (selected) item.setAttribute("aria-current", "page"); else item.removeAttribute("aria-current"); }); const more = document.querySelector("[data-nav-more]"); more?.classList.toggle("is-active", ITEMS.some((item) => item.extra && item.key === active)); }
+function closeMore(restoreFocus = false) { const button = document.querySelector("[data-nav-more]"); const panel = document.querySelector("[data-nav-more-menu]"); if (!button || !panel) return; const wasOpen = button.getAttribute("aria-expanded") === "true"; button.setAttribute("aria-expanded", "false"); panel.hidden = true; if (restoreFocus && wasOpen) button.focus(); }
 
 normalizeMainHash();
 
@@ -109,34 +51,14 @@ if (nav) {
   nav.innerHTML = `${ITEMS.map(desktopItem).join("")}
     <button class="nav-more" data-nav-more type="button" aria-label="Mais opções" aria-expanded="false" aria-controls="nav-more-panel">${icon("more")}<span class="nav-label">Mais</span></button>
     <div class="nav-more-menu" id="nav-more-panel" data-nav-more-menu hidden>${extras.map(menuItem).join("")}</div>`;
-
   const moreButton = nav.querySelector("[data-nav-more]");
   const morePanel = nav.querySelector("[data-nav-more-menu]");
   const mobileQuery = window.matchMedia("(max-width: 680px)");
-
-  moreButton?.addEventListener("click", () => {
-    const open = moreButton.getAttribute("aria-expanded") === "true";
-    if (open) {
-      closeMore();
-      return;
-    }
-    moreButton.setAttribute("aria-expanded", "true");
-    if (morePanel) morePanel.hidden = false;
-  });
+  moreButton?.addEventListener("click", () => { const open = moreButton.getAttribute("aria-expanded") === "true"; if (open) { closeMore(); return; } moreButton.setAttribute("aria-expanded", "true"); if (morePanel) morePanel.hidden = false; });
   morePanel?.addEventListener("click", () => closeMore());
-  document.addEventListener("click", (event) => {
-    if (!nav.contains(event.target)) closeMore();
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeMore(true);
-  });
-  mobileQuery.addEventListener("change", (event) => {
-    if (!event.matches) closeMore();
-  });
-  window.addEventListener("hashchange", () => {
-    if (!normalizeMainHash()) return;
-    closeMore();
-    updateActive();
-  });
+  document.addEventListener("click", (event) => { if (!nav.contains(event.target)) closeMore(); });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMore(true); });
+  mobileQuery.addEventListener("change", (event) => { if (!event.matches) closeMore(); });
+  window.addEventListener("hashchange", () => { if (!normalizeMainHash()) return; closeMore(); updateActive(); });
   updateActive();
 }

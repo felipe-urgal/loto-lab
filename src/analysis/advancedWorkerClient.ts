@@ -1,6 +1,8 @@
 import { Worker } from "node:worker_threads";
 import type { Contest, LotteryId } from "../domain/types.js";
 import type { AdvancedAnalysis } from "../api/services.js";
+import { ApiError } from "../api/http.js";
+import { expensiveAnalysisGate } from "../api/workGate.js";
 
 export const ADVANCED_ANALYSIS_TIMEOUT_MS = 15_000;
 
@@ -32,14 +34,28 @@ export function runAdvancedAnalysisInWorker(
   timeoutMs = ADVANCED_ANALYSIS_TIMEOUT_MS,
 ): Promise<AdvancedAnalysis> {
   return new Promise<AdvancedAnalysis>((resolve, reject) => {
-    const worker = new Worker(new URL("../api/analysisWorker.js", import.meta.url), {
-      workerData: { kind: "advanced-analysis", contests, lottery },
-      name: `analysis-${lottery}`,
-      resourceLimits: {
-        maxOldGenerationSizeMb: 256,
-        maxYoungGenerationSizeMb: 64,
-      },
-    });
+    const release = expensiveAnalysisGate.acquire();
+    if (!release) {
+      reject(new ApiError(429, "ANALYSIS_BUSY", "Another expensive analysis is already running"));
+      return;
+    }
+
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL("../api/analysisWorker.js", import.meta.url), {
+        workerData: { kind: "advanced-analysis", contests, lottery },
+        name: `analysis-${lottery}`,
+        resourceLimits: {
+          maxOldGenerationSizeMb: 256,
+          maxYoungGenerationSizeMb: 64,
+        },
+      });
+    } catch (error) {
+      release();
+      reject(error);
+      return;
+    }
+
     let settled = false;
     let timeout: NodeJS.Timeout | undefined;
 
@@ -47,6 +63,7 @@ export function runAdvancedAnalysisInWorker(
       if (settled) return;
       settled = true;
       if (timeout) clearTimeout(timeout);
+      release();
       callback();
     };
 
