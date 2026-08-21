@@ -24,6 +24,9 @@ function withGlobalUiLayers(html) {
   if (!output.includes("/assets/readability.css")) {
     output = output.replace(/<\/head>/i, '    <link rel="stylesheet" href="/assets/readability.css" />\n  </head>');
   }
+  if (!output.includes("/assets/readability.js")) {
+    output = output.replace(/<\/body>/i, '    <script type="module" src="/assets/readability.js"></script>\n  </body>');
+  }
   if (!output.includes("/assets/localization.js")) {
     output = output.replace(/<\/body>/i, '    <script type="module" src="/assets/localization.js"></script>\n  </body>');
   }

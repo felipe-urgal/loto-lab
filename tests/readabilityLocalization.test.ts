@@ -12,21 +12,28 @@ test("web build injects readability and Portuguese localization into every HTML 
   for (const page of pages) {
     const html = await source(`web-dist/${page}`);
     assert.match(html, /\/assets\/readability\.css\?v=[a-f0-9]{12}/, `${page} must load readability.css`);
+    assert.match(html, /\/assets\/readability\.js\?v=[a-f0-9]{12}/, `${page} must load readability.js`);
     assert.match(html, /\/assets\/localization\.js\?v=[a-f0-9]{12}/, `${page} must load localization.js`);
   }
 });
 
-test("readability layer raises tiny functional typography without flattening hierarchy", async () => {
+test("readability layer establishes a hard 16px minimum for functional text", async () => {
   const css = await source("web/readability.css");
+  const js = await source("web/readability.js");
 
-  assert.match(css, /body \{ font-size: 14px;/);
-  assert.match(css, /\.nav-item,[\s\S]*font-size: 14px !important;/);
-  assert.match(css, /\.topbar-copy p \{ font-size: 14px !important;/);
-  assert.match(css, /th \{ font-size: 11px !important;/);
-  assert.match(css, /td \{ font-size: 13px !important;/);
-  assert.match(css, /\.field input,[\s\S]*font-size: 13px !important;/);
-  assert.match(css, /\.a2-tabs button \{ font-size: 13px !important;/);
-  assert.match(css, /\.a2-panel-head span,[\s\S]*font-size: 12px !important;/);
+  assert.match(css, /--loto-font-min: 16px/);
+  assert.match(css, /body \{ font-size: 16px;/);
+  assert.match(css, /\.readability-min-text \{ font-size: 16px !important;/);
+  assert.match(css, /th,[\s\S]*td,[\s\S]*font-size: 16px !important;/);
+  assert.match(css, /\.field input,[\s\S]*\.field select[\s\S]*font-size: 16px !important;/);
+  assert.match(css, /\.a2-panel-head strong,[\s\S]*font-size: 16px !important;/);
+  assert.match(js, /const MIN_FONT_PX = 16;/);
+  assert.match(js, /size < MIN_FONT_PX/);
+  assert.match(js, /MutationObserver/);
+
+  const fontSizes = [...css.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]));
+  assert.ok(fontSizes.length > 20, "readability.css should explicitly cover the UI typography");
+  assert.ok(fontSizes.every((size) => size >= 16), `readability.css contains font-size below 16px: ${fontSizes.filter((size) => size < 16).join(", ")}`);
 });
 
 test("localization keeps product vocabulary in Portuguese and scopes dynamic replacements to system UI", async () => {
