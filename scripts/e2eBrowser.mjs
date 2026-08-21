@@ -22,7 +22,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function waitForJson(url, attempts = 80) {
+async function waitForJson(url, attempts = 200) {
   let lastError;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
