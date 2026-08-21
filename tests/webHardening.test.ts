@@ -1,10 +1,10 @@
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import type { Pool } from "pg";
 import { createLotoLabServer } from "../src/api/server.js";
 
-async function startServer(t: test.TestContext): Promise<string> {
+async function startServer(t: TestContext): Promise<string> {
   const pool = {
     async query() {
       return { rows: [] };
@@ -94,6 +94,7 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
   assert.match(agenda, /new AbortController\(\)/);
   assert.match(agenda, /loadToken/);
   assert.match(agenda, /safeActionHref/);
+  assert.match(agenda, /new URL\(value, location\.origin\)/);
   assert.match(agenda, /aria-pressed/);
 
   assert.match(foundation, /\.nav-item \.nav-label/);
