@@ -75,14 +75,20 @@ async function ensureViewFeatures() {
     // by app.js remains the fallback when this optional module cannot mount.
     await loadStyledModule("generation-v2");
   } else if (view === "games") {
-    await Promise.all([
-      loadStyle("real-bets"),
-      loadStyle("my-games-management"),
-    ]);
-    await Promise.all([
-      loadModule("real-bets"),
-      loadModule("my-games-management"),
-    ]);
+    // My Games 2.0 owns the clean management surface. If it cannot load, keep
+    // the previous refinements as a functional fallback instead of breaking the view.
+    const styleReady = await loadStyle("my-games-v2");
+    const moduleReady = styleReady ? await loadModule("my-games-v2") : false;
+    if (!moduleReady) {
+      await Promise.all([
+        loadStyle("real-bets"),
+        loadStyle("my-games-management"),
+      ]);
+      await Promise.all([
+        loadModule("real-bets"),
+        loadModule("my-games-management"),
+      ]);
+    }
   }
 }
 
