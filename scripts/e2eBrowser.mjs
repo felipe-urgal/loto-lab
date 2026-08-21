@@ -180,12 +180,10 @@ function classifyHttpFailure(response, type) {
   const sameOrigin = url.origin === base.origin;
   const isApi = sameOrigin && url.pathname.startsWith("/api/");
 
-  // Empty-state API 404s are part of the product contract (for example when a
-  // lottery has no stored latest contest yet). Server errors must still fail.
+  // Empty-state API 404s are part of the product contract. Server errors must
+  // still fail; bounded/explicit 4xx application states are not browser faults.
   if (isApi) return status >= 500 ? `${status} API ${url.pathname}` : undefined;
 
-  // Documents, scripts, styles, icons and every other first-party asset must
-  // never fail to load during the real-browser smoke flow.
   return `${status} ${type || "resource"} ${url.pathname}`;
 }
 
@@ -259,7 +257,7 @@ try {
     "Analyses 2.0 is missing the observed-vs-expected principle",
   );
   await evaluate(client, "document.querySelector('[data-a2-tab=structure]').click(); true");
-  await waitFor(client, "document.body.innerText.includes('Estrutura do sorteio')", "structure analysis");
+  await waitFor(client, "document.body.innerText.includes('Histórico esperado')", "transition-matched structure baseline");
   await evaluate(client, "document.querySelector('[data-a2-tab=validation]').click(); true");
   await waitFor(client, "document.body.innerText.includes('Teste fora da amostra')", "rolling validation analysis");
   assert(
@@ -269,26 +267,26 @@ try {
   await evaluate(client, "document.querySelector('[data-a2-tab=ranking]').click(); true");
   await waitFor(client, "Boolean(document.querySelector('[data-a2-number]'))", "auditable ranking numbers");
   await evaluate(client, "document.querySelector('[data-a2-number]').click(); true");
-  await waitFor(client, "!document.querySelector('#a2-detail').hidden", "number detail drawer");
+  await waitFor(client, "document.querySelector('#a2-detail')?.open === true", "number detail modal");
   assert(
     await evaluate(client, "document.querySelector('#a2-detail').innerText.includes('Decomposição do score')"),
     "Number detail is missing score decomposition",
   );
   assert(
-    await evaluate(client, "document.querySelector('#a2-detail').getAttribute('aria-modal') === 'true'"),
-    "Number detail is missing modal dialog semantics",
+    await evaluate(client, "document.querySelector('#a2-detail')?.tagName === 'DIALOG' && document.querySelector('#a2-detail').matches(':modal')"),
+    "Number detail is not a native modal dialog",
   );
   await evaluate(client, `(() => {
     const detail = document.querySelector('#a2-detail');
     detail.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     return true;
   })()`);
-  await waitFor(client, "document.querySelector('#a2-detail').hidden", "number detail Escape close");
+  await waitFor(client, "document.querySelector('#a2-detail')?.open === false", "number detail Escape close");
+  assert(
+    await evaluate(client, "!document.body.classList.contains('a2-detail-open')"),
+    "Desktop dialog close left the body scroll lock active",
+  );
 
-  // For responsive-layout checks we want a deterministic CSS viewport, not
-  // Chrome's mobile-device emulation heuristics. The real page already carries
-  // a width=device-width viewport meta tag; this override exercises the 390px
-  // media-query layout directly and reproducibly in headless Chrome.
   await client.send("Emulation.setDeviceMetricsOverride", {
     width: 390,
     height: 844,
@@ -312,7 +310,7 @@ try {
   assert(mobileAnalysis.tabsVisible, "Analyses tabs are not visible on mobile");
   assert(mobileAnalysis.firstNumberVisible, "Analyses ranking numbers are not visible on mobile");
   await evaluate(client, "document.querySelector('[data-a2-number]').click(); true");
-  await waitFor(client, "!document.querySelector('#a2-detail').hidden", "mobile number detail drawer");
+  await waitFor(client, "document.querySelector('#a2-detail')?.open === true", "mobile number detail modal");
   const mobileDrawer = await evaluate(client, `(() => {
     const detail = document.querySelector('#a2-detail');
     const rect = detail.getBoundingClientRect();
@@ -320,12 +318,12 @@ try {
   })()`);
   assert(mobileDrawer.width <= mobileDrawer.viewport + 1, "Analyses detail drawer overflows the mobile viewport");
   assert(mobileDrawer.left >= -1, "Analyses detail drawer starts outside the mobile viewport");
-  await evaluate(client, `(() => {
-    const detail = document.querySelector('#a2-detail');
-    detail.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    return true;
-  })()`);
-  await waitFor(client, "document.querySelector('#a2-detail').hidden", "mobile number detail Escape close");
+
+  // Navigate away without explicitly closing the modal: the Analyses lifecycle
+  // must release scroll lock even when #content is replaced by another view.
+  await evaluate(client, "location.hash = 'dashboard'; true");
+  await waitFor(client, "!document.querySelector('.a2-shell')", "leave Analyses with modal open");
+  await waitFor(client, "!document.body.classList.contains('a2-detail-open')", "dialog navigation cleanup");
 
   await navigate(client, "/strategies");
   await waitFor(client, "Boolean(document.querySelector('#strategy-form'))", "strategies form");
@@ -364,7 +362,7 @@ try {
   assert(severeLogs.length === 0, `Browser console errors: ${severeLogs.join(" | ")}`);
   assert(networkErrors.length === 0, `Browser resource/server failures: ${networkErrors.join(" | ")}`);
 
-  console.log("Browser E2E passed: main, Analyses 2.0 desktop/mobile, strategies, mobile nav, jobs, agenda and AI");
+  console.log("Browser E2E passed: main, hardened Analyses 2.0 desktop/mobile, dialog cleanup, strategies, mobile nav, jobs, agenda and AI");
 } finally {
   client?.close();
   await stopBrowser(browser);
