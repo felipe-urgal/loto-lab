@@ -9,7 +9,6 @@ import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import {
   PostgresOperationRepository,
   type OperationRunRecord,
-  type OperationStatus,
 } from "../persistence/operationRepository.js";
 import { NotificationService } from "../notifications/service.js";
 import { RealBetService } from "../realBets/service.js";
@@ -121,7 +120,7 @@ export async function runOperationalSync(
     const successfulLotteries = lotteries.filter((item) => item.status !== "failed").length;
     const failedLotteries = lotteries.length - successfulLotteries;
     const hasPartial = lotteries.some((item) => item.status === "partial");
-    const status: Exclude<OperationStatus, "running"> =
+    const status: "success" | "partial" | "failed" =
       successfulLotteries === 0 ? "failed" : failedLotteries > 0 || hasPartial ? "partial" : "success";
     const details: SyncAllDetails = {
       lotteries,
