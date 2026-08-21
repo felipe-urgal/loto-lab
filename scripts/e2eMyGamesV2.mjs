@@ -301,10 +301,11 @@ try {
   assert(official.hasCompare && official.hasHide, `Real-bet actions are incomplete: ${JSON.stringify(official)}`);
 
   await evaluate(client, `document.querySelector('[data-mg2-hide="${seeded.betBatchId}"]').click(); true`);
-  await waitFor(client, `!document.querySelector('[data-mg2-batch="${seeded.betBatchId}"]')`, "hidden batch removed from visible list");
+  await waitFor(client, `Boolean(document.querySelector('[data-my-games-v2]')) && !document.querySelector('[data-mg2-batch="${seeded.betBatchId}"]')`, "hidden batch removed from visible list");
 
+  await waitFor(client, `Boolean(document.querySelector('[data-mg2-filter="hidden"]'))`, "Ocultos filter after hide");
   await evaluate(client, "document.querySelector('[data-mg2-filter=\"hidden\"]').click(); true");
-  await waitFor(client, `Boolean(document.querySelector('[data-mg2-batch="${seeded.betBatchId}"]'))`, "batch in Ocultos");
+  await waitFor(client, `Boolean(document.querySelector('[data-my-games-v2]')) && Boolean(document.querySelector('[data-mg2-batch="${seeded.betBatchId}"]'))`, "batch in Ocultos");
   await evaluate(client, `document.querySelector('[data-mg2-toggle="${seeded.betBatchId}"]').click(); true`);
   await waitFor(client, `Boolean(document.querySelector('[data-mg2-show="${seeded.betBatchId}"]'))`, "restore hidden batch action");
   await evaluate(client, `document.querySelector('[data-mg2-show="${seeded.betBatchId}"]').click(); true`);
