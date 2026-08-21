@@ -208,19 +208,25 @@ try {
 
     await waitFor(
       client,
-      `document.querySelector('#lottery-select')?.value === ${JSON.stringify(lottery.id)} && document.querySelectorAll('[data-a2-number]').length === ${lottery.numberCount}`,
+      `(() => {
+        const uniqueNumbers = new Set([...document.querySelectorAll('[data-a2-number]')].map((node) => node.dataset.a2Number));
+        return document.querySelector('#lottery-select')?.value === ${JSON.stringify(lottery.id)} && uniqueNumbers.size === ${lottery.numberCount};
+      })()`,
       `${lottery.id} advanced ranking`,
     );
 
-    const state = await evaluate(client, `({
-      fallback: Boolean(document.querySelector('[data-analysis-v2-fallback]')),
-      principle: document.body.innerText.includes('Observado × esperado'),
-      numberCount: document.querySelectorAll('[data-a2-number]').length,
-      tabs: document.querySelectorAll('[data-a2-tab]').length
-    })`);
+    const state = await evaluate(client, `(() => {
+      const uniqueNumbers = new Set([...document.querySelectorAll('[data-a2-number]')].map((node) => node.dataset.a2Number));
+      return {
+        fallback: Boolean(document.querySelector('[data-analysis-v2-fallback]')),
+        principle: document.body.innerText.includes('Observado × esperado'),
+        numberCount: uniqueNumbers.size,
+        tabs: document.querySelectorAll('[data-a2-tab]').length
+      };
+    })()`);
     assert(!state.fallback, `${lottery.id} fell back instead of mounting advanced analyses`);
     assert(state.principle, `${lottery.id} is missing the observed-vs-expected principle`);
-    assert(state.numberCount === lottery.numberCount, `${lottery.id} rendered ${state.numberCount} ranking numbers`);
+    assert(state.numberCount === lottery.numberCount, `${lottery.id} rendered ${state.numberCount} unique ranking numbers`);
     assert(state.tabs === 5, `${lottery.id} did not render all five analysis modes`);
   }
 
