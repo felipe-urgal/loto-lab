@@ -27,6 +27,7 @@ const EXACT_TEXT = new Map([
 
 const EXACT_PHRASES = new Map([
   ["Loto Lab - Dashboard", "Loto Lab - Painel"],
+  ["Baseline condicionado", "Referência condicionada"],
   ["Frequências, score e classificação por horizonte.", "Frequências, pontuação e classificação por horizonte."],
   ["maior score combinado", "maior pontuação combinada"],
   ["menor score combinado", "menor pontuação combinada"],
