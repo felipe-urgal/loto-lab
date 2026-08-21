@@ -22,6 +22,9 @@ test("dashboard scope keeps comparison mode separate from the active lottery", a
   assert.match(scopeSource, /\/real-bets\/\$\{lottery\}\?limit=50/);
   assert.match(scopeSource, /\/game-batches\/\$\{lottery\}\?limit=3/);
   assert.match(scopeSource, /Dashboard · \$\{LOTTERIES\[scope\]\}/);
+  assert.match(scopeSource, /navigatingFromDashboard/);
+  assert.match(scopeSource, /const previousScope = savedScope\(\)/);
+  assert.match(scopeSource, /localStorage\.setItem\(DASHBOARD_SCOPE_KEY, previousScope\)/);
 
   const scopeLoad = loaderSource.indexOf('loadStyledModule("dashboard-scope")');
   const statusLoad = loaderSource.indexOf('loadStyledModule("data-status")');
