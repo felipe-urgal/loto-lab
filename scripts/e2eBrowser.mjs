@@ -251,6 +251,10 @@ try {
     "Analyses 2.0 is missing one or more modes",
   );
   assert(
+    await evaluate(client, "document.querySelector('.a2-tabs')?.getAttribute('role') === 'tablist'"),
+    "Analyses 2.0 tablist semantics are missing",
+  );
+  assert(
     await evaluate(client, "document.body.innerText.includes('Observado × esperado')"),
     "Analyses 2.0 is missing the observed-vs-expected principle",
   );
@@ -270,10 +274,16 @@ try {
     await evaluate(client, "document.querySelector('#a2-detail').innerText.includes('Decomposição do score')"),
     "Number detail is missing score decomposition",
   );
-
-  await navigate(client, "/strategies");
-  await waitFor(client, "Boolean(document.querySelector('#strategy-form'))", "strategies form");
-  assert(await evaluate(client, "document.querySelector('h1')?.textContent === 'Estratégias'"), "Strategies page identity mismatch");
+  assert(
+    await evaluate(client, "document.querySelector('#a2-detail').getAttribute('aria-modal') === 'true'"),
+    "Number detail is missing modal dialog semantics",
+  );
+  await evaluate(client, `(() => {
+    const detail = document.querySelector('#a2-detail');
+    detail.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    return true;
+  })()`);
+  await waitFor(client, "document.querySelector('#a2-detail').hidden", "number detail Escape close");
 
   await client.send("Emulation.setDeviceMetricsOverride", {
     width: 390,
@@ -281,6 +291,40 @@ try {
     deviceScaleFactor: 1,
     mobile: true,
   });
+  await navigate(client, "/#analysis");
+  await waitFor(client, "Boolean(document.querySelector('.a2-shell'))", "mobile Analyses 2.0 shell");
+  const mobileAnalysis = await evaluate(client, `(() => {
+    const tabs = document.querySelector('.a2-tabs');
+    const firstNumber = document.querySelector('[data-a2-number]');
+    return {
+      width: innerWidth,
+      tabsVisible: Boolean(tabs && getComputedStyle(tabs).display !== 'none'),
+      firstNumberVisible: Boolean(firstNumber && firstNumber.getBoundingClientRect().width > 0)
+    };
+  })()`);
+  assert(mobileAnalysis.width === 390, "Analyses mobile viewport override was not applied");
+  assert(mobileAnalysis.tabsVisible, "Analyses tabs are not visible on mobile");
+  assert(mobileAnalysis.firstNumberVisible, "Analyses ranking numbers are not visible on mobile");
+  await evaluate(client, "document.querySelector('[data-a2-number]').click(); true");
+  await waitFor(client, "!document.querySelector('#a2-detail').hidden", "mobile number detail drawer");
+  const mobileDrawer = await evaluate(client, `(() => {
+    const detail = document.querySelector('#a2-detail');
+    const rect = detail.getBoundingClientRect();
+    return { width: rect.width, left: rect.left, viewport: innerWidth };
+  })()`);
+  assert(mobileDrawer.width <= mobileDrawer.viewport + 1, "Analyses detail drawer overflows the mobile viewport");
+  assert(mobileDrawer.left >= -1, "Analyses detail drawer starts outside the mobile viewport");
+  await evaluate(client, `(() => {
+    const detail = document.querySelector('#a2-detail');
+    detail.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    return true;
+  })()`);
+  await waitFor(client, "document.querySelector('#a2-detail').hidden", "mobile number detail Escape close");
+
+  await navigate(client, "/strategies");
+  await waitFor(client, "Boolean(document.querySelector('#strategy-form'))", "strategies form");
+  assert(await evaluate(client, "document.querySelector('h1')?.textContent === 'Estratégias'"), "Strategies page identity mismatch");
+
   await sleep(120);
   const mobileMoreVisible = await evaluate(client, `(() => {
     const button = document.querySelector('[data-nav-more]');
@@ -314,7 +358,7 @@ try {
   assert(severeLogs.length === 0, `Browser console errors: ${severeLogs.join(" | ")}`);
   assert(networkErrors.length === 0, `Browser resource/server failures: ${networkErrors.join(" | ")}`);
 
-  console.log("Browser E2E passed: main, Analyses 2.0, strategies, mobile nav, jobs, agenda and AI");
+  console.log("Browser E2E passed: main, Analyses 2.0 desktop/mobile, strategies, mobile nav, jobs, agenda and AI");
 } finally {
   client?.close();
   await stopBrowser(browser);
