@@ -23,6 +23,7 @@ const subtitle = document.querySelector("#view-subtitle");
 const selectLabel = select?.closest(".select-control")?.querySelector("span");
 let applyToken = 0;
 let scheduled = false;
+let navigatingFromDashboard = false;
 
 function currentView() {
   return location.hash.replace("#", "") || "dashboard";
@@ -236,7 +237,7 @@ function scheduleApply() {
 }
 
 select?.addEventListener("change", () => {
-  if (currentView() !== "dashboard") return;
+  if (currentView() !== "dashboard" || navigatingFromDashboard) return;
   const scope = normalizeScope(select.value);
   localStorage.setItem(DASHBOARD_SCOPE_KEY, scope);
   scheduleApply();
@@ -249,8 +250,13 @@ root?.addEventListener("click", (event) => {
   const lottery = button.dataset.dashboardLottery;
   const view = button.dataset.dashboardOpen;
   if (!validLottery(lottery) || !view) return;
+
+  const previousScope = savedScope();
+  navigatingFromDashboard = true;
   select.value = lottery;
   select.dispatchEvent(new Event("change", { bubbles: true }));
+  navigatingFromDashboard = false;
+  localStorage.setItem(DASHBOARD_SCOPE_KEY, previousScope);
   queueMicrotask(() => { location.hash = view; });
 });
 
