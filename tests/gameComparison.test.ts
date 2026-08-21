@@ -52,6 +52,27 @@ test("batch comparison highlights matches and summarizes the best game per conte
   assert.equal(serialized.includes("netResult"), false);
 });
 
+test("Lotofacil comparison preserves the 15-number game denominator and exact matches", () => {
+  const input = batch("lotofacil", [{
+    lottery: "lotofacil",
+    numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    fixedNumbers: [1, 2, 3, 4, 5, 6, 7, 8],
+    variableNumbers: [9, 10, 11, 12, 13, 14, 15],
+    metadata: { odd: 8, even: 7, sum: 120, repeatedFromLastContest: [] },
+  }]);
+
+  const result = buildBatchComparison(input, [{
+    number: 100,
+    date: "2026-08-21",
+    numbers: [1, 2, 3, 4, 5, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25],
+  }]);
+
+  assert.equal(result.drawSize, 15);
+  assert.equal(result.items[0]!.games[0]!.hits, 5);
+  assert.deepEqual(result.items[0]!.games[0]!.matchedNumbers, [1, 2, 3, 4, 5]);
+  assert.equal(result.summary.bestHits, 5);
+});
+
 test("Dia de Sorte comparison keeps lucky-month hits separate from number hits", () => {
   const input = batch("dia-de-sorte", [{
     lottery: "dia-de-sorte",
