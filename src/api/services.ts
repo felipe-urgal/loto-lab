@@ -118,7 +118,7 @@ export class LotoLabApiServices {
     this.backtests = new PostgresBacktestRepository(pool);
   }
 
-  async analyze(lottery: LotteryId) {
+  async analyze(lottery: LotteryId): Promise<Record<string, unknown>> {
     const contests = await this.contests.list({ lottery, order: "asc" });
     const config = getLotteryConfig(lottery);
     const rows = buildNumberAnalysis(contests, config);
