@@ -378,35 +378,14 @@ export class PostgresGameRepository {
   async setArchived(id: number, archived: boolean): Promise<GeneratedGameBatchRecord | undefined> {
     const current = await this.findBatch(id);
     if (!current) return undefined;
-    if (archived && current.hasRealBet) {
-      throw new Error(`BATCH_HAS_REAL_BET:${id}`);
-    }
     if (Boolean(current.archivedAt) === archived) return current;
 
-    const result = await this.pool.query<{ id: string }>(
+    await this.pool.query(
       archived
-        ? `
-            UPDATE generated_game_batches batch
-            SET archived_at = NOW()
-            WHERE batch.id = $1
-              AND NOT EXISTS (
-                SELECT 1 FROM real_bets bet WHERE bet.batch_id = batch.id
-              )
-            RETURNING batch.id
-          `
-        : `
-            UPDATE generated_game_batches
-            SET archived_at = NULL
-            WHERE id = $1
-            RETURNING id
-          `,
+        ? `UPDATE generated_game_batches SET archived_at = NOW() WHERE id = $1`
+        : `UPDATE generated_game_batches SET archived_at = NULL WHERE id = $1`,
       [id],
     );
-
-    if (archived && result.rowCount === 0) {
-      const refreshed = await this.findBatch(id);
-      if (refreshed?.hasRealBet) throw new Error(`BATCH_HAS_REAL_BET:${id}`);
-    }
 
     return this.findBatch(id);
   }
