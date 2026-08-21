@@ -30,7 +30,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
       }
 
       if (await serveFeatureRoutes(request, response, options)) return;
-      if (method === "GET" && await serveWebAsset(url, response)) return;
+      if ((method === "GET" || method === "HEAD") && await serveWebAsset(url, response, method === "HEAD")) return;
       apiHandler(request, response);
     } catch (error) {
       console.error("Loto Lab web request failed", error);
