@@ -151,7 +151,7 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
     try {
       const method = request.method ?? "GET";
       const url = new URL(request.url ?? "/", "http://localhost");
-      const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/$/, "") : url.pathname;
+      const pathname = url.pathname.length > 1 ? request.url && url.pathname.replace(/\/$/, "") : url.pathname;
 
       if (method === "OPTIONS") {
         sendNoContent(response, corsOrigin);
@@ -347,7 +347,6 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
         const lotteryParam = url.searchParams.get("lottery");
         const lottery = lotteryParam === null ? undefined : parseLottery(lotteryParam);
         const items = await services.strategies.list(lottery);
-        sendJson(response, 200, { items: Object.values(LOTTERY_CONFIGS) }, corsOrigin);
         sendJson(response, 200, { items }, corsOrigin);
         return;
       }
