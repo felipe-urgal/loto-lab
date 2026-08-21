@@ -10,16 +10,8 @@ function formatPercent(value) {
   return `${Math.round((Number(value) || 0) * 100)}%`;
 }
 
-function formatDateTime(value) {
-  if (!value) return "sem sincronização";
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 function formatAge(minutes) {
-  if (!Number.isFinite(Number(minutes))) return "sem execução";
+  if (!Number.isFinite(Number(minutes))) return "sem execução recente";
   const value = Math.max(0, Math.round(Number(minutes)));
   if (value < 1) return "agora";
   if (value < 60) return `há ${value} min`;
@@ -28,16 +20,8 @@ function formatAge(minutes) {
   return `há ${Math.floor(hours / 24)} d`;
 }
 
-function operationCopy(status) {
-  if (!status?.latest) return "Nenhuma sincronização operacional registrada";
-  const result = status.latest.status === "success"
-    ? "última execução concluída"
-    : status.latest.status === "partial"
-      ? "última execução parcial"
-      : status.latest.status === "running"
-        ? "sincronização em andamento"
-        : "última execução falhou";
-  return `${result} · ${formatAge(status.ageMinutes)}`;
+function formatCount(value) {
+  return new Intl.NumberFormat("pt-BR").format(Number(value) || 0);
 }
 
 function currentScope() {
@@ -45,28 +29,36 @@ function currentScope() {
   return value === "all" || labels[value] ? value : "all";
 }
 
-async function runSync(button) {
-  button.disabled = true;
-  const original = button.textContent;
-  button.textContent = "Sincronizando...";
-  try {
-    const response = await fetch("/api/v1/operations/sync", { method: "POST" });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) {
-      throw new Error(payload?.error?.message || `HTTP ${response.status}`);
-    }
-    await refreshDataStatus();
-    window.dispatchEvent(new CustomEvent("loto-lab:data-synced"));
-  } catch (error) {
-    button.textContent = error?.message || "Falha ao sincronizar";
-    window.setTimeout(() => {
-      button.textContent = original;
-      button.disabled = false;
-    }, 2500);
-    return;
+function statusCopy(operations, items, scope) {
+  const stale = Boolean(operations?.stale);
+  const latestFailed = operations?.latest && operations.latest.status !== "success";
+  const missing = items.reduce((total, item) => total + Number(item.missingContestCount || 0), 0);
+  const warning = stale || latestFailed || missing > 0;
+  const age = formatAge(operations?.ageMinutes);
+  const title = warning ? "Dados precisam de atenção" : `Dados atualizados ${age}`;
+
+  if (scope !== "all") {
+    const item = items[0];
+    if (!item) return { warning: true, title: "Dados indisponíveis", detail: "Não há cobertura registrada para esta loteria." };
+    const continuity = item.missingContestCount > 0
+      ? `${formatCount(item.missingContestCount)} concurso(s) faltando`
+      : `histórico até #${item.lastContest || 0}`;
+    return {
+      warning,
+      title,
+      detail: `${formatCount(item.contestCount)} concursos · ${continuity} · cobertura ${formatPercent(item.financialCoverage)}`,
+    };
   }
-  button.textContent = original;
-  button.disabled = false;
+
+  const contests = items.reduce((total, item) => total + Number(item.contestCount || 0), 0);
+  const coverage = items.length
+    ? items.reduce((total, item) => total + Number(item.financialCoverage || 0), 0) / items.length
+    : 0;
+  return {
+    warning,
+    title,
+    detail: `${items.length} loterias · ${formatCount(contests)} concursos · cobertura média ${formatPercent(coverage)}`,
+  };
 }
 
 async function refreshDataStatus() {
@@ -78,7 +70,7 @@ async function refreshDataStatus() {
   }
 
   root.hidden = false;
-  root.innerHTML = '<div class="data-status-shell"><div class="data-status-item"><span class="data-status-detail">Verificando cobertura histórica...</span></div></div>';
+  root.innerHTML = '<div class="data-status-compact is-loading"><span class="data-status-dot"></span><span>Verificando dados...</span></div>';
 
   try {
     const [dataResponse, operationsResponse] = await Promise.all([
@@ -88,47 +80,28 @@ async function refreshDataStatus() {
     if (!dataResponse.ok) throw new Error(`HTTP ${dataResponse.status}`);
     const payload = await dataResponse.json();
     const operations = operationsResponse.ok ? await operationsResponse.json() : null;
-    const stale = Boolean(operations?.stale);
-    const auto = operations?.autoSyncEnabled !== false;
     const scope = currentScope();
     const items = (payload.items || []).filter((item) => scope === "all" || item.lottery === scope);
+    const status = statusCopy(operations, items, scope);
+    const auto = operations?.autoSyncEnabled !== false;
+    const interval = operations?.intervalMinutes || 30;
 
-    root.innerHTML = `
-      <div class="data-ops-row ${stale ? "is-warning" : ""}">
-        <div class="data-ops-copy">
-          <strong>${stale ? "Sincronização precisa de atenção" : "Dados operacionais atualizados"}</strong>
-          <span>${operationCopy(operations)} · automático ${auto ? `a cada ${operations?.intervalMinutes || 30} min` : "desativado"}</span>
-        </div>
-        <button class="data-sync-button" type="button">Sincronizar agora</button>
-      </div>
-      <div class="data-status-shell ${scope === "all" ? "" : "is-focused"}">${items.map((item) => {
-        const warning = item.missingContestCount > 0;
-        const detail = warning
-          ? `${item.missingContestCount} concurso(s) faltando até #${item.lastContest || 0}`
-          : `Histórico contínuo até #${item.lastContest || 0}`;
-        return `<article class="data-status-item ${warning ? "is-warning" : ""}">
-          <span class="data-status-name">${labels[item.lottery] || item.lottery}</span>
-          <span class="data-status-count">${item.contestCount} concursos</span>
-          <span class="data-status-detail">${detail} · financeiro ${formatPercent(item.financialCoverage)} · ${formatDateTime(item.lastUpdatedAt)}</span>
-        </article>`;
-      }).join("")}</div>`;
-
-    root.querySelector(".data-sync-button")?.addEventListener("click", (event) => {
-      void runSync(event.currentTarget);
-    });
+    root.innerHTML = `<div class="data-status-compact ${status.warning ? "is-warning" : ""}" title="${auto ? `Sincronização automática a cada ${interval} min.` : "Sincronização automática desativada."}">
+      <span class="data-status-dot"></span>
+      <strong>${status.title}</strong>
+      <span>${status.detail}</span>
+    </div>`;
   } catch {
-    root.innerHTML = '<div class="data-status-shell"><div class="data-status-item is-warning"><span class="data-status-detail">Não foi possível consultar o estado operacional da base.</span></div></div>';
+    root.innerHTML = '<div class="data-status-compact is-warning"><span class="data-status-dot"></span><strong>Status indisponível</strong><span>Não foi possível consultar o estado da base.</span></div>';
   }
 }
 
 window.addEventListener("hashchange", refreshDataStatus);
+window.addEventListener("loto-lab:data-synced", refreshDataStatus);
 lotterySelect?.addEventListener("change", () => {
   if ((location.hash.replace("#", "") || "dashboard") === "dashboard") {
     window.setTimeout(refreshDataStatus, 0);
   }
-});
-document.querySelector("#refresh-view")?.addEventListener("click", () => {
-  window.setTimeout(refreshDataStatus, 0);
 });
 
 refreshDataStatus();
