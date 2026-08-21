@@ -32,6 +32,12 @@ interface ComparisonContestResult {
   games: ComparisonGameResult[];
 }
 
+export interface ComparisonAvailability {
+  status: "available" | "pending";
+  targetContestNumber: number;
+  lastAvailableContestNumber?: number;
+}
+
 function compactGameCheck(check: GameCheckResult, position: number): ComparisonGameResult {
   return {
     position,
@@ -64,6 +70,20 @@ function summarize(items: ComparisonContestResult[]) {
     bestHits: best.bestHits,
     bestContestNumber: best.contestNumber,
     averageBestHits: items.reduce((sum, item) => sum + item.bestHits, 0) / items.length,
+  };
+}
+
+export function buildComparisonAvailability(
+  targetContestNumber: number,
+  selected: Array<{ number: number }>,
+  lastAvailableBeforeStart?: number,
+): ComparisonAvailability {
+  return {
+    status: selected.length > 0 ? "available" : "pending",
+    targetContestNumber,
+    ...(selected.at(-1)?.number ?? lastAvailableBeforeStart) !== undefined
+      ? { lastAvailableContestNumber: selected.at(-1)?.number ?? lastAvailableBeforeStart }
+      : {},
   };
 }
 
@@ -142,13 +162,6 @@ export async function serveGameComparison(
       "This legacy batch has no target contest; choose a starting contest to compare it safely",
     );
   }
-  if (minimumContest !== undefined && startContest < minimumContest) {
-    throw new ApiError(
-      400,
-      "COMPARISON_BEFORE_TARGET",
-      `Comparison starts at contest ${minimumContest} because earlier contests belong to the generation context`,
-    );
-  }
 
   const selected = await contests.list({
     lottery: batch.lottery,
@@ -156,18 +169,32 @@ export async function serveGameComparison(
     order: "asc",
     limit: count,
   });
+
   const comparison = buildBatchComparison(batch, selected);
+  const lastAvailableBeforeStart = selected.length === 0
+    ? (await contests.list({
+      lottery: batch.lottery,
+      endContest: startContest - 1,
+      order: "desc",
+      limit: 1,
+    }))[0]?.number
+    : undefined;
+  const availability = buildComparisonAvailability(startContest, selected, lastAvailableBeforeStart);
+
   sendJson(response, 200, {
     ...comparison,
     startContestNumber: startContest,
     requestedCount: count,
+    availability,
     scope: {
-      kind: minimumContest === undefined ? "manual-anchor" : "post-target",
+      kind: minimumContest !== undefined && startContest < minimumContest ? "backtest" : "post-target",
       minimumContestNumber: minimumContest,
       financial: false,
-      note: minimumContest === undefined
-        ? "Comparação exploratória a partir do concurso escolhido; nenhum valor financeiro é registrado."
-        : "Somente concursos a partir do alvo são comparados; resultados anteriores faziam parte do contexto usado para gerar o lote.",
+      note: minimumContest !== undefined && startContest < minimumContest
+        ? "Backtest histórico dos jogos gerados contra concursos anteriores ao alvo; nenhum valor financeiro é registrado."
+        : minimumContest === undefined
+          ? "Comparação exploratória a partir do concurso escolhido; nenhum valor financeiro é registrado."
+          : "Comparação dos jogos a partir do concurso-alvo; nenhum valor financeiro é registrado.",
     },
   }, corsOrigin);
   return true;

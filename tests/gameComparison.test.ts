@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildBatchComparison } from "../src/api/gameComparison.js";
+import { buildBatchComparison, buildComparisonAvailability } from "../src/api/gameComparison.js";
 import type { GeneratedGameBatchRecord } from "../src/persistence/types.js";
 
 function batch(lottery: GeneratedGameBatchRecord["lottery"], games: GeneratedGameBatchRecord["games"]): GeneratedGameBatchRecord {
@@ -50,6 +50,64 @@ test("batch comparison highlights matches and summarizes the best game per conte
   assert.equal(serialized.includes("ticketCost"), false);
   assert.equal(serialized.includes("totalPrizeValue"), false);
   assert.equal(serialized.includes("netResult"), false);
+});
+
+test("empty comparison remains a valid result while contest history is unavailable", () => {
+  const input = batch("lotofacil", [{
+    lottery: "lotofacil",
+    numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    fixedNumbers: [1, 2, 3, 4, 5, 6, 7, 8],
+    variableNumbers: [9, 10, 11, 12, 13, 14, 15],
+    metadata: { odd: 8, even: 7, sum: 120, repeatedFromLastContest: [] },
+  }]);
+
+  const result = buildBatchComparison(input, []);
+
+  assert.deepEqual(result.items, []);
+  assert.equal(result.summary.contestCount, 0);
+  assert.equal(result.summary.bestHits, 0);
+  assert.equal(result.summary.averageBestHits, 0);
+  assert.equal(result.summary.bestContestNumber, undefined);
+  assert.equal(result.drawSize, 15);
+});
+
+test("comparison availability is pending when the requested contest is not synchronized", () => {
+  const availability = buildComparisonAvailability(3768, [], 3767);
+
+  assert.deepEqual(availability, {
+    status: "pending",
+    targetContestNumber: 3768,
+    lastAvailableContestNumber: 3767,
+  });
+});
+
+test("comparison availability uses the last selected contest when history is available", () => {
+  const availability = buildComparisonAvailability(3760, [{ number: 3760 }, { number: 3761 }, { number: 3762 }], 3759);
+
+  assert.deepEqual(availability, {
+    status: "available",
+    targetContestNumber: 3760,
+    lastAvailableContestNumber: 3762,
+  });
+});
+
+test("historical comparison is allowed before the batch target", () => {
+  const input = batch("lotofacil", [{
+    lottery: "lotofacil",
+    numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    fixedNumbers: [1, 2, 3, 4, 5, 6, 7, 8],
+    variableNumbers: [9, 10, 11, 12, 13, 14, 15],
+    metadata: { odd: 8, even: 7, sum: 120, repeatedFromLastContest: [] },
+  }]);
+
+  const result = buildBatchComparison(input, [{
+    number: 99,
+    date: "2026-08-20",
+    numbers: [1, 2, 3, 4, 5, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25],
+  }]);
+
+  assert.equal(result.items[0]!.contestNumber, 99);
+  assert.equal(result.items[0]!.games[0]!.hits, 5);
 });
 
 test("Lotofacil comparison preserves the 15-number game denominator and exact matches", () => {
