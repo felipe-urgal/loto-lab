@@ -156,11 +156,31 @@ export async function serveGameComparison(
     order: "asc",
     limit: count,
   });
+
   const comparison = buildBatchComparison(batch, selected);
+  const lastAvailable = selected.length > 0
+    ? selected[0]!.number
+    : (await contests.list({
+      lottery: batch.lottery,
+      endContest: startContest - 1,
+      order: "desc",
+      limit: 1,
+    }))[0]?.number;
+  const available = selected.length > 0;
+
   sendJson(response, 200, {
     ...comparison,
     startContestNumber: startContest,
     requestedCount: count,
+    availability: {
+      status: available ? "available" : "pending",
+      available,
+      targetContestNumber: startContest,
+      ...(lastAvailable !== undefined ? { lastAvailableContestNumber: lastAvailable } : {}),
+      message: available
+        ? undefined
+        : `O resultado do concurso #${startContest} ainda não está disponível no histórico sincronizado.`,
+    },
     scope: {
       kind: minimumContest === undefined ? "manual-anchor" : "post-target",
       minimumContestNumber: minimumContest,
