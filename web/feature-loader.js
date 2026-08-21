@@ -1,6 +1,7 @@
 const build = document.documentElement.dataset.build || "";
 const moduleLoads = new Map();
 const styleLoads = new Map();
+let lifecycleToken = 0;
 
 function asset(name, extension) {
   const suffix = build ? `?v=${build}` : "";
@@ -73,5 +74,31 @@ async function ensureViewFeatures() {
   }
 }
 
-window.addEventListener("hashchange", () => { void ensureViewFeatures(); });
-queueMicrotask(() => { void ensureViewFeatures(); });
+function isMainRenderPending() {
+  const content = document.querySelector("#content");
+  return Boolean(content?.querySelector(":scope > .loading-state"));
+}
+
+async function emitWhenRendered() {
+  const token = ++lifecycleToken;
+  const view = location.hash.replace("#", "") || "dashboard";
+  const lottery = document.querySelector("#lottery-select")?.value || "mega-sena";
+  await ensureViewFeatures();
+
+  for (let frame = 0; frame < 120; frame += 1) {
+    if (token !== lifecycleToken) return;
+    if (!isMainRenderPending()) {
+      window.dispatchEvent(new CustomEvent("loto-lab:view-rendered", {
+        detail: { view, lottery, token },
+      }));
+      return;
+    }
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  }
+  console.warn(`View lifecycle timed out for ${view}`);
+}
+
+window.addEventListener("hashchange", () => { void emitWhenRendered(); });
+document.querySelector("#lottery-select")?.addEventListener("change", () => { void emitWhenRendered(); });
+document.querySelector("#refresh-view")?.addEventListener("click", () => { void emitWhenRendered(); });
+queueMicrotask(() => { void emitWhenRendered(); });

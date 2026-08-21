@@ -1,3 +1,12 @@
+import {
+  api,
+  escapeHtml,
+  formatCurrency,
+  formatDateTime,
+  formatPercent,
+  onViewRendered,
+} from "./runtime.js";
+
 const root = document.querySelector("#content");
 const lotterySelect = document.querySelector("#lottery-select");
 const cache = new Map();
@@ -9,46 +18,6 @@ function currentView() {
 
 function currentLottery() {
   return lotterySelect?.value || "mega-sena";
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function formatCurrency(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
-
-function formatPercent(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
-  return `${(value * 100).toFixed(1).replace(".", ",")}%`;
-}
-
-function formatDateTime(value) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
-}
-
-async function api(path, options = {}) {
-  const response = await fetch(`/api/v1${path}`, {
-    ...options,
-    headers: options.body
-      ? { "Content-Type": "application/json", ...(options.headers || {}) }
-      : options.headers,
-  });
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = new Error(payload?.error?.message || `Erro HTTP ${response.status}`);
-    error.code = payload?.error?.code || "HTTP_ERROR";
-    throw error;
-  }
-  return payload;
 }
 
 function load(lottery, force = false) {
@@ -259,14 +228,11 @@ function scheduleRefine() {
 
 function invalidateCurrentLottery() {
   cache.delete(currentLottery());
-  scheduleRefine();
 }
 
-if (root) new MutationObserver(scheduleRefine).observe(root, { childList: true, subtree: true });
-window.addEventListener("hashchange", invalidateCurrentLottery);
+onViewRendered(scheduleRefine);
 lotterySelect?.addEventListener("change", () => {
   cache.clear();
-  scheduleRefine();
 });
 document.querySelector("#refresh-view")?.addEventListener("click", invalidateCurrentLottery);
 window.addEventListener("loto-lab:data-synced", () => {

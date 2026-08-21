@@ -43,7 +43,11 @@ export async function serveOperations(
     const staleAfterMinutes = options.staleAfterMinutes ?? positiveMinutes(process.env.OPS_STALE_AFTER_MINUTES, 180);
     const reference = latest?.finishedAt ?? latest?.startedAt;
     const ageMinutes = reference ? Math.max(0, (Date.now() - Date.parse(reference)) / 60_000) : undefined;
-    const stale = !latest || latest.status === "failed" || ageMinutes === undefined || ageMinutes > staleAfterMinutes;
+    const stale = !latest
+      || latest.status === "failed"
+      || latest.status === "abandoned"
+      || ageMinutes === undefined
+      || ageMinutes > staleAfterMinutes;
 
     sendJson(response, 200, {
       autoSyncEnabled: enabled(process.env.OPS_AUTO_SYNC),

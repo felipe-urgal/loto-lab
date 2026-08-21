@@ -50,5 +50,12 @@ export function buildPostgresPoolConfig(options: PostgresPoolOptions = {}): Pool
 }
 
 export function createPostgresPool(options: PostgresPoolOptions = {}): Pool {
-  return new Pool(buildPostgresPoolConfig(options));
+  const pool = new Pool(buildPostgresPoolConfig(options));
+  pool.on("error", (error) => {
+    // node-postgres emits errors from idle clients on the Pool itself. Keeping an
+    // explicit listener prevents a transient database/network failure from
+    // becoming an unhandled EventEmitter error that terminates the process.
+    console.error("Unexpected PostgreSQL idle-client error", error);
+  });
+  return pool;
 }

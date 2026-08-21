@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 
 export type OperationName = "sync-all";
-export type OperationStatus = "running" | "success" | "partial" | "failed";
+export type OperationStatus = "running" | "success" | "partial" | "failed" | "abandoned";
 
 export interface OperationRunRecord<TDetails = unknown> {
   id: number;
@@ -49,7 +49,7 @@ export class PostgresOperationRepository {
 
   async finish<TDetails>(
     id: number,
-    status: Exclude<OperationStatus, "running">,
+    status: "success" | "partial" | "failed",
     details: TDetails,
   ): Promise<OperationRunRecord<TDetails>> {
     const result = await this.pool.query<OperationRunRow>(
@@ -63,6 +63,17 @@ export class PostgresOperationRepository {
     );
     if (!result.rows[0]) throw new Error(`Operation run ${id} was not found`);
     return mapRun<TDetails>(result.rows[0]);
+  }
+
+  async recoverRunning(): Promise<number> {
+    const result = await this.pool.query(
+      `
+        UPDATE operation_runs
+        SET status = 'abandoned', finished_at = NOW()
+        WHERE status = 'running' AND finished_at IS NULL
+      `,
+    );
+    return result.rowCount ?? 0;
   }
 
   async latest<TDetails>(operation: OperationName): Promise<OperationRunRecord<TDetails> | undefined> {

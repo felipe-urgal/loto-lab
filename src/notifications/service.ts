@@ -110,13 +110,17 @@ export class NotificationService {
     }
 
     const latest = await this.operations.latest("sync-all") as OperationRunRecord<Record<string, unknown>> | undefined;
-    if (latest && (latest.status === "failed" || latest.status === "partial")) {
+    if (latest && (latest.status === "failed" || latest.status === "partial" || latest.status === "abandoned")) {
+      const abandoned = latest.status === "abandoned";
+      const failed = latest.status === "failed";
       await this.notifications.upsert({
         eventKey: `operation:${latest.id}`,
         type: "operation-warning",
-        severity: latest.status === "failed" ? "error" : "warning",
-        title: latest.status === "failed" ? "Sincronização falhou" : "Sincronização parcial",
-        body: `Execução operacional #${latest.id} terminou como ${latest.status}. Consulte o Dashboard e tente sincronizar novamente.`,
+        severity: failed || abandoned ? "error" : "warning",
+        title: abandoned ? "Sincronização interrompida" : failed ? "Sincronização falhou" : "Sincronização parcial",
+        body: abandoned
+          ? `Execução operacional #${latest.id} foi interrompida antes de finalizar. Uma nova sincronização é recomendada.`
+          : `Execução operacional #${latest.id} terminou como ${latest.status}. Consulte o Dashboard e tente sincronizar novamente.`,
         actionHref: `/#dashboard`,
         metadata: { operationRunId: latest.id, status: latest.status },
       });

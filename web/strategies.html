@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b1117" />
+    <meta name="description" content="Loto Lab — catálogo versionado de estratégias." />
+    <title>Estratégias · Loto Lab</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <link rel="stylesheet" href="/assets/ui-foundation.css" />
+    <link rel="stylesheet" href="/assets/experiments.css" />
+  </head>
+  <body data-active-nav="strategies">
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegação principal">
+        <a class="brand" href="/#dashboard" aria-label="Loto Lab - Dashboard"><span class="brand-mark" aria-hidden="true">L</span><span class="brand-copy"><strong>Loto Lab</strong><small>Strategy console</small></span></a>
+        <nav class="main-nav" data-shell-nav aria-label="Seções do Loto Lab"></nav>
+        <div class="sidebar-footer"><div class="status-row is-ok"><span class="status-dot"></span><span>Versões imutáveis</span></div><p>Configuração reproduzível<br />por versão.</p></div>
+      </aside>
+      <main class="main-area">
+        <header class="topbar">
+          <div class="topbar-copy"><h1>Estratégias</h1><p>Crie configurações reproduzíveis; mudanças geram novas versões sem alterar o histórico.</p></div>
+          <div class="topbar-actions"><label class="select-control" for="strategy-filter"><span>Filtrar loteria</span><select id="strategy-filter"><option value="">Todas</option><option value="mega-sena">Mega-Sena</option><option value="lotofacil">Lotofácil</option><option value="dia-de-sorte">Dia de Sorte</option></select></label></div>
+        </header>
+        <section class="content experiment-content">
+          <div class="experiment-grid">
+            <form class="panel experiment-form" id="strategy-form">
+              <div class="section-head"><div><h2 id="strategy-form-title">Nova estratégia</h2><p>Salvar uma configuração diferente cria uma nova versão imutável.</p></div></div>
+              <div class="form-grid">
+                <div class="field"><label for="strategy-lottery">Loteria</label><select id="strategy-lottery" name="lottery"><option value="mega-sena">Mega-Sena</option><option value="lotofacil">Lotofácil</option><option value="dia-de-sorte">Dia de Sorte</option></select></div>
+                <div class="field"><label for="strategy-slug">Slug</label><input id="strategy-slug" name="slug" required maxlength="100" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="meu-backtest-base" /></div>
+                <div class="field is-wide"><label for="strategy-name">Nome</label><input id="strategy-name" name="name" required maxlength="160" placeholder="Minha estratégia base" /></div>
+                <div class="field"><label for="strategy-methodology">Metodologia</label><input id="strategy-methodology" name="methodologyVersion" required maxlength="80" value="v1" /></div>
+                <div class="field"><label for="strategy-games">Jogos</label><input id="strategy-games" name="gameCount" type="number" min="1" max="20" value="4" /></div>
+                <div class="field"><label for="strategy-warmup">Aquecimento</label><input id="strategy-warmup" name="warmupContests" type="number" min="1" max="2000" value="20" /></div>
+                <div class="field" id="strategy-fixed-field"><label for="strategy-fixed">Fixas · Lotofácil</label><select id="strategy-fixed" name="fixedCount"><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></div>
+                <div class="field"><label for="strategy-experiment">Experimento Lab</label><select id="strategy-experiment" name="experiment"><option value="fixed-core">Núcleo fixo</option><option value="external-rules">Regras externas · Mega</option></select></div>
+                <div class="field"><label for="strategy-lookback">Lookback Lab</label><input id="strategy-lookback" name="lookbackContests" type="number" min="10" max="2000" value="200" /></div>
+                <div class="field"><label for="strategy-bucket">Bucket Lab</label><input id="strategy-bucket" name="bucketSize" type="number" min="5" max="250" value="25" /></div>
+              </div>
+              <div class="form-inline-note">Esses parâmetros alimentam a fila de Backtests/Laboratório. O histórico guarda o ID exato da versão usada.</div>
+              <div class="form-actions"><button class="button ghost" id="strategy-reset" type="button">Nova</button><button class="button primary" type="submit">Salvar versão</button></div>
+            </form>
+            <section>
+              <div class="section-head"><div><h2>Catálogo</h2><p id="strategy-count">Carregando estratégias...</p></div></div>
+              <div id="strategy-list"><div class="loading-state"><span class="spinner"></span><span>Carregando...</span></div></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div class="toast-root" id="toast-root" aria-live="assertive"></div>
+    <script type="module" src="/assets/shell.js"></script>
+    <script type="module" src="/assets/strategies.js"></script>
+  </body>
+</html>

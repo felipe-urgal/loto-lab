@@ -11,6 +11,7 @@ interface BacktestRunRow {
   id: string;
   lottery: LotteryId;
   strategy_id: string | null;
+  strategy_version_id: string | null;
   options: Record<string, unknown>;
   summary: Record<string, unknown>;
   created_at: Date;
@@ -33,6 +34,7 @@ function mapSummary(row: BacktestRunSummaryRow): BacktestRunSummaryRecord {
     id: Number(row.id),
     lottery: row.lottery,
     ...(row.strategy_id ? { strategyId: Number(row.strategy_id) } : {}),
+    ...(row.strategy_version_id ? { strategyVersionId: Number(row.strategy_version_id) } : {}),
     options: row.options,
     summary: row.summary,
     roundCount: Number(row.round_count),
@@ -54,6 +56,7 @@ export class PostgresBacktestRepository {
           INSERT INTO backtest_runs (
             lottery,
             strategy_id,
+            strategy_version_id,
             options,
             summary,
             tested_contests,
@@ -64,13 +67,14 @@ export class PostgresBacktestRepository {
             roi,
             financial_coverage
           ) VALUES (
-            $1, $2, $3::jsonb, $4::jsonb, $5, $6, $7, $8, $9, $10, $11
+            $1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9, $10, $11, $12
           )
           RETURNING id
         `,
         [
           input.lottery,
           input.strategyId ?? null,
+          input.strategyVersionId ?? null,
           JSON.stringify(input.options ?? {}),
           JSON.stringify(input.summary),
           nonNegativeInt(input.summary.testedContests),
@@ -114,7 +118,7 @@ export class PostgresBacktestRepository {
   async findById(id: number): Promise<BacktestRunRecord | undefined> {
     const runResult = await this.pool.query<BacktestRunRow>(
       `
-        SELECT id, lottery, strategy_id, options, summary, created_at
+        SELECT id, lottery, strategy_id, strategy_version_id, options, summary, created_at
         FROM backtest_runs
         WHERE id = $1
       `,
@@ -137,6 +141,7 @@ export class PostgresBacktestRepository {
       id: Number(run.id),
       lottery: run.lottery,
       ...(run.strategy_id ? { strategyId: Number(run.strategy_id) } : {}),
+      ...(run.strategy_version_id ? { strategyVersionId: Number(run.strategy_version_id) } : {}),
       options: run.options,
       summary: run.summary,
       rounds: roundsResult.rows.map((row) => row.payload),
@@ -170,6 +175,7 @@ export class PostgresBacktestRepository {
           b.id,
           b.lottery,
           b.strategy_id,
+          b.strategy_version_id,
           b.options,
           b.summary,
           b.created_at,

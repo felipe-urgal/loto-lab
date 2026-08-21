@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ApiServerOptions } from "./app.js";
-import { ApiError, parseLottery, parsePositiveInt, readJsonBody, sendJson } from "./http.js";
+import { ApiError, parseBoolean, parseLottery, parsePositiveInt, readJsonBody, sendJson } from "./http.js";
 import { AiInsightService } from "../ai/service.js";
 import { OpenAiInterpretationProvider, OpenAiProviderError } from "../ai/openai.js";
 import type { AiInsightFocus, AiInterpretationProvider } from "../ai/types.js";
@@ -50,8 +50,9 @@ export async function serveAiInsights(
       const body = await readJsonBody(request);
       const lottery = parseLottery(body.lottery);
       const focus = parseFocus(body.focus);
-      const insight = await service.generate(lottery, focus);
-      sendJson(response, 201, { ...insight, disclaimer: AI_DISCLAIMER }, corsOrigin);
+      const force = parseBoolean(body.force, "force", false);
+      const insight = await service.generate(lottery, focus, force);
+      sendJson(response, insight.reused ? 200 : 201, { ...insight, disclaimer: AI_DISCLAIMER }, corsOrigin);
       return true;
     }
 
