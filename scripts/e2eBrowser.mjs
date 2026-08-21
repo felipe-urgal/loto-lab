@@ -285,11 +285,15 @@ try {
   })()`);
   await waitFor(client, "document.querySelector('#a2-detail').hidden", "number detail Escape close");
 
+  // For responsive-layout checks we want a deterministic CSS viewport, not
+  // Chrome's mobile-device emulation heuristics. The real page already carries
+  // a width=device-width viewport meta tag; this override exercises the 390px
+  // media-query layout directly and reproducibly in headless Chrome.
   await client.send("Emulation.setDeviceMetricsOverride", {
     width: 390,
     height: 844,
     deviceScaleFactor: 1,
-    mobile: true,
+    mobile: false,
   });
   await navigate(client, "/#analysis");
   await waitFor(client, "Boolean(document.querySelector('.a2-shell'))", "mobile Analyses 2.0 shell");
@@ -297,12 +301,14 @@ try {
     const tabs = document.querySelector('.a2-tabs');
     const firstNumber = document.querySelector('[data-a2-number]');
     return {
-      width: innerWidth,
+      width: document.documentElement.clientWidth,
+      mobileBreakpoint: matchMedia('(max-width: 680px)').matches,
       tabsVisible: Boolean(tabs && getComputedStyle(tabs).display !== 'none'),
       firstNumberVisible: Boolean(firstNumber && firstNumber.getBoundingClientRect().width > 0)
     };
   })()`);
-  assert(mobileAnalysis.width === 390, "Analyses mobile viewport override was not applied");
+  assert(mobileAnalysis.mobileBreakpoint, `Analyses responsive breakpoint was not active: ${JSON.stringify(mobileAnalysis)}`);
+  assert(mobileAnalysis.width <= 390, `Analyses responsive viewport is wider than expected: ${JSON.stringify(mobileAnalysis)}`);
   assert(mobileAnalysis.tabsVisible, "Analyses tabs are not visible on mobile");
   assert(mobileAnalysis.firstNumberVisible, "Analyses ranking numbers are not visible on mobile");
   await evaluate(client, "document.querySelector('[data-a2-number]').click(); true");
@@ -310,7 +316,7 @@ try {
   const mobileDrawer = await evaluate(client, `(() => {
     const detail = document.querySelector('#a2-detail');
     const rect = detail.getBoundingClientRect();
-    return { width: rect.width, left: rect.left, viewport: innerWidth };
+    return { width: rect.width, left: rect.left, viewport: document.documentElement.clientWidth };
   })()`);
   assert(mobileDrawer.width <= mobileDrawer.viewport + 1, "Analyses detail drawer overflows the mobile viewport");
   assert(mobileDrawer.left >= -1, "Analyses detail drawer starts outside the mobile viewport");
