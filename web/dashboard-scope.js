@@ -122,12 +122,18 @@ function number(value) {
   return String(value).padStart(2, "0");
 }
 
+function nextContestNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric + 1 : null;
+}
+
 function balls(numbers) {
   return (numbers || []).map((value) => `<span class="ball">${number(value)}</span>`).join("");
 }
 
 function toneFor(value) {
-  return typeof value === "number" ? (value >= 0 ? "positive" : "negative") : "";
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? (numeric >= 0 ? "positive" : "negative") : "";
 }
 
 function netTone(value) {
@@ -151,6 +157,7 @@ function focusedLatestCard(lottery, contest) {
     </article>`;
   }
 
+  const nextContest = nextContestNumber(contest.number);
   return `<article class="panel dashboard-latest-card">
     <div class="dashboard-latest-main">
       <div class="dashboard-latest-head">
@@ -158,7 +165,7 @@ function focusedLatestCard(lottery, contest) {
         <strong class="dashboard-contest-number">Concurso ${contest.number}</strong>
       </div>
       <div class="draw-numbers">${balls(contest.numbers)}</div>
-      <span class="dashboard-target">Próximo alvo <strong>#${contest.number + 1}</strong></span>
+      <span class="dashboard-target">Próximo alvo <strong>${nextContest ? `#${nextContest}` : "—"}</strong></span>
     </div>
     ${dashboardAction("generate", lottery, "Gerar jogos", "primary")}
   </article>`;
@@ -214,10 +221,11 @@ function latestLotteryCard(lottery, contest) {
     return `<article class="panel dashboard-lottery-card"><div class="dashboard-lottery-head"><strong>${LOTTERIES[lottery]}</strong><span>Sem dados</span></div><div class="dashboard-inline-empty"><span>Atualize os dados para carregar esta loteria.</span></div></article>`;
   }
 
+  const nextContest = nextContestNumber(contest.number);
   return `<article class="panel dashboard-lottery-card">
     <div class="dashboard-lottery-head"><strong>${LOTTERIES[lottery]}</strong><span>#${contest.number} · ${formatDate(contest.date)}</span></div>
     <div class="draw-numbers dashboard-lottery-numbers">${balls(contest.numbers)}</div>
-    <div class="dashboard-lottery-footer"><span>Próximo <strong>#${contest.number + 1}</strong></span>${dashboardAction("generate", lottery, "Gerar")}</div>
+    <div class="dashboard-lottery-footer"><span>Próximo <strong>${nextContest ? `#${nextContest}` : "—"}</strong></span>${dashboardAction("generate", lottery, "Gerar")}</div>
   </article>`;
 }
 
