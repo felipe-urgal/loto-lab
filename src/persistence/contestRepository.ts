@@ -19,6 +19,10 @@ interface AnalysisContestRow {
   numbers: number[];
 }
 
+interface GenerationContestRow extends AnalysisContestRow {
+  lucky_month: string | null;
+}
+
 interface ContestStatusRow {
   contest_count: string;
   first_contest: number | null;
@@ -45,6 +49,13 @@ function mapAnalysisContest(row: AnalysisContestRow): Contest {
     number: row.contest_number,
     date: row.draw_date,
     numbers: row.numbers.map(Number),
+  };
+}
+
+function mapGenerationContest(row: GenerationContestRow): Contest {
+  return {
+    ...mapAnalysisContest(row),
+    ...(row.lucky_month ? { luckyMonth: row.lucky_month } : {}),
   };
 }
 
@@ -153,6 +164,24 @@ export class PostgresContestRepository {
       [lottery],
     );
     return result.rows.map(mapAnalysisContest);
+  }
+
+  async listGenerationHistory(lottery: LotteryId): Promise<Contest[]> {
+    const result = await this.pool.query<GenerationContestRow>(
+      `
+        SELECT
+          lottery,
+          contest_number,
+          draw_date::text AS draw_date,
+          numbers,
+          lucky_month
+        FROM contests
+        WHERE lottery = $1
+        ORDER BY contest_number ASC
+      `,
+      [lottery],
+    );
+    return result.rows.map(mapGenerationContest);
   }
 
   async listContestNumbers(

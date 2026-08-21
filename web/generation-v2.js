@@ -37,13 +37,6 @@ async function postJson(path, body, signal) {
   return payload;
 }
 
-async function getJson(path, signal) {
-  const response = await fetch(`/api/v1${path}`, { signal });
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error?.message || `Erro HTTP ${response.status}`);
-  return payload;
-}
-
 function formatInteger(value) {
   return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(Number(value) || 0);
 }
@@ -62,8 +55,12 @@ function numberLabel(value) {
   return String(value).padStart(2, "0");
 }
 
-function tierByNumber(analysis) {
-  return new Map((analysis?.numbers || []).map((row) => [row.number, row.tier]));
+function tierByNumber(plan) {
+  const result = new Map();
+  for (const tier of ["strong", "balanced", "cold"]) {
+    for (const number of plan?.numberTiers?.[tier] || []) result.set(number, tier);
+  }
+  return result;
 }
 
 function constraintPayload(state) {
@@ -107,45 +104,60 @@ function rangeOptions(minimum, maximum, selected) {
 
 function fixedCountOptions(state) {
   return state.plan.methodology.fixedCountOptions.map((value) =>
-    `<option value="${value}" ${value === state.fixedCount ? "selected" : ""} ${value < state.fixed.size ? "disabled" : ""}>${value} ${value === 1 ? "fixa" : "fixas"}</option>`,
+    `<option value="${value}" ${value === state.fixedCount ? "selected" : ""} ${value < state.fixed.size ? "disabled" : ""}>${value} fixas</option>`,
   ).join("");
 }
 
-function filterMarkup(key, title, baseline, state, minimum, maximum, unit = "") {
+function filterMarkup(key, title, baseline, state, minimum, maximum, disabled = false) {
   const filter = state.filters[key];
-  return `<div class="g2-filter" data-g2-filter="${key}" aria-disabled="${filter.enabled ? "false" : "true"}">
+  const inactive = !filter.enabled || disabled;
+  return `<div class="g2-filter" data-g2-filter="${key}" aria-disabled="${inactive ? "true" : "false"}">
     <div class="g2-filter-top">
-      <label class="g2-filter-toggle"><input type="checkbox" data-g2-filter-toggle="${key}" ${filter.enabled ? "checked" : ""} /> ${escapeHtml(title)}</label>
-      <span class="g2-filter-baseline">${escapeHtml(baseline)}</span>
+      <label class="g2-filter-toggle"><input type="checkbox" data-g2-filter-toggle="${key}" ${filter.enabled ? "checked" : ""} ${disabled ? "disabled" : ""} /> ${escapeHtml(title)}</label>
+      <span class="g2-filter-baseline" data-g2-filter-baseline="${key}">${escapeHtml(baseline)}</span>
     </div>
     <div class="g2-range">
-      <select data-g2-range="${key}:min" aria-label="Mínimo de ${escapeHtml(title)}">${rangeOptions(minimum, maximum, filter.min)}</select>
+      <select data-g2-range="${key}:min" aria-label="Mínimo de ${escapeHtml(title)}" ${inactive ? "disabled" : ""}>${rangeOptions(minimum, maximum, filter.min)}</select>
       <span>até</span>
-      <select data-g2-range="${key}:max" aria-label="Máximo de ${escapeHtml(title)}">${rangeOptions(minimum, maximum, filter.max)}</select>
+      <select data-g2-range="${key}:max" aria-label="Máximo de ${escapeHtml(title)}" ${inactive ? "disabled" : ""}>${rangeOptions(minimum, maximum, filter.max)}</select>
     </div>
-    ${unit ? `<div class="g2-selection-summary">Faixa em ${escapeHtml(unit)}</div>` : ""}
   </div>`;
 }
 
 function sumFilterMarkup(state) {
   const filter = state.filters.sum;
-  const expected = state.plan.baseline.expectedSum;
-  const deviation = state.plan.baseline.sumStdDev;
+  const baseline = state.plan.baseline;
   return `<div class="g2-filter" data-g2-filter="sum" aria-disabled="${filter.enabled ? "false" : "true"}">
     <div class="g2-filter-top">
       <label class="g2-filter-toggle"><input type="checkbox" data-g2-filter-toggle="sum" ${filter.enabled ? "checked" : ""} /> Limitar soma</label>
-      <span class="g2-filter-baseline">Esperado ${formatDecimal(expected)} · desvio ${formatDecimal(deviation)}</span>
+      <span class="g2-filter-baseline" data-g2-filter-baseline="sum">Esperado ${formatDecimal(baseline.expectedSum)} · desvio ${formatDecimal(baseline.sumStdDev)}</span>
     </div>
     <div class="g2-range">
-      <input type="number" data-g2-range="sum:min" value="${filter.min}" aria-label="Soma mínima" />
+      <input type="number" data-g2-range="sum:min" value="${filter.min}" aria-label="Soma mínima" ${filter.enabled ? "" : "disabled"} />
       <span>até</span>
-      <input type="number" data-g2-range="sum:max" value="${filter.max}" aria-label="Soma máxima" />
+      <input type="number" data-g2-range="sum:max" value="${filter.max}" aria-label="Soma máxima" ${filter.enabled ? "" : "disabled"} />
     </div>
   </div>`;
 }
 
+function filtersMarkup(state) {
+  const repeatedExpected = state.plan.baseline.expectedRepeated;
+  const repeatedUnavailable = !state.plan.dataQuality.previousContestAvailable;
+  return `${filterMarkup("odd", "Faixa de ímpares", `Esperado ${formatDecimal(state.plan.baseline.expectedOdd)}`, state, 0, state.plan.drawSize)}
+    ${filterMarkup(
+      "repeated",
+      "Repetidas do concurso anterior",
+      repeatedUnavailable ? `Concurso #${state.plan.dataQuality.expectedPreviousContestNumber ?? "—"} indisponível` : `Esperado ${formatDecimal(repeatedExpected)}`,
+      state,
+      0,
+      state.plan.drawSize,
+      repeatedUnavailable,
+    )}
+    ${sumFilterMarkup(state)}`;
+}
+
 function numberGridMarkup(state) {
-  const tiers = tierByNumber(state.analysis);
+  const tiers = tierByNumber(state.plan);
   let html = "";
   for (let value = 1; value <= state.plan.universeSize; value += 1) {
     const selection = state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
@@ -156,18 +168,30 @@ function numberGridMarkup(state) {
   return html;
 }
 
+function algorithmSpace(state) {
+  return state.plan.algorithmSpaces?.[String(state.fixedCount)] || {
+    candidatePoolSize: 0,
+    rawCombinationCapacity: 0,
+    shortlistLimit: 0,
+    variableCount: state.plan.drawSize - state.fixedCount,
+  };
+}
+
 function planMarkup(state) {
   const plan = state.plan;
+  const algorithm = algorithmSpace(state);
   const coverage = Math.max(0, Math.min(1, plan.space.overallCoverage));
-  return `<div class="g2-card-head"><div><strong>Espaço combinatório</strong><span>Contagem exata para a configuração atual.</span></div></div>
+  const issue = plan.constraintIssues?.[0];
+  return `<div class="g2-card-head"><div><strong>Espaço e funil do motor</strong><span>Matemática global separada do espaço realmente percorrido pelo algoritmo.</span></div></div>
     <div class="g2-plan-grid">
-      <div class="g2-plan-stat"><span>Universo total</span><strong>${formatInteger(plan.baseline.totalCombinations)}</strong><small>combinações válidas da loteria</small></div>
-      <div class="g2-plan-stat"><span>Após fixar/excluir</span><strong>${formatInteger(plan.space.afterManualSelection)}</strong><small>antes dos filtros estruturais</small></div>
-      <div class="g2-plan-stat"><span>Elegíveis</span><strong>${formatInteger(plan.space.eligibleCombinations)}</strong><small>atendem aos filtros ativos</small></div>
-      <div class="g2-plan-stat"><span>Cobertura do universo</span><strong>${formatPercent(plan.space.overallCoverage)}</strong><small>${formatPercent(plan.space.structuralCoverage)} após a seleção manual</small></div>
+      <div class="g2-plan-stat"><span>Universo matemático</span><strong>${formatInteger(plan.lotteryBaseline.totalCombinations)}</strong><small>todas as combinações simples</small></div>
+      <div class="g2-plan-stat"><span>Após seleção manual</span><strong>${formatInteger(plan.space.afterManualSelection)}</strong><small>fixadas/excluídas, antes dos filtros</small></div>
+      <div class="g2-plan-stat"><span>Elegíveis matematicamente</span><strong>${formatInteger(plan.space.eligibleCombinations)}</strong><small>atendem aos filtros estruturais</small></div>
+      <div class="g2-plan-stat"><span>Pool explorado pelo motor</span><strong>${formatInteger(algorithm.rawCombinationCapacity)}</strong><small>${algorithm.candidatePoolSize} dezenas no pool · shortlist até ${algorithm.shortlistLimit}</small></div>
     </div>
     <div class="g2-space-bar" aria-hidden="true"><span style="width:${Math.max(.2, coverage * 100)}%"></span></div>
-    <p class="g2-disclaimer"><strong>Importante:</strong> restringir o espaço organiza a seleção, mas não aumenta a probabilidade matemática individual de uma combinação válida ser sorteada.</p>`;
+    ${issue ? `<p class="g2-error">${escapeHtml(issue)}</p>` : ""}
+    <p class="g2-disclaimer"><strong>Importante:</strong> o contador elegível descreve o universo matemático. O motor ranqueia um pool menor por pontuação e diversificação; restringir o espaço não aumenta a probabilidade individual de uma combinação ser sorteada.</p>`;
 }
 
 function methodologyMarkup(state) {
@@ -177,15 +201,40 @@ function methodologyMarkup(state) {
   </div>`;
 }
 
+function baselineMarkup(state) {
+  const plan = state.plan;
+  const conditional = plan.baseline;
+  const lottery = plan.lotteryBaseline;
+  const reference = plan.dataQuality.previousContestAvailable ? `#${plan.referenceContestNumber}` : "indisponível";
+  const gaps = plan.dataQuality.historyGapCount;
+  return `<div class="g2-card-head"><div><strong>Baseline condicionado</strong><span>Referências após fixadas/excluídas; a referência original da loteria aparece abaixo.</span></div></div>
+    <div class="g2-plan-grid">
+      <div class="g2-plan-stat"><span>Ímpares esperados</span><strong>${formatDecimal(conditional.expectedOdd)}</strong><small>loteria sem seleção: ${formatDecimal(lottery.expectedOdd)}</small></div>
+      <div class="g2-plan-stat"><span>Repetidas esperadas</span><strong>${conditional.expectedRepeated === null ? "—" : formatDecimal(conditional.expectedRepeated)}</strong><small>loteria: ${lottery.expectedRepeated === null ? "—" : formatDecimal(lottery.expectedRepeated)} · referência ${reference}</small></div>
+      <div class="g2-plan-stat"><span>Soma esperada</span><strong>${formatDecimal(conditional.expectedSum)}</strong><small>loteria: ${formatDecimal(lottery.expectedSum)} · desvio cond. ${formatDecimal(conditional.sumStdDev)}</small></div>
+      <div class="g2-plan-stat"><span>Histórico usado</span><strong>${formatInteger(plan.historyCount)}</strong><small>${gaps ? `${formatInteger(gaps)} concurso(s) ausente(s) no histórico` : "sequência armazenada sem gaps internos"}</small></div>
+    </div>
+    ${!plan.dataQuality.previousContestAvailable ? `<p class="g2-disclaimer"><strong>Repetição indisponível:</strong> falta o concurso #${escapeHtml(plan.dataQuality.expectedPreviousContestNumber ?? "—")}. Nenhum concurso mais antigo é usado como substituto.</p>` : ""}`;
+}
+
+function selectionModesMarkup(state) {
+  const modes = [
+    ["fix", "Fixar"],
+    ["exclude", "Excluir"],
+    ["auto", "Automática"],
+  ];
+  return `<div class="g2-result-actions" role="group" aria-label="Ação ao clicar nas dezenas">
+    ${modes.map(([mode, label]) => `<button class="button compact ${state.selectionMode === mode ? "primary" : ""}" type="button" data-g2-selection-mode="${mode}" aria-pressed="${state.selectionMode === mode ? "true" : "false"}">${label}</button>`).join("")}
+  </div>`;
+}
+
 function workspaceMarkup(state) {
-  const profile = state.plan.methodology;
-  const repeatedExpected = state.plan.baseline.expectedRepeated;
   return `<div class="g2-shell" data-g2-shell>
-    <div class="g2-principle"><strong>Algoritmo calcula; você audita.</strong><span>Configure o lote, veja exatamente quanto cada escolha restringe o universo, gere uma prévia reproduzível e só então salve o lote escolhido.</span></div>
+    <div class="g2-principle"><strong>Algoritmo calcula; você audita.</strong><span>Configure o lote, veja o universo matemático e o espaço realmente explorado, gere uma prévia congelada e só então salve.</span></div>
     <div class="g2-workspace">
       <div class="g2-main">
         <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>1. Configuração do lote</strong><span>O concurso alvo define o corte histórico; nenhuma informação futura entra no cálculo.</span></div></div>
+          <div class="g2-card-head"><div><strong>1. Configuração do lote</strong><span>O concurso alvo define o corte histórico usado no plano, nas cores das dezenas e na geração.</span></div></div>
           <div class="g2-form-grid">
             <div class="g2-field"><label for="g2-game-count">Quantidade de jogos</label><input id="g2-game-count" type="number" min="1" max="10" value="${state.gameCount}" /></div>
             <div class="g2-field"><label for="g2-fixed-count">Núcleo compartilhado</label><select id="g2-fixed-count">${fixedCountOptions(state)}</select></div>
@@ -194,7 +243,8 @@ function workspaceMarkup(state) {
         </section>
 
         <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>2. Dezenas</strong><span>Clique para alternar entre automática, fixada e excluída. O restante do núcleo é completado pelo algoritmo.</span></div></div>
+          <div class="g2-card-head"><div><strong>2. Dezenas</strong><span>Escolha explicitamente a ação e clique nas dezenas. As cores Forte/Intermediária/Fria usam somente o histórico anterior ao alvo.</span></div></div>
+          ${selectionModesMarkup(state)}
           <div class="g2-number-legend">
             <span><i class="g2-key"></i> Automática</span><span><i class="g2-key is-fixed"></i> Fixada</span><span><i class="g2-key is-excluded"></i> Excluída</span>
             <span><i class="g2-key is-strong"></i> Forte</span><span><i class="g2-key is-balanced"></i> Intermediária</span><span><i class="g2-key is-cold"></i> Fria</span>
@@ -204,18 +254,14 @@ function workspaceMarkup(state) {
         </section>
 
         <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>3. Filtros estruturais</strong><span>Desligados por padrão. Ative somente quando quiser impor uma restrição rígida ao espaço de combinações.</span></div></div>
-          <div class="g2-filter-list">
-            ${filterMarkup("odd", "Faixa de ímpares", `Esperado ${formatDecimal(state.plan.baseline.expectedOdd)}`, state, 0, state.plan.drawSize)}
-            ${filterMarkup("repeated", "Repetidas do concurso anterior", repeatedExpected === null ? "Sem concurso de referência" : `Esperado ${formatDecimal(repeatedExpected)}`, state, 0, state.plan.drawSize)}
-            ${sumFilterMarkup(state)}
-          </div>
+          <div class="g2-card-head"><div><strong>3. Filtros estruturais</strong><span>Desligados por padrão. Os baselines abaixo são condicionados às dezenas manuais atuais.</span></div></div>
+          <div class="g2-filter-list" data-g2-filters>${filtersMarkup(state)}</div>
           <div style="margin-top:14px">${methodologyMarkup(state)}</div>
         </section>
 
         <section class="panel g2-card">
           <div class="g2-actions">
-            <div class="g2-actions-copy">A prévia não entra em <strong>Meus jogos</strong>. Ela recebe uma seed e pode ser reproduzida exatamente antes de você decidir salvar.</div>
+            <div class="g2-actions-copy">A prévia fica congelada por até 24 horas com hash do histórico, configuração, fingerprint dos jogos e chave idempotente. Se o histórico mudar, o save é recusado.</div>
             <button class="button primary" type="button" data-g2-preview>Gerar prévia auditável</button>
           </div>
           <div class="g2-error" data-g2-error hidden></div>
@@ -226,15 +272,7 @@ function workspaceMarkup(state) {
 
       <aside class="g2-side">
         <section class="panel g2-card" data-g2-plan>${planMarkup(state)}</section>
-        <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>Baseline atual</strong><span>Referências matemáticas, não previsões.</span></div></div>
-          <div class="g2-plan-grid">
-            <div class="g2-plan-stat"><span>Ímpares esperados</span><strong>${formatDecimal(state.plan.baseline.expectedOdd)}</strong><small>em ${state.plan.drawSize} dezenas</small></div>
-            <div class="g2-plan-stat"><span>Repetidas esperadas</span><strong>${repeatedExpected === null ? "—" : formatDecimal(repeatedExpected)}</strong><small>contra o concurso #${state.plan.referenceContestNumber ?? "—"}</small></div>
-            <div class="g2-plan-stat"><span>Soma esperada</span><strong>${formatDecimal(state.plan.baseline.expectedSum)}</strong><small>desvio ${formatDecimal(state.plan.baseline.sumStdDev)}</small></div>
-            <div class="g2-plan-stat"><span>Histórico usado</span><strong>${formatInteger(state.plan.historyCount)}</strong><small>concursos anteriores ao alvo</small></div>
-          </div>
-        </section>
+        <section class="panel g2-card" data-g2-baseline>${baselineMarkup(state)}</section>
       </aside>
     </div>
   </div>`;
@@ -245,23 +283,33 @@ function selectionSummary(state, message = "") {
   if (!target) return;
   const fixed = [...state.fixed].sort((a, b) => a - b).map(numberLabel).join(", ") || "nenhuma";
   const excluded = [...state.excluded].sort((a, b) => a - b).map(numberLabel).join(", ") || "nenhuma";
-  target.innerHTML = `<span>Fixadas <strong>${escapeHtml(fixed)}</strong></span><span>Excluídas <strong>${escapeHtml(excluded)}</strong></span>${message ? `<span><strong>${escapeHtml(message)}</strong></span>` : ""}`;
+  const modeLabel = state.selectionMode === "fix" ? "Fixar" : state.selectionMode === "exclude" ? "Excluir" : "Automática";
+  target.innerHTML = `<span>Ação <strong>${modeLabel}</strong></span><span>Fixadas <strong>${escapeHtml(fixed)}</strong></span><span>Excluídas <strong>${escapeHtml(excluded)}</strong></span>${message ? `<span><strong>${escapeHtml(message)}</strong></span>` : ""}`;
+}
+
+function updateModeButtons(state) {
+  root?.querySelectorAll("[data-g2-selection-mode]").forEach((button) => {
+    const active = button.dataset.g2SelectionMode === state.selectionMode;
+    button.classList.toggle("primary", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
 }
 
 function updateNumberButtons(state) {
+  const tiers = tierByNumber(state.plan);
   root?.querySelectorAll("[data-g2-number]").forEach((button) => {
     const value = Number(button.dataset.g2Number);
     const selection = state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
+    const tier = tiers.get(value) || "";
     button.dataset.selection = selection;
     button.classList.toggle("is-fixed", selection === "fixed");
     button.classList.toggle("is-excluded", selection === "excluded");
+    for (const name of ["strong", "balanced", "cold"]) button.classList.toggle(`is-${name}`, tier === name);
     const label = selection === "fixed" ? "fixada" : selection === "excluded" ? "excluída" : "automática";
     button.setAttribute("aria-label", `Dezena ${numberLabel(value)}: ${label}`);
   });
   const select = root?.querySelector("#g2-fixed-count");
-  if (select) {
-    [...select.options].forEach((option) => { option.disabled = Number(option.value) < state.fixed.size; });
-  }
+  if (select) [...select.options].forEach((option) => { option.disabled = Number(option.value) < state.fixed.size; });
 }
 
 function clearPreview(state) {
@@ -295,19 +343,21 @@ function renderPreview(state) {
   const preview = state.preview;
   const audit = preview.audit;
   const seed = preview.generatorOptions?.seed || "—";
+  const proof = preview.preview?.id || preview.generatorOptions?.previewId || "—";
   target.innerHTML = `<div class="g2-preview">
-    <div class="g2-preview-head"><div><h2>4. Prévia auditável</h2><p>Este lote ainda não foi salvo. Revise a cobertura e as estruturas antes de persistir.</p></div></div>
+    <div class="g2-preview-head"><div><h2>4. Prévia auditável</h2><p>Este lote ainda não foi salvo. O servidor congelou os jogos e as provas da revisão usada para gerá-los.</p></div></div>
     <div class="g2-audit-grid">
       <div class="g2-audit"><span>Núcleo compartilhado</span><strong>${audit.sharedCore.map(numberLabel).join(" · ") || "Sem núcleo"}</strong><small>${audit.sharedCore.length} dezenas em todos os jogos</small></div>
       <div class="g2-audit"><span>Cobertura do lote</span><strong>${audit.uniqueNumbers.length} dezenas</strong><small>${audit.uniqueVariableNumbers.length} variáveis distintas</small></div>
       <div class="g2-audit"><span>Sobreposição média</span><strong>${formatDecimal(audit.averagePairwiseOverlap)}</strong><small>mín. ${formatDecimal(audit.minimumPairwiseOverlap)} · máx. ${formatDecimal(audit.maximumPairwiseOverlap)}</small></div>
-      <div class="g2-audit"><span>Espaço elegível</span><strong>${formatInteger(audit.plan.space.eligibleCombinations)}</strong><small>${formatPercent(audit.plan.space.overallCoverage)} do universo</small></div>
+      <div class="g2-audit"><span>Elegíveis matematicamente</span><strong>${formatInteger(audit.plan.space.eligibleCombinations)}</strong><small>${formatPercent(audit.plan.space.overallCoverage)} do universo</small></div>
     </div>
     <div class="g2-game-grid">${preview.games.map(gameMarkup).join("")}</div>
-    <div class="g2-seed"><strong>Seed reproduzível</strong><code>${escapeHtml(seed)}</code></div>
+    <div class="g2-seed"><strong>Seed</strong><code>${escapeHtml(seed)}</code></div>
+    <div class="g2-seed"><strong>Preview ID</strong><code>${escapeHtml(proof)}</code></div>
     <div class="g2-result-actions">
       <button class="button" type="button" data-g2-another>Gerar outra prévia</button>
-      <button class="button primary" type="button" data-g2-save>Salvar este lote</button>
+      <button class="button primary" type="button" data-g2-save>Salvar exatamente este lote</button>
       <span class="g2-saved" data-g2-saved hidden></span>
     </div>
   </div>`;
@@ -329,7 +379,7 @@ async function generatePreview(state) {
   } catch (error) {
     setError(error instanceof Error ? error.message : "Falha ao gerar a prévia");
   } finally {
-    if (button) button.disabled = false;
+    if (button?.isConnected) button.disabled = false;
     if (another?.isConnected) another.disabled = false;
   }
 }
@@ -352,14 +402,6 @@ async function savePreview(state) {
   }
 }
 
-function updateFilterState(rootNode, state, key) {
-  const filter = state.filters[key];
-  const toggle = rootNode.querySelector(`[data-g2-filter-toggle="${key}"]`);
-  filter.enabled = Boolean(toggle?.checked);
-  const panel = rootNode.querySelector(`[data-g2-filter="${key}"]`);
-  panel?.setAttribute("aria-disabled", filter.enabled ? "false" : "true");
-}
-
 function updateRange(state, key, edge, value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return;
@@ -368,10 +410,41 @@ function updateRange(state, key, edge, value) {
     if (edge === "min") state.filters[key].max = state.filters[key].min;
     else state.filters[key].min = state.filters[key].max;
   }
+  const min = root?.querySelector(`[data-g2-range="${key}:min"]`);
+  const max = root?.querySelector(`[data-g2-range="${key}:max"]`);
+  if (min) min.value = String(state.filters[key].min);
+  if (max) max.value = String(state.filters[key].max);
+}
+
+function renderDynamicPlan(state) {
+  const planTarget = root?.querySelector("[data-g2-plan]");
+  if (planTarget) planTarget.innerHTML = planMarkup(state);
+  const baselineTarget = root?.querySelector("[data-g2-baseline]");
+  if (baselineTarget) baselineTarget.innerHTML = baselineMarkup(state);
+  updateNumberButtons(state);
+  const repeatedToggle = root?.querySelector('[data-g2-filter-toggle="repeated"]');
+  if (repeatedToggle) repeatedToggle.disabled = !state.plan.dataQuality.previousContestAvailable;
+  const filterBaselines = {
+    odd: `Esperado ${formatDecimal(state.plan.baseline.expectedOdd)}`,
+    repeated: state.plan.dataQuality.previousContestAvailable
+      ? `Esperado ${formatDecimal(state.plan.baseline.expectedRepeated)}`
+      : `Concurso #${state.plan.dataQuality.expectedPreviousContestNumber ?? "—"} indisponível`,
+    sum: `Esperado ${formatDecimal(state.plan.baseline.expectedSum)} · desvio ${formatDecimal(state.plan.baseline.sumStdDev)}`,
+  };
+  for (const [key, text] of Object.entries(filterBaselines)) {
+    const node = root?.querySelector(`[data-g2-filter-baseline="${key}"]`);
+    if (node) node.textContent = text;
+  }
+  const algorithm = algorithmSpace(state);
+  const previewButton = root?.querySelector("[data-g2-preview]");
+  const invalid = state.plan.space.eligibleCombinations < 1 || algorithm.rawCombinationCapacity < 1 || (state.plan.constraintIssues?.length ?? 0) > 0;
+  if (previewButton) previewButton.disabled = invalid;
 }
 
 function bindWorkspace(state) {
   selectionSummary(state);
+  updateModeButtons(state);
+  renderDynamicPlan(state);
   let planTimer;
   let planSequence = 0;
 
@@ -381,11 +454,15 @@ function bindWorkspace(state) {
       const plan = await postJson("/generation/plan", planPayload(state), state.controller.signal);
       if (sequence !== planSequence || state.controller.signal.aborted) return;
       state.plan = plan;
-      const target = root?.querySelector("[data-g2-plan]");
-      if (target) target.innerHTML = planMarkup(state);
-      const previewButton = root?.querySelector("[data-g2-preview]");
-      if (previewButton) previewButton.disabled = plan.space.eligibleCombinations < 1;
-      setError(plan.space.eligibleCombinations < 1 ? "Nenhuma combinação atende à configuração atual." : "");
+      if (!plan.dataQuality.previousContestAvailable && state.filters.repeated.enabled) {
+        state.filters.repeated.enabled = false;
+        const toggle = root?.querySelector('[data-g2-filter-toggle="repeated"]');
+        if (toggle) toggle.checked = false;
+        return void refreshPlan();
+      }
+      renderDynamicPlan(state);
+      const issue = plan.constraintIssues?.[0];
+      setError(issue || (plan.space.eligibleCombinations < 1 ? "Nenhuma combinação atende à configuração atual." : ""));
     } catch (error) {
       if (state.controller.signal.aborted) return;
       setError(error instanceof Error ? error.message : "Não foi possível recalcular o espaço combinatório");
@@ -398,8 +475,10 @@ function bindWorkspace(state) {
     planTimer = setTimeout(() => void refreshPlan(), 220);
   }
 
-  root?.querySelector("#g2-game-count")?.addEventListener("input", (event) => {
-    state.gameCount = Math.max(1, Math.min(10, Number(event.target.value) || 1));
+  root?.querySelector("#g2-game-count")?.addEventListener("change", (event) => {
+    const value = Math.max(1, Math.min(10, Math.round(Number(event.target.value) || 1)));
+    state.gameCount = value;
+    event.target.value = String(value);
     clearPreview(state);
   });
 
@@ -413,6 +492,7 @@ function bindWorkspace(state) {
     state.fixedCount = next;
     selectionSummary(state);
     clearPreview(state);
+    renderDynamicPlan(state);
   });
 
   root?.querySelector("#g2-target")?.addEventListener("change", (event) => {
@@ -423,28 +503,45 @@ function bindWorkspace(state) {
     }
   });
 
+  root?.querySelectorAll("[data-g2-selection-mode]").forEach((button) => button.addEventListener("click", () => {
+    state.selectionMode = button.dataset.g2SelectionMode;
+    updateModeButtons(state);
+    selectionSummary(state);
+  }));
+
   root?.querySelectorAll("[data-g2-number]").forEach((button) => button.addEventListener("click", () => {
     const value = Number(button.dataset.g2Number);
-    if (state.fixed.has(value)) {
+    let message = "";
+    if (state.selectionMode === "fix") {
+      if (state.fixed.has(value)) {
+        state.fixed.delete(value);
+      } else if (state.fixedCount === 0) {
+        message = "Selecione um núcleo compartilhado maior que zero para fixar dezenas.";
+      } else if (state.fixed.size >= state.fixedCount) {
+        message = `O núcleo já tem ${state.fixedCount} dezenas fixadas manualmente.`;
+      } else {
+        state.excluded.delete(value);
+        state.fixed.add(value);
+      }
+    } else if (state.selectionMode === "exclude") {
       state.fixed.delete(value);
-      state.excluded.add(value);
-    } else if (state.excluded.has(value)) {
-      state.excluded.delete(value);
-    } else if (state.fixedCount === 0) {
-      state.excluded.add(value);
-    } else if (state.fixed.size < state.fixedCount) {
-      state.fixed.add(value);
+      if (state.excluded.has(value)) state.excluded.delete(value);
+      else state.excluded.add(value);
     } else {
-      selectionSummary(state, `O núcleo já tem ${state.fixedCount} dezenas fixadas manualmente.`);
-      return;
+      state.fixed.delete(value);
+      state.excluded.delete(value);
     }
     updateNumberButtons(state);
-    selectionSummary(state);
-    schedulePlan();
+    selectionSummary(state, message);
+    if (!message) schedulePlan();
   }));
 
   root?.querySelectorAll("[data-g2-filter-toggle]").forEach((toggle) => toggle.addEventListener("change", () => {
-    updateFilterState(root, state, toggle.dataset.g2FilterToggle);
+    const key = toggle.dataset.g2FilterToggle;
+    state.filters[key].enabled = Boolean(toggle.checked);
+    const panel = root?.querySelector(`[data-g2-filter="${key}"]`);
+    panel?.setAttribute("aria-disabled", state.filters[key].enabled ? "false" : "true");
+    root?.querySelectorAll(`[data-g2-range^="${key}:"]`).forEach((control) => { control.disabled = !state.filters[key].enabled; });
     schedulePlan();
   }));
 
@@ -478,15 +575,12 @@ async function mount(detail) {
   const controller = new AbortController();
 
   try {
-    const [analysis, plan] = await Promise.all([
-      getJson(`/analysis/${lottery}`, controller.signal),
-      postJson("/generation/plan", {
-        lottery,
-        ...(legacyTarget ? { targetContestNumber: legacyTarget } : {}),
-        fixedNumbers: [],
-        excludedNumbers: [],
-      }, controller.signal),
-    ]);
+    const plan = await postJson("/generation/plan", {
+      lottery,
+      ...(legacyTarget ? { targetContestNumber: legacyTarget } : {}),
+      fixedNumbers: [],
+      excludedNumbers: [],
+    }, controller.signal);
     if (token !== lifecycleToken || currentView() !== "generate" || controller.signal.aborted) return;
 
     const preferredSumMin = Math.max(1, Math.round(plan.baseline.expectedSum - plan.baseline.sumStdDev));
@@ -498,12 +592,12 @@ async function mount(detail) {
       targetContestNumber: plan.targetContestNumber,
       fixed: new Set(),
       excluded: new Set(),
+      selectionMode: "fix",
       filters: {
         odd: { enabled: false, ...plan.methodology.preferredOdd },
         repeated: { enabled: false, ...plan.methodology.preferredRepeated },
         sum: { enabled: false, min: preferredSumMin, max: preferredSumMax },
       },
-      analysis,
       plan,
       preview: null,
       controller,
@@ -515,8 +609,6 @@ async function mount(detail) {
     cleanupCurrent = () => state.cleanup?.();
   } catch (error) {
     controller.abort();
-    // Degradação graciosa: se a camada v2 não estiver disponível, preservamos
-    // integralmente o formulário básico já renderizado pelo app principal.
     console.warn("Generator 2.0 unavailable; keeping basic generator", error);
   }
 }

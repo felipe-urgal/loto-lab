@@ -32,6 +32,7 @@ export interface MegaSenaGeneratorOptions {
   fixedNumbers?: number[];
   excludedNumbers?: number[];
   constraints?: GenerationConstraints;
+  referenceContestNumber?: number | null;
 }
 
 function bestUnused(
@@ -105,6 +106,7 @@ interface NormalizedMegaSenaGeneratorOptions {
   fixedNumbers: number[];
   excludedNumbers: number[];
   constraints?: GenerationConstraints;
+  referenceContestNumber?: number | null;
 }
 
 function normalizeOptions(
@@ -122,6 +124,7 @@ function normalizeOptions(
     fixedNumbers: value.fixedNumbers ?? [],
     excludedNumbers: value.excludedNumbers ?? [],
     ...(value.constraints !== undefined ? { constraints: value.constraints } : {}),
+    ...(value.referenceContestNumber !== undefined ? { referenceContestNumber: value.referenceContestNumber } : {}),
   };
 }
 
@@ -206,7 +209,17 @@ export function generateMegaSenaGames(
   contests: Contest[],
   options: number | MegaSenaGeneratorOptions = 2,
 ): GeneratedGame[] {
-  const { gameCount, fixedCount, generationMode, seed, rules, fixedNumbers: manualFixed, excludedNumbers, constraints } = normalizeOptions(options);
+  const {
+    gameCount,
+    fixedCount,
+    generationMode,
+    seed,
+    rules,
+    fixedNumbers: manualFixed,
+    excludedNumbers,
+    constraints,
+    referenceContestNumber,
+  } = normalizeOptions(options);
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
   }
@@ -219,10 +232,14 @@ export function generateMegaSenaGames(
     .filter((contest) => contest.lottery === "mega-sena")
     .sort((a, b) => a.number - b.number);
   const analysis = buildNumberAnalysis(scoped, config);
+  const lastContest = referenceContestNumber === undefined
+    ? scoped.at(-1)
+    : referenceContestNumber === null
+      ? undefined
+      : scoped.find((contest) => contest.number === referenceContestNumber);
   const fixedNumbers = selectMegaSenaFixedNumbers(analysis, fixedCount, random, manualFixed, excludedNumbers);
   const fixedSet = new Set(fixedNumbers);
   const excludedSet = new Set(excludedNumbers);
-  const lastContest = scoped.at(-1);
   const scoreByNumber = new Map(analysis.map((row) => [row.number, row.score]));
   const variableCount = config.drawSize - fixedCount;
   const candidatePool = buildCandidatePool(analysis, fixedSet, excludedSet, fixedCount, rules);

@@ -24,6 +24,7 @@ export interface LotofacilGeneratorOptions {
   fixedNumbers?: number[];
   excludedNumbers?: number[];
   constraints?: GenerationConstraints;
+  referenceContestNumber?: number | null;
 }
 
 export function generateLotofacilGames(
@@ -43,11 +44,18 @@ export function generateLotofacilGames(
   if (![8, 9, 10].includes(fixedCount)) {
     throw new Error("Lotofacil fixedCount must be 8, 9 or 10");
   }
+  if (manualFixed.length > fixedCount) {
+    throw new Error("Manual fixed numbers exceed the configured fixed core");
+  }
 
   const scoped = contests
     .filter((contest) => contest.lottery === "lotofacil")
     .sort((a, b) => a.number - b.number);
-  const lastContest = scoped.at(-1);
+  const lastContest = options.referenceContestNumber === undefined
+    ? scoped.at(-1)
+    : options.referenceContestNumber === null
+      ? undefined
+      : scoped.find((contest) => contest.number === options.referenceContestNumber);
   const analysis = buildNumberAnalysis(scoped, config);
   const fixedNumbers = selectProfiledFixedNumbers(
     analysis,

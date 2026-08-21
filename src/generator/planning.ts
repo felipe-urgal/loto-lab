@@ -1,4 +1,6 @@
-import type { Contest, GeneratedGame, LotteryId } from "../domain/types.js";
+import { createHash } from "node:crypto";
+import type { Contest, GeneratedGame, LotteryId, NumberTier } from "../domain/types.js";
+import { buildNumberAnalysis } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 
 export interface GenerationRange {
@@ -21,9 +23,26 @@ export interface GenerationMethodologyProfile {
   notes: string[];
 }
 
+export interface GenerationBaseline {
+  totalCombinations: number;
+  expectedOdd: number;
+  expectedRepeated: number | null;
+  expectedSum: number;
+  sumStdDev: number;
+}
+
+export interface GenerationAlgorithmSpace {
+  fixedCount: number;
+  variableCount: number;
+  candidatePoolSize: number;
+  rawCombinationCapacity: number;
+  shortlistLimit: number;
+}
+
 export interface GenerationPlan {
   lottery: LotteryId;
   historyCount: number;
+  historySignature: string;
   referenceContestNumber?: number;
   targetContestNumber?: number;
   universeSize: number;
@@ -32,13 +51,17 @@ export interface GenerationPlan {
   excludedNumbers: number[];
   constraints: GenerationConstraints;
   methodology: GenerationMethodologyProfile;
-  baseline: {
-    totalCombinations: number;
-    expectedOdd: number;
-    expectedRepeated: number | null;
-    expectedSum: number;
-    sumStdDev: number;
+  numberTiers: Record<NumberTier, number[]>;
+  lotteryBaseline: GenerationBaseline;
+  baseline: GenerationBaseline;
+  dataQuality: {
+    previousContestAvailable: boolean;
+    expectedPreviousContestNumber?: number;
+    missingPreviousContestNumber?: number;
+    historyGapCount: number;
   };
+  constraintIssues: string[];
+  algorithmSpaces: Record<string, GenerationAlgorithmSpace>;
   space: {
     afterManualSelection: number;
     eligibleCombinations: number;
@@ -161,11 +184,94 @@ function validateSelection(
   return { fixed, excluded };
 }
 
-function sumBaseline(universeSize: number, drawSize: number): { expected: number; stdDev: number } {
-  const mean = (universeSize + 1) / 2;
-  const populationVariance = (universeSize * universeSize - 1) / 12;
-  const variance = drawSize * populationVariance * ((universeSize - drawSize) / (universeSize - 1));
-  return { expected: mean * drawSize, stdDev: Math.sqrt(Math.max(0, variance)) };
+function within(value: number, range: GenerationRange | undefined): boolean {
+  return !range || (value >= range.min && value <= range.max);
+}
+
+export function scopeGenerationHistory(
+  contests: Contest[],
+  lottery: LotteryId,
+  targetContestNumber?: number,
+): { history: Contest[]; targetContestNumber?: number; referenceContest?: Contest; expectedPreviousContestNumber?: number } {
+  const scoped = contests
+    .filter((contest) => contest.lottery === lottery)
+    .sort((a, b) => a.number - b.number);
+  const latest = scoped.at(-1);
+  const target = targetContestNumber ?? (latest ? latest.number + 1 : undefined);
+  const history = target === undefined ? scoped : scoped.filter((contest) => contest.number < target);
+  const expectedPreviousContestNumber = target === undefined ? undefined : target - 1;
+  const referenceContest = expectedPreviousContestNumber === undefined
+    ? history.at(-1)
+    : history.find((contest) => contest.number === expectedPreviousContestNumber);
+  return {
+    history,
+    ...(target !== undefined ? { targetContestNumber: target } : {}),
+    ...(referenceContest ? { referenceContest } : {}),
+    ...(expectedPreviousContestNumber !== undefined ? { expectedPreviousContestNumber } : {}),
+  };
+}
+
+export function generationHistorySignature(
+  contests: Contest[],
+  lottery: LotteryId,
+  targetContestNumber?: number,
+): string {
+  const { history } = scopeGenerationHistory(contests, lottery, targetContestNumber);
+  const hash = createHash("sha256");
+  hash.update(lottery);
+  hash.update("|");
+  for (const contest of history) {
+    hash.update(String(contest.number));
+    hash.update("|");
+    hash.update(contest.date);
+    hash.update("|");
+    hash.update([...contest.numbers].sort((a, b) => a - b).join(","));
+    hash.update("|");
+    hash.update(contest.luckyMonth ?? "");
+    hash.update(";");
+  }
+  return hash.digest("hex");
+}
+
+function populationStats(values: number[]): { mean: number; variance: number } {
+  if (values.length === 0) return { mean: 0, variance: 0 };
+  const mean = values.reduce((total, value) => total + value, 0) / values.length;
+  const variance = values.reduce((total, value) => total + (value - mean) ** 2, 0) / values.length;
+  return { mean, variance };
+}
+
+function conditionalBaseline(
+  universe: number[],
+  drawSize: number,
+  fixed: number[],
+  excluded: number[],
+  referenceContest: Contest | undefined,
+  totalCombinations: number,
+): GenerationBaseline {
+  const fixedSet = new Set(fixed);
+  const excludedSet = new Set(excluded);
+  const remaining = universe.filter((value) => !fixedSet.has(value) && !excludedSet.has(value));
+  const needed = Math.max(0, drawSize - fixed.length);
+  const fixedOdd = fixed.filter((value) => value % 2 !== 0).length;
+  const remainingOdd = remaining.filter((value) => value % 2 !== 0).length;
+  const fixedSum = fixed.reduce((total, value) => total + value, 0);
+  const stats = populationStats(remaining);
+  const sampleVariance = needed === 0 || remaining.length <= 1
+    ? 0
+    : needed * stats.variance * ((remaining.length - needed) / (remaining.length - 1));
+  const referenceSet = new Set(referenceContest?.numbers ?? []);
+  const fixedRepeated = fixed.filter((value) => referenceSet.has(value)).length;
+  const remainingRepeated = remaining.filter((value) => referenceSet.has(value)).length;
+
+  return {
+    totalCombinations,
+    expectedOdd: fixedOdd + (remaining.length === 0 ? 0 : needed * remainingOdd / remaining.length),
+    expectedRepeated: referenceContest
+      ? fixedRepeated + (remaining.length === 0 ? 0 : needed * remainingRepeated / remaining.length)
+      : null,
+    expectedSum: fixedSum + needed * stats.mean,
+    sumStdDev: Math.sqrt(Math.max(0, sampleVariance)),
+  };
 }
 
 interface DpState {
@@ -184,34 +290,34 @@ function parseKey(key: string): DpState {
   return { picked: picked!, odd: odd!, repeated: repeated!, sum: sum! };
 }
 
-function within(value: number, range: GenerationRange | undefined): boolean {
-  return !range || (value >= range.min && value <= range.max);
-}
-
 function countEligible(
   lottery: LotteryId,
   fixed: number[],
   excluded: number[],
-  lastContest: Contest | undefined,
+  referenceContest: Contest | undefined,
   constraints: GenerationConstraints,
 ): number {
   const config = getLotteryConfig(lottery);
   const fixedSet = new Set(fixed);
   const excludedSet = new Set(excluded);
-  const lastSet = new Set(lastContest?.numbers ?? []);
+  const referenceSet = new Set(referenceContest?.numbers ?? []);
   const needed = config.drawSize - fixed.length;
-  const fixedOdd = fixed.filter((value) => value % 2 !== 0).length;
-  const fixedRepeated = fixed.filter((value) => lastSet.has(value)).length;
-  const fixedSum = fixed.reduce((total, value) => total + value, 0);
-
-  if (!within(fixedOdd, constraints.odd) && constraints.odd && fixedOdd > constraints.odd.max) return 0;
-  if (!within(fixedRepeated, constraints.repeated) && constraints.repeated && fixedRepeated > constraints.repeated.max) return 0;
-  if (constraints.sum && fixedSum > constraints.sum.max) return 0;
-
   const candidates = Array.from(
     { length: config.maxNumber - config.minNumber + 1 },
     (_, index) => config.minNumber + index,
   ).filter((value) => !fixedSet.has(value) && !excludedSet.has(value));
+
+  if (!constraints.odd && !constraints.repeated && !constraints.sum) {
+    return combinationCount(candidates.length, needed);
+  }
+
+  const fixedOdd = fixed.filter((value) => value % 2 !== 0).length;
+  const fixedRepeated = fixed.filter((value) => referenceSet.has(value)).length;
+  const fixedSum = fixed.reduce((total, value) => total + value, 0);
+
+  if (constraints.odd && fixedOdd > constraints.odd.max) return 0;
+  if (constraints.repeated && fixedRepeated > constraints.repeated.max) return 0;
+  if (constraints.sum && fixedSum > constraints.sum.max) return 0;
 
   let states = new Map<string, number>([[keyOf({ picked: 0, odd: fixedOdd, repeated: fixedRepeated, sum: fixedSum }), 1]]);
 
@@ -223,7 +329,7 @@ function countEligible(
       const candidate: DpState = {
         picked: state.picked + 1,
         odd: state.odd + (value % 2 !== 0 ? 1 : 0),
-        repeated: state.repeated + (lastSet.has(value) ? 1 : 0),
+        repeated: state.repeated + (referenceSet.has(value) ? 1 : 0),
         sum: state.sum + value,
       };
       if (constraints.odd && candidate.odd > constraints.odd.max) continue;
@@ -247,6 +353,48 @@ function countEligible(
   return total;
 }
 
+function algorithmPoolLimit(lottery: LotteryId, fixedCount: number): number {
+  if (lottery === "lotofacil") return Number.POSITIVE_INFINITY;
+  if (lottery === "mega-sena") return fixedCount === 0 ? 14 : fixedCount === 2 ? 18 : 24;
+  return fixedCount === 0 ? 13 : fixedCount === 2 ? 14 : 18;
+}
+
+function algorithmSpaces(
+  lottery: LotteryId,
+  methodology: GenerationMethodologyProfile,
+  universeSize: number,
+  drawSize: number,
+  manualFixedCount: number,
+  excludedCount: number,
+): Record<string, GenerationAlgorithmSpace> {
+  const result: Record<string, GenerationAlgorithmSpace> = {};
+  for (const fixedCount of methodology.fixedCountOptions) {
+    const variableCount = drawSize - fixedCount;
+    const availableAfterCore = Math.max(0, universeSize - excludedCount - fixedCount);
+    const poolLimit = algorithmPoolLimit(lottery, fixedCount);
+    const candidatePoolSize = manualFixedCount > fixedCount
+      ? 0
+      : Math.min(availableAfterCore, poolLimit);
+    const rawCombinationCapacity = combinationCount(candidatePoolSize, variableCount);
+    result[String(fixedCount)] = {
+      fixedCount,
+      variableCount,
+      candidatePoolSize,
+      rawCombinationCapacity,
+      shortlistLimit: Math.min(24, rawCombinationCapacity),
+    };
+  }
+  return result;
+}
+
+function historyGapCount(history: Contest[]): number {
+  let gaps = 0;
+  for (let index = 1; index < history.length; index += 1) {
+    gaps += Math.max(0, history[index]!.number - history[index - 1]!.number - 1);
+  }
+  return gaps;
+}
+
 export function buildGenerationPlan(
   contests: Contest[],
   lottery: LotteryId,
@@ -258,11 +406,8 @@ export function buildGenerationPlan(
   } = {},
 ): GenerationPlan {
   const config = getLotteryConfig(lottery);
-  const history = contests
-    .filter((contest) => contest.lottery === lottery)
-    .filter((contest) => options.targetContestNumber === undefined || contest.number < options.targetContestNumber)
-    .sort((a, b) => a.number - b.number);
-  const lastContest = history.at(-1);
+  const scoped = scopeGenerationHistory(contests, lottery, options.targetContestNumber);
+  const { history, referenceContest } = scoped;
   const { fixed, excluded } = validateSelection(
     lottery,
     options.fixedNumbers ?? [],
@@ -272,40 +417,70 @@ export function buildGenerationPlan(
 
   assertRange("odd", constraints.odd, 0, config.drawSize);
   assertRange("repeated", constraints.repeated, 0, config.drawSize);
-  const minimumSum = Array.from({ length: config.drawSize }, (_, index) => config.minNumber + index)
-    .reduce((total, value) => total + value, 0);
-  const maximumSum = Array.from({ length: config.drawSize }, (_, index) => config.maxNumber - index)
-    .reduce((total, value) => total + value, 0);
+  const universe = Array.from(
+    { length: config.maxNumber - config.minNumber + 1 },
+    (_, index) => config.minNumber + index,
+  );
+  const minimumSum = universe.slice(0, config.drawSize).reduce((total, value) => total + value, 0);
+  const maximumSum = universe.slice(-config.drawSize).reduce((total, value) => total + value, 0);
   assertRange("sum", constraints.sum, minimumSum, maximumSum);
-  if (constraints.repeated && !lastContest) {
-    throw new Error("A previous contest is required to constrain repeated numbers");
-  }
 
-  const universeSize = config.maxNumber - config.minNumber + 1;
+  const totalCombinations = combinationCount(universe.length, config.drawSize);
   const variableCount = config.drawSize - fixed.length;
-  const afterManualSelection = combinationCount(universeSize - fixed.length - excluded.length, variableCount);
-  const eligibleCombinations = countEligible(lottery, fixed, excluded, lastContest, constraints);
-  const totalCombinations = combinationCount(universeSize, config.drawSize);
-  const sum = sumBaseline(universeSize, config.drawSize);
+  const remainingCount = universe.length - fixed.length - excluded.length;
+  const afterManualSelection = combinationCount(remainingCount, variableCount);
+  const constraintIssues: string[] = [];
+  if (constraints.repeated && !referenceContest) {
+    constraintIssues.push("Repetição indisponível: o concurso imediatamente anterior ao alvo não está armazenado.");
+  }
+  const eligibleCombinations = constraintIssues.length > 0
+    ? 0
+    : countEligible(lottery, fixed, excluded, referenceContest, constraints);
+  const methodology = generationMethodology(lottery);
+  const analysis = history.length > 0 ? buildNumberAnalysis(history, config) : [];
+  const numberTiers: Record<NumberTier, number[]> = {
+    strong: analysis.filter((row) => row.tier === "strong").map((row) => row.number),
+    balanced: analysis.filter((row) => row.tier === "balanced").map((row) => row.number),
+    cold: analysis.filter((row) => row.tier === "cold").map((row) => row.number),
+  };
+  const lotteryBaseline = conditionalBaseline(universe, config.drawSize, [], [], referenceContest, totalCombinations);
+  const baseline = conditionalBaseline(universe, config.drawSize, fixed, excluded, referenceContest, totalCombinations);
+  const previousContestAvailable = scoped.expectedPreviousContestNumber !== undefined && Boolean(referenceContest);
 
   return {
     lottery,
     historyCount: history.length,
-    ...(lastContest ? { referenceContestNumber: lastContest.number } : {}),
-    targetContestNumber: options.targetContestNumber ?? (lastContest ? lastContest.number + 1 : undefined),
-    universeSize,
+    historySignature: generationHistorySignature(contests, lottery, options.targetContestNumber),
+    ...(referenceContest ? { referenceContestNumber: referenceContest.number } : {}),
+    ...(scoped.targetContestNumber !== undefined ? { targetContestNumber: scoped.targetContestNumber } : {}),
+    universeSize: universe.length,
     drawSize: config.drawSize,
     fixedNumbers: fixed,
     excludedNumbers: excluded,
     constraints,
-    methodology: generationMethodology(lottery),
-    baseline: {
-      totalCombinations,
-      expectedOdd: config.drawSize * (Math.ceil(universeSize / 2) / universeSize),
-      expectedRepeated: lastContest ? (config.drawSize * lastContest.numbers.length) / universeSize : null,
-      expectedSum: sum.expected,
-      sumStdDev: sum.stdDev,
+    methodology,
+    numberTiers,
+    lotteryBaseline,
+    baseline,
+    dataQuality: {
+      previousContestAvailable,
+      ...(scoped.expectedPreviousContestNumber !== undefined
+        ? { expectedPreviousContestNumber: scoped.expectedPreviousContestNumber }
+        : {}),
+      ...(!previousContestAvailable && scoped.expectedPreviousContestNumber !== undefined
+        ? { missingPreviousContestNumber: scoped.expectedPreviousContestNumber }
+        : {}),
+      historyGapCount: historyGapCount(history),
     },
+    constraintIssues,
+    algorithmSpaces: algorithmSpaces(
+      lottery,
+      methodology,
+      universe.length,
+      config.drawSize,
+      fixed.length,
+      excluded.length,
+    ),
     space: {
       afterManualSelection,
       eligibleCombinations,

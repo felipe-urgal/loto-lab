@@ -25,6 +25,7 @@ export interface DiaDeSorteGeneratorOptions {
   fixedNumbers?: number[];
   excludedNumbers?: number[];
   constraints?: GenerationConstraints;
+  referenceContestNumber?: number | null;
 }
 
 const LUCKY_MONTHS = [
@@ -82,6 +83,7 @@ interface NormalizedDiaDeSorteGeneratorOptions {
   fixedNumbers: number[];
   excludedNumbers: number[];
   constraints?: GenerationConstraints;
+  referenceContestNumber?: number | null;
 }
 
 function normalizeOptions(
@@ -98,6 +100,7 @@ function normalizeOptions(
     fixedNumbers: value.fixedNumbers ?? [],
     excludedNumbers: value.excludedNumbers ?? [],
     ...(value.constraints !== undefined ? { constraints: value.constraints } : {}),
+    ...(value.referenceContestNumber !== undefined ? { referenceContestNumber: value.referenceContestNumber } : {}),
   };
 }
 
@@ -105,7 +108,16 @@ export function generateDiaDeSorteGames(
   contests: Contest[],
   options: number | DiaDeSorteGeneratorOptions = 2,
 ): GeneratedGame[] {
-  const { gameCount, fixedCount, generationMode, seed, fixedNumbers: manualFixed, excludedNumbers, constraints } = normalizeOptions(options);
+  const {
+    gameCount,
+    fixedCount,
+    generationMode,
+    seed,
+    fixedNumbers: manualFixed,
+    excludedNumbers,
+    constraints,
+    referenceContestNumber,
+  } = normalizeOptions(options);
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
   }
@@ -120,7 +132,11 @@ export function generateDiaDeSorteGames(
   const scoped = contests
     .filter((contest) => contest.lottery === "dia-de-sorte")
     .sort((a, b) => a.number - b.number);
-  const lastContest = scoped.at(-1);
+  const lastContest = referenceContestNumber === undefined
+    ? scoped.at(-1)
+    : referenceContestNumber === null
+      ? undefined
+      : scoped.find((contest) => contest.number === referenceContestNumber);
   const analysis = buildNumberAnalysis(scoped, config);
   if (fixedCount === 0 && manualFixed.length > 0) {
     throw new Error("Manual fixed numbers require a fixed core");
