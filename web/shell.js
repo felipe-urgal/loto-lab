@@ -24,9 +24,25 @@ const ITEMS = [
 const nav = document.querySelector("[data-shell-nav]");
 const isMainApp = location.pathname === "/" || location.pathname === "/index.html";
 const configuredActive = document.body.dataset.activeNav || "dashboard";
+const mainViews = new Set(ITEMS.filter((item) => item.view).map((item) => item.view));
+
+function requestedMainView() {
+  return location.hash.replace("#", "");
+}
+
+function normalizeMainHash() {
+  if (!isMainApp) return true;
+  const requested = requestedMainView();
+  if (requested && mainViews.has(requested)) return true;
+  location.hash = "dashboard";
+  return false;
+}
 
 function currentKey() {
-  if (isMainApp) return location.hash.replace("#", "") || "dashboard";
+  if (isMainApp) {
+    const requested = requestedMainView();
+    return mainViews.has(requested) ? requested : "dashboard";
+  }
   return configuredActive;
 }
 
@@ -79,6 +95,8 @@ function closeMore(restoreFocus = false) {
   if (restoreFocus && wasOpen) button.focus();
 }
 
+normalizeMainHash();
+
 if (nav) {
   const extras = ITEMS.filter((item) => item.extra);
   nav.innerHTML = `${ITEMS.map(desktopItem).join("")}
@@ -87,6 +105,8 @@ if (nav) {
 
   const moreButton = nav.querySelector("[data-nav-more]");
   const morePanel = nav.querySelector("[data-nav-more-menu]");
+  const mobileQuery = window.matchMedia("(max-width: 680px)");
+
   moreButton?.addEventListener("click", () => {
     const open = moreButton.getAttribute("aria-expanded") === "true";
     if (open) {
@@ -103,7 +123,11 @@ if (nav) {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeMore(true);
   });
+  mobileQuery.addEventListener("change", (event) => {
+    if (!event.matches) closeMore();
+  });
   window.addEventListener("hashchange", () => {
+    if (!normalizeMainHash()) return;
     closeMore();
     updateActive();
   });
