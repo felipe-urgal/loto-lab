@@ -6,6 +6,22 @@ const LABELS = {
   "dia-de-sorte": "Dia de Sorte",
 };
 
+const STATUS_LABELS = {
+  queued: "na fila",
+  running: "em execução",
+  succeeded: "concluída",
+  completed: "concluída",
+  failed: "falhou",
+  cancelled: "cancelada",
+  abandoned: "abandonada",
+};
+
+const RANKING_LABELS = {
+  prizeRate: "taxa de premiação",
+  averageHitsPerGame: "média de acertos",
+  roi: "ROI",
+};
+
 const form = document.querySelector("#job-form");
 const kind = document.querySelector("#job-kind");
 const lottery = document.querySelector("#job-lottery");
@@ -88,18 +104,19 @@ async function loadStrategies(preferredVersionId) {
 }
 
 function jobResult(job) {
-  if (job.status === "running") return '<div class="job-running"><span class="spinner"></span>Processando em worker dedicado</div>';
-  if (job.status === "queued") return '<div class="job-result">Aguardando o gate de análises.</div>';
+  if (job.status === "running") return '<div class="job-running"><span class="spinner"></span>Processando em processo dedicado</div>';
+  if (job.status === "queued") return '<div class="job-result">Aguardando disponibilidade para análises.</div>';
   if (job.status === "cancelled") return '<div class="job-result job-error">Execução cancelada.</div>';
-  if (job.status === "failed") return `<div class="job-result job-error"><strong>${escapeHtml(job.error?.code || "ERROR")}</strong>${escapeHtml(job.error?.message || "Falha na execução")}</div>`;
+  if (job.status === "failed") return `<div class="job-result job-error"><strong>${escapeHtml(job.error?.code || "ERRO")}</strong>${escapeHtml(job.error?.message || "Falha na execução")}</div>`;
   if (!job.result) return "";
 
   if (job.kind === "backtest") {
     const summary = job.result.summary || {};
-    return `<div class="job-result"><strong>Backtest ${job.result.id ? `#${job.result.id}` : "concluído"}</strong><span>${job.result.roundCount ?? "—"} concursos · ROI ${escapeHtml(formatPercent(summary.roi))} · cobertura ${escapeHtml(formatPercent(summary.financialCoverage))}</span></div>`;
+    return `<div class="job-result"><strong>Teste histórico ${job.result.id ? `#${job.result.id}` : "concluído"}</strong><span>${job.result.roundCount ?? "—"} concursos · ROI ${escapeHtml(formatPercent(summary.roi))} · cobertura ${escapeHtml(formatPercent(summary.financialCoverage))}</span></div>`;
   }
 
-  return `<div class="job-result"><strong>Laboratório concluído</strong><span>Vencedor: ${escapeHtml(job.result.winner || "empate/indefinido")} · ${job.result.variants?.length ?? 0} variantes · ranking por ${escapeHtml(job.result.rankingBasis || "—")}</span></div>`;
+  const ranking = RANKING_LABELS[job.result.rankingBasis] || job.result.rankingBasis || "—";
+  return `<div class="job-result"><strong>Laboratório concluído</strong><span>Vencedor: ${escapeHtml(job.result.winner || "empate/indefinido")} · ${job.result.variants?.length ?? 0} variantes · classificação por ${escapeHtml(ranking)}</span></div>`;
 }
 
 function renderJobs() {
@@ -116,13 +133,13 @@ function renderJobs() {
     return `
       <article class="panel experiment-card" data-job-id="${job.id}">
         <div class="experiment-card-head">
-          <div><h3>#${job.id} · ${job.kind === "backtest" ? "Backtest" : "Laboratório"}</h3><p>${escapeHtml(LABELS[job.lottery])} · criada ${escapeHtml(formatDateTime(job.createdAt))}</p></div>
-          <span class="status-pill ${job.status}">${escapeHtml(job.status)}</span>
+          <div><h3>#${job.id} · ${job.kind === "backtest" ? "Teste histórico" : "Laboratório"}</h3><p>${escapeHtml(LABELS[job.lottery])} · criada ${escapeHtml(formatDateTime(job.createdAt))}</p></div>
+          <span class="status-pill ${job.status}">${escapeHtml(STATUS_LABELS[job.status] || job.status)}</span>
         </div>
         <div class="experiment-meta">
           ${strategyVersionId ? `<span>estratégia #${strategyVersionId}</span>` : ""}
           <span>${job.input?.gameCount ?? "—"} jogos</span>
-          <span>warmup ${job.input?.warmupContests ?? "—"}</span>
+          <span>aquecimento ${job.input?.warmupContests ?? "—"}</span>
           ${job.startedAt ? `<span>início ${escapeHtml(formatDateTime(job.startedAt))}</span>` : ""}
           ${job.finishedAt ? `<span>fim ${escapeHtml(formatDateTime(job.finishedAt))}</span>` : ""}
         </div>
@@ -162,29 +179,16 @@ form.addEventListener("submit", async (event) => {
   const submit = form.querySelector('button[type="submit"]');
   submit.disabled = true;
   try {
-    const body = {
-      kind: kind.value,
-      lottery: lottery.value,
-      gameCount: Number(games.value),
-      warmupContests: Number(warmup.value),
-    };
+    const body = { kind: kind.value, lottery: lottery.value, gameCount: Number(games.value), warmupContests: Number(warmup.value) };
     if (strategySelect.value) body.strategyVersionId = Number(strategySelect.value);
     if (start.value) body.startContest = Number(start.value);
     if (end.value) body.endContest = Number(end.value);
     if (lottery.value === "lotofacil") body.fixedCount = Number(fixed.value);
-    if (kind.value === "strategy-lab") {
-      body.experiment = experiment.value;
-      body.lookbackContests = Number(lookback.value);
-      body.bucketSize = Number(bucket.value);
-    }
+    if (kind.value === "strategy-lab") { body.experiment = experiment.value; body.lookbackContests = Number(lookback.value); body.bucketSize = Number(bucket.value); }
     const job = await api("/analysis-jobs", { method: "POST", body: JSON.stringify(body) });
     toast(`Execução #${job.id} entrou na fila.`);
     await loadJobs(false);
-  } catch (error) {
-    toast(error.message, "error");
-  } finally {
-    submit.disabled = false;
-  }
+  } catch (error) { toast(error.message, "error"); } finally { submit.disabled = false; }
 });
 
 listRoot.addEventListener("click", async (event) => {
@@ -195,10 +199,7 @@ listRoot.addEventListener("click", async (event) => {
     const job = await api(`/analysis-jobs/${button.dataset.cancelJob}/cancel`, { method: "POST" });
     toast(`Execução #${job.id} cancelada/solicitada.`);
     await loadJobs(false);
-  } catch (error) {
-    toast(error.message, "error");
-    if (button.isConnected) button.disabled = false;
-  }
+  } catch (error) { toast(error.message, "error"); if (button.isConnected) button.disabled = false; }
 });
 
 strategySelect.addEventListener("change", () => {
