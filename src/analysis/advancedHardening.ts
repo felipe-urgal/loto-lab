@@ -7,7 +7,7 @@ export const MIN_EVIDENCE_ROUNDS = 30;
 export const MIN_ASSOCIATION_HISTORY = 20;
 
 type AdvancedAnalysis = ReturnType<typeof buildAdvancedAnalysis>;
-type MutableAdvanced = AdvancedAnalysis & Record<string, any>;
+type MutableAdvanced = any;
 
 function round(value: number, digits = 4): number {
   const factor = 10 ** digits;
@@ -210,7 +210,6 @@ function hardenStructure(result: MutableAdvanced, contests: Contest[], config: L
         coverage: round(nextCoverage.coverage),
       }
     : null;
-  // Backward-compatible alias. The UI names this explicitly as the next-contest universe.
   filter.exactUniverse = filter.nextContestUniverse;
 
   const transitionCoverages: number[] = [];
@@ -268,8 +267,8 @@ function hardenStructure(result: MutableAdvanced, contests: Contest[], config: L
         const value = mean(historicalStructures.flatMap((item) => item.columns ? [item.columns[index] ?? 0] : []));
         return value === null ? null : round(value);
       });
-      (result.structure.grid as any).historicalLineMean = lineMeans;
-      (result.structure.grid as any).historicalColumnMean = columnMeans;
+      result.structure.grid.historicalLineMean = lineMeans;
+      result.structure.grid.historicalColumnMean = columnMeans;
     }
   }
 }
@@ -376,9 +375,6 @@ function buildCycles(contests: Contest[], config: LotteryConfig, leftCensored: b
   segments.forEach((segment, segmentIndex) => {
     const seen = new Set<number>();
     let currentLength = 0;
-    // The first segment starts from a known cycle boundary only when the stored
-    // history starts at contest #1. Segments after gaps are also left-censored
-    // until their first complete cycle establishes a new boundary.
     let currentKnown = segmentIndex === 0 && !leftCensored;
     for (const contest of segment) {
       currentLength += 1;
@@ -478,5 +474,5 @@ export function hardenAdvancedAnalysis(
   hardenValidation(result);
   hardenAssociations(result, scoped);
 
-  return result;
+  return result as AdvancedAnalysis;
 }
