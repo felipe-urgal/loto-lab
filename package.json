@@ -10,6 +10,7 @@
     "build:prod": "tsc -p tsconfig.build.json && npm run web:build",
     "test": "npm run build && node --test dist/tests/*.test.js",
     "check": "npm test",
+    "e2e:browser": "node scripts/e2eBrowser.mjs",
     "api:start": "npm run build && node --env-file-if-exists=.env dist/src/cli/apiStart.js",
     "data:sync": "npm run build:server && node --env-file-if-exists=.env dist/src/cli/sync.js",
     "data:refresh": "npm run build:server && node --env-file-if-exists=.env dist/src/cli/refresh.js",
