@@ -125,7 +125,11 @@ function cacheControl(url: URL, extension: string, buildVersion: string | undefi
   return "public, max-age=300";
 }
 
-export async function serveWebAsset(url: URL, response: ServerResponse): Promise<boolean> {
+export async function serveWebAsset(
+  url: URL,
+  response: ServerResponse,
+  headOnly = false,
+): Promise<boolean> {
   const root = webRoot();
   const candidates = assetCandidates(root, url.pathname);
   if (!candidates) return false;
@@ -135,8 +139,9 @@ export async function serveWebAsset(url: URL, response: ServerResponse): Promise
   if (!file) {
     response.statusCode = 404;
     response.setHeader("Content-Type", "text/plain; charset=utf-8");
+    response.setHeader("Cache-Control", "no-store");
     setSecurityHeaders(response);
-    response.end("Web asset not found");
+    response.end(headOnly ? undefined : "Web asset not found");
     return true;
   }
 
@@ -146,6 +151,6 @@ export async function serveWebAsset(url: URL, response: ServerResponse): Promise
   response.setHeader("Content-Length", file.body.byteLength);
   response.setHeader("Cache-Control", cacheControl(url, extension, buildVersion));
   setSecurityHeaders(response);
-  response.end(file.body);
+  response.end(headOnly ? undefined : file.body);
   return true;
 }
