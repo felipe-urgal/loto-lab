@@ -270,8 +270,14 @@ test(
 
     const storedRun = await fetch(`${baseUrl}/api/v1/backtest-runs/${backtest.id}`);
     assert.equal(storedRun.status, 200);
-    const stored = (await storedRun.json()) as { rounds: unknown[] };
+    const stored = (await storedRun.json()) as { rounds: Array<Record<string, unknown>> };
     assert.equal(stored.rounds.length, 3);
+    for (const round of stored.rounds) {
+      assert.ok(Array.isArray(round.targetNumbers));
+      assert.ok(Array.isArray(round.hitsByGame));
+      assert.equal("generatedGames" in round, false);
+      assert.equal("checks" in round, false);
+    }
 
     const labResponse = await fetch(`${baseUrl}/api/v1/lab/compare`, {
       method: "POST",
