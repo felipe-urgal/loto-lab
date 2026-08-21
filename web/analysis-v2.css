@@ -1,0 +1,206 @@
+.a2-shell { display: grid; gap: 18px; }
+.a2-stack { display: grid; gap: 24px; }
+.a2-summary { margin-bottom: 0; }
+.a2-metric { min-height: 106px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; }
+.a2-metric > span { color: var(--muted); font-size: 10px; font-weight: 700; }
+.a2-metric > strong { margin-top: 10px; font-size: 24px; letter-spacing: -.04em; }
+.a2-metric > small { margin-top: 7px; color: var(--muted-2); font-size: 9px; }
+.a2-principle, .a2-warning, .a2-validation-principle {
+  display: flex; align-items: center; gap: 12px; padding: 11px 13px; border: 1px solid var(--border); border-radius: 11px;
+  background: var(--surface); color: var(--muted); font-size: 10px; line-height: 1.45;
+}
+.a2-principle strong, .a2-validation-principle strong { color: var(--accent-strong); white-space: nowrap; }
+.a2-warning { border-color: rgba(240,189,102,.3); background: var(--warning-soft); }
+.a2-warning strong { color: var(--warning); white-space: nowrap; }
+.a2-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); scrollbar-width: none; }
+.a2-tabs::-webkit-scrollbar { display: none; }
+.a2-tabs button { border: 0; min-height: 38px; padding: 0 14px; border-radius: 9px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 750; cursor: pointer; white-space: nowrap; }
+.a2-tabs button:hover { color: var(--text); background: var(--surface-2); }
+.a2-tabs button.is-active { color: var(--accent-strong); background: var(--accent-soft); }
+.a2-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.a2-panel-head > div { display: grid; gap: 4px; }
+.a2-panel-head strong { font-size: 12px; }
+.a2-panel-head span, .a2-panel-head small { color: var(--muted-2); font-size: 9px; }
+.a2-tier-list { display: grid; gap: 10px; }
+.a2-tier-panel { padding: 15px; }
+.a2-ball-cloud { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+.a2-ball { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); font-size: 10px; font-weight: 800; cursor: pointer; }
+.a2-ball:hover { transform: translateY(-1px); border-color: var(--accent); }
+.a2-ball.is-strong { background: var(--accent-soft); color: var(--accent-strong); border-color: rgba(101,214,164,.32); }
+.a2-ball.is-balanced { background: var(--warning-soft); color: var(--warning); border-color: rgba(240,189,102,.28); }
+.a2-ball.is-cold { background: var(--info-soft); color: var(--info); border-color: rgba(123,182,239,.27); }
+.a2-tier-chip { display: inline-flex; align-items: center; min-height: 23px; padding: 0 7px; border-radius: 99px; font-size: 9px; font-weight: 800; }
+.a2-tier-chip.is-strong { color: var(--accent-strong); background: var(--accent-soft); }
+.a2-tier-chip.is-balanced { color: var(--warning); background: var(--warning-soft); }
+.a2-tier-chip.is-cold { color: var(--info); background: var(--info-soft); }
+.a2-table tr[data-a2-number] { cursor: pointer; }
+.a2-table tr[data-a2-number]:hover td { background: rgba(255,255,255,.02); }
+.a2-move { font-weight: 800; color: var(--muted); }
+.a2-move.positive, .positive { color: var(--accent-strong) !important; }
+.a2-move.negative, .negative { color: var(--danger) !important; }
+.a2-compare-panel { padding: 16px; display: grid; gap: 14px; }
+.a2-compare-controls, .a2-pair-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.a2-compare-controls select, .a2-pair-controls select, .a2-window-control select {
+  min-width: 140px; height: 38px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text); padding: 0 10px; font-size: 10px; font-weight: 700;
+}
+.a2-compare-table { margin-top: 4px; display: grid; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.a2-compare-table > div { display: grid; grid-template-columns: 1.2fr .8fr .8fr; gap: 10px; padding: 9px 11px; border-top: 1px solid var(--border); font-size: 10px; }
+.a2-compare-table > div:first-child { border-top: 0; background: var(--surface-2); }
+.a2-compare-table span { color: var(--muted); }
+.a2-structure-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.a2-structure-card { padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.a2-structure-title { display: flex; justify-content: space-between; gap: 10px; }
+.a2-structure-title strong { font-size: 11px; }
+.a2-structure-title span { color: var(--muted-2); font-size: 9px; }
+.a2-structure-current { font-size: 28px; line-height: 1; font-weight: 800; letter-spacing: -.045em; }
+.a2-observed-expected { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; }
+.a2-observed-expected span { display: grid; gap: 4px; padding: 8px; border-radius: 8px; background: var(--bg); }
+.a2-observed-expected small { color: var(--muted-2); font-size: 8px; line-height: 1.3; }
+.a2-observed-expected strong { font-size: 11px; }
+.a2-distribution { height: 88px; display: flex; align-items: stretch; gap: 4px; padding-top: 4px; overflow-x: auto; }
+.a2-dist-column { min-width: 24px; flex: 1; display: grid; grid-template-rows: 1fr auto auto; gap: 2px; text-align: center; }
+.a2-dist-bar { position: relative; min-height: 48px; display: flex; align-items: end; justify-content: center; border-bottom: 1px solid var(--border); }
+.a2-dist-bar i { width: 70%; max-width: 18px; border-radius: 3px 3px 0 0; background: var(--accent); opacity: .7; }
+.a2-dist-column strong { font-size: 8px; }
+.a2-dist-column small { color: var(--muted-2); font-size: 7px; }
+.a2-grid-profile { padding: 16px; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 8px; }
+.a2-grid-profile > strong { grid-column: 1/-1; font-size: 11px; margin-bottom: 3px; }
+.a2-grid-profile > span { display: grid; gap: 4px; padding: 9px; border-radius: 8px; background: var(--bg); text-align: center; color: var(--muted); font-size: 9px; }
+.a2-grid-profile b { color: var(--text); font-size: 18px; }
+.a2-grid-profile small { color: var(--muted-2); font-size: 8px; }
+.a2-filter-validation { padding: 17px; display: grid; gap: 16px; }
+.a2-filter-rules { display: flex; gap: 8px; flex-wrap: wrap; }
+.a2-filter-rules span { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 9px; }
+.a2-filter-rules strong { color: var(--text); font-size: 11px; }
+.a2-filter-rules small { color: var(--muted-2); }
+.a2-filter-numbers { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.a2-filter-numbers span { display: grid; gap: 5px; padding: 12px; border-radius: 9px; background: var(--bg); }
+.a2-filter-numbers small { color: var(--muted); font-size: 9px; }
+.a2-filter-numbers strong { font-size: 22px; }
+.a2-filter-numbers em { color: var(--muted-2); font-size: 8px; font-style: normal; }
+.a2-filter-validation > p { margin: 0; color: var(--muted-2); font-size: 9px; line-height: 1.5; }
+.a2-movers { padding: 16px; display: grid; gap: 12px; }
+.a2-mover-list { display: grid; gap: 5px; }
+.a2-mover-list button { display: grid; grid-template-columns: 45px 1fr auto; align-items: center; gap: 8px; width: 100%; min-height: 35px; padding: 0 9px; border: 0; border-radius: 7px; background: var(--bg); color: var(--text); cursor: pointer; text-align: left; }
+.a2-mover-list button:hover { background: var(--surface-2); }
+.a2-mover-list strong { font-size: 11px; }
+.a2-mover-list span { color: var(--muted); font-size: 9px; }
+.a2-mover-list em { font-style: normal; font-size: 10px; font-weight: 800; }
+.a2-cycle { padding: 16px; display: grid; grid-template-columns: minmax(180px,.35fr) 1fr; gap: 16px; align-items: stretch; }
+.a2-cycle > div:first-child .a2-metric { height: 100%; box-shadow: none; }
+.a2-cycle-copy { display: grid; align-content: center; gap: 8px; }
+.a2-cycle-copy > strong { font-size: 12px; }
+.a2-cycle-copy > small { color: var(--muted); font-size: 9px; }
+.a2-cycle-copy .a2-ball-cloud { margin-top: 0; }
+.a2-delay-list { padding: 10px; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 6px; }
+.a2-delay-list button { display: grid; gap: 4px; padding: 10px; border: 0; border-radius: 8px; background: var(--bg); color: var(--text); text-align: left; cursor: pointer; }
+.a2-delay-list button:hover { background: var(--surface-2); }
+.a2-delay-list strong { font-size: 12px; }
+.a2-delay-list span { color: var(--muted); font-size: 9px; }
+.a2-delay-list em { color: var(--info); font-size: 8px; font-style: normal; }
+.a2-heat-panel { padding: 12px; }
+.a2-heatmap-wrap { overflow: auto; max-height: 560px; }
+.a2-heatmap { display: grid; grid-template-columns: 54px repeat(calc(var(--a2-columns) - 1), 18px); gap: 2px; width: max-content; align-items: center; }
+.a2-heat-corner, .a2-heat-head, .a2-heat-contest { color: var(--muted-2); font-size: 7px; text-align: center; }
+.a2-heat-contest { position: sticky; left: 0; z-index: 2; padding: 3px; background: var(--surface); font-size: 8px; }
+.a2-heat-cell { width: 16px; height: 16px; border-radius: 3px; background: var(--bg); border: 1px solid rgba(255,255,255,.025); }
+.a2-heat-cell.is-hit { background: var(--accent-soft); border-color: rgba(101,214,164,.35); }
+.a2-pair-explorer { padding: 16px; display: grid; gap: 14px; }
+.a2-pair-result:empty::before { content: "Selecione duas dezenas para comparar ocorrência conjunta e baseline matemático."; color: var(--muted-2); font-size: 9px; }
+.a2-pair-stat { display: grid; grid-template-columns: 1.2fr repeat(4,1fr); gap: 8px; align-items: center; }
+.a2-pair-stat > strong { font-size: 16px; }
+.a2-pair-stat > span { display: grid; gap: 3px; padding: 8px; border-radius: 8px; background: var(--bg); }
+.a2-pair-stat small { color: var(--muted-2); font-size: 8px; }
+.a2-pair-stat b { font-size: 11px; }
+.a2-pair-stat em { grid-column: 1/-1; font-style: normal; font-size: 9px; }
+.a2-associations { padding: 13px; display: grid; gap: 6px; align-content: start; }
+.a2-association-row { display: grid; grid-template-columns: minmax(90px,1.1fr) repeat(3,minmax(70px,.75fr)) minmax(120px,1fr); gap: 8px; align-items: center; min-height: 37px; padding: 6px 8px; border-radius: 7px; background: var(--bg); font-size: 9px; }
+.a2-association-row strong { font-size: 10px; }
+.a2-association-row span { color: var(--muted); }
+.a2-association-row em { font-style: normal; text-align: right; }
+.evidence-none { color: var(--muted-2) !important; }
+.evidence-weak { color: var(--warning) !important; }
+.evidence-moderate { color: var(--accent-strong) !important; }
+.a2-similarity { padding: 10px; display: grid; gap: 5px; }
+.a2-similarity > div { display: grid; grid-template-columns: 70px 90px 90px 1fr; gap: 9px; align-items: center; min-height: 38px; padding: 6px 8px; border-radius: 7px; background: var(--bg); }
+.a2-similarity strong { font-size: 10px; }
+.a2-similarity span, .a2-similarity small { color: var(--muted); font-size: 8px; }
+.a2-similarity em { color: var(--accent-strong); font-size: 9px; font-style: normal; }
+.a2-window-control { display: grid; gap: 4px; color: var(--muted); font-size: 8px; }
+.a2-validation-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.a2-validation-card { padding: 15px; display: grid; gap: 12px; }
+.a2-validation-rates { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+.a2-validation-rates span { display: grid; gap: 3px; padding: 8px; border-radius: 8px; background: var(--bg); }
+.a2-validation-rates small { color: var(--muted-2); font-size: 8px; }
+.a2-validation-rates strong { font-size: 14px; }
+.a2-validation-card p { margin: 0; color: var(--muted-2); font-size: 8px; line-height: 1.45; }
+.a2-method-card { padding: 17px; display: grid; gap: 9px; }
+.a2-method-card > strong { font-size: 12px; }
+.a2-method-card > p { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.55; }
+.a2-method-card > div { display: flex; gap: 7px; flex-wrap: wrap; }
+.a2-method-card > div span { padding: 7px 9px; border-radius: 7px; background: var(--bg); color: var(--muted); font-size: 8px; }
+.a2-method-card b { color: var(--text); }
+.a2-detail { position: fixed; inset: 0 0 0 auto; z-index: 80; width: min(520px, 92vw); overflow-y: auto; padding: 20px; border-left: 1px solid var(--border); background: rgba(14,22,31,.98); box-shadow: -24px 0 70px rgba(0,0,0,.35); backdrop-filter: blur(16px); }
+.a2-detail[hidden] { display: none; }
+.a2-detail-head { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.a2-detail-head > div { display: grid; gap: 5px; }
+.a2-detail-head > div > span { color: var(--muted); font-size: 10px; }
+.a2-detail-head h2 { margin: 0; font-size: 25px; }
+.a2-detail-head > div > div { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 9px; }
+.a2-detail-head button { width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--muted); font-size: 20px; cursor: pointer; }
+.a2-detail-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-top: 16px; }
+.a2-detail-grid .a2-metric { min-height: 92px; box-shadow: none; }
+.a2-detail-section { display: grid; gap: 8px; margin-top: 20px; }
+.a2-detail-section > strong { font-size: 11px; }
+.a2-detail-section > p { margin: 0; color: var(--muted-2); font-size: 8px; }
+.a2-contributions { display: grid; gap: 7px; }
+.a2-contributions > div { display: grid; grid-template-columns: 75px 1fr 44px; gap: 8px; align-items: center; }
+.a2-contributions span { color: var(--muted); font-size: 8px; }
+.a2-contributions i { height: 6px; border-radius: 99px; overflow: hidden; background: var(--surface-3); }
+.a2-contributions b { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
+.a2-contributions strong { font-size: 9px; text-align: right; }
+.a2-frequency-grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 6px; }
+.a2-frequency-grid span { display: grid; gap: 4px; padding: 8px; border-radius: 8px; background: var(--bg); }
+.a2-frequency-grid small { color: var(--muted-2); font-size: 7px; }
+.a2-frequency-grid strong { font-size: 13px; }
+.a2-frequency-grid em { color: var(--muted); font-size: 8px; font-style: normal; }
+.a2-detail-warning { margin-top: 20px; padding: 11px; border-left: 3px solid var(--info); border-radius: 7px; background: var(--info-soft); color: var(--muted); font-size: 8px; line-height: 1.5; }
+.a2-empty { padding: 14px; color: var(--muted-2); font-size: 9px; text-align: center; }
+
+@media (max-width: 1180px) {
+  .a2-structure-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .a2-delay-list { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .a2-association-row { grid-template-columns: 1fr 1fr 1fr; }
+  .a2-association-row em { grid-column: 1/-1; text-align: left; }
+}
+
+@media (max-width: 900px) {
+  .a2-summary.grid.cols-4 { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .a2-validation-grid, .a2-filter-numbers { grid-template-columns: 1fr; }
+  .a2-cycle { grid-template-columns: 1fr; }
+  .a2-delay-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .a2-pair-stat { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .a2-pair-stat > strong, .a2-pair-stat em { grid-column: 1/-1; }
+  .a2-similarity > div { grid-template-columns: 60px 80px 1fr; }
+  .a2-similarity small { grid-column: 1/-1; }
+}
+
+@media (max-width: 680px) {
+  .a2-principle, .a2-warning, .a2-validation-principle { align-items: flex-start; flex-direction: column; }
+  .a2-structure-grid { grid-template-columns: 1fr; }
+  .a2-observed-expected { grid-template-columns: 1fr; }
+  .a2-grid-profile { grid-template-columns: repeat(5,minmax(42px,1fr)); overflow-x: auto; }
+  .a2-delay-list { grid-template-columns: 1fr; }
+  .a2-compare-controls select, .a2-pair-controls select { flex: 1 1 120px; min-width: 0; }
+  .a2-compare-controls .button, .a2-pair-controls .button { width: 100%; }
+  .a2-validation-rates { grid-template-columns: 1fr; }
+  .a2-frequency-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .a2-detail { width: 100%; padding: 16px; }
+  .a2-detail-grid { grid-template-columns: 1fr 1fr; }
+  .a2-association-row { grid-template-columns: 1fr 1fr; }
+  .a2-similarity > div { grid-template-columns: 1fr 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a2-ball:hover { transform: none; }
+}
