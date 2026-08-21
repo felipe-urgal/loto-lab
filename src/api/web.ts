@@ -5,6 +5,7 @@ import type { ServerResponse } from "node:http";
 
 const HTML_ROUTES = new Map([
   ["/", "index.html"],
+  ["/index.html", "index.html"],
   ["/lab", "lab.html"],
   ["/lab/", "lab.html"],
   ["/ai", "ai.html"],
@@ -20,6 +21,9 @@ const CONTENT_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml; charset=utf-8",
   ".json": "application/json; charset=utf-8",
 };
+
+const buildVersions = new Map<string, string>();
+const builtAssetBodies = new Map<string, Promise<Buffer>>();
 
 function webRoot(): string {
   if (process.env.WEB_ROOT) return resolve(process.env.WEB_ROOT);
@@ -47,10 +51,46 @@ function assetCandidates(root: string, pathname: string): string[] | undefined {
   ].filter((item): item is string => Boolean(item));
 }
 
-async function readFirst(paths: string[]): Promise<{ body: Buffer; path: string } | undefined> {
+async function readBuildVersion(root: string): Promise<string | undefined> {
+  const cached = buildVersions.get(root);
+  if (cached) return cached;
+
+  try {
+    const manifest = JSON.parse(await readFile(join(root, "build-manifest.json"), "utf8")) as {
+      version?: unknown;
+    };
+    if (typeof manifest.version !== "string" || !/^[a-f0-9]{12}$/i.test(manifest.version)) {
+      throw new Error("Invalid web build manifest version");
+    }
+    buildVersions.set(root, manifest.version);
+    return manifest.version;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+}
+
+async function readAsset(path: string, cacheInMemory: boolean): Promise<Buffer> {
+  if (!cacheInMemory) return readFile(path);
+
+  let pending = builtAssetBodies.get(path);
+  if (!pending) {
+    pending = readFile(path).catch((error) => {
+      builtAssetBodies.delete(path);
+      throw error;
+    });
+    builtAssetBodies.set(path, pending);
+  }
+  return pending;
+}
+
+async function readFirst(
+  paths: string[],
+  cacheInMemory: boolean,
+): Promise<{ body: Buffer; path: string } | undefined> {
   for (const path of paths) {
     try {
-      return { body: await readFile(path), path };
+      return { body: await readAsset(path, cacheInMemory), path };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
@@ -71,9 +111,16 @@ function setSecurityHeaders(response: ServerResponse): void {
   );
 }
 
-function cacheControl(url: URL, extension: string): string {
+function cacheControl(url: URL, extension: string, buildVersion: string | undefined): string {
   if (extension === ".html") return "no-cache";
-  if (url.searchParams.has("v")) return "public, max-age=31536000, immutable";
+
+  const requestedVersion = url.searchParams.get("v");
+  if (requestedVersion !== null) {
+    return buildVersion !== undefined && requestedVersion === buildVersion
+      ? "public, max-age=31536000, immutable"
+      : "no-store";
+  }
+
   if (extension === ".svg") return "public, max-age=86400";
   return "public, max-age=300";
 }
@@ -83,7 +130,8 @@ export async function serveWebAsset(url: URL, response: ServerResponse): Promise
   const candidates = assetCandidates(root, url.pathname);
   if (!candidates) return false;
 
-  const file = await readFirst(candidates);
+  const buildVersion = await readBuildVersion(root);
+  const file = await readFirst(candidates, buildVersion !== undefined);
   if (!file) {
     response.statusCode = 404;
     response.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -96,7 +144,7 @@ export async function serveWebAsset(url: URL, response: ServerResponse): Promise
   response.statusCode = 200;
   response.setHeader("Content-Type", CONTENT_TYPES[extension] ?? "application/octet-stream");
   response.setHeader("Content-Length", file.body.byteLength);
-  response.setHeader("Cache-Control", cacheControl(url, extension));
+  response.setHeader("Cache-Control", cacheControl(url, extension, buildVersion));
   setSecurityHeaders(response);
   response.end(file.body);
   return true;
