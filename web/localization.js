@@ -11,6 +11,11 @@ const EXACT_TEXT = new Map([
   ["Experimento Lab", "Experimento do Laboratório"],
   ["Lookback Lab", "Janela histórica do Laboratório"],
   ["Bucket Lab", "Bloco do Laboratório"],
+  ["historical", "Histórico"],
+  ["year", "Ano"],
+  ["month", "Mês"],
+  ["recent10", "Últimos 10"],
+  ["recent20", "Últimos 20"],
   ["queued", "na fila"],
   ["running", "em execução"],
   ["succeeded", "concluída"],
@@ -23,6 +28,10 @@ const EXACT_TEXT = new Map([
 const EXACT_PHRASES = new Map([
   ["Loto Lab - Dashboard", "Loto Lab - Painel"],
   ["Frequências, score e classificação por horizonte.", "Frequências, pontuação e classificação por horizonte."],
+  ["maior score combinado", "maior pontuação combinada"],
+  ["menor score combinado", "menor pontuação combinada"],
+  ["Decomposição do score", "Decomposição da pontuação"],
+  ["Quanto cada janela contribui para o score final com os pesos atuais.", "Quanto cada janela contribui para a pontuação final com os pesos atuais."],
   ["Resumo do último backtest persistido.", "Resumo do último teste histórico salvo."],
   ["Ver backtests", "Ver testes históricos"],
   ["Sem backtest", "Sem teste histórico"],
@@ -62,6 +71,8 @@ function replaceOperationalTerms(value) {
 
 function replaceAnalysisTerms(value) {
   return replaceOperationalTerms(value)
+    .replace(/\bz-score\b/gi, "escore-z")
+    .replace(/\brank\s+#/gi, "posição #")
     .replace(/\bBacktest\b/g, "Teste histórico")
     .replace(/\bbacktest\b/g, "teste histórico")
     .replace(/\bRanking\b/g, "Classificação")
