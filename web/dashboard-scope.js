@@ -210,6 +210,7 @@ async function applyDashboardScope() {
 
     recentSection.innerHTML = `<div class="section-head"><div><h2>Desempenho recente</h2><p>Último backtest persistido de cada loteria.</p></div></div><div class="dashboard-comparison-grid">${data.backtests.map(([lottery, item]) => backtestComparisonCard(lottery, item)).join("")}</div>`;
     batchesSection.innerHTML = `<div class="section-head"><div><h2>Jogos recentes</h2><p>Últimos lotes gerados nas três loterias.</p></div></div><div class="panel list">${combinedBatchesMarkup(data.batches)}</div>`;
+    root.querySelector(".real-performance-section")?.remove();
     recentSection.insertAdjacentElement("afterend", realPerformanceSection(scope, data.realBets));
     return;
   }
@@ -221,6 +222,7 @@ async function applyDashboardScope() {
 
   const real = await loadRealPerformance(scope);
   if (token !== applyToken || currentView() !== "dashboard" || select.value !== scope) return;
+  root.querySelector(".real-performance-section")?.remove();
   recentSection.insertAdjacentElement("afterend", realPerformanceSection(scope, real));
 }
 
@@ -241,7 +243,8 @@ select?.addEventListener("change", () => {
 });
 
 root?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-dashboard-open]");
+  const target = event.target instanceof Element ? event.target : null;
+  const button = target?.closest("[data-dashboard-open]");
   if (!button) return;
   const lottery = button.dataset.dashboardLottery;
   const view = button.dataset.dashboardOpen;
