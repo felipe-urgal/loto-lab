@@ -93,7 +93,10 @@ function batchTrailing(batch, bet) {
     return `<div class="mg2-trailing-copy"><strong>${batch.games.length} jogo${batch.games.length === 1 ? "" : "s"}</strong><span>somente gerado</span></div>`;
   }
   if (bet.status === "checked") {
-    const result = Number(bet.netResult || 0);
+    if (bet.netResult === undefined || bet.netResult === null) {
+      return `<div class="mg2-trailing-copy"><strong>Conferido</strong><span>financeiro indisponível</span></div>`;
+    }
+    const result = Number(bet.netResult);
     return `<div class="mg2-trailing-copy"><strong class="${result >= 0 ? "is-positive" : "is-negative"}">${money(result)}</strong><span>resultado líquido</span></div>`;
   }
   return `<div class="mg2-trailing-copy"><strong>${money(bet.actualCost)}</strong><span>valor apostado</span></div>`;
@@ -117,8 +120,10 @@ function officialBetMarkup(bet) {
 
   const checkedGames = (bet.games || []).filter((item) => item.checkResult);
   const best = checkedGames.length ? Math.max(...checkedGames.map((item) => Number(item.checkResult.hits || 0))) : 0;
-  const prize = Number(bet.totalPrizeValue || 0);
-  const net = Number(bet.netResult || 0);
+  const prizeKnown = bet.totalPrizeValue !== undefined && bet.totalPrizeValue !== null;
+  const netKnown = bet.netResult !== undefined && bet.netResult !== null;
+  const prize = prizeKnown ? Number(bet.totalPrizeValue) : undefined;
+  const net = netKnown ? Number(bet.netResult) : undefined;
   return `<section class="mg2-official" data-mg2-official>
     <div class="mg2-official-head">
       <div><strong>Resultado da aposta · concurso #${bet.contestNumber}</strong><p>${checkedGames.length} jogo${checkedGames.length === 1 ? "" : "s"} efetivamente apostado${checkedGames.length === 1 ? "" : "s"}</p></div>
@@ -127,14 +132,15 @@ function officialBetMarkup(bet) {
     <div class="mg2-result-metrics">
       <div><span>Melhor jogo</span><strong>${hitText(best)}</strong></div>
       <div><span>Custo real</span><strong>${money(bet.actualCost)}</strong></div>
-      <div><span>Prêmio</span><strong>${money(prize)}</strong></div>
-      <div><span>Resultado</span><strong class="${net >= 0 ? "is-positive" : "is-negative"}">${money(net)}</strong></div>
+      <div><span>Prêmio</span><strong>${prizeKnown ? money(prize) : "—"}</strong></div>
+      <div><span>Resultado</span><strong class="${netKnown ? (net >= 0 ? "is-positive" : "is-negative") : ""}">${netKnown ? money(net) : "—"}</strong></div>
     </div>
+    ${!prizeKnown || !netKnown ? `<p class="mg2-form-note">O concurso foi conferido, mas o rateio financeiro ainda não está disponível na base.</p>` : ""}
     <details class="mg2-result-details">
       <summary>Ver jogos apostados</summary>
       <div class="mg2-official-games">
         ${checkedGames.map((item) => `<div class="mg2-official-game">
-          <div class="mg2-official-game-head"><strong>Jogo ${item.batchPosition}</strong><span>${hitText(item.checkResult.hits)} · ${money(item.prizeValue || 0)}</span></div>
+          <div class="mg2-official-game-head"><strong>Jogo ${item.batchPosition}</strong><span>${hitText(item.checkResult.hits)} · ${item.prizeValue === undefined || item.prizeValue === null ? "—" : money(item.prizeValue)}</span></div>
           <div class="mg2-numbers">${gameNumbers(item.game, { matchedNumbers: item.checkResult.matchedNumbers })}</div>
           ${item.game.luckyMonth ? `<span class="mg2-month">Mês da Sorte: ${escapeHtml(item.game.luckyMonth)}${item.checkResult.luckyMonthHit ? " · acertou" : ""}</span>` : ""}
         </div>`).join("")}
