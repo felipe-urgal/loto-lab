@@ -35,6 +35,7 @@ Por isso:
 - atrasos históricos só usam intervalos totalmente observados;
 - atraso/sequência atuais podem ficar indisponíveis quando a resposta depender de atravessar um gap;
 - ciclos são reiniciados após lacunas e o ciclo atual só é mostrado quando o seu início é conhecido;
+- o primeiro fechamento de ciclo depois de uma lacuna apenas restabelece uma fronteira conhecida e não entra na média histórica de duração;
 - a validação rolling usa somente o trecho contínuo mais recente.
 
 A UI exibe um aviso explícito quando essas proteções estão ativas.
@@ -204,15 +205,21 @@ Os campos antigos são preservados. A resposta agora acrescenta:
 
 Isso mantém compatibilidade com consumidores existentes.
 
-## Lifecycle, cache e fallback
+## Lifecycle, snapshot e execução pesada
 
 A view básica continua sendo renderizada pelo shell principal. O módulo Análises 2.0 é carregado sob demanda e usa o evento explícito `loto-lab:view-rendered` para substituir a visão básica somente quando a resposta avançada está disponível.
 
 O navegador **não mantém cache permanente por loteria**. Cada render oficial consulta novamente o endpoint, evitando que uma sincronização automática no servidor deixe a tela presa ao concurso anterior.
 
-O backend mantém apenas o cache curto já existente para absorver consultas consecutivas durante a montagem da view. A assinatura inclui tamanho do histórico e último concurso/data, portanto um novo concurso invalida a análise avançada.
+No backend, Análises usa uma consulta de histórico enxuta com apenas `lottery`, número do concurso, data e dezenas. Rateios, arrecadação e demais campos financeiros não são carregados para esse caminho.
 
-Se a segunda montagem avançada falhar, a visão básica já renderizada é preservada e recebe apenas um aviso de fallback. Uma falha opcional não transforma uma tela utilizável em uma tela totalmente indisponível.
+A revisão analítica é identificada por **SHA-256 do conteúdo histórico relevante**. O hash inclui número do concurso, data e dezenas; por isso tanto a entrada de um novo concurso quanto uma correção retroativa invalidam o snapshot.
+
+O cálculo pesado de uma revisão nova roda em `worker_threads`, fora do event loop HTTP. Requests simultâneos para a mesma loteria e a mesma revisão compartilham a mesma Promise em andamento, evitando dois cálculos caros em paralelo durante a montagem da tela.
+
+Depois de concluído, o snapshot fica memoizado enquanto a assinatura do histórico permanecer idêntica. O ranking/tier do contrato básico também é reaproveitado do mesmo snapshot, sem recalcular o score em cada request.
+
+Se a montagem avançada falhar, a visão básica já renderizada é preservada e recebe apenas um aviso de fallback. Uma falha opcional não transforma uma tela utilizável em uma tela totalmente indisponível.
 
 ## Acessibilidade
 
@@ -223,6 +230,8 @@ As cinco áreas usam semântica de `tablist/tab/tabpanel` e suportam:
 - foco visível.
 
 O detalhe da dezena usa semântica de diálogo modal, recebe foco ao abrir, fecha com `Escape`, mantém o foco dentro do painel com `Tab` e devolve o foco ao elemento que abriu o detalhe.
+
+O Chrome E2E valida a área tanto em desktop quanto em viewport móvel de `390×844`, incluindo abertura e fechamento do drawer.
 
 ## Interpretação correta
 
