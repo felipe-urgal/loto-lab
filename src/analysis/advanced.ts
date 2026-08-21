@@ -38,7 +38,7 @@ interface ContestStructure {
   odd: number;
   even: number;
   sum: number;
-  repeated: number;
+  repeated: number | null;
   low: number;
   high: number;
   longestRun: number;
@@ -47,8 +47,7 @@ interface ContestStructure {
   frame?: number;
 }
 
-interface PairStat {
-  numbers: [number, number];
+interface AssociationStat {
   observed: number;
   expected: number;
   lift: number;
@@ -58,19 +57,18 @@ interface PairStat {
   evidence: EvidenceLevel;
 }
 
-interface TripleStat {
+interface PairStat extends AssociationStat {
+  numbers: [number, number];
+}
+
+interface TripleStat extends AssociationStat {
   numbers: [number, number, number];
-  observed: number;
-  expected: number;
-  lift: number;
-  zScore: number;
-  adjustedPValue: number;
-  evidence: EvidenceLevel;
 }
 
 const ANALYSIS_WINDOWS = [100, 300, 500] as const;
 const MIN_VALIDATION_HISTORY = 20;
 const WEIGHT_MULTIPLIERS = [0.9, 1, 1.1] as const;
+const VALIDATION_COMPARISONS = ANALYSIS_WINDOWS.length * 3;
 
 function round(value: number, digits = 4): number {
   const factor = 10 ** digits;
@@ -144,6 +142,58 @@ export function hypergeometricDistribution(
   return points;
 }
 
+function binomialProbabilityTable(trials: number, probability: number): number[] {
+  if (!Number.isInteger(trials) || trials < 0 || probability < 0 || probability > 1) return [];
+  if (probability === 0) return Array.from({ length: trials + 1 }, (_, index) => index === 0 ? 1 : 0);
+  if (probability === 1) return Array.from({ length: trials + 1 }, (_, index) => index === trials ? 1 : 0);
+
+  const logFactorials = Array.from({ length: trials + 1 }, () => 0);
+  for (let index = 1; index <= trials; index += 1) {
+    logFactorials[index] = logFactorials[index - 1]! + Math.log(index);
+  }
+  const logP = Math.log(probability);
+  const logQ = Math.log1p(-probability);
+  return Array.from({ length: trials + 1 }, (_, observed) => {
+    const logProbability =
+      logFactorials[trials]! -
+      logFactorials[observed]! -
+      logFactorials[trials - observed]! +
+      observed * logP +
+      (trials - observed) * logQ;
+    return logProbability < -745 ? 0 : Math.exp(logProbability);
+  });
+}
+
+function exactTwoSidedFromTable(probabilities: number[], observed: number): number {
+  if (!Number.isInteger(observed) || observed < 0 || observed >= probabilities.length) return 1;
+  const observedProbability = probabilities[observed] ?? 0;
+  const threshold = observedProbability * (1 + 1e-12) + Number.EPSILON;
+  return Math.max(0, Math.min(1, probabilities.reduce(
+    (sum, probability) => probability <= threshold ? sum + probability : sum,
+    0,
+  )));
+}
+
+export function exactBinomialTwoSidedP(
+  observed: number,
+  trials: number,
+  probability: number,
+): number {
+  return exactTwoSidedFromTable(binomialProbabilityTable(trials, probability), observed);
+}
+
+function exactBinomialLookup(trials: number, probability: number) {
+  const probabilities = binomialProbabilityTable(trials, probability);
+  const cache = new Map<number, number>();
+  return (observed: number): number => {
+    const cached = cache.get(observed);
+    if (cached !== undefined) return cached;
+    const value = exactTwoSidedFromTable(probabilities, observed);
+    cache.set(observed, value);
+    return value;
+  };
+}
+
 function expectedFromDistribution(points: ProbabilityPoint[]): number {
   return points.reduce((sum, point) => sum + point.value * point.probability, 0);
 }
@@ -183,6 +233,46 @@ function sortedNumbers(contest: Contest): number[] {
   return [...contest.numbers].sort((a, b) => a - b);
 }
 
+function isConsecutive(previous: Contest | undefined, current: Contest | undefined): boolean {
+  return Boolean(previous && current && current.number === previous.number + 1);
+}
+
+function splitContinuousSegments(contests: Contest[]): Contest[][] {
+  if (contests.length === 0) return [];
+  const segments: Contest[][] = [[contests[0]!]];
+  for (let index = 1; index < contests.length; index += 1) {
+    const contest = contests[index]!;
+    const previous = contests[index - 1]!;
+    if (isConsecutive(previous, contest)) segments.at(-1)!.push(contest);
+    else segments.push([contest]);
+  }
+  return segments;
+}
+
+function latestContinuousSegment(contests: Contest[]): Contest[] {
+  return splitContinuousSegments(contests).at(-1) ?? [];
+}
+
+function buildDataQuality(contests: Contest[]) {
+  const gaps: Array<{ after: number; before: number; missing: number }> = [];
+  let missingContestCount = 0;
+  for (let index = 1; index < contests.length; index += 1) {
+    const previous = contests[index - 1]!;
+    const current = contests[index]!;
+    const missing = Math.max(0, current.number - previous.number - 1);
+    if (missing > 0) {
+      gaps.push({ after: previous.number, before: current.number, missing });
+      missingContestCount += missing;
+    }
+  }
+  return {
+    continuous: gaps.length === 0,
+    missingContestCount,
+    gaps: gaps.slice(-20),
+    latestContinuousContests: latestContinuousSegment(contests).length,
+  };
+}
+
 function longestConsecutiveRun(numbers: number[]): number {
   const sorted = [...numbers].sort((a, b) => a - b);
   let best = sorted.length > 0 ? 1 : 0;
@@ -219,12 +309,13 @@ function structureForContest(
   config: LotteryConfig,
 ): ContestStructure {
   const numbers = sortedNumbers(contest);
-  const previousSet = new Set(previous?.numbers ?? []);
+  const validPrevious = isConsecutive(previous, contest) ? previous : undefined;
+  const previousSet = new Set(validPrevious?.numbers ?? []);
   const midpoint = Math.floor((config.minNumber + config.maxNumber) / 2);
   const odd = numbers.filter((number) => number % 2 !== 0).length;
-  const repeated = previous
+  const repeated = validPrevious
     ? numbers.filter((number) => previousSet.has(number)).length
-    : 0;
+    : null;
   const low = numbers.filter((number) => number <= midpoint).length;
   const base: ContestStructure = {
     odd,
@@ -327,7 +418,7 @@ function buildStructure(contests: Contest[], config: LotteryConfig) {
     structureForContest(contest, index > 0 ? contests[index - 1] : undefined, config),
   );
   const latest = structures.at(-1);
-  const repeatValues = structures.slice(1).map((item) => item.repeated);
+  const repeatValues = structures.flatMap((item) => item.repeated === null ? [] : [item.repeated]);
   const oddValues = structures.map((item) => item.odd);
   const sumValues = structures.map((item) => item.sum);
   const lowValues = structures.map((item) => item.low);
@@ -345,11 +436,12 @@ function buildStructure(contests: Contest[], config: LotteryConfig) {
     : config.drawSize * populationVariance * ((population - config.drawSize) / (population - 1));
   const expectedSum = config.drawSize * ((config.minNumber + config.maxNumber) / 2);
 
-  const exactCoverage = exactFilterCoverage(config, contests.at(-1)?.numbers ?? []);
-  const ranges = exactCoverage.ranges;
-  const historicalTransitions = structures.slice(1);
+  const latestContest = contests.at(-1);
+  const exactCoverage = latestContest ? exactFilterCoverage(config, latestContest.numbers) : null;
+  const ranges = exactCoverage?.ranges ?? methodologyRanges(config);
+  const historicalTransitions = structures.filter((item) => item.repeated !== null);
   const historicalPassing = historicalTransitions.filter((item) =>
-    item.repeated >= ranges.repeated.min && item.repeated <= ranges.repeated.max &&
+    item.repeated! >= ranges.repeated.min && item.repeated! <= ranges.repeated.max &&
     item.odd >= ranges.odd.min && item.odd <= ranges.odd.max,
   ).length;
 
@@ -381,13 +473,7 @@ function buildStructure(contests: Contest[], config: LotteryConfig) {
       low: structuralMetric(latest?.low ?? null, lowValues, lowDistribution),
       longestRun: structuralMetric(latest?.longestRun ?? null, longestRunValues),
       ...(config.id === "lotofacil"
-        ? {
-            frame: structuralMetric(
-              latest?.frame ?? null,
-              frameValues,
-              frameDistribution,
-            ),
-          }
+        ? { frame: structuralMetric(latest?.frame ?? null, frameValues, frameDistribution) }
         : {}),
     },
     grid: config.id === "lotofacil"
@@ -399,23 +485,22 @@ function buildStructure(contests: Contest[], config: LotteryConfig) {
         }
       : null,
     methodologyFilter: {
-      rules: {
-        repeated: ranges.repeated,
-        odd: ranges.odd,
-      },
-      exactUniverse: {
-        passing: exactCoverage.passing,
-        total: exactCoverage.total,
-        coverage: round(exactCoverage.coverage),
-      },
+      rules: { repeated: ranges.repeated, odd: ranges.odd },
+      exactUniverse: exactCoverage
+        ? {
+            passing: exactCoverage.passing,
+            total: exactCoverage.total,
+            coverage: round(exactCoverage.coverage),
+          }
+        : null,
       historical: {
         passing: historicalPassing,
         total: historicalTransitions.length,
         coverage: historicalTransitions.length === 0
-          ? 0
+          ? null
           : round(historicalPassing / historicalTransitions.length),
       },
-      note: "Cobertura exata considera apenas repetição e paridade, as faixas estruturais explícitas da metodologia; soma e demais estruturas permanecem descritivas.",
+      note: "Cobertura exata considera apenas repetição e paridade. Transições com concursos faltantes são excluídas; soma e demais estruturas permanecem descritivas.",
     },
   };
 }
@@ -436,31 +521,34 @@ function rawFrequencyMap(contests: Contest[], config: LotteryConfig) {
   return new Map(calculateFrequency(contests, config).map((item) => [item.number, item]));
 }
 
-function currentDelay(contests: Contest[], number: number): number {
-  let delay = 0;
-  for (let index = contests.length - 1; index >= 0; index -= 1) {
-    if (contests[index]!.numbers.includes(number)) return delay;
-    delay += 1;
+function currentDelay(contests: Contest[], number: number): number | null {
+  const segment = latestContinuousSegment(contests);
+  for (let index = segment.length - 1; index >= 0; index -= 1) {
+    if (segment[index]!.numbers.includes(number)) return segment.length - index - 1;
   }
-  return contests.length;
+  return segment.length === contests.length ? segment.length : null;
 }
 
-function currentStreak(contests: Contest[], number: number): number {
+function currentStreak(contests: Contest[], number: number): number | null {
+  const segment = latestContinuousSegment(contests);
+  if (segment.length === 0) return null;
   let streak = 0;
-  for (let index = contests.length - 1; index >= 0; index -= 1) {
-    if (!contests[index]!.numbers.includes(number)) break;
+  for (let index = segment.length - 1; index >= 0; index -= 1) {
+    if (!segment[index]!.numbers.includes(number)) return streak;
     streak += 1;
   }
-  return streak;
+  return segment.length === contests.length ? streak : null;
 }
 
 function historicalDelays(contests: Contest[], number: number): number[] {
-  const occurrenceIndexes = contests
-    .map((contest, index) => contest.numbers.includes(number) ? index : -1)
-    .filter((index) => index >= 0);
   const delays: number[] = [];
-  for (let index = 1; index < occurrenceIndexes.length; index += 1) {
-    delays.push(occurrenceIndexes[index]! - occurrenceIndexes[index - 1]! - 1);
+  for (const segment of splitContinuousSegments(contests)) {
+    const occurrenceIndexes = segment
+      .map((contest, index) => contest.numbers.includes(number) ? index : -1)
+      .filter((index) => index >= 0);
+    for (let index = 1; index < occurrenceIndexes.length; index += 1) {
+      delays.push(occurrenceIndexes[index]! - occurrenceIndexes[index - 1]! - 1);
+    }
   }
   return delays;
 }
@@ -471,9 +559,13 @@ function weightScenarios(base: AnalysisWeights): AnalysisWeights[] {
 
   function visit(index: number, multipliers: number[]) {
     if (index === keys.length) {
-      const raw = Object.fromEntries(keys.map((key, keyIndex) => [key, base[key] * multipliers[keyIndex]!])) as unknown as AnalysisWeights;
+      const raw = Object.fromEntries(
+        keys.map((key, keyIndex) => [key, base[key] * multipliers[keyIndex]!]),
+      ) as unknown as AnalysisWeights;
       const total = keys.reduce((sum, key) => sum + raw[key], 0);
-      scenarios.push(Object.fromEntries(keys.map((key) => [key, raw[key] / total])) as unknown as AnalysisWeights);
+      scenarios.push(Object.fromEntries(
+        keys.map((key) => [key, raw[key] / total]),
+      ) as unknown as AnalysisWeights);
       return;
     }
     for (const multiplier of WEIGHT_MULTIPLIERS) visit(index + 1, [...multipliers, multiplier]);
@@ -491,10 +583,20 @@ function scoreWithWeights(row: NumberAnalysis, weights: AnalysisWeights): number
     row.recent20 * weights.recent20;
 }
 
-function robustnessByNumber(rows: NumberAnalysis[], weights: AnalysisWeights) {
+function robustnessByNumber(rows: NumberAnalysis[], weights: AnalysisWeights, enabled: boolean) {
+  const numbers = rows.map((row) => row.number);
+  if (!enabled) {
+    const ranks = rankMap(rows);
+    return new Map(numbers.map((number) => [number, {
+      scenarioCount: 0,
+      tierStability: null,
+      strongShare: null,
+      rankRange: [ranks.get(number) ?? 0, ranks.get(number) ?? 0] as [number, number],
+    }]));
+  }
+
   const currentTiers = tierMap(rows);
   const scenarios = weightScenarios(weights);
-  const numbers = rows.map((row) => row.number);
   const third = Math.ceil(numbers.length / 3);
   const stats = new Map(numbers.map((number) => [number, {
     sameTier: 0,
@@ -540,12 +642,14 @@ function buildDynamics(contests: Contest[], config: LotteryConfig, currentRows: 
   }
 
   const recentTierSnapshots: Array<Map<number, NumberTier>> = [];
-  const firstSnapshot = Math.max(1, contests.length - 9);
-  for (let length = firstSnapshot; length <= contests.length; length += 1) {
-    recentTierSnapshots.push(tierMap(buildNumberAnalysis(contests.slice(0, length), config)));
+  if (contests.length > 0) {
+    const firstSnapshot = Math.max(1, contests.length - 9);
+    for (let length = firstSnapshot; length <= contests.length; length += 1) {
+      recentTierSnapshots.push(tierMap(buildNumberAnalysis(contests.slice(0, length), config)));
+    }
   }
 
-  const robustness = robustnessByNumber(currentRows, DEFAULT_WEIGHTS);
+  const robustness = robustnessByNumber(currentRows, DEFAULT_WEIGHTS, contests.length > 0);
   const latestDate = contests.at(-1)?.date;
   const yearPrefix = latestDate?.slice(0, 4) ?? "";
   const monthPrefix = latestDate?.slice(0, 7) ?? "";
@@ -583,15 +687,35 @@ function buildDynamics(contests: Contest[], config: LotteryConfig, currentRows: 
       tier: row.tier,
       score: round(row.score),
       rank,
-      previousRanks: { one: rank1 ?? null, five: rank5 ?? null, ten: rank10 ?? null, twenty: rank20 ?? null },
-      movements: { one: movement(rank1), five: movement(rank5), ten: movement10, twenty: movement(rank20) },
-      trend: movement10 === null ? "unknown" : movement10 >= 5 ? "rising" : movement10 <= -5 ? "falling" : "stable",
-      recentTierStability: recentTierSnapshots.length === 0 ? 0 : round(sameTierCount / recentTierSnapshots.length),
-      recentStrongShare: recentTierSnapshots.length === 0 ? 0 : round(strongCount / recentTierSnapshots.length),
+      previousRanks: {
+        one: rank1 ?? null,
+        five: rank5 ?? null,
+        ten: rank10 ?? null,
+        twenty: rank20 ?? null,
+      },
+      movements: {
+        one: movement(rank1),
+        five: movement(rank5),
+        ten: movement10,
+        twenty: movement(rank20),
+      },
+      trend: movement10 === null
+        ? "unknown"
+        : movement10 >= 5
+          ? "rising"
+          : movement10 <= -5
+            ? "falling"
+            : "stable",
+      recentTierStability: recentTierSnapshots.length === 0
+        ? null
+        : round(sameTierCount / recentTierSnapshots.length),
+      recentStrongShare: recentTierSnapshots.length === 0
+        ? null
+        : round(strongCount / recentTierSnapshots.length),
       weightRobustness: robustnessItem,
       delay: {
         current: delay,
-        percentile: percentileRank(delay, delays) ?? 0,
+        percentile: delay === null ? null : percentileRank(delay, delays) ?? null,
         historical: summarize(delays),
       },
       streak: currentStreak(contests, row.number),
@@ -620,30 +744,63 @@ function buildDynamics(contests: Contest[], config: LotteryConfig, currentRows: 
   return {
     items,
     movers: {
-      rising: movers.filter((item) => (item.movements.ten ?? 0) > 0).slice(0, 8).map((item) => ({ number: item.number, movement: item.movements.ten, rank: item.rank })),
-      falling: [...movers].reverse().filter((item) => (item.movements.ten ?? 0) < 0).slice(0, 8).map((item) => ({ number: item.number, movement: item.movements.ten, rank: item.rank })),
+      rising: movers
+        .filter((item) => (item.movements.ten ?? 0) > 0)
+        .slice(0, 8)
+        .map((item) => ({ number: item.number, movement: item.movements.ten, rank: item.rank })),
+      falling: [...movers]
+        .reverse()
+        .filter((item) => (item.movements.ten ?? 0) < 0)
+        .slice(0, 8)
+        .map((item) => ({ number: item.number, movement: item.movements.ten, rank: item.rank })),
     },
   };
 }
 
 function buildCycles(contests: Contest[], config: LotteryConfig) {
   const universe = numberRange(config);
-  const seen = new Set<number>();
   const completedLengths: number[] = [];
-  let currentLength = 0;
-  for (const contest of contests) {
-    currentLength += 1;
-    for (const number of contest.numbers) seen.add(number);
-    if (seen.size === universe.length) {
-      completedLengths.push(currentLength);
-      seen.clear();
-      currentLength = 0;
+  const segments = splitContinuousSegments(contests);
+  let current = {
+    available: contests.length > 0,
+    currentLength: 0 as number | null,
+    seen: 0 as number | null,
+    missing: [...universe],
+  };
+
+  segments.forEach((segment, segmentIndex) => {
+    const seen = new Set<number>();
+    let currentLength = 0;
+    let currentKnown = segmentIndex === 0;
+    for (const contest of segment) {
+      currentLength += 1;
+      for (const number of contest.numbers) seen.add(number);
+      if (seen.size === universe.length) {
+        completedLengths.push(currentLength);
+        seen.clear();
+        currentLength = 0;
+        currentKnown = true;
+      }
     }
-  }
+    if (segmentIndex === segments.length - 1) {
+      current = currentKnown
+        ? {
+            available: true,
+            currentLength,
+            seen: seen.size,
+            missing: universe.filter((number) => !seen.has(number)),
+          }
+        : {
+            available: false,
+            currentLength: null,
+            seen: null,
+            missing: [],
+          };
+    }
+  });
+
   return {
-    currentLength,
-    seen: seen.size,
-    missing: universe.filter((number) => !seen.has(number)),
+    ...current,
     completedCount: completedLengths.length,
     historicalLength: summarize(completedLengths),
   };
@@ -657,18 +814,24 @@ function tripleKey(a: number, b: number, c: number): string {
   return `${a}:${b}:${c}`;
 }
 
-function associationStat(observed: number, expected: number, probability: number, trials: number, comparisons: number) {
+function associationStat(
+  observed: number,
+  expected: number,
+  probability: number,
+  trials: number,
+  comparisons: number,
+  exactPValue: number,
+): AssociationStat {
   const variance = trials * probability * (1 - probability);
   const zScore = variance > 0 ? (observed - expected) / Math.sqrt(variance) : 0;
-  const pValue = twoSidedNormalP(zScore);
-  const adjustedPValue = Math.min(1, pValue * comparisons);
+  const adjustedPValue = Math.min(1, exactPValue * comparisons);
   return {
     observed,
     expected: round(expected),
     lift: expected > 0 ? round(observed / expected) : 0,
     zScore: round(zScore),
-    pValue: round(pValue, 8),
-    adjustedPValue: round(adjustedPValue, 8),
+    pValue: round(exactPValue, 10),
+    adjustedPValue: round(adjustedPValue, 10),
     evidence: evidenceLevel(adjustedPValue),
   };
 }
@@ -694,37 +857,51 @@ function buildAssociations(contests: Contest[], config: LotteryConfig) {
 
   const population = universe.length;
   const draw = config.drawSize;
-  const pairProbability = population < 2 ? 0 : (draw * (draw - 1)) / (population * (population - 1));
+  const pairProbability = population < 2
+    ? 0
+    : (draw * (draw - 1)) / (population * (population - 1));
   const pairExpected = contests.length * pairProbability;
   const totalPairs = combination(population, 2);
+  const pairPValue = exactBinomialLookup(contests.length, pairProbability);
   const pairs: PairStat[] = [];
   for (let first = 0; first < universe.length - 1; first += 1) {
     for (let second = first + 1; second < universe.length; second += 1) {
       const a = universe[first]!;
       const b = universe[second]!;
+      const observed = pairCounts.get(pairKey(a, b)) ?? 0;
       pairs.push({
         numbers: [a, b],
-        ...associationStat(pairCounts.get(pairKey(a, b)) ?? 0, pairExpected, pairProbability, contests.length, totalPairs),
+        ...associationStat(
+          observed,
+          pairExpected,
+          pairProbability,
+          contests.length,
+          totalPairs,
+          pairPValue(observed),
+        ),
       });
     }
   }
 
   const tripleProbability = population < 3
     ? 0
-    : (draw * (draw - 1) * (draw - 2)) / (population * (population - 1) * (population - 2));
+    : (draw * (draw - 1) * (draw - 2)) /
+      (population * (population - 1) * (population - 2));
   const tripleExpected = contests.length * tripleProbability;
   const totalTriples = combination(population, 3);
+  const triplePValue = exactBinomialLookup(contests.length, tripleProbability);
   const triples: TripleStat[] = [...tripleCounts.entries()].map(([key, observed]) => {
     const [a, b, c] = key.split(":").map(Number) as [number, number, number];
-    const stat = associationStat(observed, tripleExpected, tripleProbability, contests.length, totalTriples);
     return {
       numbers: [a, b, c],
-      observed: stat.observed,
-      expected: stat.expected,
-      lift: stat.lift,
-      zScore: stat.zScore,
-      adjustedPValue: stat.adjustedPValue,
-      evidence: stat.evidence,
+      ...associationStat(
+        observed,
+        tripleExpected,
+        tripleProbability,
+        contests.length,
+        totalTriples,
+        triplePValue(observed),
+      ),
     };
   });
 
@@ -738,8 +915,9 @@ function buildAssociations(contests: Contest[], config: LotteryConfig) {
     methodology: {
       pairComparisons: totalPairs,
       tripleComparisons: totalTriples,
+      test: "exact-binomial-two-sided",
       correction: "bonferroni",
-      note: "Associações são exploratórias. A correção por múltiplas comparações reduz falsos sinais produzidos apenas pelo grande número de pares e trincas examinados.",
+      note: "Associações são exploratórias. O p-value é binomial bilateral exato e a correção por múltiplas comparações reduz falsos sinais produzidos pelo grande número de pares e trincas examinados.",
     },
   };
 }
@@ -748,12 +926,19 @@ function buildSimilarity(contests: Contest[], config: LotteryConfig) {
   const latest = contests.at(-1);
   if (!latest) return { overlapDistribution: [], closest: [] };
   const latestSet = new Set(latest.numbers);
-  const latestStructure = structureForContest(latest, contests.at(-2), config);
+  const latestStructure = structureForContest(
+    latest,
+    isConsecutive(contests.at(-2), latest) ? contests.at(-2) : undefined,
+    config,
+  );
   const overlapCounts = new Map<number, number>();
   const candidates = contests.slice(0, -1).map((contest, index) => {
     const overlap = contest.numbers.filter((number) => latestSet.has(number)).length;
     overlapCounts.set(overlap, (overlapCounts.get(overlap) ?? 0) + 1);
-    const structure = structureForContest(contest, index > 0 ? contests[index - 1] : undefined, config);
+    const previous = index > 0 && isConsecutive(contests[index - 1], contest)
+      ? contests[index - 1]
+      : undefined;
+    const structure = structureForContest(contest, previous, config);
     const structuralDistance =
       Math.abs(structure.odd - latestStructure.odd) / config.drawSize +
       Math.abs(structure.sum - latestStructure.sum) / (config.drawSize * config.maxNumber) +
@@ -763,36 +948,55 @@ function buildSimilarity(contests: Contest[], config: LotteryConfig) {
       contest: contest.number,
       date: contest.date,
       overlap,
-      sharedNumbers: contest.numbers.filter((number) => latestSet.has(number)).sort((a, b) => a - b),
+      sharedNumbers: contest.numbers
+        .filter((number) => latestSet.has(number))
+        .sort((a, b) => a - b),
       structuralDistance: round(structuralDistance),
     };
   });
   return {
     referenceContest: latest.number,
-    overlapDistribution: [...overlapCounts.entries()].sort((a, b) => a[0] - b[0]).map(([overlap, count]) => ({ overlap, count })),
-    closest: candidates.sort((a, b) => b.overlap - a.overlap || a.structuralDistance - b.structuralDistance || b.contest - a.contest).slice(0, 10),
+    overlapDistribution: [...overlapCounts.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([overlap, count]) => ({ overlap, count })),
+    closest: candidates
+      .sort((a, b) =>
+        b.overlap - a.overlap ||
+        a.structuralDistance - b.structuralDistance ||
+        b.contest - a.contest,
+      )
+      .slice(0, 10),
   };
 }
 
-function aggregateValidation(rounds: Array<{
-  hits: Record<NumberTier, number>;
-  sizes: Record<NumberTier, number>;
-}>, config: LotteryConfig, window: number) {
+function aggregateValidation(
+  rounds: Array<{
+    hits: Record<NumberTier, number>;
+    sizes: Record<NumberTier, number>;
+  }>,
+  config: LotteryConfig,
+  window: number,
+) {
   const selected = rounds.slice(-window);
+  const population = numberRange(config).length;
   const totalDrawn = selected.length * config.drawSize;
   const tiers = (["strong", "balanced", "cold"] as NumberTier[]).map((tier) => {
     const observedHits = selected.reduce((sum, round) => sum + round.hits[tier], 0);
-    const expectedHits = selected.reduce((sum, round) => sum + config.drawSize * (round.sizes[tier] / numberRange(config).length), 0);
+    const expectedHits = selected.reduce(
+      (sum, round) => sum + config.drawSize * (round.sizes[tier] / population),
+      0,
+    );
     const variance = selected.reduce((sum, round) => {
-      const population = numberRange(config).length;
       const success = round.sizes[tier];
       const p = success / population;
-      const finitePopulation = population <= 1 ? 0 : (population - config.drawSize) / (population - 1);
+      const finitePopulation = population <= 1
+        ? 0
+        : (population - config.drawSize) / (population - 1);
       return sum + config.drawSize * p * (1 - p) * finitePopulation;
     }, 0);
     const zScore = variance > 0 ? (observedHits - expectedHits) / Math.sqrt(variance) : 0;
     const pValue = twoSidedNormalP(zScore);
-    const adjustedPValue = Math.min(1, pValue * 3);
+    const adjustedPValue = Math.min(1, pValue * VALIDATION_COMPARISONS);
     return {
       tier,
       observedHits,
@@ -809,15 +1013,19 @@ function aggregateValidation(rounds: Array<{
 }
 
 function buildRollingValidation(contests: Contest[], config: LotteryConfig) {
+  const validationContests = latestContinuousSegment(contests);
   const rounds: Array<{
     contest: number;
     hits: Record<NumberTier, number>;
     sizes: Record<NumberTier, number>;
   }> = [];
-  const start = Math.max(MIN_VALIDATION_HISTORY, contests.length - Math.max(...ANALYSIS_WINDOWS));
-  for (let index = start; index < contests.length; index += 1) {
-    const history = contests.slice(0, index);
-    const target = contests[index]!;
+  const start = Math.max(
+    MIN_VALIDATION_HISTORY,
+    validationContests.length - Math.max(...ANALYSIS_WINDOWS),
+  );
+  for (let index = start; index < validationContests.length; index += 1) {
+    const history = validationContests.slice(0, index);
+    const target = validationContests[index]!;
     const rows = buildNumberAnalysis(history, config);
     const tiers = tierMap(rows);
     const sizes: Record<NumberTier, number> = {
@@ -836,11 +1044,13 @@ function buildRollingValidation(contests: Contest[], config: LotteryConfig) {
   return {
     periods: ANALYSIS_WINDOWS.map((window) => aggregateValidation(rounds, config, window)),
     availableRounds: rounds.length,
+    sourceContests: validationContests.length,
     methodology: {
       warmupContests: MIN_VALIDATION_HISTORY,
       leakageProtection: true,
-      correction: "bonferroni-3-tiers",
-      note: "Cada concurso é avaliado usando apenas concursos anteriores. O esperado usa a distribuição hipergeométrica implícita no tamanho de cada grupo, sem olhar o resultado futuro.",
+      requiresContinuousHistory: true,
+      correction: `bonferroni-${VALIDATION_COMPARISONS}-tests`,
+      note: "Cada concurso é avaliado usando apenas concursos anteriores do trecho contínuo mais recente. O esperado usa a distribuição hipergeométrica implícita no tamanho de cada grupo; a correção cobre 3 grupos × 3 janelas.",
     },
   };
 }
@@ -861,6 +1071,7 @@ export function buildAdvancedAnalysis(contests: Contest[], config: LotteryConfig
     lottery: config.id,
     latestContest: latest,
     historySize: scoped.length,
+    dataQuality: buildDataQuality(scoped),
     model: {
       weights: DEFAULT_WEIGHTS,
       baseline: "uniform-without-replacement",
@@ -875,7 +1086,11 @@ export function buildAdvancedAnalysis(contests: Contest[], config: LotteryConfig
     structure: buildStructure(scoped, config),
     dynamics: {
       cycles: buildCycles(scoped, config),
-      heatmap: scoped.slice(-30).map((contest) => ({ contest: contest.number, date: contest.date, numbers: sortedNumbers(contest) })),
+      heatmap: scoped.slice(-30).map((contest) => ({
+        contest: contest.number,
+        date: contest.date,
+        numbers: sortedNumbers(contest),
+      })),
     },
     combinations: buildAssociations(scoped, config),
     similarity: buildSimilarity(scoped, config),
