@@ -523,6 +523,7 @@ function rawFrequencyMap(contests: Contest[], config: LotteryConfig) {
 
 function currentDelay(contests: Contest[], number: number): number | null {
   const segment = latestContinuousSegment(contests);
+  if (segment.length === 0) return null;
   for (let index = segment.length - 1; index >= 0; index -= 1) {
     if (segment[index]!.numbers.includes(number)) return segment.length - index - 1;
   }
@@ -776,7 +777,7 @@ function buildCycles(contests: Contest[], config: LotteryConfig) {
       currentLength += 1;
       for (const number of contest.numbers) seen.add(number);
       if (seen.size === universe.length) {
-        completedLengths.push(currentLength);
+        if (currentKnown) completedLengths.push(currentLength);
         seen.clear();
         currentLength = 0;
         currentKnown = true;
