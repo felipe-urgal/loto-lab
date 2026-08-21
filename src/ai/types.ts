@@ -114,10 +114,12 @@ export interface AiInsightRecord {
   focus: AiInsightFocus;
   model: string;
   providerResponseId?: string;
+  evidenceHash?: string;
   evidence: AiEvidenceContext;
   insight: AiInsightContent;
   usage?: Record<string, unknown>;
   createdAt: string;
+  reused?: boolean;
 }
 
 export const AI_DISCLAIMER =
