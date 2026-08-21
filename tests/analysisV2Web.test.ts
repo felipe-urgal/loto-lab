@@ -3,12 +3,15 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 test("Analyses 2.0 is lazy-loaded and exposes the five analysis modes", async () => {
-  const [source, css, loader, services, advanced] = await Promise.all([
+  const [source, css, loader, services, advanced, repository, workerClient, worker] = await Promise.all([
     readFile("web/analysis-v2.js", "utf8"),
     readFile("web/analysis-v2.css", "utf8"),
     readFile("web/feature-loader.js", "utf8"),
     readFile("src/api/services.ts", "utf8"),
     readFile("src/analysis/advanced.ts", "utf8"),
+    readFile("src/persistence/contestRepository.ts", "utf8"),
+    readFile("src/analysis/advancedWorkerClient.ts", "utf8"),
+    readFile("src/api/analysisWorker.ts", "utf8"),
   ]);
 
   assert.match(loader, /view === "analysis"/);
@@ -38,6 +41,13 @@ test("Analyses 2.0 is lazy-loaded and exposes the five analysis modes", async ()
   assert.match(advanced, /exactBinomialTwoSidedP/);
   assert.match(advanced, /bonferroni-\$\{VALIDATION_COMPARISONS\}-tests/);
   assert.match(advanced, /latestContinuousSegment/);
-  assert.match(services, /buildAdvancedAnalysis\(contests, config\)/);
-  assert.match(services, /\n\s+advanced,\n/);
+  assert.match(repository, /listAnalysisHistory/);
+  assert.doesNotMatch(repository.match(/async listAnalysisHistory[\s\S]*?\n  }/)?.[0] ?? "", /contest_prize_tiers/);
+  assert.match(services, /analysisSignature/);
+  assert.match(services, /createHash\("sha256"\)/);
+  assert.match(services, /advancedAnalysisInFlight/);
+  assert.match(services, /runAdvancedAnalysisInWorker\(contests, lottery\)/);
+  assert.match(services, /Promise<AnalysisResponse>/);
+  assert.match(workerClient, /kind: "advanced-analysis"/);
+  assert.match(worker, /buildAdvancedAnalysis\(job\.contests, getLotteryConfig\(job\.lottery\)\)/);
 });
