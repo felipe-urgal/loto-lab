@@ -100,11 +100,19 @@ test("Generator 2.0 saves the frozen preview exactly and is idempotent", async (
   assert.equal(typeof seed, "string");
   assert.ok(preview.preview.id.length === 64);
 
-  const firstSave = await runGenerationV2(services, { ...input, seed: String(seed), persist: true });
+  const firstSave = await runGenerationV2(services, { ...input, seed: String(seed), persist: true }) as {
+    alreadySaved: boolean;
+    batchId: number;
+    games: GeneratedGame[];
+  };
   assert.equal(firstSave.alreadySaved, false);
   assert.equal(fingerprint(firstSave.games), fingerprint(preview.games));
 
-  const secondSave = await runGenerationV2(services, { ...input, seed: String(seed), persist: true });
+  const secondSave = await runGenerationV2(services, { ...input, seed: String(seed), persist: true }) as {
+    alreadySaved: boolean;
+    batchId: number;
+    games: GeneratedGame[];
+  };
   assert.equal(secondSave.alreadySaved, true);
   assert.equal(secondSave.batchId, firstSave.batchId);
   assert.equal(fingerprint(secondSave.games), fingerprint(preview.games));
