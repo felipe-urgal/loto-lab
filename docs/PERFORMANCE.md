@@ -17,7 +17,7 @@ O build web é feito por `npm run web:build` sem adicionar dependências de runt
 
 A navegação e os ícones ficam centralizados em `web/shell.js`. A home carrega apenas o shell, o core `app.js` e o loader; CSS/JS de status, geração e gestão de jogos são carregados quando necessários.
 
-O loader compartilha as Promises de carregamento e aguarda o stylesheet de cada feature antes de executar seu módulo. Isso evita downloads/imports duplicados e reduz o risco de conteúdo temporariamente sem estilo e layout shift.
+O loader compartilha as Promises de carregamento e aguarda a tentativa de carregamento do stylesheet de cada feature antes de executar seu módulo. Isso evita downloads/imports duplicados e reduz o risco de conteúdo temporariamente sem estilo e layout shift. Se o CSS falhar, o módulo funcional ainda é carregado para preservar o comportamento da feature.
 
 ## CPU / análises pesadas
 
