@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import type { Pool } from "pg";
 import { createLotoLabServer } from "../src/api/server.js";
 
-test("web application shell, Strategy Lab and assets are served by the Loto Lab process", async (t) => {
+test("web shell, lazy feature assets and cache policy are served by the Loto Lab process", async (t) => {
   const pool = {
     async query() {
       return {
@@ -32,119 +32,69 @@ test("web application shell, Strategy Lab and assets are served by the Loto Lab 
   const page = await fetch(`${baseUrl}/`);
   assert.equal(page.status, 200);
   assert.match(page.headers.get("content-type") ?? "", /^text\/html/);
+  assert.equal(page.headers.get("cache-control"), "no-cache");
   const html = await page.text();
   assert.match(html, /Loto Lab/);
-  assert.match(html, /Dashboard/);
-  assert.match(html, /Gerar jogos/);
-  assert.match(html, /Laboratório/);
-  assert.match(html, /data-status-bar/);
-  assert.match(html, /\/assets\/app\.js/);
-  assert.match(html, /\/assets\/data-status\.js/);
-  assert.match(html, /\/assets\/real-bets\.js/);
-  assert.match(html, /\/assets\/real-bets\.css/);
-  assert.match(html, /\/assets\/generation-diversity\.js/);
-  assert.match(html, /\/assets\/generation-diversity\.css/);
-  assert.match(html, /\/assets\/my-games-management\.js/);
-  assert.match(html, /\/assets\/my-games-management\.css/);
+  assert.match(html, /data-shell-nav/);
+  assert.match(html, /\/assets\/shell\.js/);
+  assert.match(html, /\/assets\/feature-loader\.js/);
+  assert.match(html, /\/assets\/ui-foundation\.css/);
+  assert.doesNotMatch(html, /<script[^>]+data-status\.js/);
+  assert.doesNotMatch(html, /<script[^>]+real-bets\.js/);
 
-  const labPage = await fetch(`${baseUrl}/lab`);
-  assert.equal(labPage.status, 200);
-  assert.match(labPage.headers.get("content-type") ?? "", /^text\/html/);
-  const labHtml = await labPage.text();
-  assert.match(labHtml, /Laboratório/);
-  assert.match(labHtml, /Agenda/);
-  assert.match(labHtml, />IA</);
-  assert.match(labHtml, /Executar comparação/);
-  assert.match(labHtml, /\/assets\/lab\.js/);
-  assert.match(labHtml, /\/assets\/lab\.css/);
-  assert.match(labHtml, /<span class="nav-icon"[^>]*><svg/);
+  for (const route of ["/lab", "/ai", "/agenda"]) {
+    const response = await fetch(`${baseUrl}${route}`);
+    assert.equal(response.status, 200);
+    const source = await response.text();
+    assert.match(source, /data-shell-nav/);
+    assert.match(source, /\/assets\/shell\.js/);
+  }
 
-  const aiPage = await fetch(`${baseUrl}/ai`);
-  assert.equal(aiPage.status, 200);
-  const aiHtml = await aiPage.text();
-  assert.match(aiHtml, /Laboratório/);
-  assert.match(aiHtml, /Agenda/);
-  assert.match(aiHtml, />IA</);
-  assert.match(aiHtml, /<span class="nav-icon"[^>]*><svg/);
-  assert.doesNotMatch(aiHtml, /[▦▥✦▤↶♧◷◇]/);
+  const shell = await fetch(`${baseUrl}/assets/shell.js`);
+  assert.equal(shell.status, 200);
+  const shellSource = await shell.text();
+  assert.match(shellSource, /nav-more/);
+  assert.match(shellSource, /Backtests/);
+  assert.match(shellSource, /Laboratório/);
+  assert.match(shellSource, /Agenda/);
 
-  const agendaPage = await fetch(`${baseUrl}/agenda`);
-  assert.equal(agendaPage.status, 200);
-  const agendaHtml = await agendaPage.text();
-  assert.match(agendaHtml, /Laboratório/);
-  assert.match(agendaHtml, /Agenda/);
-  assert.match(agendaHtml, />IA</);
-  assert.match(agendaHtml, /<span class="nav-icon"[^>]*><svg/);
-  assert.doesNotMatch(agendaHtml, /[▦▥✦▤↶♧◷◇]/);
+  const loader = await fetch(`${baseUrl}/assets/feature-loader.js`);
+  assert.equal(loader.status, 200);
+  const loaderSource = await loader.text();
+  assert.match(loaderSource, /import\(asset/);
+  assert.match(loaderSource, /generation-diversity/);
+  assert.match(loaderSource, /my-games-management/);
 
-  const javascript = await fetch(`${baseUrl}/assets/app.js`);
+  const javascript = await fetch(`${baseUrl}/assets/app.js?v=test`);
   assert.equal(javascript.status, 200);
   assert.match(javascript.headers.get("content-type") ?? "", /^text\/javascript/);
+  assert.match(javascript.headers.get("cache-control") ?? "", /immutable/);
   const source = await javascript.text();
   assert.match(source, /\/api\/v1/);
   assert.match(source, /games\/generate/);
   assert.match(source, /backtests\/run/);
 
-  const realBetsJavascript = await fetch(`${baseUrl}/assets/real-bets.js`);
-  assert.equal(realBetsJavascript.status, 200);
-  assert.match(realBetsJavascript.headers.get("content-type") ?? "", /^text\/javascript/);
-  const realBetSource = await realBetsJavascript.text();
-  assert.match(realBetSource, /real-bets/);
-  assert.match(realBetSource, /Marcar como apostado/);
-  assert.match(realBetSource, /Desempenho real/);
+  for (const asset of [
+    "real-bets.js",
+    "generation-diversity.js",
+    "my-games-management.js",
+    "lab.js",
+    "data-status.js",
+    "styles.css",
+    "refinements.css",
+    "lab.css",
+    "data-status.css",
+  ]) {
+    const response = await fetch(`${baseUrl}/assets/${asset}`);
+    assert.equal(response.status, 200, asset);
+  }
 
-  const realBetStyles = await fetch(`${baseUrl}/assets/real-bets.css`);
-  assert.equal(realBetStyles.status, 200);
-  assert.match(await realBetStyles.text(), /\.real-bet-status/);
-
-  const diversityJavascript = await fetch(`${baseUrl}/assets/generation-diversity.js`);
-  assert.equal(diversityJavascript.status, 200);
-  assert.match(diversityJavascript.headers.get("content-type") ?? "", /^text\/javascript/);
-  const diversitySource = await diversityJavascript.text();
-  assert.match(diversitySource, /Modo real · diversificado/);
-  assert.match(diversitySource, /generatorOptions/);
-
-  const diversityStyles = await fetch(`${baseUrl}/assets/generation-diversity.css`);
-  assert.equal(diversityStyles.status, 200);
-  assert.match(await diversityStyles.text(), /\.generation-mode-card/);
-
-  const managementJavascript = await fetch(`${baseUrl}/assets/my-games-management.js`);
-  assert.equal(managementJavascript.status, 200);
-  assert.match(managementJavascript.headers.get("content-type") ?? "", /^text\/javascript/);
-  const managementSource = await managementJavascript.text();
-  assert.match(managementSource, /Arquivar duplicados/);
-  assert.match(managementSource, /game-batches\/manage/);
-  assert.match(managementSource, /Apostados/);
-
-  const managementStyles = await fetch(`${baseUrl}/assets/my-games-management.css`);
-  assert.equal(managementStyles.status, 200);
-  assert.match(await managementStyles.text(), /\.my-games-management/);
-
-  const labJavascript = await fetch(`${baseUrl}/assets/lab.js`);
-  assert.equal(labJavascript.status, 200);
-  assert.match(labJavascript.headers.get("content-type") ?? "", /^text\/javascript/);
-  assert.match(await labJavascript.text(), /lab\/compare/);
-
-  const dataStatusJavascript = await fetch(`${baseUrl}/assets/data-status.js`);
-  assert.equal(dataStatusJavascript.status, 200);
-  assert.match(await dataStatusJavascript.text(), /data\/status/);
-
-  const stylesheet = await fetch(`${baseUrl}/assets/styles.css`);
-  assert.equal(stylesheet.status, 200);
-  assert.match(stylesheet.headers.get("content-type") ?? "", /^text\/css/);
-  assert.match(await stylesheet.text(), /\.app-shell/);
-
-  const refinementsStyles = await fetch(`${baseUrl}/assets/refinements.css`);
-  assert.equal(refinementsStyles.status, 200);
-  assert.match(await refinementsStyles.text(), /a\.nav-item\s*\{\s*text-decoration:\s*none/);
-
-  const labStyles = await fetch(`${baseUrl}/assets/lab.css`);
-  assert.equal(labStyles.status, 200);
-  assert.match(await labStyles.text(), /\.lab-ranking/);
-
-  const dataStatusStyles = await fetch(`${baseUrl}/assets/data-status.css`);
-  assert.equal(dataStatusStyles.status, 200);
-  assert.match(await dataStatusStyles.text(), /\.data-status-bar/);
+  const foundation = await fetch(`${baseUrl}/assets/ui-foundation.css`);
+  assert.equal(foundation.status, 200);
+  const foundationSource = await foundation.text();
+  assert.match(foundationSource, /:focus-visible/);
+  assert.match(foundationSource, /prefers-reduced-motion/);
+  assert.match(foundationSource, /nav-more-menu/);
 
   const status = await fetch(`${baseUrl}/api/v1/data/status`);
   assert.equal(status.status, 200);

@@ -9,6 +9,7 @@ COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
 COPY db ./db
 COPY web ./web
+COPY scripts ./scripts
 
 RUN npm run build:prod
 
@@ -27,7 +28,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/db ./db
-COPY --from=build /app/web ./web
+COPY --from=build /app/web-dist ./web-dist
 
 USER loto
 

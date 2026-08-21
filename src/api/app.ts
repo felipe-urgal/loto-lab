@@ -20,6 +20,7 @@ import {
 } from "./http.js";
 import { enforceRateLimit, FixedWindowRateLimiter } from "./rateLimit.js";
 import { expensiveAnalysisGate } from "./workGate.js";
+import { runBacktestInWorker } from "./workerClient.js";
 
 export interface ApiServerOptions {
   pool: Pool;
@@ -272,7 +273,7 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
           throw new ApiError(429, "ANALYSIS_BUSY", "Another backtest or Strategy Lab analysis is already running");
         }
         try {
-          const result = await services.runBacktest({
+          const result = await runBacktestInWorker(services, {
             lottery,
             gameCount,
             warmupContests,
