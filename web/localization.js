@@ -26,7 +26,6 @@ const EXACT_PHRASES = new Map([
   ["Resumo do último backtest persistido.", "Resumo do último teste histórico salvo."],
   ["Ver backtests", "Ver testes históricos"],
   ["Sem backtest", "Sem teste histórico"],
-  ["Teste a estratégia em dados passados sem vazamento futuro.", "Teste a estratégia em dados passados sem vazamento futuro."],
   ["Jobs são serializados para preservar CPU e memória.", "As execuções são serializadas para preservar CPU e memória."],
   ["Uma estratégia selecionada fornece os defaults; valores preenchidos neste formulário têm prioridade.", "Uma estratégia selecionada fornece os valores padrão; valores preenchidos neste formulário têm prioridade."],
   ["Processando em worker dedicado", "Processando em processo dedicado"],
@@ -41,23 +40,25 @@ function replaceKnownPhrases(value) {
   const trimmed = value.trim();
   if (EXACT_TEXT.has(trimmed)) return value.replace(trimmed, EXACT_TEXT.get(trimmed));
   if (EXACT_PHRASES.has(trimmed)) return value.replace(trimmed, EXACT_PHRASES.get(trimmed));
+  return value;
+}
 
-  let output = value;
-  output = output.replace(/\bBacktests\b/g, "Testes históricos");
-  output = output.replace(/\bbacktests\b/g, "testes históricos");
-  output = output.replace(/\bBacktest #/g, "Teste histórico #");
-  output = output.replace(/\bBacktest concluído\b/g, "Teste histórico concluído");
-  output = output.replace(/\bSem backtest\b/g, "Sem teste histórico");
-  output = output.replace(/\bwarmup\s+(\d+)/gi, "aquecimento $1");
-  output = output.replace(/\branking por\s+prizeRate\b/g, "classificação por taxa de premiação");
-  output = output.replace(/\branking por\s+averageHitsPerGame\b/g, "classificação por média de acertos");
-  output = output.replace(/\branking por\s+roi\b/gi, "classificação por ROI");
-  output = output.replace(/\branking por\b/gi, "classificação por");
-  return output;
+function replaceOperationalTerms(value) {
+  return replaceKnownPhrases(value)
+    .replace(/\bBacktests\b/g, "Testes históricos")
+    .replace(/\bbacktests\b/g, "testes históricos")
+    .replace(/\bBacktest #/g, "Teste histórico #")
+    .replace(/\bBacktest concluído\b/g, "Teste histórico concluído")
+    .replace(/\bSem backtest\b/g, "Sem teste histórico")
+    .replace(/\bwarmup\s+(\d+)/gi, "aquecimento $1")
+    .replace(/\branking por\s+prizeRate\b/g, "classificação por taxa de premiação")
+    .replace(/\branking por\s+averageHitsPerGame\b/g, "classificação por média de acertos")
+    .replace(/\branking por\s+roi\b/gi, "classificação por ROI")
+    .replace(/\branking por\b/gi, "classificação por");
 }
 
 function replaceAnalysisTerms(value) {
-  return replaceKnownPhrases(value)
+  return replaceOperationalTerms(value)
     .replace(/\bRanking\b/g, "Classificação")
     .replace(/\branking\b/g, "classificação")
     .replace(/\bScore\b/g, "Pontuação")
@@ -75,13 +76,42 @@ function replaceAnalysisTerms(value) {
     .replace(/\bTop\s+(\d+)\b/g, "$1 melhores");
 }
 
+function parentElementFor(node) {
+  if (node instanceof Element) return node;
+  return node?.parentElement || null;
+}
+
 function shouldUseAnalysisVocabulary(node) {
-  const element = node.parentElement;
+  const element = parentElementFor(node);
   if (!element) return false;
   if (element.closest(".a2-shell")) return true;
-  if (location.pathname === "/" || location.pathname === "/index.html") return Boolean(element.closest("#content, .topbar, .sidebar"));
+  if (location.pathname === "/" || location.pathname === "/index.html") {
+    return Boolean(element.closest("#content, .topbar, .sidebar"));
+  }
   if (document.body.dataset.activeNav === "lab") return true;
   return false;
+}
+
+function shouldUseOperationalVocabulary(node) {
+  const element = parentElementFor(node);
+  if (!element) return false;
+  return Boolean(element.closest([
+    ".job-result",
+    ".experiment-meta",
+    ".status-pill",
+    ".form-inline-note",
+    ".ai-principle",
+    ".ai-history",
+    ".sidebar",
+    ".topbar",
+    ".section-head",
+  ].join(",")));
+}
+
+function localizedValue(value, node) {
+  if (shouldUseAnalysisVocabulary(node)) return replaceAnalysisTerms(value);
+  if (shouldUseOperationalVocabulary(node)) return replaceOperationalTerms(value);
+  return replaceKnownPhrases(value);
 }
 
 function translateTextNode(node) {
@@ -89,15 +119,7 @@ function translateTextNode(node) {
   const parent = node.parentElement;
   if (!parent || parent.closest("script, style, code, pre")) return;
 
-  let next = shouldUseAnalysisVocabulary(node)
-    ? replaceAnalysisTerms(node.nodeValue)
-    : replaceKnownPhrases(node.nodeValue);
-
-  if (parent.classList.contains("status-pill")) {
-    const trimmed = next.trim();
-    if (EXACT_TEXT.has(trimmed)) next = next.replace(trimmed, EXACT_TEXT.get(trimmed));
-  }
-
+  const next = localizedValue(node.nodeValue, node);
   if (next !== node.nodeValue) node.nodeValue = next;
 }
 
@@ -105,9 +127,7 @@ function translateAttributes(element) {
   for (const attribute of ["aria-label", "title", "placeholder"]) {
     const value = element.getAttribute?.(attribute);
     if (!value) continue;
-    const next = shouldUseAnalysisVocabulary(element.firstChild || { parentElement: element })
-      ? replaceAnalysisTerms(value)
-      : replaceKnownPhrases(value);
+    const next = localizedValue(value, element);
     if (next !== value) element.setAttribute(attribute, next);
   }
 }
