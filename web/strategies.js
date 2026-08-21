@@ -1,4 +1,5 @@
-const API = "/api/v1";
+import { api, escapeHtml, formatDateTime, toast } from "./runtime.js";
+
 const LABELS = {
   "mega-sena": "Mega-Sena",
   lotofacil: "Lotofácil",
@@ -24,43 +25,6 @@ const bucket = document.querySelector("#strategy-bucket");
 const resetButton = document.querySelector("#strategy-reset");
 
 let strategies = [];
-let editingId = null;
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function formatDate(value) {
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
-}
-
-function toast(message, type = "info") {
-  const root = document.querySelector("#toast-root");
-  const item = document.createElement("div");
-  item.className = `toast ${type === "error" ? "error" : ""}`;
-  item.textContent = message;
-  root.append(item);
-  window.setTimeout(() => item.remove(), 3600);
-}
-
-async function api(path, options = {}) {
-  const response = await fetch(`${API}${path}`, {
-    ...options,
-    headers: options.body ? { "Content-Type": "application/json", ...(options.headers || {}) } : options.headers,
-  });
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = new Error(payload?.error?.message || `Erro HTTP ${response.status}`);
-    error.code = payload?.error?.code || "HTTP_ERROR";
-    throw error;
-  }
-  return payload;
-}
 
 function syncLotteryFields() {
   const isLotofacil = lottery.value === "lotofacil";
@@ -86,7 +50,6 @@ function strategyConfig() {
 }
 
 function applyStrategy(strategy, duplicate = false) {
-  editingId = duplicate ? null : strategy.id;
   formTitle.textContent = duplicate ? "Duplicar estratégia" : `Nova versão · ${strategy.name}`;
   lottery.value = strategy.lottery;
   slug.value = duplicate ? `${strategy.slug}-copy` : strategy.slug;
@@ -105,7 +68,6 @@ function applyStrategy(strategy, duplicate = false) {
 }
 
 function resetForm() {
-  editingId = null;
   form.reset();
   formTitle.textContent = "Nova estratégia";
   slug.readOnly = false;
@@ -134,7 +96,7 @@ function renderStrategies() {
       <div class="experiment-meta">
         <span>versão #${strategy.latestVersionId}</span>
         <span>metodologia ${escapeHtml(strategy.methodologyVersion)}</span>
-        <span>atualizada ${escapeHtml(formatDate(strategy.updatedAt))}</span>
+        <span>atualizada ${escapeHtml(formatDateTime(strategy.updatedAt))}</span>
       </div>
       <pre class="experiment-config">${escapeHtml(JSON.stringify(strategy.config || {}, null, 2))}</pre>
       <div class="experiment-card-actions">
@@ -164,7 +126,7 @@ async function loadVersions(strategyId) {
     root.innerHTML = data.items.map((version) => `
       <div class="version-row">
         <strong>v${version.version}</strong>
-        <span>${escapeHtml(version.methodologyVersion)} · ${escapeHtml(formatDate(version.createdAt))}</span>
+        <span>${escapeHtml(version.methodologyVersion)} · ${escapeHtml(formatDateTime(version.createdAt))}</span>
         <a class="button compact" href="/jobs?lottery=${encodeURIComponent(strategy.lottery)}&strategyVersionId=${version.id}">Executar #${version.id}</a>
       </div>
     `).join("");
