@@ -1,16 +1,9 @@
+import { escapeHtml, onViewRendered } from "./runtime.js";
+
 const root = document.querySelector("#content");
 const lotterySelect = document.querySelector("#lottery-select");
 const latestCache = new Map();
 let scheduled = false;
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
 
 function currentView() {
   return location.hash.replace("#", "") || "dashboard";
@@ -278,17 +271,12 @@ function scheduleRefine() {
   }, 0);
 }
 
-if (root) {
-  new MutationObserver(scheduleRefine).observe(root, { childList: true, subtree: true });
-}
-window.addEventListener("hashchange", scheduleRefine);
+onViewRendered(scheduleRefine);
 lotterySelect?.addEventListener("change", () => {
   latestCache.clear();
-  scheduleRefine();
 });
 document.querySelector("#refresh-view")?.addEventListener("click", () => {
   latestCache.delete(currentLottery());
-  scheduleRefine();
 });
 window.addEventListener("loto-lab:data-synced", () => {
   latestCache.clear();
