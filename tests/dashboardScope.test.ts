@@ -34,6 +34,8 @@ test("dashboard scope keeps comparison mode separate from the active lottery", a
 
   assert.match(statusSource, /scope === "all" \|\| item\.lottery === scope/);
   assert.match(statusSource, /data-status-compact/);
+  assert.match(statusSource, /Sincronização em andamento/);
+  assert.doesNotMatch(statusSource, /cobertura média/);
   assert.doesNotMatch(statusSource, /Sincronizar agora/);
   assert.match(scopeCss, /dashboard-shell\.is-focused/);
   assert.match(scopeCss, /dashboard-lottery-grid/);
