@@ -48,7 +48,8 @@ test("advanced Lotofacil analysis compares observed structure with exact mathema
   assert.equal(result.ranking.dynamics.items.length, 25);
   assert.equal(result.ranking.dynamics.items[0]?.weightRobustness.scenarioCount, 243);
   assert.equal(result.structure.metrics.repeated.expectedMean, 9);
-  assert.equal(result.structure.metrics.frame.expectedMean, 9.6);
+  assert.ok(result.structure.metrics.frame, "Lotofacil analysis must expose the frame metric");
+  assert.equal(result.structure.metrics.frame?.expectedMean, 9.6);
   assert.ok((result.structure.metrics.odd.expectedMean ?? 0) > 7.7);
   assert.ok((result.structure.metrics.odd.expectedMean ?? 0) < 7.9);
   assert.equal(result.structure.methodologyFilter.exactUniverse.total, 3_268_760);
