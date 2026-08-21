@@ -20,12 +20,12 @@ async function walk(directory) {
 }
 
 function withVersion(html, version) {
-  let output = html.replace(/<html([^>]*)>/i, (match, attributes) => {
-    if (/\bdata-build=/.test(attributes)) return match;
-    return `<html${attributes} data-build="${version}">`;
+  let output = html.replace(/<html([^>]*)>/i, (_, attributes) => {
+    const normalizedAttributes = attributes.replace(/\sdata-build=(['"])[^'"]*\1/i, "");
+    return `<html${normalizedAttributes} data-build="${version}">`;
   });
   output = output.replace(
-    /((?:src|href)=["'])(\/(?:assets\/[^"'?#]+|favicon\.svg))(["'])/g,
+    /((?:src|href)=["'])(\/(?:assets\/[^"'?#]+|favicon\.svg))(?:\?[^"'#]*)?(["'])/g,
     (_, prefix, url, quote) => `${prefix}${url}?v=${version}${quote}`,
   );
   return output;
