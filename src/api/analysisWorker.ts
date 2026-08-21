@@ -24,6 +24,14 @@ interface StrategyLabWorkerInput {
 
 type AnalysisWorkerInput = BacktestWorkerInput | StrategyLabWorkerInput;
 
+function compactBacktestRound(round: BacktestRoundArtifact): BacktestRoundArtifact {
+  const compact: BacktestRoundArtifact = { contest: round.contest };
+  for (const key of ["date", "targetNumbers", "hitsByGame", "bestHits", "fixedHits"] as const) {
+    if (round[key] !== undefined) compact[key] = round[key];
+  }
+  return compact;
+}
+
 function computeBacktest(contests: Contest[], input: RunBacktestRequest) {
   const options: Record<string, unknown> = {
     gameCount: input.gameCount,
@@ -62,7 +70,7 @@ function computeBacktest(contests: Contest[], input: RunBacktestRequest) {
   return {
     options,
     summary: result.summary as Record<string, unknown>,
-    rounds: result.rounds as unknown as BacktestRoundArtifact[],
+    rounds: (result.rounds as unknown as BacktestRoundArtifact[]).map(compactBacktestRound),
   };
 }
 
