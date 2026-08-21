@@ -2,14 +2,16 @@ import { execFileSync, spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Pool } from "pg";
 
 const baseUrl = process.env.E2E_BASE_URL || "http://127.0.0.1:3099";
 const debugPort = Number(process.env.E2E_GENERATOR_CHROME_PORT || 9228);
 const lotteries = [
-  { id: "mega-sena", max: 60, fixedCount: 3 },
-  { id: "lotofacil", max: 25, fixedCount: 8 },
-  { id: "dia-de-sorte", max: 31, fixedCount: 3 },
+  { id: "mega-sena", max: 60, drawSize: 6, step: 11, fixedCount: 3 },
+  { id: "lotofacil", max: 25, drawSize: 15, step: 2, fixedCount: 8 },
+  { id: "dia-de-sorte", max: 31, drawSize: 7, step: 4, fixedCount: 3 },
 ];
+const luckyMonths = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 function findChrome() {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
@@ -20,6 +22,44 @@ function findChrome() {
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function seedGeneratorHistory() {
+  if (!process.env.DATABASE_URL) throw new Error("Generator E2E requires DATABASE_URL");
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  try {
+    for (const lottery of lotteries) {
+      for (let index = 0; index < 40; index += 1) {
+        const contestNumber = 9001 + index;
+        const numbers = Array.from(
+          { length: lottery.drawSize },
+          (_, offset) => ((index * 3 + offset * lottery.step) % lottery.max) + 1,
+        ).sort((a, b) => a - b);
+        const month = String((index % 12) + 1).padStart(2, "0");
+        const day = String((index % 27) + 1).padStart(2, "0");
+        await pool.query(
+          `
+            INSERT INTO contests (lottery, contest_number, draw_date, numbers, lucky_month)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (lottery, contest_number) DO UPDATE SET
+              draw_date = EXCLUDED.draw_date,
+              numbers = EXCLUDED.numbers,
+              lucky_month = EXCLUDED.lucky_month,
+              updated_at = NOW()
+          `,
+          [
+            lottery.id,
+            contestNumber,
+            `2025-${month}-${day}`,
+            numbers,
+            lottery.id === "dia-de-sorte" ? luckyMonths[index % luckyMonths.length] : null,
+          ],
+        );
+      }
+    }
+  } finally {
+    await pool.end();
+  }
+}
 
 async function waitForJson(url, attempts = 200) {
   let lastError;
@@ -127,6 +167,8 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+await seedGeneratorHistory();
+
 const chrome = findChrome();
 const userDataDir = await mkdtemp(join(tmpdir(), "loto-lab-generator-v2-"));
 const browser = spawn(chrome, [
@@ -161,7 +203,7 @@ try {
       return true;
     })()`);
     await waitFor(client, `document.querySelector('#lottery-select')?.value === ${JSON.stringify(lottery.id)} && Boolean(document.querySelector('.g2-shell'))`, `${lottery.id} Generator 2.0 shell`);
-    await waitFor(client, "document.querySelectorAll('[data-g2-number]').length > 0", `${lottery.id} number grid`);
+    await waitFor(client, `document.querySelectorAll('[data-g2-number]').length === ${lottery.max}`, `${lottery.id} number grid`);
 
     const beforeCount = await evaluate(client, `(async () => {
       const response = await fetch('/api/v1/game-batches/${lottery.id}?limit=200');
@@ -202,9 +244,11 @@ try {
     const antiLeakage = await evaluate(client, `(() => ({
       hasTieredNumbers: document.querySelectorAll('.g2-number.is-strong,.g2-number.is-balanced,.g2-number.is-cold').length > 0,
       funnel: document.querySelector('[data-g2-plan]')?.innerText || '',
-      baseline: document.querySelector('[data-g2-baseline]')?.innerText || ''
+      baseline: document.querySelector('[data-g2-baseline]')?.innerText || '',
+      target: Number(document.querySelector('#g2-target')?.value || 0)
     }))()`);
     assert(antiLeakage.hasTieredNumbers, `${lottery.id} has no target-scoped number tiers`);
+    assert(antiLeakage.target === 9041, `${lottery.id} did not use the deterministic target #9041: ${JSON.stringify(antiLeakage)}`);
     assert(antiLeakage.funnel.includes("Pool explorado pelo motor"), `${lottery.id} does not expose algorithm space`);
     assert(antiLeakage.baseline.includes("Baseline condicionado"), `${lottery.id} does not expose conditioned baseline`);
 
@@ -241,7 +285,7 @@ try {
     await evaluate(client, "location.hash = 'games'; true");
     await waitFor(client, `document.body.innerText.includes('Lote #${batchId}')`, `${lottery.id} saved batch in My Games`);
     await evaluate(client, "location.hash = 'generate'; true");
-    await waitFor(client, "Boolean(document.querySelector('.g2-shell'))", `${lottery.id} return to generator`);
+    await waitFor(client, `document.querySelector('#lottery-select')?.value === ${JSON.stringify(lottery.id)} && Boolean(document.querySelector('.g2-shell'))`, `${lottery.id} return to generator`);
   }
 
   await client.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: false });
@@ -260,7 +304,7 @@ try {
 
   assert(runtimeErrors.length === 0, `Generator browser runtime exceptions: ${runtimeErrors.join(" | ")}`);
   assert(serverErrors.length === 0, `Generator browser server failures: ${serverErrors.join(" | ")}`);
-  console.log("Generator 2.0 E2E passed: three lotteries, explicit fix/exclude, frozen preview, exact save and mobile layout");
+  console.log("Generator 2.0 E2E passed: three lotteries, target-scoped tiers, explicit fix/exclude, frozen preview, exact save and mobile layout");
 } finally {
   client?.close();
   await stopBrowser(browser);
