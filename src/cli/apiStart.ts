@@ -2,6 +2,8 @@ import { createPostgresPool } from "../db/client.js";
 import { runMigrations } from "../db/migrations.js";
 import { createLotoLabServer } from "../api/server.js";
 import { startOperationsScheduler, type OperationsScheduler } from "../operations/scheduler.js";
+import { PostgresOperationRepository } from "../persistence/operationRepository.js";
+import { getAnalysisJobManager } from "../analysis/jobManager.js";
 
 function parsePort(value: string | undefined): number {
   const port = Number(value ?? 3000);
@@ -27,6 +29,17 @@ function autoSyncEnabled(value: string | undefined): boolean {
 async function main(): Promise<void> {
   const pool = createPostgresPool();
   await runMigrations(pool);
+
+  const recoveredOperations = await new PostgresOperationRepository(pool).recoverRunning();
+  if (recoveredOperations > 0) {
+    console.warn(`Recovered ${recoveredOperations} interrupted operational run(s)`);
+  }
+
+  const analysisJobs = getAnalysisJobManager(pool);
+  const recoveredJobs = await analysisJobs.start();
+  if (recoveredJobs > 0) {
+    console.warn(`Requeued ${recoveredJobs} interrupted analysis job(s)`);
+  }
 
   const port = parsePort(process.env.API_PORT);
   const host = process.env.API_HOST ?? "127.0.0.1";
@@ -70,7 +83,10 @@ async function main(): Promise<void> {
         else resolve();
       });
     });
-    await scheduler?.stopAndDrain();
+    await Promise.all([
+      scheduler?.stopAndDrain(),
+      analysisJobs.stopAndDrain(),
+    ]);
     await pool.end();
   }
 
