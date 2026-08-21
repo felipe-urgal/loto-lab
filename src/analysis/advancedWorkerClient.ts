@@ -2,6 +2,8 @@ import { Worker } from "node:worker_threads";
 import type { Contest, LotteryId } from "../domain/types.js";
 import type { AdvancedAnalysis } from "../api/services.js";
 
+export const ADVANCED_ANALYSIS_TIMEOUT_MS = 15_000;
+
 interface WorkerErrorPayload {
   name: string;
   message: string;
@@ -15,21 +17,48 @@ interface WorkerMessage<T> {
   error?: WorkerErrorPayload;
 }
 
+export class AdvancedAnalysisTimeoutError extends Error {
+  readonly code = "ADVANCED_ANALYSIS_TIMEOUT";
+
+  constructor(readonly timeoutMs = ADVANCED_ANALYSIS_TIMEOUT_MS) {
+    super(`Advanced analysis exceeded the ${timeoutMs}ms worker limit`);
+    this.name = "AdvancedAnalysisTimeoutError";
+  }
+}
+
 export function runAdvancedAnalysisInWorker(
   contests: Contest[],
   lottery: LotteryId,
+  timeoutMs = ADVANCED_ANALYSIS_TIMEOUT_MS,
 ): Promise<AdvancedAnalysis> {
   return new Promise<AdvancedAnalysis>((resolve, reject) => {
     const worker = new Worker(new URL("../api/analysisWorker.js", import.meta.url), {
       workerData: { kind: "advanced-analysis", contests, lottery },
+      name: `analysis-${lottery}`,
+      resourceLimits: {
+        maxOldGenerationSizeMb: 256,
+        maxYoungGenerationSizeMb: 64,
+      },
     });
     let settled = false;
+    let timeout: NodeJS.Timeout | undefined;
 
     const finish = (callback: () => void) => {
       if (settled) return;
       settled = true;
+      if (timeout) clearTimeout(timeout);
       callback();
     };
+
+    timeout = setTimeout(() => {
+      finish(() => {
+        // Termination is deliberately best-effort here; the caller must receive
+        // a bounded failure even if the worker takes a moment to exit.
+        void worker.terminate().catch(() => undefined);
+        reject(new AdvancedAnalysisTimeoutError(timeoutMs));
+      });
+    }, timeoutMs);
+    timeout.unref?.();
 
     worker.once("message", (message: WorkerMessage<AdvancedAnalysis>) => {
       finish(() => {
