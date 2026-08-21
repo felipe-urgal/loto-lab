@@ -112,6 +112,89 @@ Após cada resultado oficial:
 5. registrar repetição, pares/ímpares, soma e demais estruturas;
 6. não alterar toda a estratégia por causa de um único resultado.
 
+## Regra de interpretação das análises
+
+Toda evolução da área de Análises deve separar três conceitos:
+
+1. **observado**: o que apareceu no histórico real;
+2. **esperado**: o que a combinatória/estatística prevê para sorteios uniformes quando existe um modelo implementado;
+3. **validado**: o que continua diferente quando a hipótese é testada sem usar informação futura e levando em conta a incerteza estatística.
+
+Uma estrutura comum não deve ser chamada de especial apenas porque aparece muitas vezes. Primeiro é obrigatório perguntar se essa concentração já é consequência natural do tamanho do universo e da quantidade de dezenas sorteadas.
+
+Exemplos tratados com baseline matemático exato quando aplicáveis:
+
+- repetição entre concursos consecutivos;
+- pares/ímpares;
+- faixas de dezenas;
+- moldura da Lotofácil;
+- soma do concurso.
+
+Quando o motor não possui ainda um modelo matemático implementado para uma métrica, ela permanece **descritiva**. Não criar um valor "esperado" arbitrário para sequências, ciclos ou qualquer outro padrão.
+
+### Atraso e ciclos
+
+Atraso pode ser mostrado como:
+
+- quantidade atual de concursos sem aparecer;
+- distribuição histórica de atrasos da própria dezena;
+- percentil do atraso atual;
+- sequência atual de aparições.
+
+Ciclos podem mostrar quantos concursos foram necessários para todas as dezenas aparecerem e quais ainda não apareceram no ciclo atual.
+
+Nenhuma dessas métricas autoriza frases como:
+
+- "está para sair";
+- "ficou mais provável";
+- "deve compensar o atraso".
+
+Elas descrevem o histórico, não mudam a probabilidade matemática do próximo sorteio.
+
+### Combinações e múltiplas comparações
+
+Duques, trincas e outras combinações podem ser explorados, mas o sistema deve comparar:
+
+- ocorrências observadas;
+- ocorrências esperadas para uma combinação fixa;
+- magnitude do desvio;
+- incerteza estatística;
+- correção pelo número de combinações examinadas.
+
+O fato de o maior entre centenas ou milhares de pares parecer extremo não é evidência suficiente. A ferramenta deve controlar falsos sinais produzidos pela busca em massa e manter a interpretação como exploratória.
+
+### Sensibilidade dos pesos
+
+Os pesos do score podem ser perturbados para medir robustez do ranking. Essa análise responde perguntas como:
+
+- a dezena continua no mesmo grupo quando os pesos mudam pouco?
+- a posição permanece em uma faixa estreita?
+- o rótulo `strong` depende fortemente de uma configuração específica?
+
+Sensibilidade mede fragilidade do modelo. Ela não escolhe automaticamente novos pesos e não deve ser usada para otimizar os pesos olhando o resultado futuro.
+
+## Validação rolling do ranking
+
+Antes de interpretar `strong`, `balanced` e `cold` como grupos com comportamento diferente, a classificação deve ser avaliada fora da amostra.
+
+Para cada concurso histórico alvo:
+
+1. usar somente concursos anteriores;
+2. recalcular todas as janelas e o score;
+3. congelar os grupos;
+4. revelar o concurso alvo;
+5. contar quantas dezenas sorteadas pertenciam a cada grupo;
+6. comparar o observado com o esperado pelo tamanho de cada grupo;
+7. repetir o processo em muitas rodadas.
+
+A leitura deve considerar diferentes janelas históricas e correção estatística. Um pequeno excesso em uma janela isolada não justifica alteração na geração.
+
+A conclusão correta pode ser, inclusive:
+
+> **Nenhuma separação estatisticamente relevante foi detectada entre os grupos.**
+
+Esse resultado é útil: impede que uma classificação visualmente convincente seja confundida com capacidade preditiva.
+
 ## Backtest
 
 O backtest é obrigatório antes de afirmar que uma regra é melhor que outra.
@@ -130,3 +213,5 @@ A regra arquitetural central é:
 > **Algoritmo calcula; IA interpreta.**
 
 A IA pode explicar resultados e sugerir hipóteses, mas frequência, score, geração e backtest precisam ser reproduzíveis por código.
+
+A especificação detalhada da nova área de análise está em [`ANALYSES.md`](ANALYSES.md).

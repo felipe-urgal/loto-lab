@@ -1,6 +1,14 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
-import type { LotteryId } from "../domain/types.js";
+import type {
+  AnalysisWeights,
+  Contest,
+  LotteryId,
+  NumberAnalysis,
+  NumberTier,
+} from "../domain/types.js";
+import type { buildAdvancedAnalysis } from "../analysis/advanced.js";
+import { runAdvancedAnalysisInWorker } from "../analysis/advancedWorkerClient.js";
 import { buildNumberAnalysis, DEFAULT_WEIGHTS } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { generateMegaSenaGames } from "../generator/megaSena.js";
@@ -25,6 +33,31 @@ import type {
 
 export const MIN_GENERATION_HISTORY = 20;
 export const MAX_HTTP_BACKTEST_ROUNDS = 500;
+
+export type AdvancedAnalysis = ReturnType<typeof buildAdvancedAnalysis>;
+
+export interface AnalysisResponse {
+  lottery: LotteryId;
+  latestContest: Contest | null;
+  weights: AnalysisWeights;
+  tiers: Record<NumberTier, number[]>;
+  numbers: NumberAnalysis[];
+}
+
+export interface AdvancedAnalysisResponse {
+  lottery: LotteryId;
+  advanced: AdvancedAnalysis;
+}
+
+interface AdvancedAnalysisCacheEntry {
+  signature: string;
+  value: AdvancedAnalysis;
+}
+
+interface AdvancedAnalysisInFlightEntry {
+  signature: string;
+  promise: Promise<AdvancedAnalysis>;
+}
 
 export class InsufficientGenerationHistoryError extends Error {
   constructor(
@@ -86,6 +119,19 @@ function gameFingerprint(games: GeneratedGameBatchRecord["games"]): string {
     .join("|");
 }
 
+function analysisSignature(contests: Contest[]): string {
+  const hash = createHash("sha256");
+  for (const contest of contests) {
+    hash.update(String(contest.number));
+    hash.update("|");
+    hash.update(contest.date);
+    hash.update("|");
+    hash.update([...contest.numbers].sort((a, b) => a - b).join(","));
+    hash.update(";");
+  }
+  return hash.digest("hex");
+}
+
 function compactBacktestRound(round: BacktestRoundArtifact): BacktestRoundArtifact {
   const compact: BacktestRoundArtifact = { contest: round.contest };
   for (const key of ["date", "targetNumbers", "hitsByGame", "bestHits", "fixedHits"] as const) {
@@ -99,6 +145,8 @@ export class LotoLabApiServices {
   readonly games: PostgresGameRepository;
   readonly strategies: PostgresStrategyRepository;
   readonly backtests: PostgresBacktestRepository;
+  private readonly advancedAnalysisCache = new Map<LotteryId, AdvancedAnalysisCacheEntry>();
+  private readonly advancedAnalysisInFlight = new Map<LotteryId, AdvancedAnalysisInFlightEntry>();
 
   constructor(pool: Pool) {
     this.contests = new PostgresContestRepository(pool);
@@ -107,15 +155,15 @@ export class LotoLabApiServices {
     this.backtests = new PostgresBacktestRepository(pool);
   }
 
-  async analyze(lottery: LotteryId) {
-    const contests = await this.contests.list({ lottery, order: "asc" });
+  async analyze(lottery: LotteryId): Promise<AnalysisResponse> {
+    const contests = await this.contests.listAnalysisHistory(lottery);
     const config = getLotteryConfig(lottery);
     const rows = buildNumberAnalysis(contests, config);
-    const latestContest = contests.at(-1);
+    const latestContest = contests.at(-1) ?? null;
 
     return {
       lottery,
-      latestContest: latestContest ?? null,
+      latestContest,
       weights: DEFAULT_WEIGHTS,
       tiers: {
         strong: rows.filter((row) => row.tier === "strong").map((row) => row.number),
@@ -124,6 +172,34 @@ export class LotoLabApiServices {
       },
       numbers: rows,
     };
+  }
+
+  async analyzeAdvanced(lottery: LotteryId): Promise<AdvancedAnalysisResponse> {
+    const contests = await this.contests.listAnalysisHistory(lottery);
+    const signature = analysisSignature(contests);
+    const cached = this.advancedAnalysisCache.get(lottery);
+    let advanced: AdvancedAnalysis;
+
+    if (cached?.signature === signature) {
+      advanced = cached.value;
+    } else {
+      const existing = this.advancedAnalysisInFlight.get(lottery);
+      if (existing?.signature === signature) {
+        advanced = await existing.promise;
+      } else {
+        const promise = runAdvancedAnalysisInWorker(contests, lottery);
+        this.advancedAnalysisInFlight.set(lottery, { signature, promise });
+        try {
+          advanced = await promise;
+          this.advancedAnalysisCache.set(lottery, { signature, value: advanced });
+        } finally {
+          const current = this.advancedAnalysisInFlight.get(lottery);
+          if (current?.promise === promise) this.advancedAnalysisInFlight.delete(lottery);
+        }
+      }
+    }
+
+    return { lottery, advanced };
   }
 
   async generate(input: GenerateGamesRequest): Promise<GenerateGamesResponse> {

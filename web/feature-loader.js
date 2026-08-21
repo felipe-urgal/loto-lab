@@ -61,6 +61,13 @@ async function ensureViewFeatures() {
     return;
   }
 
+  if (view === "analysis") {
+    await loadStyle("analysis-v2");
+    await loadStyle("analysis-v2-hardening");
+    await loadModule("analysis-v2");
+    return;
+  }
+
   await loadStyledModule("refinements");
 
   if (view === "generate") {

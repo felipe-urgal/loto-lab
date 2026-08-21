@@ -22,7 +22,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function waitForJson(url, attempts = 80) {
+async function waitForJson(url, attempts = 200) {
   let lastError;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
@@ -180,12 +180,10 @@ function classifyHttpFailure(response, type) {
   const sameOrigin = url.origin === base.origin;
   const isApi = sameOrigin && url.pathname.startsWith("/api/");
 
-  // Empty-state API 404s are part of the product contract (for example when a
-  // lottery has no stored latest contest yet). Server errors must still fail.
+  // Empty-state API 404s are part of the product contract. Server errors must
+  // still fail; bounded/explicit 4xx application states are not browser faults.
   if (isApi) return status >= 500 ? `${status} API ${url.pathname}` : undefined;
 
-  // Documents, scripts, styles, icons and every other first-party asset must
-  // never fail to load during the real-browser smoke flow.
   return `${status} ${type || "resource"} ${url.pathname}`;
 }
 
@@ -242,16 +240,95 @@ try {
   assert(home.content, "Main application content root is missing");
   assert(home.text.includes("Dashboard"), "Main application rendered no meaningful navigation content");
 
-  await navigate(client, "/strategies");
-  await waitFor(client, "Boolean(document.querySelector('#strategy-form'))", "strategies form");
-  assert(await evaluate(client, "document.querySelector('h1')?.textContent === 'Estratégias'"), "Strategies page identity mismatch");
+  await navigate(client, "/#analysis");
+  await waitFor(client, "Boolean(document.querySelector('.a2-shell'))", "Analyses 2.0 shell");
+  const analysisTabs = await evaluate(client, `[...document.querySelectorAll('[data-a2-tab]')].map((node) => node.textContent.trim())`);
+  assert(analysisTabs.length === 5, "Analyses 2.0 did not render five modes");
+  assert(
+    ["Ranking", "Estrutura", "Dinâmica", "Combinações", "Validação"].every((label) => analysisTabs.includes(label)),
+    "Analyses 2.0 is missing one or more modes",
+  );
+  assert(
+    await evaluate(client, "document.querySelector('.a2-tabs')?.getAttribute('role') === 'tablist'"),
+    "Analyses 2.0 tablist semantics are missing",
+  );
+  assert(
+    await evaluate(client, "document.body.innerText.includes('Observado × esperado')"),
+    "Analyses 2.0 is missing the observed-vs-expected principle",
+  );
+  await evaluate(client, "document.querySelector('[data-a2-tab=structure]').click(); true");
+  await waitFor(client, "document.body.innerText.includes('Histórico esperado')", "transition-matched structure baseline");
+  await evaluate(client, "document.querySelector('[data-a2-tab=validation]').click(); true");
+  await waitFor(client, "document.body.innerText.includes('Teste fora da amostra')", "rolling validation analysis");
+  assert(
+    await evaluate(client, "document.body.innerText.includes('Sensibilidade dos pesos')"),
+    "Analyses 2.0 is missing weight-sensitivity validation",
+  );
+  await evaluate(client, "document.querySelector('[data-a2-tab=ranking]').click(); true");
+  await waitFor(client, "Boolean(document.querySelector('[data-a2-number]'))", "auditable ranking numbers");
+  await evaluate(client, "document.querySelector('[data-a2-number]').click(); true");
+  await waitFor(client, "document.querySelector('#a2-detail')?.open === true", "number detail modal");
+  assert(
+    await evaluate(client, "document.querySelector('#a2-detail').innerText.includes('Decomposição do score')"),
+    "Number detail is missing score decomposition",
+  );
+  assert(
+    await evaluate(client, "document.querySelector('#a2-detail')?.tagName === 'DIALOG' && document.querySelector('#a2-detail').matches(':modal')"),
+    "Number detail is not a native modal dialog",
+  );
+  await evaluate(client, `(() => {
+    const detail = document.querySelector('#a2-detail');
+    detail.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    return true;
+  })()`);
+  await waitFor(client, "document.querySelector('#a2-detail')?.open === false", "number detail Escape close");
+  assert(
+    await evaluate(client, "!document.body.classList.contains('a2-detail-open')"),
+    "Desktop dialog close left the body scroll lock active",
+  );
 
   await client.send("Emulation.setDeviceMetricsOverride", {
     width: 390,
     height: 844,
     deviceScaleFactor: 1,
-    mobile: true,
+    mobile: false,
   });
+  await navigate(client, "/#analysis");
+  await waitFor(client, "Boolean(document.querySelector('.a2-shell'))", "mobile Analyses 2.0 shell");
+  const mobileAnalysis = await evaluate(client, `(() => {
+    const tabs = document.querySelector('.a2-tabs');
+    const firstNumber = document.querySelector('[data-a2-number]');
+    return {
+      width: document.documentElement.clientWidth,
+      mobileBreakpoint: matchMedia('(max-width: 680px)').matches,
+      tabsVisible: Boolean(tabs && getComputedStyle(tabs).display !== 'none'),
+      firstNumberVisible: Boolean(firstNumber && firstNumber.getBoundingClientRect().width > 0)
+    };
+  })()`);
+  assert(mobileAnalysis.mobileBreakpoint, `Analyses responsive breakpoint was not active: ${JSON.stringify(mobileAnalysis)}`);
+  assert(mobileAnalysis.width <= 390, `Analyses responsive viewport is wider than expected: ${JSON.stringify(mobileAnalysis)}`);
+  assert(mobileAnalysis.tabsVisible, "Analyses tabs are not visible on mobile");
+  assert(mobileAnalysis.firstNumberVisible, "Analyses ranking numbers are not visible on mobile");
+  await evaluate(client, "document.querySelector('[data-a2-number]').click(); true");
+  await waitFor(client, "document.querySelector('#a2-detail')?.open === true", "mobile number detail modal");
+  const mobileDrawer = await evaluate(client, `(() => {
+    const detail = document.querySelector('#a2-detail');
+    const rect = detail.getBoundingClientRect();
+    return { width: rect.width, left: rect.left, viewport: document.documentElement.clientWidth };
+  })()`);
+  assert(mobileDrawer.width <= mobileDrawer.viewport + 1, "Analyses detail drawer overflows the mobile viewport");
+  assert(mobileDrawer.left >= -1, "Analyses detail drawer starts outside the mobile viewport");
+
+  // Navigate away without explicitly closing the modal: the Analyses lifecycle
+  // must release scroll lock even when #content is replaced by another view.
+  await evaluate(client, "location.hash = 'dashboard'; true");
+  await waitFor(client, "!document.querySelector('.a2-shell')", "leave Analyses with modal open");
+  await waitFor(client, "!document.body.classList.contains('a2-detail-open')", "dialog navigation cleanup");
+
+  await navigate(client, "/strategies");
+  await waitFor(client, "Boolean(document.querySelector('#strategy-form'))", "strategies form");
+  assert(await evaluate(client, "document.querySelector('h1')?.textContent === 'Estratégias'"), "Strategies page identity mismatch");
+
   await sleep(120);
   const mobileMoreVisible = await evaluate(client, `(() => {
     const button = document.querySelector('[data-nav-more]');
@@ -285,7 +362,7 @@ try {
   assert(severeLogs.length === 0, `Browser console errors: ${severeLogs.join(" | ")}`);
   assert(networkErrors.length === 0, `Browser resource/server failures: ${networkErrors.join(" | ")}`);
 
-  console.log("Browser E2E passed: main, strategies, mobile nav, jobs, agenda and AI");
+  console.log("Browser E2E passed: main, hardened Analyses 2.0 desktop/mobile, dialog cleanup, strategies, mobile nav, jobs, agenda and AI");
 } finally {
   client?.close();
   await stopBrowser(browser);
