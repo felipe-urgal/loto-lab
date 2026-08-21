@@ -5,6 +5,8 @@ const ICONS = {
   games: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a3 3 0 0 0 0 6v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a3 3 0 0 0 0-6V6Z"/><path d="M12 7v2M12 11v2M12 15v2"/></svg>',
   backtests: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>',
   lab: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3h6"/><path d="M10 3v5l-5 9a2.5 2.5 0 0 0 2.2 4h9.6A2.5 2.5 0 0 0 19 17l-5-9V3"/><path d="M8 14h8"/></svg>',
+  strategies: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M7 14v6"/></svg>',
+  jobs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h5M8 17h3"/></svg>',
   agenda: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/><path d="M7 3v3M17 3v3"/></svg>',
   ai: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a5 5 0 0 0-5 5c0 .7.1 1.3.4 1.9A4.5 4.5 0 0 0 9 18.6V21h6v-2.4a4.5 4.5 0 0 0 1.6-8.7A5 5 0 0 0 12 3Z"/><path d="M9 10h6M10 14h4"/></svg>',
   more: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>',
@@ -17,6 +19,8 @@ const ITEMS = [
   { key: "games", label: "Meus jogos", view: "games" },
   { key: "backtests", label: "Backtests", view: "backtests", extra: true },
   { key: "lab", label: "Laboratório", href: "/lab", extra: true },
+  { key: "strategies", label: "Estratégias", href: "/strategies", extra: true },
+  { key: "jobs", label: "Execuções", href: "/jobs", extra: true },
   { key: "agenda", label: "Agenda", href: "/agenda", extra: true },
   { key: "ai", label: "IA", href: "/ai", extra: true },
 ];
