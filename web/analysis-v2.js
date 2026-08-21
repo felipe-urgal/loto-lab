@@ -82,9 +82,18 @@ function tabsMarkup() {
 
 function qualityWarning(advanced) {
   const quality = advanced.dataQuality;
-  if (!quality || quality.continuous) return "";
+  if (!quality) return "";
+  const messages = [];
+  if (!quality.continuous) {
+    messages.push(`${quality.missingContestCount} concurso(s) ausente(s); métricas sequenciais não atravessam essas lacunas.`);
+  }
+  if (quality.leftCensored) {
+    messages.push(`A base armazenada começa no concurso #${quality.firstStoredContest}; valores que dependem do histórico anterior são tratados como desconhecidos.`);
+  }
+  if (!messages.length) return "";
   const latestSegment = quality.latestContinuousContests ?? 0;
-  return `<div class="a2-warning a2-quality-warning"><strong>Histórico com lacunas</strong><span>${quality.missingContestCount} concurso(s) ausente(s). Métricas sequenciais ignoram transições incompletas e a validação usa somente o trecho contínuo mais recente (${latestSegment} concursos).</span></div>`;
+  messages.push(`A validação usa o trecho contínuo mais recente (${latestSegment} concursos).`);
+  return `<div class="a2-warning a2-quality-warning"><strong>Qualidade do histórico</strong><span>${escapeHtml(messages.join(" "))}</span></div>`;
 }
 
 function shellMarkup(data) {
@@ -102,7 +111,7 @@ function shellMarkup(data) {
     ${qualityWarning(advanced)}
     ${tabsMarkup()}
     <section id="a2-view" role="tabpanel" aria-labelledby="a2-tab-${activeTab}"></section>
-    <aside class="a2-detail" id="a2-detail" hidden role="dialog" aria-modal="true" aria-label="Detalhe da dezena" tabindex="-1"></aside>
+    <dialog class="a2-detail" id="a2-detail" aria-label="Detalhe da dezena"></dialog>
   </div>`;
 }
 
@@ -139,7 +148,7 @@ function rankingView(data) {
       <div class="a2-compare-controls"><select data-a2-compare-a aria-label="Primeira dezena">${options}</select><select data-a2-compare-b aria-label="Segunda dezena">${options}</select><button class="button compact" type="button" data-a2-compare>Comparar</button></div>
       <div data-a2-compare-result></div>
     </section>
-    <section><div class="section-head"><div><h2>Ranking auditável</h2><p>Movimento usa a posição de 10 concursos atrás; robustez perturba todos os pesos em ±10%.</p></div></div>
+    <section><div class="section-head"><div><h2>Ranking auditável</h2><p>Movimento usa o número real do concurso de referência; se a referência estiver ausente, a variação fica indisponível.</p></div></div>
       <div class="panel table-wrap"><table class="a2-table"><thead><tr><th>#</th><th>Dezena</th><th>Grupo</th><th>Score</th><th>Mov. 10</th><th>Tendência</th><th>Robustez</th><th>Atraso</th></tr></thead><tbody>${dynamics.map((item) => `
         <tr data-a2-number="${item.number}" tabindex="0"><td><strong>${item.rank}</strong></td><td><strong>${number(item.number)}</strong></td><td><span class="a2-tier-chip ${tierClass(item.tier)}">${TIER_LABELS[item.tier]}</span></td><td>${decimal(item.score)}</td><td>${movementBadge(item.movements.ten)}</td><td>${trendCopy(item.trend)}</td><td>${percent(item.weightRobustness.tierStability)}</td><td>${delayCopy(item)}</td></tr>`).join("")}</tbody></table></div>
     </section>
@@ -161,7 +170,7 @@ function structureCard(label, metric, formatter = decimal) {
     <div class="a2-structure-title"><strong>${escapeHtml(label)}</strong>${metric?.percentile !== undefined ? `<span>percentil ${Math.round(metric.percentile * 100)}</span>` : ""}</div>
     <div class="a2-structure-current">${current === null || current === undefined ? "—" : formatter(current)}</div>
     <div class="a2-observed-expected">
-      <span><small>observado · média</small><strong>${observed ? formatter(observed.mean) : "—"}</strong></span>
+      <span><small>histórico anterior · média</small><strong>${observed ? formatter(observed.mean) : "—"}</strong></span>
       <span><small>esperado · matemática</small><strong>${metric?.expectedMean !== undefined ? formatter(metric.expectedMean) : "descritivo"}</strong></span>
       <span><small>diferença atual</small><strong>${metric?.deviationFromExpected !== undefined ? signed(metric.deviationFromExpected) : "—"}</strong></span>
     </div>
@@ -170,17 +179,19 @@ function structureCard(label, metric, formatter = decimal) {
 }
 
 function filterValidationMarkup(filter) {
-  const exact = filter.exactUniverse;
+  const next = filter.nextContestUniverse || filter.exactUniverse;
   const historical = filter.historical;
-  const difference = exact && typeof historical.coverage === "number"
-    ? (historical.coverage - exact.coverage) * 100
+  const expected = filter.historicalExpected;
+  const difference = expected && typeof historical.coverage === "number"
+    ? (historical.coverage - expected.coverage) * 100
     : null;
   return `<article class="panel a2-filter-validation">
     <div class="a2-filter-rules"><span>Repetidas <strong>${filter.rules.repeated.min}–${filter.rules.repeated.max}</strong>${filter.rules.repeated.preferredMin !== undefined ? `<small>preferencial ${filter.rules.repeated.preferredMin}–${filter.rules.repeated.preferredMax}</small>` : ""}</span><span>Ímpares <strong>${filter.rules.odd.min}–${filter.rules.odd.max}</strong></span></div>
     <div class="a2-filter-numbers">
-      <span><small>Universo que passa</small><strong>${exact ? percent(exact.coverage) : "—"}</strong><em>${exact ? `${exact.passing.toLocaleString("pt-BR")} / ${exact.total.toLocaleString("pt-BR")}` : "sem concurso de referência"}</em></span>
-      <span><small>Histórico que passou</small><strong>${percent(historical.coverage)}</strong><em>${historical.total ? `${historical.passing.toLocaleString("pt-BR")} / ${historical.total.toLocaleString("pt-BR")}` : "sem transições contínuas"}</em></span>
-      <span><small>Diferença</small><strong>${signed(difference, " p.p.")}</strong><em>histórico − universo</em></span>
+      <span><small>Próximo concurso · universo</small><strong>${next ? percent(next.coverage) : "—"}</strong><em>${next ? `${next.passing.toLocaleString("pt-BR")} / ${next.total.toLocaleString("pt-BR")}` : "sem concurso de referência"}</em></span>
+      <span><small>Histórico observado</small><strong>${percent(historical.coverage)}</strong><em>${historical.total ? `${historical.passing.toLocaleString("pt-BR")} / ${historical.total.toLocaleString("pt-BR")}` : "sem transições contínuas"}</em></span>
+      <span><small>Histórico esperado</small><strong>${expected ? percent(expected.coverage) : "—"}</strong><em>${expected ? `faixa ${percent(expected.minCoverage)}–${percent(expected.maxCoverage)}` : "sem baseline histórico"}</em></span>
+      <span><small>Diferença histórica</small><strong>${signed(difference, " p.p.")}</strong><em>observado − esperado comparável</em></span>
     </div>
     <p>${escapeHtml(filter.note)}</p>
   </article>`;
@@ -192,7 +203,7 @@ function structureView(data) {
   const filter = structure.methodologyFilter;
   const grid = structure.grid;
   return `<div class="a2-stack">
-    <section><div class="section-head"><div><h2>Estrutura do sorteio</h2><p>O resultado atual é comparado ao histórico e, quando há modelo exato, à distribuição combinatória.</p></div></div>
+    <section><div class="section-head"><div><h2>Estrutura do sorteio</h2><p>O resultado atual é comparado somente aos concursos anteriores e, quando há modelo exato, à distribuição combinatória.</p></div></div>
       <div class="a2-structure-grid">
         ${structureCard("Repetidas do concurso anterior", metrics.repeated, (value) => decimal(value, 1))}
         ${structureCard("Ímpares", metrics.odd, (value) => decimal(value, 1))}
@@ -202,13 +213,13 @@ function structureView(data) {
         ${metrics.frame ? structureCard("Moldura · Lotofácil", metrics.frame, (value) => decimal(value, 1)) : ""}
       </div>
     </section>
-    ${grid ? `<section><div class="section-head"><div><h2>Linhas e colunas</h2><p>Distribuição atual comparada à média histórica da Lotofácil.</p></div></div><div class="grid cols-2"><article class="panel a2-grid-profile"><strong>Linhas</strong>${grid.currentLines.map((value, index) => `<span>L${index + 1}<b>${value}</b><small>média ${decimal(grid.historicalLineMean[index])}</small></span>`).join("")}</article><article class="panel a2-grid-profile"><strong>Colunas</strong>${grid.currentColumns.map((value, index) => `<span>C${index + 1}<b>${value}</b><small>média ${decimal(grid.historicalColumnMean[index])}</small></span>`).join("")}</article></div></section>` : ""}
-    <section><div class="section-head"><div><h2>Validador da estrutura metodológica</h2><p>Quanto as regras explícitas de repetição + paridade reduzem o universo e quanto preservaram resultados históricos.</p></div></div>${filterValidationMarkup(filter)}</section>
+    ${grid ? `<section><div class="section-head"><div><h2>Linhas e colunas</h2><p>Distribuição atual comparada à média dos concursos anteriores da Lotofácil.</p></div></div><div class="grid cols-2"><article class="panel a2-grid-profile"><strong>Linhas</strong>${grid.currentLines.map((value, index) => `<span>L${index + 1}<b>${value}</b><small>média ${decimal(grid.historicalLineMean[index])}</small></span>`).join("")}</article><article class="panel a2-grid-profile"><strong>Colunas</strong>${grid.currentColumns.map((value, index) => `<span>C${index + 1}<b>${value}</b><small>média ${decimal(grid.historicalColumnMean[index])}</small></span>`).join("")}</article></div></section>` : ""}
+    <section><div class="section-head"><div><h2>Validador da estrutura metodológica</h2><p>Separa o universo do próximo sorteio do baseline histórico condicionado a cada transição.</p></div></div>${filterValidationMarkup(filter)}</section>
   </div>`;
 }
 
 function moverList(items, direction) {
-  if (!items?.length) return '<div class="a2-empty">Histórico insuficiente.</div>';
+  if (!items?.length) return '<div class="a2-empty">Histórico insuficiente ou concurso de referência ausente.</div>';
   return `<div class="a2-mover-list">${items.map((item) => `<button type="button" data-a2-number="${item.number}"><strong>${number(item.number)}</strong><span>#${item.rank}</span><em class="${direction === "up" ? "positive" : "negative"}">${direction === "up" ? "↑" : "↓"}${Math.abs(item.movement)}</em></button>`).join("")}</div>`;
 }
 
@@ -224,9 +235,9 @@ function heatmap(data) {
 
 function cycleMarkup(cycles) {
   if (!cycles.available) {
-    return '<article class="panel a2-cycle"><div class="a2-empty">O ciclo atual cruza uma lacuna do histórico e, por isso, não é exibido como uma medida exata.</div></article>';
+    return '<article class="panel a2-cycle"><div class="a2-empty">O início exato do ciclo não é conhecido por causa de uma lacuna ou porque a base armazenada começa depois do concurso #1.</div></article>';
   }
-  return `<article class="panel a2-cycle"><div>${metricCard("Ciclo atual", cycles.currentLength, `${cycles.seen} dezenas já vistas`)}</div><div class="a2-cycle-copy"><strong>${cycles.missing.length ? `${cycles.missing.length} ainda não vistas` : "ciclo recém-completado"}</strong><div class="a2-ball-cloud">${cycles.missing.map((value) => `<button type="button" data-a2-number="${value}" class="a2-ball">${number(value)}</button>`).join("")}</div><small>Média histórica de duração: ${cycles.historicalLength ? decimal(cycles.historicalLength.mean) : "—"} concursos · ${cycles.completedCount} ciclo(s) completos.</small></div></article>`;
+  return `<article class="panel a2-cycle"><div>${metricCard("Ciclo atual", cycles.currentLength, `${cycles.seen} dezenas já vistas`)}</div><div class="a2-cycle-copy"><strong>${cycles.missing.length ? `${cycles.missing.length} ainda não vistas` : "ciclo recém-completado"}</strong><div class="a2-ball-cloud">${cycles.missing.map((value) => `<button type="button" data-a2-number="${value}" class="a2-ball">${number(value)}</button>`).join("")}</div><small>Média histórica de duração: ${cycles.historicalLength ? decimal(cycles.historicalLength.mean) : "—"} concursos · ${cycles.completedCount} ciclo(s) completos com início conhecido.</small></div></article>`;
 }
 
 function dynamicsView(data) {
@@ -237,9 +248,9 @@ function dynamicsView(data) {
     .sort((a, b) => b.delay.percentile - a.delay.percentile || b.delay.current - a.delay.current)
     .slice(0, 12);
   return `<div class="a2-stack">
-    <section><div class="section-head"><div><h2>Movimento do ranking</h2><p>Variação entre a posição atual e a posição de 10 concursos atrás.</p></div></div><div class="grid cols-2"><article class="panel a2-movers"><div class="a2-panel-head"><strong>Maiores altas</strong><span>subiram no ranking</span></div>${moverList(advanced.ranking.dynamics.movers.rising, "up")}</article><article class="panel a2-movers"><div class="a2-panel-head"><strong>Maiores quedas</strong><span>caíram no ranking</span></div>${moverList(advanced.ranking.dynamics.movers.falling, "down")}</article></div></section>
+    <section><div class="section-head"><div><h2>Movimento do ranking</h2><p>Variação contra o concurso de número exatamente 10 posições antes; referências ausentes não são aproximadas.</p></div></div><div class="grid cols-2"><article class="panel a2-movers"><div class="a2-panel-head"><strong>Maiores altas</strong><span>subiram no ranking</span></div>${moverList(advanced.ranking.dynamics.movers.rising, "up")}</article><article class="panel a2-movers"><div class="a2-panel-head"><strong>Maiores quedas</strong><span>caíram no ranking</span></div>${moverList(advanced.ranking.dynamics.movers.falling, "down")}</article></div></section>
     <section><div class="section-head"><div><h2>Ciclo descritivo</h2><p>Tempo necessário para o conjunto inteiro de dezenas aparecer ao menos uma vez; não é previsão de saída.</p></div></div>${cycleMarkup(cycles)}</section>
-    <section><div class="section-head"><div><h2>Atraso em contexto</h2><p>Percentil alto significa que o atraso atual foi pouco frequente no histórico contínuo daquela própria dezena; não significa maior chance no próximo sorteio.</p></div></div><div class="panel a2-delay-list">${delayed.length ? delayed.map((item) => `<button type="button" data-a2-number="${item.number}"><strong>${number(item.number)}</strong><span>${item.delay.current} concurso(s)</span><em>percentil ${Math.round(item.delay.percentile * 100)}</em></button>`).join("") : '<div class="a2-empty">Histórico contínuo insuficiente para calcular atrasos exatos.</div>'}</div></section>
+    <section><div class="section-head"><div><h2>Atraso em contexto</h2><p>Percentil alto descreve raridade histórica do atraso observado; não significa maior chance no próximo sorteio.</p></div></div><div class="panel a2-delay-list">${delayed.length ? delayed.map((item) => `<button type="button" data-a2-number="${item.number}"><strong>${number(item.number)}</strong><span>${item.delay.current} concurso(s)</span><em>percentil ${Math.round(item.delay.percentile * 100)}</em></button>`).join("") : '<div class="a2-empty">Histórico contínuo suficiente e com início conhecido é necessário para atrasos exatos.</div>'}</div></section>
     <section><div class="section-head"><div><h2>Mapa binário · últimos 30</h2><p>Presença/ausência por concurso para visualizar sequências, blocos e mudanças sem converter o padrão em probabilidade futura.</p></div></div><article class="panel a2-heat-panel">${heatmap(data)}</article></section>
   </div>`;
 }
@@ -252,20 +263,24 @@ function combinationsView(data) {
   const combos = data.advanced.combinations;
   const options = data.advanced.ranking.dynamics.items.map((item) => `<option value="${item.number}">${number(item.number)}</option>`).join("");
   const similarity = data.advanced.similarity;
+  const enough = (combos.methodology.availableContests ?? 0) >= (combos.methodology.minimumContests ?? 0);
+  const unavailable = `<div class="a2-empty">São necessários ao menos ${combos.methodology.minimumContests ?? 20} concursos para explorar associações com significância.</div>`;
   return `<div class="a2-stack">
     <div class="a2-warning"><strong>Exploração, não previsão</strong><span>${escapeHtml(combos.methodology.note)}</span></div>
-    <section><div class="section-head"><div><h2>Explorador de duques</h2><p>Frequência conjunta observada comparada ao esperado para um par fixo sob sorteios uniformes.</p></div></div><article class="panel a2-pair-explorer"><div class="a2-pair-controls"><select data-a2-pair-a aria-label="Primeira dezena da dupla">${options}</select><select data-a2-pair-b aria-label="Segunda dezena da dupla">${options}</select><button class="button compact" type="button" data-a2-pair-check>Analisar dupla</button></div><div data-a2-pair-result class="a2-pair-result"></div></article></section>
-    <section><div class="section-head"><div><h2>Associações que mais desviaram</h2><p>Ranking por z-score; evidência usa p-value binomial exato ajustado por ${combos.methodology.pairComparisons.toLocaleString("pt-BR")} pares testados.</p></div></div><div class="grid cols-2"><article class="panel a2-associations"><div class="a2-panel-head"><strong>Acima do esperado</strong><span>maior desvio positivo</span></div>${combos.highlights.positivePairs.slice(0, 8).map(associationRow).join("")}</article><article class="panel a2-associations"><div class="a2-panel-head"><strong>Abaixo do esperado</strong><span>maior desvio negativo</span></div>${combos.highlights.negativePairs.slice(0, 8).map(associationRow).join("")}</article></div></section>
-    <section><div class="section-head"><div><h2>Trincas exploratórias</h2><p>As maiores ocorrências relativas usam binomial exato e correção sobre ${combos.methodology.tripleComparisons.toLocaleString("pt-BR")} trincas possíveis.</p></div></div><article class="panel a2-associations">${combos.highlights.positiveTriples.slice(0, 10).map(associationRow).join("") || '<div class="a2-empty">Sem histórico suficiente.</div>'}</article></section>
+    <section><div class="section-head"><div><h2>Explorador de duques</h2><p>Frequência conjunta observada comparada ao esperado para um par fixo sob sorteios uniformes.</p></div></div><article class="panel a2-pair-explorer">${enough ? `<div class="a2-pair-controls"><select data-a2-pair-a aria-label="Primeira dezena da dupla">${options}</select><select data-a2-pair-b aria-label="Segunda dezena da dupla">${options}</select><button class="button compact" type="button" data-a2-pair-check>Analisar dupla</button></div><div data-a2-pair-result class="a2-pair-result"></div>` : unavailable}</article></section>
+    <section><div class="section-head"><div><h2>Associações que mais desviaram</h2><p>Ranking por z-score; p-value exato com Bonferroni aplicado à família de pares.</p></div></div>${enough ? `<div class="grid cols-2"><article class="panel a2-associations"><div class="a2-panel-head"><strong>Acima do esperado</strong><span>maior desvio positivo</span></div>${combos.highlights.positivePairs.slice(0, 8).map(associationRow).join("")}</article><article class="panel a2-associations"><div class="a2-panel-head"><strong>Abaixo do esperado</strong><span>maior desvio negativo</span></div>${combos.highlights.negativePairs.slice(0, 8).map(associationRow).join("")}</article></div>` : unavailable}</section>
+    <section><div class="section-head"><div><h2>Trincas exploratórias</h2><p>Binomial exato com Bonferroni aplicado separadamente à família de ${combos.methodology.tripleComparisons.toLocaleString("pt-BR")} trincas possíveis.</p></div></div><article class="panel a2-associations">${enough ? (combos.highlights.positiveTriples.slice(0, 10).map(associationRow).join("") || '<div class="a2-empty">Nenhuma trinca observada.</div>') : unavailable}</article></section>
     <section><div class="section-head"><div><h2>Concursos mais parecidos com o atual</h2><p>Primeiro por quantidade de dezenas em comum; empate resolvido por distância estrutural.</p></div></div><div class="panel a2-similarity">${(similarity.closest || []).map((item) => `<div><strong>#${item.contest}</strong><span>${formatDate(item.date)}</span><em>${item.overlap} em comum</em><small>${item.sharedNumbers.map(number).join(" · ") || "nenhuma"}</small></div>`).join("") || '<div class="a2-empty">Sem histórico suficiente.</div>'}</div></section>
   </div>`;
 }
 
 function validationCards(period) {
   if (!period?.rounds) return '<div class="a2-empty">São necessários ao menos 20 concursos contínuos antes do primeiro alvo de validação.</div>';
+  const evidenceEligible = period.evidenceEligible !== false;
   return period.tiers.map((tier) => {
     const tone = tier.difference > 0 ? "positive" : tier.difference < 0 ? "negative" : "";
-    return `<article class="panel a2-validation-card"><div class="a2-panel-head"><strong>${TIER_LABELS[tier.tier]}</strong><span class="evidence-${tier.evidence}">${evidenceCopy(tier.evidence)}</span></div><div class="a2-validation-rates"><span><small>observado</small><strong>${percent(tier.observedRate)}</strong></span><span><small>esperado</small><strong>${percent(tier.expectedRate)}</strong></span><span><small>diferença</small><strong class="${tone}">${signed(tier.difference * 100, " p.p.")}</strong></span></div><p>${tier.observedHits} dezenas observadas · ${decimal(tier.expectedHits)} esperadas · p ajustado ${decimal(tier.adjustedPValue, 4)}</p></article>`;
+    const evidence = evidenceEligible ? evidenceCopy(tier.evidence) : "amostra insuficiente para classificar evidência";
+    return `<article class="panel a2-validation-card"><div class="a2-panel-head"><strong>${TIER_LABELS[tier.tier]}</strong><span class="evidence-${evidenceEligible ? tier.evidence : "none"}">${evidence}</span></div><div class="a2-validation-rates"><span><small>observado</small><strong>${percent(tier.observedRate)}</strong></span><span><small>esperado</small><strong>${percent(tier.expectedRate)}</strong></span><span><small>diferença</small><strong class="${tone}">${signed(tier.difference * 100, " p.p.")}</strong></span></div><p>${tier.observedHits} dezenas observadas · ${decimal(tier.expectedHits)} esperadas · p ajustado ${decimal(tier.adjustedPValue, 4)}${evidenceEligible ? "" : " · selo de evidência suprimido"}</p></article>`;
   }).join("");
 }
 
@@ -280,9 +295,9 @@ function validationView(data) {
   const initial = [...validation.periods].reverse().find((period) => period.rounds > 0) || validation.periods[0];
   return `<div class="a2-stack">
     <div class="a2-validation-principle"><strong>Teste fora da amostra</strong><span>${escapeHtml(validation.methodology.note)}</span></div>
-    <section><div class="section-head"><div><h2>Fortes × intermediárias × frias</h2><p>O ranking de cada rodada é congelado antes de olhar o concurso seguinte.</p></div><label class="a2-window-control">Período<select data-a2-validation-window>${validation.periods.map((period) => `<option value="${period.window}" ${period.window === initial.window ? "selected" : ""}>últimos ${period.window} · ${period.rounds} válidos</option>`).join("")}</select></label></div><div class="a2-validation-grid" data-a2-validation-cards>${validationCards(initial)}</div></section>
+    <section><div class="section-head"><div><h2>Fortes × intermediárias × frias</h2><p>O ranking de cada rodada é congelado antes de olhar o concurso seguinte. Selos de evidência exigem pelo menos ${validation.methodology.minimumEvidenceRounds ?? 30} alvos válidos.</p></div><label class="a2-window-control">Período<select data-a2-validation-window>${validation.periods.map((period) => `<option value="${period.window}" ${period.window === initial.window ? "selected" : ""}>últimos ${period.window} · ${period.rounds} válidos</option>`).join("")}</select></label></div><div class="a2-validation-grid" data-a2-validation-cards>${validationCards(initial)}</div></section>
     <section><div class="section-head"><div><h2>Sensibilidade dos pesos</h2><p>Cada peso é perturbado em -10%, 0 e +10%, depois normalizado; são 243 cenários por dezena quando há histórico.</p></div></div><div class="panel table-wrap"><table class="a2-table"><thead><tr><th>Dezena</th><th>Rank</th><th>Grupo</th><th>Mesmo grupo</th><th>Forte nos cenários</th><th>Faixa de rank</th></tr></thead><tbody>${robustnessRows(data)}</tbody></table></div></section>
-    <section><article class="panel a2-method-card"><strong>Como ler esta aba</strong><p>Um grupo aparecer acima do esperado em uma janela não basta para concluir capacidade preditiva. O Loto Lab mostra o desvio, a incerteza e a correção estatística; resultados instáveis entre janelas devem ser tratados como observação, não como regra.</p><div><span>Warmup <b>${validation.methodology.warmupContests}</b></span><span>Anti-leakage <b>${validation.methodology.leakageProtection ? "ativo" : "não"}</b></span><span>Trecho contínuo <b>${validation.sourceContests}</b></span><span>Correção <b>${validation.methodology.correction}</b></span></div></article></section>
+    <section><article class="panel a2-method-card"><strong>Como ler esta aba</strong><p>Um grupo aparecer acima do esperado em uma janela não basta para concluir capacidade preditiva. O Loto Lab mostra o desvio, a incerteza e a correção estatística; resultados instáveis entre janelas devem ser tratados como observação, não como regra.</p><div><span>Warmup <b>${validation.methodology.warmupContests}</b></span><span>Evidência mín. <b>${validation.methodology.minimumEvidenceRounds ?? 30} alvos</b></span><span>Anti-leakage <b>${validation.methodology.leakageProtection ? "ativo" : "não"}</b></span><span>Trecho contínuo <b>${validation.sourceContests}</b></span><span>Correção <b>${validation.methodology.correction}</b></span></div></article></section>
   </div>`;
 }
 
@@ -313,51 +328,27 @@ function numberDetailMarkup(item) {
     <div class="a2-detail-warning">Atraso e frequência são descrições históricas. Eles não aumentam nem reduzem a chance matemática individual desta dezena no próximo sorteio.</div>`;
 }
 
-function closeNumberDetail() {
-  const detail = root?.querySelector("#a2-detail");
-  if (!detail || detail.hidden) return;
-  detail.hidden = true;
+function cleanupDetailState({ restoreFocus = true } = {}) {
   document.body.classList.remove("a2-detail-open");
-  if (detailReturnFocus?.isConnected) detailReturnFocus.focus();
+  if (restoreFocus && detailReturnFocus?.isConnected) detailReturnFocus.focus();
   detailReturnFocus = null;
 }
 
-function trapDetailFocus(event) {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    closeNumberDetail();
-    return;
-  }
-  if (event.key !== "Tab") return;
-  const detail = event.currentTarget;
-  const focusable = [...detail.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
-    .filter((node) => !node.disabled && !node.hidden);
-  if (!focusable.length) {
-    event.preventDefault();
-    detail.focus();
-    return;
-  }
-  const first = focusable[0];
-  const last = focusable.at(-1);
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault();
-    first.focus();
-  }
+function closeNumberDetail({ restoreFocus = true } = {}) {
+  const detail = root?.querySelector("#a2-detail");
+  if (detail?.open) detail.close();
+  cleanupDetailState({ restoreFocus });
 }
 
 function openNumberDetail(value, trigger) {
   const item = currentData?.advanced?.ranking?.dynamics?.items?.find((candidate) => candidate.number === Number(value));
   const detail = root?.querySelector("#a2-detail");
-  if (!item || !detail) return;
+  if (!item || !(detail instanceof HTMLDialogElement)) return;
   detailReturnFocus = trigger instanceof HTMLElement ? trigger : document.activeElement;
   detail.innerHTML = numberDetailMarkup(item);
-  detail.hidden = false;
   document.body.classList.add("a2-detail-open");
-  detail.addEventListener("keydown", trapDetailFocus);
-  detail.querySelector("[data-a2-detail-close]")?.addEventListener("click", closeNumberDetail);
+  if (!detail.open) detail.showModal();
+  detail.querySelector("[data-a2-detail-close]")?.addEventListener("click", () => closeNumberDetail(), { once: true });
   detail.querySelector("[data-a2-detail-close]")?.focus();
 }
 
@@ -398,7 +389,7 @@ function pairCheck() {
   }
   const pair = currentData.advanced.combinations.pairs.find((item) => item.numbers.includes(a) && item.numbers.includes(b));
   if (!pair) {
-    target.innerHTML = '<div class="a2-empty">Par não encontrado.</div>';
+    target.innerHTML = '<div class="a2-empty">Par indisponível para a amostra atual.</div>';
     return;
   }
   target.innerHTML = `<div class="a2-pair-stat"><strong>${number(a)} + ${number(b)}</strong><span><small>observado</small><b>${pair.observed}</b></span><span><small>esperado</small><b>${decimal(pair.expected)}</b></span><span><small>lift</small><b>${decimal(pair.lift, 2)}×</b></span><span><small>z-score</small><b>${decimal(pair.zScore, 2)}</b></span><em class="evidence-${pair.evidence}">${evidenceCopy(pair.evidence)} · p exato ajustado ${decimal(pair.adjustedPValue, 4)}</em></div>`;
@@ -443,7 +434,7 @@ function activateTab(tab, focus = false) {
     item.setAttribute("tabindex", selected ? "0" : "-1");
     if (selected && focus) item.focus();
   });
-  closeNumberDetail();
+  closeNumberDetail({ restoreFocus: false });
   renderTab();
 }
 
@@ -452,7 +443,7 @@ function bindShellInteractions() {
   tabs.forEach((button, index) => {
     button.addEventListener("click", () => activateTab(button.dataset.a2Tab));
     button.addEventListener("keydown", (event) => {
-      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
       event.preventDefault();
       let nextIndex = index;
       if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
@@ -461,6 +452,20 @@ function bindShellInteractions() {
       if (event.key === "End") nextIndex = tabs.length - 1;
       activateTab(tabs[nextIndex].dataset.a2Tab, true);
     });
+  });
+
+  const detail = root.querySelector("#a2-detail");
+  detail?.addEventListener("close", () => cleanupDetailState());
+  detail?.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeNumberDetail();
+  });
+  // Keep programmatic Escape coverage deterministic in the CDP smoke suite.
+  detail?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeNumberDetail();
+    }
   });
 }
 
@@ -479,11 +484,12 @@ async function renderAnalysisV2() {
   const lottery = currentLottery();
   const token = ++renderToken;
   try {
-    const data = await api(`/analysis/${lottery}`);
+    const data = await api(`/analysis/${lottery}/advanced`);
     if (token !== renderToken || currentView() !== "analysis" || currentLottery() !== lottery) return;
     if (!data.advanced) return;
     currentData = data;
     if (viewSubtitle) viewSubtitle.textContent = "Ranking, estrutura, dinâmica, combinações e validação estatística.";
+    closeNumberDetail({ restoreFocus: false });
     root.innerHTML = shellMarkup(data);
     bindShellInteractions();
     renderTab();
@@ -495,6 +501,11 @@ async function renderAnalysisV2() {
 
 onViewRendered(({ view }) => {
   if (view === "analysis") void renderAnalysisV2();
+  else closeNumberDetail({ restoreFocus: false });
+});
+
+window.addEventListener("hashchange", () => {
+  if (currentView() !== "analysis") closeNumberDetail({ restoreFocus: false });
 });
 
 window.addEventListener("loto-lab:data-synced", () => {
