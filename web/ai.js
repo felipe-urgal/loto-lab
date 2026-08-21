@@ -1,6 +1,8 @@
-const API = "/api/v1";
+import { api, escapeHtml, formatDateTime, formatPercent } from "./runtime.js";
+
 const lotterySelect = document.querySelector("#ai-lottery");
 const focusSelect = document.querySelector("#ai-focus");
+const forceInput = document.querySelector("#ai-force");
 const form = document.querySelector("#ai-form");
 const runButton = document.querySelector("#ai-run");
 const providerStatus = document.querySelector("#ai-provider-status");
@@ -22,44 +24,6 @@ const FOCUS_LABELS = {
 };
 let status = null;
 let historyItems = [];
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function formatDateTime(value) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
-}
-
-function formatPercent(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
-  return `${(value * 100).toFixed(1).replace(".", ",")}%`;
-}
-
-function formatCurrency(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
-
-async function api(path, options = {}) {
-  const response = await fetch(`${API}${path}`, {
-    ...options,
-    headers: options.body ? { "Content-Type": "application/json", ...(options.headers || {}) } : options.headers,
-  });
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = new Error(payload?.error?.message || `Erro HTTP ${response.status}`);
-    error.code = payload?.error?.code || "HTTP_ERROR";
-    throw error;
-  }
-  return payload;
-}
 
 function list(items) {
   if (!items?.length) return "<li>Sem observações adicionais.</li>";
@@ -158,11 +122,18 @@ form.addEventListener("submit", async (event) => {
   try {
     const record = await api("/ai/insights", {
       method: "POST",
-      body: JSON.stringify({ lottery: lotterySelect.value, focus: focusSelect.value }),
+      body: JSON.stringify({
+        lottery: lotterySelect.value,
+        focus: focusSelect.value,
+        force: Boolean(forceInput?.checked),
+      }),
     });
     renderInsight(record, record.disclaimer);
     message.className = "panel ai-message";
-    message.innerHTML = `<strong>Interpretação salva</strong><p>Snapshot #${record.id} criado sem alterar qualquer cálculo ou jogo.</p>`;
+    message.innerHTML = record.reused
+      ? `<strong>Interpretação reutilizada</strong><p>A evidência não mudou; o snapshot #${record.id} foi reutilizado sem nova chamada ao provider.</p>`
+      : `<strong>Interpretação salva</strong><p>Snapshot #${record.id} criado sem alterar qualquer cálculo ou jogo.</p>`;
+    if (forceInput) forceInput.checked = false;
     await loadHistory();
   } catch (error) {
     message.className = "panel ai-message";
