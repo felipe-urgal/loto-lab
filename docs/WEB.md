@@ -89,7 +89,7 @@ A home não baixa todas as extensões na primeira navegação. `feature-loader.j
 - auditoria de diversidade em Gerar jogos;
 - apostas reais e gestão de lotes em Meus jogos.
 
-O loader reutiliza Promises para evitar downloads duplicados e aguarda o CSS da feature antes de executar seu módulo, evitando renderização temporariamente sem estilo.
+O loader reutiliza Promises para evitar downloads duplicados e aguarda a tentativa de carregamento do CSS da feature antes de executar seu módulo, evitando renderização temporariamente sem estilo no caminho normal. Se o stylesheet falhar, o JavaScript ainda é carregado para preservar a funcionalidade.
 
 ## Acessibilidade
 
