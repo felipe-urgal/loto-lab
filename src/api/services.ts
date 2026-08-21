@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import type { LotteryId } from "../domain/types.js";
+import { buildAdvancedAnalysis } from "../analysis/advanced.js";
 import { buildNumberAnalysis, DEFAULT_WEIGHTS } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { generateMegaSenaGames } from "../generator/megaSena.js";
@@ -124,6 +125,11 @@ export class LotoLabApiServices {
       },
       numbers: rows,
     };
+  }
+
+  async analyzeAdvanced(lottery: LotteryId) {
+    const contests = await this.contests.list({ lottery, order: "asc" });
+    return buildAdvancedAnalysis(contests, getLotteryConfig(lottery));
   }
 
   async generate(input: GenerateGamesRequest): Promise<GenerateGamesResponse> {
