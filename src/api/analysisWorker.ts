@@ -1,6 +1,7 @@
 import { parentPort, workerData } from "node:worker_threads";
 import type { Contest, LotteryId } from "../domain/types.js";
 import { buildAdvancedAnalysis } from "../analysis/advanced.js";
+import { hardenAdvancedAnalysis } from "../analysis/advancedHardening.js";
 import { backtestMegaSena } from "../backtest/megaSena.js";
 import { backtestLotofacil } from "../backtest/lotofacil.js";
 import { backtestDiaDeSorte } from "../backtest/diaDeSorte.js";
@@ -109,7 +110,12 @@ try {
   } else if (job.kind === "strategy-lab") {
     result = compareStrategyLab(job.contests, job.input);
   } else {
-    result = buildAdvancedAnalysis(job.contests, getLotteryConfig(job.lottery));
+    const config = getLotteryConfig(job.lottery);
+    result = hardenAdvancedAnalysis(
+      buildAdvancedAnalysis(job.contests, config),
+      job.contests,
+      config,
+    );
   }
   port.postMessage({ ok: true, result });
 } catch (error) {
