@@ -1,0 +1,120 @@
+.dashboard-focus-section .grid.cols-3 {
+  grid-template-columns: minmax(0, 760px);
+}
+
+.dashboard-focus-section .lottery-card {
+  min-height: 180px;
+}
+
+.dashboard-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.dashboard-comparison-card {
+  padding: 16px;
+  display: grid;
+  gap: 15px;
+}
+
+.dashboard-comparison-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dashboard-comparison-head > div {
+  display: grid;
+  gap: 4px;
+}
+
+.dashboard-comparison-head strong {
+  font-size: 12px;
+}
+
+.dashboard-comparison-head span {
+  color: var(--muted-2);
+  font-size: 9px;
+}
+
+.dashboard-comparison-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dashboard-comparison-metrics > span {
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: var(--bg);
+  display: grid;
+  gap: 4px;
+}
+
+.dashboard-comparison-metrics small {
+  color: var(--muted-2);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-weight: 800;
+}
+
+.dashboard-comparison-metrics strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-comparison-metrics strong.positive {
+  color: var(--accent-strong);
+}
+
+.dashboard-comparison-metrics strong.negative {
+  color: var(--danger);
+}
+
+.dashboard-row-action {
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-strong);
+  font: inherit;
+  font-size: 9px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.dashboard-row-action:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-comparison-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-focus-section .grid.cols-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .dashboard-comparison-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dashboard-comparison-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboard-comparison-head .button {
+    width: 100%;
+  }
+}
