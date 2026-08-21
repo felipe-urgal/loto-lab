@@ -28,7 +28,7 @@ coverage
 # nyc test coverage
 .nyc_output
 
-# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-files)
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
 .grunt
 
 # Bower dependency directory (https://bower.io/)
@@ -113,7 +113,7 @@ web-dist/
 .serverless/
 
 # FuseBox cache
-.fusebox
+.fusebox/
 
 # DynamoDB Local files
 .dynamodb/
