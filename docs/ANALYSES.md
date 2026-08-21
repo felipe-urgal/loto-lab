@@ -17,6 +17,28 @@ A tela deve responder, nesta ordem:
 5. **Associações entre dezenas sobrevivem à correção pelo número de hipóteses testadas?**
 6. **O ranking mostrou separação mensurável quando calculado sem olhar o futuro?**
 
+## Qualidade do histórico
+
+Antes de interpretar métricas sequenciais, o motor verifica a continuidade dos números dos concursos.
+
+Se existir uma lacuna, o bloco `advanced.dataQuality` informa:
+
+- quantidade de concursos ausentes;
+- transições em que existe gap;
+- quantidade de concursos do trecho contínuo mais recente.
+
+O motor **não atravessa uma lacuna fingindo que os dois registros armazenados eram concursos consecutivos**.
+
+Por isso:
+
+- repetição do concurso anterior vira indisponível quando o predecessor real está faltando;
+- atrasos históricos só usam intervalos totalmente observados;
+- atraso/sequência atuais podem ficar indisponíveis quando a resposta depender de atravessar um gap;
+- ciclos são reiniciados após lacunas e o ciclo atual só é mostrado quando o seu início é conhecido;
+- a validação rolling usa somente o trecho contínuo mais recente.
+
+A UI exibe um aviso explícito quando essas proteções estão ativas.
+
 ## Modos da interface
 
 ### Ranking
@@ -34,6 +56,8 @@ Mantém `strong`, `balanced` e `cold`, mas acrescenta:
 - comparação lado a lado entre duas dezenas.
 
 A robustez dos pesos executa todas as combinações de multiplicadores `0.9`, `1.0` e `1.1` sobre os cinco pesos, normalizando-os depois. São **243 cenários**. Isso mede sensibilidade do ranking; não escolhe automaticamente novos pesos.
+
+Sem histórico, o motor não fabrica uma robustez artificial a partir de empates: o campo é marcado como indisponível.
 
 ### Estrutura
 
@@ -75,7 +99,9 @@ A contagem do universo é feita por programação dinâmica. Nenhuma enumeraçã
 A tela compara:
 
 - `% do universo combinatório que passa`;
-- `% dos resultados históricos que passou`.
+- `% das transições históricas contínuas que passou`.
+
+Sem concurso de referência, a cobertura relativa a repetição é `indisponível`, não `0%`.
 
 Soma, linhas, colunas e outras regras sem faixa rígida definida na metodologia não entram silenciosamente neste filtro.
 
@@ -91,6 +117,8 @@ A aba mostra:
 - heatmap binário dos últimos 30 concursos.
 
 `Atraso` e `ciclo` são visualizações descritivas. O sistema não converte atraso alto em aumento de probabilidade.
+
+Quando uma lacuna impede saber o valor exato, a UI mostra a métrica como indisponível em vez de assumir ausência ou zero.
 
 ### Combinações
 
@@ -113,9 +141,11 @@ O motor calcula:
 - ocorrências observadas;
 - ocorrências esperadas;
 - `lift = observado / esperado`;
-- z-score aproximado;
-- p-value bilateral aproximado;
-- p-value corrigido por Bonferroni.
+- z-score como medida de desvio padronizado;
+- **p-value binomial bilateral exato**;
+- p-value exato corrigido por Bonferroni.
+
+A significância **não** usa a aproximação normal para eventos raros. Isso é especialmente importante para trincas da Mega-Sena, cuja quantidade esperada por combinação pode ser pequena mesmo com milhares de concursos.
 
 A correção é importante porque procurar centenas ou milhares de combinações produz extremos por acaso. O resultado é tratado como **exploratório**, nunca como previsão automática.
 
@@ -123,7 +153,7 @@ A tela também mostra concursos históricos mais parecidos com o atual, prioriza
 
 ### Validação
 
-A validação rolling usa até os últimos 500 concursos elegíveis.
+A validação rolling usa até os últimos 500 alvos elegíveis do **trecho contínuo mais recente**.
 
 Para cada concurso-alvo:
 
@@ -141,7 +171,9 @@ A interface agrega janelas de 100, 300 e 500 rodadas e compara:
 - taxa esperada pelo tamanho do grupo;
 - diferença em pontos percentuais;
 - z-score usando variância hipergeométrica;
-- p-value corrigido para os três grupos.
+- p-value corrigido pela família de **9 leituras expostas na UI: 3 grupos × 3 janelas**.
+
+A correção é Bonferroni e, portanto, deliberadamente conservadora.
 
 Uma diferença histórica isolada não vira regra de geração. O resultado precisa ser estável entre períodos e sobreviver à incerteza estatística.
 
@@ -158,6 +190,7 @@ Os campos antigos são preservados. A resposta agora acrescenta:
 ```json
 {
   "advanced": {
+    "dataQuality": {},
     "model": {},
     "ranking": {},
     "structure": {},
@@ -171,11 +204,25 @@ Os campos antigos são preservados. A resposta agora acrescenta:
 
 Isso mantém compatibilidade com consumidores existentes.
 
-## Performance
+## Lifecycle, cache e fallback
 
-A análise avançada é calculada no backend e nunca duplicada no navegador.
+A view básica continua sendo renderizada pelo shell principal. O módulo Análises 2.0 é carregado sob demanda e usa o evento explícito `loto-lab:view-rendered` para substituir a visão básica somente quando a resposta avançada está disponível.
 
-Como a view principal e o módulo lazy podem consultar o mesmo endpoint em sequência durante a montagem, o serviço mantém um cache curto por loteria e revisão dos dados. O cache só evita recomputação imediata e expira rapidamente; mudança no número/data do último concurso invalida a assinatura.
+O navegador **não mantém cache permanente por loteria**. Cada render oficial consulta novamente o endpoint, evitando que uma sincronização automática no servidor deixe a tela presa ao concurso anterior.
+
+O backend mantém apenas o cache curto já existente para absorver consultas consecutivas durante a montagem da view. A assinatura inclui tamanho do histórico e último concurso/data, portanto um novo concurso invalida a análise avançada.
+
+Se a segunda montagem avançada falhar, a visão básica já renderizada é preservada e recebe apenas um aviso de fallback. Uma falha opcional não transforma uma tela utilizável em uma tela totalmente indisponível.
+
+## Acessibilidade
+
+As cinco áreas usam semântica de `tablist/tab/tabpanel` e suportam:
+
+- setas esquerda/direita;
+- `Home`/`End`;
+- foco visível.
+
+O detalhe da dezena usa semântica de diálogo modal, recebe foco ao abrir, fecha com `Escape`, mantém o foco dentro do painel com `Tab` e devolve o foco ao elemento que abriu o detalhe.
 
 ## Interpretação correta
 
@@ -185,6 +232,7 @@ O Loto Lab deve ser capaz de dizer explicitamente:
 - `fora do centro histórico, mas matematicamente natural`;
 - `sinal exploratório que não sobrevive à correção`;
 - `diferença que merece investigação fora da amostra`;
-- `nenhuma separação estatisticamente relevante detectada`.
+- `nenhuma separação estatisticamente relevante detectada`;
+- `histórico insuficiente ou descontínuo para esta métrica`.
 
 Essas respostas são preferíveis a rótulos como “está para sair”, “garantida”, “dupla quente” ou “atrasada com maior chance”.
