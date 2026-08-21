@@ -1,4 +1,5 @@
 const root = document.querySelector("#data-status-bar");
+const lotterySelect = document.querySelector("#lottery-select");
 const labels = {
   "mega-sena": "Mega-Sena",
   lotofacil: "Lotofácil",
@@ -37,6 +38,11 @@ function operationCopy(status) {
         ? "sincronização em andamento"
         : "última execução falhou";
   return `${result} · ${formatAge(status.ageMinutes)}`;
+}
+
+function currentScope() {
+  const value = lotterySelect?.value;
+  return value === "all" || labels[value] ? value : "all";
 }
 
 async function runSync(button) {
@@ -84,6 +90,8 @@ async function refreshDataStatus() {
     const operations = operationsResponse.ok ? await operationsResponse.json() : null;
     const stale = Boolean(operations?.stale);
     const auto = operations?.autoSyncEnabled !== false;
+    const scope = currentScope();
+    const items = (payload.items || []).filter((item) => scope === "all" || item.lottery === scope);
 
     root.innerHTML = `
       <div class="data-ops-row ${stale ? "is-warning" : ""}">
@@ -93,7 +101,7 @@ async function refreshDataStatus() {
         </div>
         <button class="data-sync-button" type="button">Sincronizar agora</button>
       </div>
-      <div class="data-status-shell">${(payload.items || []).map((item) => {
+      <div class="data-status-shell ${scope === "all" ? "" : "is-focused"}">${items.map((item) => {
         const warning = item.missingContestCount > 0;
         const detail = warning
           ? `${item.missingContestCount} concurso(s) faltando até #${item.lastContest || 0}`
@@ -114,6 +122,11 @@ async function refreshDataStatus() {
 }
 
 window.addEventListener("hashchange", refreshDataStatus);
+lotterySelect?.addEventListener("change", () => {
+  if ((location.hash.replace("#", "") || "dashboard") === "dashboard") {
+    window.setTimeout(refreshDataStatus, 0);
+  }
+});
 document.querySelector("#refresh-view")?.addEventListener("click", () => {
   window.setTimeout(refreshDataStatus, 0);
 });

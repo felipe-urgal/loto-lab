@@ -54,6 +54,9 @@ async function loadStyledModule(name) {
 async function ensureViewFeatures() {
   const view = location.hash.replace("#", "") || "dashboard";
   if (view === "dashboard") {
+    // Scope owns the selector value on the dashboard. Load it before status so
+    // the operational cards render against the same scope on the first paint.
+    await loadStyledModule("dashboard-scope");
     await loadStyledModule("data-status");
     return;
   }
