@@ -25,6 +25,9 @@ const nav = document.querySelector("[data-shell-nav]");
 const isMainApp = location.pathname === "/" || location.pathname === "/index.html";
 const configuredActive = document.body.dataset.activeNav || "dashboard";
 const mainViews = new Set(ITEMS.filter((item) => item.view).map((item) => item.view));
+const lotteries = new Set(["mega-sena", "lotofacil", "dia-de-sorte"]);
+const storedLottery = localStorage.getItem("loto-lab:lottery");
+if (storedLottery && !lotteries.has(storedLottery)) localStorage.removeItem("loto-lab:lottery");
 
 function requestedMainView() {
   return location.hash.replace("#", "");
