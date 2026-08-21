@@ -109,12 +109,15 @@ export class PostgresStrategyRepository {
         const sameVersion = await client.query(
           `
             SELECT 1
-            FROM strategy_versions
-            WHERE strategy_id = $1
-              AND methodology_version = $2
-              AND config = $3::jsonb
-            ORDER BY version DESC
-            LIMIT 1
+            FROM (
+              SELECT methodology_version, config
+              FROM strategy_versions
+              WHERE strategy_id = $1
+              ORDER BY version DESC
+              LIMIT 1
+            ) latest
+            WHERE latest.methodology_version = $2
+              AND latest.config = $3::jsonb
           `,
           [strategyId, input.methodologyVersion, JSON.stringify(config)],
         );
