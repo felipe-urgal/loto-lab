@@ -9,7 +9,7 @@ import type {
 } from "../domain/types.js";
 import type { buildAdvancedAnalysis } from "../analysis/advanced.js";
 import { runAdvancedAnalysisInWorker } from "../analysis/advancedWorkerClient.js";
-import { DEFAULT_WEIGHTS } from "../analysis/scoring.js";
+import { buildNumberAnalysis, DEFAULT_WEIGHTS } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { generateMegaSenaGames } from "../generator/megaSena.js";
 import { generateLotofacilGames } from "../generator/lotofacil.js";
@@ -42,6 +42,10 @@ export interface AnalysisResponse {
   weights: AnalysisWeights;
   tiers: Record<NumberTier, number[]>;
   numbers: NumberAnalysis[];
+}
+
+export interface AdvancedAnalysisResponse {
+  lottery: LotteryId;
   advanced: AdvancedAnalysis;
 }
 
@@ -153,6 +157,25 @@ export class LotoLabApiServices {
 
   async analyze(lottery: LotteryId): Promise<AnalysisResponse> {
     const contests = await this.contests.listAnalysisHistory(lottery);
+    const config = getLotteryConfig(lottery);
+    const rows = buildNumberAnalysis(contests, config);
+    const latestContest = contests.at(-1) ?? null;
+
+    return {
+      lottery,
+      latestContest,
+      weights: DEFAULT_WEIGHTS,
+      tiers: {
+        strong: rows.filter((row) => row.tier === "strong").map((row) => row.number),
+        balanced: rows.filter((row) => row.tier === "balanced").map((row) => row.number),
+        cold: rows.filter((row) => row.tier === "cold").map((row) => row.number),
+      },
+      numbers: rows,
+    };
+  }
+
+  async analyzeAdvanced(lottery: LotteryId): Promise<AdvancedAnalysisResponse> {
+    const contests = await this.contests.listAnalysisHistory(lottery);
     const signature = analysisSignature(contests);
     const cached = this.advancedAnalysisCache.get(lottery);
     let advanced: AdvancedAnalysis;
@@ -176,14 +199,7 @@ export class LotoLabApiServices {
       }
     }
 
-    return {
-      lottery,
-      latestContest: advanced.latestContest,
-      weights: DEFAULT_WEIGHTS,
-      tiers: advanced.ranking.tiers,
-      numbers: advanced.ranking.numbers,
-      advanced,
-    };
+    return { lottery, advanced };
   }
 
   async generate(input: GenerateGamesRequest): Promise<GenerateGamesResponse> {
