@@ -12,6 +12,13 @@ interface ContestRow {
   prize_tiers: ContestPrizeTier[];
 }
 
+interface AnalysisContestRow {
+  lottery: LotteryId;
+  contest_number: number;
+  draw_date: string;
+  numbers: number[];
+}
+
 interface ContestStatusRow {
   contest_count: string;
   first_contest: number | null;
@@ -29,6 +36,15 @@ function mapContest(row: ContestRow): Contest {
     ...(row.lucky_month ? { luckyMonth: row.lucky_month } : {}),
     ...(row.prize_tiers.length > 0 ? { prizeTiers: row.prize_tiers } : {}),
     ...(row.amount_collected !== null ? { amountCollected: Number(row.amount_collected) } : {}),
+  };
+}
+
+function mapAnalysisContest(row: AnalysisContestRow): Contest {
+  return {
+    lottery: row.lottery,
+    number: row.contest_number,
+    date: row.draw_date,
+    numbers: row.numbers.map(Number),
   };
 }
 
@@ -120,6 +136,23 @@ export class PostgresContestRepository {
 
   async list(options: ContestListOptions = {}): Promise<Contest[]> {
     return this.queryContests(options);
+  }
+
+  async listAnalysisHistory(lottery: LotteryId): Promise<Contest[]> {
+    const result = await this.pool.query<AnalysisContestRow>(
+      `
+        SELECT
+          lottery,
+          contest_number,
+          draw_date::text AS draw_date,
+          numbers
+        FROM contests
+        WHERE lottery = $1
+        ORDER BY contest_number ASC
+      `,
+      [lottery],
+    );
+    return result.rows.map(mapAnalysisContest);
   }
 
   async listContestNumbers(
