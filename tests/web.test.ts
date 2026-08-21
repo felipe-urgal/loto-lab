@@ -71,6 +71,7 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.match(loaderSource, /import\(asset/);
   assert.match(loaderSource, /generation-v2/);
   assert.doesNotMatch(loaderSource, /loadStyledModule\("generation-diversity"\)/);
+  assert.match(loaderSource, /my-games-v2/);
   assert.match(loaderSource, /my-games-management/);
   assert.match(loaderSource, /styleLoads/);
   assert.match(loaderSource, /loadStyledModule/);
@@ -97,6 +98,8 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
     "real-bets.js",
     "generation-v2.js",
     "generation-v2.css",
+    "my-games-v2.js",
+    "my-games-v2.css",
     "my-games-management.js",
     "lab.js",
     "data-status.js",
