@@ -167,6 +167,55 @@ GET /api/v1/game-batches/lotofacil?limit=20
 GET /api/v1/game-batches/id/1
 ```
 
+## Comparar jogos do lote
+
+```http
+GET /api/v1/game-batches/1/comparison?startContest=3760&count=5
+```
+
+Compara os jogos persistidos do lote com os concursos a partir de `startContest`. O concurso inicial pode ser anterior ao concurso-alvo do lote, permitindo **backtest histórico** dos jogos gerados.
+
+Query params:
+
+- `startContest`: concurso inicial da comparação; opcional, usando o concurso-alvo do lote quando disponível;
+- `count`: quantidade de concursos, de 1 a 20, com padrão 5.
+
+A resposta inclui:
+
+- `targetContestNumber`: concurso para o qual o lote foi originalmente gerado;
+- `startContestNumber`: concurso usado para iniciar a comparação;
+- `summary`: resumo dos acertos;
+- `items`: resultados por concurso;
+- `availability.status`: `available` quando há concursos sincronizados para o intervalo solicitado ou `pending` quando o concurso inicial ainda não está disponível;
+- `availability.lastAvailableContestNumber`: último concurso conhecido, quando aplicável;
+- `scope.kind`: `backtest` quando a comparação começa antes do alvo do lote ou `post-target` quando começa no alvo/depois dele.
+
+Quando `availability.status` é `pending`, a API continua respondendo `200` com `items: []` e resumo zerado. Isso representa ausência temporária do resultado sincronizado, não um erro de servidor.
+
+Exemplo de resposta pendente:
+
+```json
+{
+  "targetContestNumber": 3768,
+  "startContestNumber": 3768,
+  "requestedCount": 5,
+  "availability": {
+    "status": "pending",
+    "targetContestNumber": 3768,
+    "lastAvailableContestNumber": 3767
+  },
+  "items": []
+}
+```
+
+Exemplo de backtest:
+
+```http
+GET /api/v1/game-batches/1/comparison?startContest=3760&count=5
+```
+
+Nesse caso, um lote originalmente gerado para o concurso 3768 pode ser comparado com 3760, 3761, 3762, 3763 e 3764, desde que esses concursos estejam sincronizados.
+
 ## Conferir lote
 
 ```http
@@ -291,6 +340,8 @@ Status usados neste milestone:
 - `404`: rota/recurso inexistente;
 - `413`: body acima de 1 MB;
 - `500`: erro inesperado de servidor/banco.
+
+Uma comparação sem resultados sincronizados continua sendo `200` com `availability.status = "pending"`; não é classificada como erro `500`.
 
 ## CORS
 
