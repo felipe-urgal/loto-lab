@@ -1,8 +1,10 @@
 import { parentPort, workerData } from "node:worker_threads";
-import type { Contest } from "../domain/types.js";
+import type { Contest, LotteryId } from "../domain/types.js";
+import { buildAdvancedAnalysis } from "../analysis/advanced.js";
 import { backtestMegaSena } from "../backtest/megaSena.js";
 import { backtestLotofacil } from "../backtest/lotofacil.js";
 import { backtestDiaDeSorte } from "../backtest/diaDeSorte.js";
+import { getLotteryConfig } from "../lotteries/config.js";
 import type { BacktestRoundArtifact } from "../persistence/types.js";
 import {
   compareStrategyLab,
@@ -22,7 +24,16 @@ interface StrategyLabWorkerInput {
   input: StrategyLabOptions;
 }
 
-type AnalysisWorkerInput = BacktestWorkerInput | StrategyLabWorkerInput;
+interface AdvancedAnalysisWorkerInput {
+  kind: "advanced-analysis";
+  contests: Contest[];
+  lottery: LotteryId;
+}
+
+type AnalysisWorkerInput =
+  | BacktestWorkerInput
+  | StrategyLabWorkerInput
+  | AdvancedAnalysisWorkerInput;
 
 function compactBacktestRound(round: BacktestRoundArtifact): BacktestRoundArtifact {
   const compact: BacktestRoundArtifact = { contest: round.contest };
@@ -92,9 +103,14 @@ if (!port) throw new Error("Analysis worker requires a parent port");
 
 try {
   const job = workerData as AnalysisWorkerInput;
-  const result = job.kind === "backtest"
-    ? computeBacktest(job.contests, job.input)
-    : compareStrategyLab(job.contests, job.input);
+  let result: unknown;
+  if (job.kind === "backtest") {
+    result = computeBacktest(job.contests, job.input);
+  } else if (job.kind === "strategy-lab") {
+    result = compareStrategyLab(job.contests, job.input);
+  } else {
+    result = buildAdvancedAnalysis(job.contests, getLotteryConfig(job.lottery));
+  }
   port.postMessage({ ok: true, result });
 } catch (error) {
   port.postMessage({ ok: false, error: serializeError(error) });
