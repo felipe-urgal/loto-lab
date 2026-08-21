@@ -41,8 +41,10 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.match(html, /\/assets\/ui-foundation\.css/);
   assert.doesNotMatch(html, /<script[^>]+data-status\.js/);
   assert.doesNotMatch(html, /<script[^>]+real-bets\.js/);
+  const buildVersion = html.match(/\bdata-build="([a-f0-9]{12})"/)?.[1];
+  assert.ok(buildVersion);
 
-  for (const route of ["/lab", "/ai", "/agenda"]) {
+  for (const route of ["/index.html", "/lab", "/ai", "/agenda"]) {
     const response = await fetch(`${baseUrl}${route}`);
     assert.equal(response.status, 200);
     const source = await response.text();
@@ -57,6 +59,11 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.match(shellSource, /Backtests/);
   assert.match(shellSource, /Laboratório/);
   assert.match(shellSource, /Agenda/);
+  assert.match(shellSource, /aria-label="\$\{item\.label\}"/);
+  assert.match(shellSource, /aria-label="Mais opções"/);
+  assert.match(shellSource, /aria-controls="nav-more-panel"/);
+  assert.match(shellSource, /data-agenda-nav-badge/);
+  assert.doesNotMatch(shellSource, /role="menu"/);
 
   const loader = await fetch(`${baseUrl}/assets/feature-loader.js`);
   assert.equal(loader.status, 200);
@@ -64,8 +71,11 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.match(loaderSource, /import\(asset/);
   assert.match(loaderSource, /generation-diversity/);
   assert.match(loaderSource, /my-games-management/);
+  assert.match(loaderSource, /styleLoads/);
+  assert.match(loaderSource, /loadStyledModule/);
+  assert.match(loaderSource, /addEventListener\("load"/);
 
-  const javascript = await fetch(`${baseUrl}/assets/app.js?v=test`);
+  const javascript = await fetch(`${baseUrl}/assets/app.js?v=${buildVersion}`);
   assert.equal(javascript.status, 200);
   assert.match(javascript.headers.get("content-type") ?? "", /^text\/javascript/);
   assert.match(javascript.headers.get("cache-control") ?? "", /immutable/);
@@ -73,6 +83,14 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.match(source, /\/api\/v1/);
   assert.match(source, /games\/generate/);
   assert.match(source, /backtests\/run/);
+
+  const invalidVersion = await fetch(`${baseUrl}/assets/app.js?v=stale-build`);
+  assert.equal(invalidVersion.status, 200);
+  assert.equal(invalidVersion.headers.get("cache-control"), "no-store");
+
+  const unversionedJavascript = await fetch(`${baseUrl}/assets/app.js`);
+  assert.equal(unversionedJavascript.status, 200);
+  assert.match(unversionedJavascript.headers.get("cache-control") ?? "", /max-age=300/);
 
   for (const asset of [
     "real-bets.js",
