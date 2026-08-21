@@ -124,12 +124,8 @@ export class LotoLabApiServices {
         cold: rows.filter((row) => row.tier === "cold").map((row) => row.number),
       },
       numbers: rows,
+      advanced: buildAdvancedAnalysis(contests, config),
     };
-  }
-
-  async analyzeAdvanced(lottery: LotteryId) {
-    const contests = await this.contests.list({ lottery, order: "asc" });
-    return buildAdvancedAnalysis(contests, getLotteryConfig(lottery));
   }
 
   async generate(input: GenerateGamesRequest): Promise<GenerateGamesResponse> {
