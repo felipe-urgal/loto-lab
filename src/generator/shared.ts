@@ -103,6 +103,8 @@ export function selectProfiledFixedNumbers(
   lastContest?: Contest,
   maxRepeatedFromLastContest = count,
   random?: () => number,
+  presetNumbers: number[] = [],
+  excludedNumbers: number[] = [],
 ): number[] {
   if (!Number.isInteger(count) || count < 1 || count > analysis.length) {
     throw new Error("Invalid fixed-number count");
@@ -115,7 +117,20 @@ export function selectProfiledFixedNumbers(
     throw new Error("Invalid fixed-core repeat limit");
   }
 
-  const selected = new Set<number>();
+  const available = new Set(analysis.map((row) => row.number));
+  const excluded = new Set(excludedNumbers);
+  const selected = new Set<number>(presetNumbers);
+  if (selected.size !== presetNumbers.length) throw new Error("Fixed numbers must be unique");
+  if (selected.size > count) throw new Error("Manual fixed numbers exceed the configured fixed core");
+  if ([...selected].some((number) => !available.has(number))) throw new Error("Manual fixed number is outside the lottery universe");
+  if ([...selected].some((number) => excluded.has(number))) throw new Error("A number cannot be fixed and excluded at the same time");
+  if ([...excluded].some((number) => !available.has(number))) throw new Error("Excluded number is outside the lottery universe");
+  if (lastContest) {
+    const presetRepeats = [...selected].filter((number) => lastContest.numbers.includes(number)).length;
+    if (presetRepeats > maxRepeatedFromLastContest) {
+      throw new Error("Manual fixed numbers exceed the fixed-core repeat limit");
+    }
+  }
 
   function pick(value: (row: NumberAnalysis) => number): void {
     const selectedRepeats = lastContest
@@ -123,7 +138,7 @@ export function selectProfiledFixedNumbers(
       : 0;
     const ranked = [...analysis]
       .filter((row) => {
-        if (selected.has(row.number)) return false;
+        if (selected.has(row.number) || excluded.has(row.number)) return false;
         if (!lastContest) return true;
         if (selectedRepeats < maxRepeatedFromLastContest) return true;
         return !lastContest.numbers.includes(row.number);
@@ -135,7 +150,7 @@ export function selectProfiledFixedNumbers(
     selected.add(candidate.number);
   }
 
-  pick((row) => row.year);
+  if (selected.size < count) pick((row) => row.year);
   if (selected.size < count) pick((row) => row.historical * 0.5 + row.year * 0.5);
   if (selected.size < count) pick((row) => row.recent10 * 0.6 + row.month * 0.4);
 
