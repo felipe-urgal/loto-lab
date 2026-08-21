@@ -26,8 +26,9 @@ test("UI refinement assets are lazy-loaded for the main app and served for strat
   const loader = await fetch(`${baseUrl}/assets/feature-loader.js`);
   assert.equal(loader.status, 200);
   const loaderSource = await loader.text();
-  assert.match(loaderSource, /loadStyle\("refinements"\)/);
-  assert.match(loaderSource, /loadModule\("refinements"\)/);
+  assert.match(loaderSource, /loadStyledModule\("refinements"\)/);
+  assert.match(loaderSource, /await loadStyle\(name\)/);
+  assert.match(loaderSource, /return loadModule\(name\)/);
 
   const app = await fetch(`${baseUrl}/assets/app.js`);
   assert.equal(app.status, 200);
