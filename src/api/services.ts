@@ -7,7 +7,8 @@ import type {
   NumberAnalysis,
   NumberTier,
 } from "../domain/types.js";
-import { buildAdvancedAnalysis } from "../analysis/advanced.js";
+import type { buildAdvancedAnalysis } from "../analysis/advanced.js";
+import { runAdvancedAnalysisInWorker } from "../analysis/advancedWorkerClient.js";
 import { DEFAULT_WEIGHTS } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { generateMegaSenaGames } from "../generator/megaSena.js";
@@ -47,6 +48,11 @@ export interface AnalysisResponse {
 interface AdvancedAnalysisCacheEntry {
   signature: string;
   value: AdvancedAnalysis;
+}
+
+interface AdvancedAnalysisInFlightEntry {
+  signature: string;
+  promise: Promise<AdvancedAnalysis>;
 }
 
 export class InsufficientGenerationHistoryError extends Error {
@@ -136,6 +142,7 @@ export class LotoLabApiServices {
   readonly strategies: PostgresStrategyRepository;
   readonly backtests: PostgresBacktestRepository;
   private readonly advancedAnalysisCache = new Map<LotteryId, AdvancedAnalysisCacheEntry>();
+  private readonly advancedAnalysisInFlight = new Map<LotteryId, AdvancedAnalysisInFlightEntry>();
 
   constructor(pool: Pool) {
     this.contests = new PostgresContestRepository(pool);
@@ -153,8 +160,20 @@ export class LotoLabApiServices {
     if (cached?.signature === signature) {
       advanced = cached.value;
     } else {
-      advanced = buildAdvancedAnalysis(contests, getLotteryConfig(lottery));
-      this.advancedAnalysisCache.set(lottery, { signature, value: advanced });
+      const existing = this.advancedAnalysisInFlight.get(lottery);
+      if (existing?.signature === signature) {
+        advanced = await existing.promise;
+      } else {
+        const promise = runAdvancedAnalysisInWorker(contests, lottery);
+        this.advancedAnalysisInFlight.set(lottery, { signature, promise });
+        try {
+          advanced = await promise;
+          this.advancedAnalysisCache.set(lottery, { signature, value: advanced });
+        } finally {
+          const current = this.advancedAnalysisInFlight.get(lottery);
+          if (current?.promise === promise) this.advancedAnalysisInFlight.delete(lottery);
+        }
+      }
     }
 
     return {
