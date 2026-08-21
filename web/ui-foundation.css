@@ -56,8 +56,8 @@ td { font-size: 13px; }
 .empty-state p, .error-state p { font-size: 12px; }
 
 @media (max-width: 900px) {
+  .nav-item .nav-label, .nav-link .nav-label, .nav-more .nav-label { display: none; }
   .nav-link, .nav-more { justify-content: center; padding: 0; }
-  .nav-link .nav-label, .nav-more .nav-label { display: none; }
 }
 
 @media (max-width: 680px) {
@@ -67,7 +67,7 @@ td { font-size: 13px; }
   .nav-more-menu {
     position: fixed;
     right: 10px;
-    bottom: 78px;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
     width: min(260px, calc(100vw - 20px));
     padding: 8px;
     border: 1px solid var(--border-strong);
