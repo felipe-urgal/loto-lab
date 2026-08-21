@@ -37,6 +37,7 @@ function runWorker<T>(workerData: unknown): Promise<T> {
     let settled = false;
 
     worker.once("message", (message: WorkerMessage<T>) => {
+      if (settled) return;
       settled = true;
       if (message.ok && message.result !== undefined) {
         resolve(message.result);
@@ -55,20 +56,16 @@ function runWorker<T>(workerData: unknown): Promise<T> {
       }
     });
     worker.once("exit", (code) => {
-      if (!settled && code !== 0) {
+      if (!settled) {
         settled = true;
-        reject(new Error(`Analysis worker exited with code ${code}`));
+        reject(new Error(
+          code === 0
+            ? "Analysis worker exited before returning a result"
+            : `Analysis worker exited with code ${code}`,
+        ));
       }
     });
   });
-}
-
-function compactBacktestRound(round: BacktestRoundArtifact): BacktestRoundArtifact {
-  const compact: BacktestRoundArtifact = { contest: round.contest };
-  for (const key of ["date", "targetNumbers", "hitsByGame", "bestHits", "fixedHits"] as const) {
-    if (round[key] !== undefined) compact[key] = round[key];
-  }
-  return compact;
 }
 
 function eligibleRoundCount(contests: Contest[], input: RunBacktestRequest): number {
@@ -103,7 +100,7 @@ export async function runBacktestInWorker(
     lottery: input.lottery,
     options: computed.options,
     summary: computed.summary,
-    rounds: computed.rounds.map(compactBacktestRound),
+    rounds: computed.rounds,
   });
 
   return {
