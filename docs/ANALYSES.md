@@ -6,6 +6,16 @@ A regra central permanece:
 
 > Histórico, atraso, frequência e estrutura descrevem o que aconteceu. Eles não mudam a probabilidade matemática individual de uma dezena ou combinação válida no próximo sorteio.
 
+## Benchmarks funcionais consultados
+
+A taxonomia de ferramentas foi confrontada com páginas públicas da MazuSoft para as três loterias suportadas:
+
+- Mega-Sena: <https://www.mazusoft.com.br/mega/tabelas.php>
+- Lotofácil: <https://www.mazusoft.com.br/lotofacil/tabelas.php>
+- Dia de Sorte: <https://www.mazusoft.com.br/dia-de-sorte/tabelas.php>
+
+Essas referências ajudam a mapear amplitude de exploração — frequência, ciclos, sequências/atrasos, paridade, repetição, soma, linhas/colunas, moldura, duques/trincas e visualizações binárias. O Loto Lab **não herda interpretações que transformem atraso, sequência ou frequência em aumento/diminuição da probabilidade futura**. Esses conceitos permanecem descritivos até que exista uma hipótese formal e uma validação apropriada.
+
 ## Objetivos
 
 A tela deve responder, nesta ordem:
@@ -19,23 +29,27 @@ A tela deve responder, nesta ordem:
 
 ## Qualidade do histórico
 
-Antes de interpretar métricas sequenciais, o motor verifica a continuidade dos números dos concursos.
+Antes de interpretar métricas sequenciais, o motor verifica a continuidade dos números dos concursos e também se a base começa no concurso `#1`.
 
-Se existir uma lacuna, o bloco `advanced.dataQuality` informa:
+`advanced.dataQuality` informa, entre outros campos:
 
 - quantidade de concursos ausentes;
-- transições em que existe gap;
-- quantidade de concursos do trecho contínuo mais recente.
+- últimas lacunas detectadas;
+- quantidade de concursos do trecho contínuo mais recente;
+- primeiro concurso armazenado;
+- se o histórico é **censurado à esquerda** (`leftCensored`).
 
-O motor **não atravessa uma lacuna fingindo que os dois registros armazenados eram concursos consecutivos**.
+O motor **não atravessa uma lacuna fingindo que os dois registros armazenados eram concursos consecutivos** e não trata o início de uma base parcial como se fosse o início real da loteria.
 
 Por isso:
 
 - repetição do concurso anterior vira indisponível quando o predecessor real está faltando;
+- posições há `1`, `5`, `10` e `20` concursos procuram o **número real do concurso**; se a referência estiver ausente, o movimento é `null`;
+- estabilidade recente usa apenas o trecho contínuo mais recente;
 - atrasos históricos só usam intervalos totalmente observados;
-- atraso/sequência atuais podem ficar indisponíveis quando a resposta depender de atravessar um gap;
-- ciclos são reiniciados após lacunas e o ciclo atual só é mostrado quando o seu início é conhecido;
-- o primeiro fechamento de ciclo depois de uma lacuna apenas restabelece uma fronteira conhecida e não entra na média histórica de duração;
+- atraso/sequência atuais ficam indisponíveis quando a resposta exata depender de atravessar uma lacuna ou a borda esquerda desconhecida;
+- ciclos são reiniciados após lacunas;
+- quando a base começa depois do concurso `#1`, o primeiro ciclo observado apenas restabelece uma fronteira conhecida e não é tratado como duração completa;
 - a validação rolling usa somente o trecho contínuo mais recente.
 
 A UI exibe um aviso explícito quando essas proteções estão ativas.
@@ -47,7 +61,7 @@ A UI exibe um aviso explícito quando essas proteções estão ativas.
 Mantém `strong`, `balanced` e `cold`, mas acrescenta:
 
 - posição atual;
-- posição há 1, 5, 10 e 20 concursos;
+- posição há 1, 5, 10 e 20 concursos reais;
 - movimento do ranking;
 - decomposição do score por janela;
 - frequência bruta em histórico, ano, mês, 10 e 20 concursos;
@@ -72,13 +86,15 @@ Para cada concurso são calculados, quando aplicáveis:
 - linhas e colunas da Lotofácil;
 - moldura da Lotofácil.
 
+A comparação entre **resultado atual** e **histórico observado** exclui o próprio concurso atual do resumo histórico. Assim, “histórico anterior” significa de fato concursos anteriores ao concurso de referência.
+
 Sempre que existe distribuição combinatória exata, a UI mostra:
 
 - valor atual;
-- média histórica observada;
+- média dos concursos anteriores;
 - média matematicamente esperada;
 - desvio do resultado atual;
-- percentil histórico;
+- percentil em relação ao histórico anterior;
 - distribuição teórica.
 
 Os baselines de repetição, paridade, faixa baixa e moldura usam distribuição hipergeométrica, porque o sorteio é uma amostra sem reposição.
@@ -97,12 +113,20 @@ O motor mede a cobertura combinatória exata das faixas explicitamente usadas pe
 
 A contagem do universo é feita por programação dinâmica. Nenhuma enumeração de milhões de cartões é necessária.
 
-A tela compara:
+Há **dois baselines distintos**, que não devem ser misturados:
 
-- `% do universo combinatório que passa`;
-- `% das transições históricas contínuas que passou`.
+1. **Próximo concurso · universo**: cobertura combinatória condicionada ao último concurso armazenado. Responde “qual fração dos jogos possíveis do próximo concurso passa pelas regras atuais?”.
+2. **Histórico esperado**: para cada transição contínua `N-1 → N`, o motor recalcula a cobertura combinatória condicionada ao próprio `N-1` e depois agrega esses baselines. Esse valor é comparável à taxa de transições históricas que efetivamente passaram.
 
-Sem concurso de referência, a cobertura relativa a repetição é `indisponível`, não `0%`.
+A diferença histórica exibida é:
+
+```text
+cobertura histórica observada - cobertura histórica esperada comparável
+```
+
+Ela **não** usa mais o baseline do último concurso para julgar todo o passado. Isso evita atribuir à metodologia diferenças que podem ser explicadas apenas pela composição do concurso de referência, especialmente pela interação entre repetição e paridade.
+
+Sem concurso de referência, a cobertura do próximo concurso é `indisponível`, não `0%`.
 
 Soma, linhas, colunas e outras regras sem faixa rígida definida na metodologia não entram silenciosamente neste filtro.
 
@@ -110,16 +134,16 @@ Soma, linhas, colunas e outras regras sem faixa rígida definida na metodologia 
 
 A aba mostra:
 
-- maiores altas e quedas do ranking em 10 concursos;
-- estabilidade de grupo;
+- maiores altas e quedas do ranking em relação ao concurso de número exatamente `N-10`;
+- estabilidade de grupo dentro do trecho contínuo recente;
 - atraso em contexto de percentil histórico;
 - ciclo descritivo até todas as dezenas aparecerem;
-- dezenas ainda não vistas no ciclo atual;
+- dezenas ainda não vistas no ciclo atual, quando o início do ciclo é conhecido;
 - heatmap binário dos últimos 30 concursos.
 
 `Atraso` e `ciclo` são visualizações descritivas. O sistema não converte atraso alto em aumento de probabilidade.
 
-Quando uma lacuna impede saber o valor exato, a UI mostra a métrica como indisponível em vez de assumir ausência ou zero.
+Quando uma lacuna ou o início parcial da base impede saber o valor exato, a UI mostra a métrica como indisponível em vez de assumir ausência ou zero.
 
 ### Combinações
 
@@ -142,13 +166,15 @@ O motor calcula:
 - ocorrências observadas;
 - ocorrências esperadas;
 - `lift = observado / esperado`;
-- z-score como medida de desvio padronizado;
+- z-score como medida descritiva de desvio padronizado;
 - **p-value binomial bilateral exato**;
 - p-value exato corrigido por Bonferroni.
 
 A significância **não** usa a aproximação normal para eventos raros. Isso é especialmente importante para trincas da Mega-Sena, cuja quantidade esperada por combinação pode ser pequena mesmo com milhares de concursos.
 
-A correção é importante porque procurar centenas ou milhares de combinações produz extremos por acaso. O resultado é tratado como **exploratório**, nunca como previsão automática.
+A correção de múltiplas comparações é aplicada **separadamente à família de pares e à família de trincas**. Essa separação é documentada explicitamente na UI; ambas continuam explorações e não viram regras de geração automaticamente.
+
+Com menos de **20 concursos**, associações e destaques ficam indisponíveis em vez de exibir rankings arbitrários de zeros.
 
 A tela também mostra concursos históricos mais parecidos com o atual, priorizando interseção de dezenas e usando distância estrutural como desempate.
 
@@ -176,20 +202,31 @@ A interface agrega janelas de 100, 300 e 500 rodadas e compara:
 
 A correção é Bonferroni e, portanto, deliberadamente conservadora.
 
+O p-value continua sendo calculado quando há poucos alvos, mas o produto **não classifica a evidência como fraca/moderada antes de haver pelo menos 30 alvos válidos**. A UI mostra “amostra insuficiente para classificar evidência”. Essa trava separa cálculo estatístico de interpretação de produto.
+
 Uma diferença histórica isolada não vira regra de geração. O resultado precisa ser estável entre períodos e sobreviver à incerteza estatística.
 
-## Contrato HTTP
+## Contrato HTTP e degradação graciosa
 
-O endpoint existente continua sendo:
+O contrato básico continua independente e compatível:
 
 ```http
 GET /api/v1/analysis/:lottery
 ```
 
-Os campos antigos são preservados. A resposta agora acrescenta:
+Ele retorna `latestContest`, pesos, grupos e ranking básico **sem depender do worker avançado**.
+
+O workspace Análises 2.0 usa uma rota separada:
+
+```http
+GET /api/v1/analysis/:lottery/advanced
+```
+
+A resposta contém:
 
 ```json
 {
+  "lottery": "mega-sena",
   "advanced": {
     "dataQuality": {},
     "model": {},
@@ -203,25 +240,27 @@ Os campos antigos são preservados. A resposta agora acrescenta:
 }
 ```
 
-Isso mantém compatibilidade com consumidores existentes.
+A view básica é renderizada primeiro. Se o cálculo avançado falhar, estiver ocupado ou atingir o limite operacional, a visão básica permanece utilizável e recebe apenas um aviso. Uma falha opcional não transforma Análises em uma tela totalmente indisponível.
 
 ## Lifecycle, snapshot e execução pesada
 
-A view básica continua sendo renderizada pelo shell principal. O módulo Análises 2.0 é carregado sob demanda e usa o evento explícito `loto-lab:view-rendered` para substituir a visão básica somente quando a resposta avançada está disponível.
-
-O navegador **não mantém cache permanente por loteria**. Cada render oficial consulta novamente o endpoint, evitando que uma sincronização automática no servidor deixe a tela presa ao concurso anterior.
+O navegador **não mantém cache permanente por loteria**. Cada render oficial consulta novamente a rota avançada, evitando que uma sincronização automática no servidor deixe a tela presa ao concurso anterior.
 
 No backend, Análises usa uma consulta de histórico enxuta com apenas `lottery`, número do concurso, data e dezenas. Rateios, arrecadação e demais campos financeiros não são carregados para esse caminho.
 
 A revisão analítica é identificada por **SHA-256 do conteúdo histórico relevante**. O hash inclui número do concurso, data e dezenas; por isso tanto a entrada de um novo concurso quanto uma correção retroativa invalidam o snapshot.
 
-O cálculo pesado de uma revisão nova roda em `worker_threads`, fora do event loop HTTP. Requests simultâneos para a mesma loteria e a mesma revisão compartilham a mesma Promise em andamento, evitando dois cálculos caros em paralelo durante a montagem da tela.
+O cálculo pesado de uma revisão nova roda em `worker_threads`, fora do event loop HTTP. O worker avançado possui:
 
-Depois de concluído, o snapshot fica memoizado enquanto a assinatura do histórico permanecer idêntica. O ranking/tier do contrato básico também é reaproveitado do mesmo snapshot, sem recalcular o score em cada request.
+- limite de **15 segundos**;
+- término explícito com `worker.terminate()` em timeout;
+- limites de memória do worker;
+- memoização por revisão do histórico;
+- deduplicação interna de execuções em andamento para a mesma loteria/revisão.
 
-Se a montagem avançada falhar, a visão básica já renderizada é preservada e recebe apenas um aviso de fallback. Uma falha opcional não transforma uma tela utilizável em uma tela totalmente indisponível.
+Depois de concluído, o snapshot fica memoizado enquanto a assinatura do histórico permanecer idêntica.
 
-## Acessibilidade
+## Acessibilidade e lifecycle do detalhe
 
 As cinco áreas usam semântica de `tablist/tab/tabpanel` e suportam:
 
@@ -229,9 +268,15 @@ As cinco áreas usam semântica de `tablist/tab/tabpanel` e suportam:
 - `Home`/`End`;
 - foco visível.
 
-O detalhe da dezena usa semântica de diálogo modal, recebe foco ao abrir, fecha com `Escape`, mantém o foco dentro do painel com `Tab` e devolve o foco ao elemento que abriu o detalhe.
+O detalhe da dezena usa `<dialog>` aberto com `showModal()`. Assim o conteúdo externo fica modal/inativo pela própria plataforma do navegador. O painel:
 
-O Chrome E2E valida a área tanto em desktop quanto em viewport móvel de `390×844`, incluindo abertura e fechamento do drawer.
+- recebe foco ao abrir;
+- fecha com `Escape` ou botão explícito;
+- devolve o foco ao elemento de origem quando aplicável;
+- remove o scroll lock mesmo se o usuário navegar para outra tela sem fechar o drawer manualmente;
+- possui backdrop próprio e ocupa no máximo a viewport em mobile.
+
+O Chrome E2E valida a área tanto em desktop quanto em viewport móvel de `390×844`, inclusive o cenário de **navegar para fora de Análises com o diálogo ainda aberto**.
 
 ## Interpretação correta
 
@@ -240,8 +285,9 @@ O Loto Lab deve ser capaz de dizer explicitamente:
 - `dentro do esperado`;
 - `fora do centro histórico, mas matematicamente natural`;
 - `sinal exploratório que não sobrevive à correção`;
+- `amostra insuficiente para classificar evidência`;
 - `diferença que merece investigação fora da amostra`;
 - `nenhuma separação estatisticamente relevante detectada`;
-- `histórico insuficiente ou descontínuo para esta métrica`.
+- `histórico insuficiente, descontínuo ou censurado para esta métrica`.
 
 Essas respostas são preferíveis a rótulos como “está para sair”, “garantida”, “dupla quente” ou “atrasada com maior chance”.
