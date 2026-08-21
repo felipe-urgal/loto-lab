@@ -282,8 +282,8 @@ try {
   for (const check of pageChecks) {
     await navigate(client, check.path);
     await waitFor(client, check.ready, `${check.path} shell`);
-    await waitFor(client, `document.body.innerText.includes(${JSON.stringify(check.required[0])})`, `${check.path} localization`);
-    const bodyText = await evaluate(client, "document.body.innerText");
+    await waitFor(client, `(document.body.textContent || '').includes(${JSON.stringify(check.required[0])})`, `${check.path} localization`);
+    const bodyText = await evaluate(client, "document.body.textContent || ''");
     for (const expected of check.required) assert(bodyText.includes(expected), `${check.path} is missing translated text: ${expected}`);
     for (const forbidden of check.forbidden) assert(!bodyText.includes(forbidden), `${check.path} still exposes English text: ${forbidden}`);
   }
