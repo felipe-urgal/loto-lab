@@ -1,4 +1,5 @@
-const API = "/api/v1";
+import { api, escapeHtml, formatDateTime, formatPercent, toast } from "./runtime.js";
+
 const LABELS = {
   "mega-sena": "Mega-Sena",
   lotofacil: "Lotofácil",
@@ -24,52 +25,10 @@ const listRoot = document.querySelector("#jobs-list");
 const countRoot = document.querySelector("#jobs-count");
 
 let strategies = [];
+let selectedHistoricalVersion;
 let jobs = [];
 let pollTimer;
 let loadToken = 0;
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function formatDate(value) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
-}
-
-function formatPercent(value) {
-  return typeof value === "number" && Number.isFinite(value)
-    ? `${(value * 100).toFixed(1).replace(".", ",")}%`
-    : "—";
-}
-
-function toast(message, type = "info") {
-  const root = document.querySelector("#toast-root");
-  const item = document.createElement("div");
-  item.className = `toast ${type === "error" ? "error" : ""}`;
-  item.textContent = message;
-  root.append(item);
-  window.setTimeout(() => item.remove(), 3600);
-}
-
-async function api(path, options = {}) {
-  const response = await fetch(`${API}${path}`, {
-    ...options,
-    headers: options.body ? { "Content-Type": "application/json", ...(options.headers || {}) } : options.headers,
-  });
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = new Error(payload?.error?.message || `Erro HTTP ${response.status}`);
-    error.code = payload?.error?.code || "HTTP_ERROR";
-    throw error;
-  }
-  return payload;
-}
 
 function syncFields() {
   const isLab = kind.value === "strategy-lab";
@@ -81,8 +40,7 @@ function syncFields() {
   if (lottery.value !== "mega-sena" && experiment.value === "external-rules") experiment.value = "fixed-core";
 }
 
-function applyStrategy(strategy) {
-  const config = strategy?.config || {};
+function applyConfig(config = {}) {
   games.value = config.gameCount ?? games.value;
   warmup.value = config.warmupContests ?? warmup.value;
   fixed.value = config.fixedCount ?? fixed.value;
@@ -93,19 +51,37 @@ function applyStrategy(strategy) {
 }
 
 async function loadStrategies(preferredVersionId) {
+  selectedHistoricalVersion = undefined;
   try {
     const data = await api(`/strategies?lottery=${encodeURIComponent(lottery.value)}`);
     strategies = data.items || [];
     strategySelect.innerHTML = '<option value="">Configuração manual</option>' + strategies.map((strategy) =>
       `<option value="${strategy.latestVersionId}">${escapeHtml(strategy.name)} · v${strategy.version} (#${strategy.latestVersionId})</option>`,
     ).join("");
-    if (preferredVersionId && [...strategySelect.options].some((option) => option.value === String(preferredVersionId))) {
-      strategySelect.value = String(preferredVersionId);
+
+    if (preferredVersionId) {
+      const preferred = String(preferredVersionId);
+      if ([...strategySelect.options].some((option) => option.value === preferred)) {
+        strategySelect.value = preferred;
+      } else {
+        const historical = await api(`/strategy-versions/${encodeURIComponent(preferred)}`);
+        if (historical.strategy?.lottery === lottery.value) {
+          selectedHistoricalVersion = historical;
+          const option = document.createElement("option");
+          option.value = String(historical.id);
+          option.textContent = `${historical.strategy.name} · v${historical.version} (#${historical.id})`;
+          strategySelect.append(option);
+          strategySelect.value = option.value;
+        }
+      }
     }
-    const selected = strategies.find((item) => item.latestVersionId === Number(strategySelect.value));
-    if (selected) applyStrategy(selected);
+
+    const latest = strategies.find((item) => item.latestVersionId === Number(strategySelect.value));
+    if (latest) applyConfig(latest.config);
+    else if (selectedHistoricalVersion?.id === Number(strategySelect.value)) applyConfig(selectedHistoricalVersion.config);
   } catch (error) {
     strategies = [];
+    selectedHistoricalVersion = undefined;
     strategySelect.innerHTML = '<option value="">Estratégias indisponíveis</option>';
     toast(error.message, "error");
   }
@@ -140,15 +116,15 @@ function renderJobs() {
     return `
       <article class="panel experiment-card" data-job-id="${job.id}">
         <div class="experiment-card-head">
-          <div><h3>#${job.id} · ${job.kind === "backtest" ? "Backtest" : "Laboratório"}</h3><p>${escapeHtml(LABELS[job.lottery])} · criada ${escapeHtml(formatDate(job.createdAt))}</p></div>
+          <div><h3>#${job.id} · ${job.kind === "backtest" ? "Backtest" : "Laboratório"}</h3><p>${escapeHtml(LABELS[job.lottery])} · criada ${escapeHtml(formatDateTime(job.createdAt))}</p></div>
           <span class="status-pill ${job.status}">${escapeHtml(job.status)}</span>
         </div>
         <div class="experiment-meta">
           ${strategyVersionId ? `<span>estratégia #${strategyVersionId}</span>` : ""}
           <span>${job.input?.gameCount ?? "—"} jogos</span>
           <span>warmup ${job.input?.warmupContests ?? "—"}</span>
-          ${job.startedAt ? `<span>início ${escapeHtml(formatDate(job.startedAt))}</span>` : ""}
-          ${job.finishedAt ? `<span>fim ${escapeHtml(formatDate(job.finishedAt))}</span>` : ""}
+          ${job.startedAt ? `<span>início ${escapeHtml(formatDateTime(job.startedAt))}</span>` : ""}
+          ${job.finishedAt ? `<span>fim ${escapeHtml(formatDateTime(job.finishedAt))}</span>` : ""}
         </div>
         ${jobResult(job)}
         ${canCancel ? `<div class="experiment-card-actions"><button class="button compact danger" type="button" data-cancel-job="${job.id}">Cancelar</button></div>` : ""}
@@ -227,7 +203,8 @@ listRoot.addEventListener("click", async (event) => {
 
 strategySelect.addEventListener("change", () => {
   const selected = strategies.find((item) => item.latestVersionId === Number(strategySelect.value));
-  if (selected) applyStrategy(selected);
+  if (selected) applyConfig(selected.config);
+  else if (selectedHistoricalVersion?.id === Number(strategySelect.value)) applyConfig(selectedHistoricalVersion.config);
 });
 kind.addEventListener("change", syncFields);
 lottery.addEventListener("change", async () => {
