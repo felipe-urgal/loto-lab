@@ -2,6 +2,7 @@ import { api, escapeHtml, onViewRendered } from "./runtime.js";
 
 const root = document.querySelector("#content");
 const lotterySelect = document.querySelector("#lottery-select");
+const viewSubtitle = document.querySelector("#view-subtitle");
 const ACTIVE_TAB_KEY = "loto-lab:analysis-v2-tab";
 const TABS = ["ranking", "structure", "dynamics", "combinations", "validation"];
 const TAB_LABELS = {
@@ -15,9 +16,8 @@ const TIER_LABELS = { strong: "Fortes", balanced: "Intermediárias", cold: "Fria
 const cache = new Map();
 let renderToken = 0;
 let currentData;
-let activeTab = TABS.includes(localStorage.getItem(ACTIVE_TAB_KEY))
-  ? localStorage.getItem(ACTIVE_TAB_KEY)
-  : "ranking";
+const savedTab = localStorage.getItem(ACTIVE_TAB_KEY);
+let activeTab = TABS.includes(savedTab) ? savedTab : "ranking";
 
 function currentView() {
   return location.hash.replace("#", "") || "dashboard";
@@ -133,7 +133,7 @@ function rankingView(data) {
     <section><div class="section-head"><div><h2>Classificação das dezenas</h2><p>Clique em uma dezena para abrir score, frequência, atraso, tendência e robustez.</p></div></div><div class="a2-tier-list">${tierSections}</div></section>
     <section class="panel a2-compare-panel">
       <div class="a2-panel-head"><div><strong>Comparar dezenas</strong><span>Entenda por que duas dezenas ocupam posições diferentes.</span></div></div>
-      <div class="a2-compare-controls"><select data-a2-compare-a>${options}</select><select data-a2-compare-b>${options.replace('value="1"', 'value="1"')}</select><button class="button compact" type="button" data-a2-compare>Comparar</button></div>
+      <div class="a2-compare-controls"><select data-a2-compare-a>${options}</select><select data-a2-compare-b>${options}</select><button class="button compact" type="button" data-a2-compare>Comparar</button></div>
       <div data-a2-compare-result></div>
     </section>
     <section><div class="section-head"><div><h2>Ranking auditável</h2><p>Movimento usa a posição de 10 concursos atrás; robustez perturba todos os pesos em ±10%.</p></div></div>
@@ -186,7 +186,7 @@ function structureView(data) {
     <section><div class="section-head"><div><h2>Validador da estrutura metodológica</h2><p>Quanto as regras explícitas de repetição + paridade reduzem o universo e quanto preservaram resultados históricos.</p></div></div>
       <article class="panel a2-filter-validation">
         <div class="a2-filter-rules"><span>Repetidas <strong>${filter.rules.repeated.min}–${filter.rules.repeated.max}</strong>${filter.rules.repeated.preferredMin !== undefined ? `<small>preferencial ${filter.rules.repeated.preferredMin}–${filter.rules.repeated.preferredMax}</small>` : ""}</span><span>Ímpares <strong>${filter.rules.odd.min}–${filter.rules.odd.max}</strong></span></div>
-        <div class="a2-filter-numbers"><span><small>Universo que passa</small><strong>${percent(filter.exactUniverse.coverage)}</strong><em>${filter.exactUniverse.passing.toLocaleString("pt-BR")} / ${filter.exactUniverse.total.toLocaleString("pt-BR")}</em></span><span><small>Histórico que passou</small><strong>${percent(filter.historical.coverage)}</strong><em>${filter.historical.passing.toLocaleString("pt-BR")} / ${filter.historical.total.toLocaleString("pt-BR")}</em></span><span><small>Diferença</small><strong>${signed(filter.historical.coverage - filter.exactUniverse.coverage, " p.p.").replace("p.p.", "")}</strong><em>histórico − universo</em></span></div>
+        <div class="a2-filter-numbers"><span><small>Universo que passa</small><strong>${percent(filter.exactUniverse.coverage)}</strong><em>${filter.exactUniverse.passing.toLocaleString("pt-BR")} / ${filter.exactUniverse.total.toLocaleString("pt-BR")}</em></span><span><small>Histórico que passou</small><strong>${percent(filter.historical.coverage)}</strong><em>${filter.historical.passing.toLocaleString("pt-BR")} / ${filter.historical.total.toLocaleString("pt-BR")}</em></span><span><small>Diferença</small><strong>${signed((filter.historical.coverage - filter.exactUniverse.coverage) * 100, " p.p.")}</strong><em>histórico − universo</em></span></div>
         <p>${escapeHtml(filter.note)}</p>
       </article>
     </section>
@@ -201,10 +201,11 @@ function moverList(items, direction) {
 function heatmap(data) {
   const rows = data.advanced.dynamics.heatmap || [];
   if (!rows.length) return '<div class="a2-empty">Sem concursos suficientes.</div>';
-  const max = Math.max(...rows.flatMap((row) => row.numbers));
-  const min = Math.min(...rows.flatMap((row) => row.numbers));
-  const universe = Array.from({ length: max - min + 1 }, (_, index) => min + index);
-  return `<div class="a2-heatmap-wrap"><div class="a2-heatmap" style="--a2-columns:${universe.length + 1}"><div class="a2-heat-corner">#</div>${universe.map((value) => `<div class="a2-heat-head">${number(value)}</div>`).join("")}${[...rows].reverse().map((row) => { const set = new Set(row.numbers); return `<div class="a2-heat-contest">${row.contest}</div>${universe.map((value) => `<div class="a2-heat-cell ${set.has(value) ? "is-hit" : ""}" title="#${row.contest} · ${number(value)}"></div>`).join("")}`; }).join("")}</div></div>`;
+  const universe = [...data.advanced.ranking.dynamics.items]
+    .map((item) => item.number)
+    .sort((a, b) => a - b);
+  const columns = `54px repeat(${universe.length}, 18px)`;
+  return `<div class="a2-heatmap-wrap"><div class="a2-heatmap" style="grid-template-columns:${columns}"><div class="a2-heat-corner">#</div>${universe.map((value) => `<div class="a2-heat-head">${number(value)}</div>`).join("")}${[...rows].reverse().map((row) => { const set = new Set(row.numbers); return `<div class="a2-heat-contest">${row.contest}</div>${universe.map((value) => `<div class="a2-heat-cell ${set.has(value) ? "is-hit" : ""}" title="#${row.contest} · ${number(value)}"></div>`).join("")}`; }).join("")}</div></div>`;
 }
 
 function dynamicsView(data) {
@@ -335,13 +336,25 @@ function pairCheck() {
   target.innerHTML = `<div class="a2-pair-stat"><strong>${number(a)} + ${number(b)}</strong><span><small>observado</small><b>${pair.observed}</b></span><span><small>esperado</small><b>${decimal(pair.expected)}</b></span><span><small>lift</small><b>${decimal(pair.lift, 2)}×</b></span><span><small>z-score</small><b>${decimal(pair.zScore, 2)}</b></span><em class="evidence-${pair.evidence}">${evidenceCopy(pair.evidence)} · p ajustado ${decimal(pair.adjustedPValue, 4)}</em></div>`;
 }
 
+function chooseDistinctDefaults(firstSelector, secondSelector) {
+  const first = root.querySelector(firstSelector);
+  const second = root.querySelector(secondSelector);
+  if (!first || !second || second.options.length < 2) return;
+  if (first.value === second.value) second.selectedIndex = 1;
+}
+
 function bindTabInteractions() {
   root.querySelectorAll("[data-a2-number]").forEach((node) => {
     node.addEventListener("click", () => openNumberDetail(node.dataset.a2Number));
     node.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") openNumberDetail(node.dataset.a2Number);
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openNumberDetail(node.dataset.a2Number);
+      }
     });
   });
+  chooseDistinctDefaults("[data-a2-compare-a]", "[data-a2-compare-b]");
+  chooseDistinctDefaults("[data-a2-pair-a]", "[data-a2-pair-b]");
   root.querySelector("[data-a2-compare]")?.addEventListener("click", compareNumbers);
   root.querySelector("[data-a2-pair-check]")?.addEventListener("click", pairCheck);
   root.querySelector("[data-a2-validation-window]")?.addEventListener("change", (event) => {
@@ -374,6 +387,7 @@ async function renderAnalysisV2(force = false) {
     if (token !== renderToken || currentView() !== "analysis" || currentLottery() !== lottery) return;
     if (!data.advanced) return;
     currentData = data;
+    if (viewSubtitle) viewSubtitle.textContent = "Ranking, estrutura, dinâmica, combinações e validação estatística.";
     root.innerHTML = shellMarkup(data);
     bindShellInteractions();
     renderTab();
