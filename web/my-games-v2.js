@@ -335,7 +335,7 @@ function comparisonContestMarkup(batch, item, index) {
 
 function comparisonPanelMarkup(batch, result, count) {
   const summary = result.summary || {};
-  const minimum = Number(result.scope?.minimumContestNumber || 1);
+  const minimum = 1;
   const counts = [3, 5, 10, 20];
   const hasItems = (result.items || []).length > 0;
   return `<section class="mg2-comparison" data-mg2-comparison>
@@ -347,7 +347,7 @@ function comparisonPanelMarkup(batch, result, count) {
       <button class="button ghost" type="button" data-mg2-close-comparison>Fechar</button>
     </div>
     <div class="mg2-comparison-controls">
-      <label><span>A partir do concurso</span><input type="number" min="${minimum}" value="${result.startContestNumber}" data-mg2-compare-start /></label>
+      <label><span>A partir do concurso</span><input type="number" min="${minimum}" step="1" value="${result.startContestNumber}" data-mg2-compare-start /></label>
       <div class="mg2-counts" role="group" aria-label="Quantidade de concursos">
         ${counts.map((value) => `<button type="button" class="mg2-count ${count === value ? "is-active" : ""}" data-mg2-compare-count="${value}" aria-pressed="${count === value}">${value}</button>`).join("")}
       </div>
