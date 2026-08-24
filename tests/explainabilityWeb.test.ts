@@ -26,15 +26,25 @@ test("Generator explainability layer exposes the five-step flow and methodology 
   assert.match(css, /g2-education-grid/);
 });
 
-test("Strategy Lab UI exposes score-model, random distribution and predictive validation", async () => {
+test("Strategy Lab UI exposes score-model, inference resolution and predictive validation", async () => {
   const html = await source("web/lab.html");
   const javascript = await source("web/lab.js");
 
   assert.match(html, /Controles aleatórios/);
-  assert.match(html, /Como interpretar/);
+  assert.match(html, /mínimo prático \(3 variantes\)/);
+  assert.match(html, /mínimo prático \(9 variantes\)/);
+  assert.match(html, /Resolução insuficiente/);
+  assert.match(html, /Amostra histórica pequena/);
   assert.match(html, /lab-v2\.css/);
   assert.match(javascript, /score-model/);
   assert.match(javascript, /Score v1 × Score v2 × sem score/);
+  assert.match(javascript, /minimumPracticalRandomSamples/);
+  assert.match(javascript, /insufficient-resolution/);
+  assert.match(javascript, /insufficient-sample/);
+  assert.match(javascript, /minimumRandomSamples/);
+  assert.match(javascript, /minimumObservationRounds/);
+  assert.match(javascript, /amostra próxima da mediana/);
+  assert.match(javascript, /EMPTY_PERIOD/);
   assert.match(javascript, /distribution\.p05/);
   assert.match(javascript, /distribution\.p50/);
   assert.match(javascript, /distribution\.p95/);
