@@ -118,3 +118,189 @@ Detalhes em [`docs/STRATEGY_LAB.md`](docs/STRATEGY_LAB.md).
 npm install
 cp .env.example .env
 ```
+
+O `.env.example` já aponta para o PostgreSQL do compose em `localhost:5433`.
+
+## Primeira carga local
+
+```bash
+docker compose up -d postgres
+npm run db:migrate
+npm run db:bootstrap
+npm run db:status
+```
+
+O bootstrap pode ser interrompido e executado novamente. Concursos já armazenados são pulados.
+
+## Rodar a aplicação
+
+```bash
+npm run api:start
+```
+
+Aplicação:
+
+```text
+http://127.0.0.1:3000
+```
+
+Laboratório:
+
+```text
+http://127.0.0.1:3000/lab
+```
+
+API:
+
+```text
+http://127.0.0.1:3000/api/v1
+```
+
+Health check:
+
+```bash
+curl http://127.0.0.1:3000/health/ready
+```
+
+## Testes
+
+```bash
+npm test
+```
+
+`npm test` propositalmente não carrega `.env` automaticamente, pois testes de integração podem limpar tabelas. No CI, um PostgreSQL isolado é iniciado automaticamente.
+
+## Build
+
+```bash
+npm run build
+```
+
+## Operação dos dados
+
+Carga histórica completa das três loterias:
+
+```bash
+npm run db:bootstrap
+```
+
+Uma loteria:
+
+```bash
+npm run db:bootstrap -- mega-sena
+```
+
+Status:
+
+```bash
+npm run db:status
+```
+
+Sync apenas do último concurso:
+
+```bash
+npm run db:sync -- mega-sena
+npm run db:sync -- lotofacil
+npm run db:sync -- dia-de-sorte
+```
+
+Detalhes em [`docs/DATA_OPERATIONS.md`](docs/DATA_OPERATIONS.md).
+
+## API HTTP
+
+Endpoints principais:
+
+```text
+GET  /api/v1/data/status
+GET  /api/v1/lotteries
+GET  /api/v1/contests/:lottery
+GET  /api/v1/contests/:lottery/latest
+GET  /api/v1/analysis/:lottery
+POST /api/v1/games/generate
+POST /api/v1/games/check
+GET  /api/v1/game-batches/:lottery
+GET  /api/v1/strategies
+POST /api/v1/strategies
+POST /api/v1/backtests/run
+GET  /api/v1/backtests/:lottery
+GET  /api/v1/backtest-runs/:id
+POST /api/v1/lab/compare
+```
+
+## CLI de geração e conferência
+
+```bash
+npm run games:generate -- mega-sena data/contests.json 2
+npm run games:generate -- lotofacil data/contests.json 4 8
+npm run games:generate -- dia-de-sorte data/contests.json 4
+npm run games:check -- data/games.json data/contests.json 3767
+```
+
+## Backtests por CLI
+
+```bash
+npm run backtest:mega -- data/contests.json 2 20 2500 3047
+npm run backtest:lotofacil -- data/contests.json 4 8 20 3500 3767
+npm run backtest:dia -- data/contests.json 4 20 1000 1277
+npm run backtest:compare -- data/contests.json 4 20 3500 3767
+```
+
+## Métricas financeiras
+
+- `totalCost`: custo de todos os jogos simulados;
+- `financialCost`: custo dos jogos com rateio disponível;
+- `totalPrizeValue`: soma dos prêmios reais conhecidos;
+- `financialCoverage`: proporção de jogos com dados financeiros;
+- `netResult`: prêmio menos custo coberto;
+- `returnRate`: prêmio / custo coberto;
+- `roi`: `(prêmio - custo coberto) / custo coberto`.
+
+## Regra anti-leakage
+
+Ao testar o concurso `N`, o gerador recebe **somente os concursos anteriores a N**. O resultado do próprio concurso e todos os concursos futuros ficam invisíveis para o algoritmo.
+
+Essa regra vale para backtests tradicionais e para todas as variantes do Laboratório.
+
+## Estrutura
+
+```text
+db/
+└── migrations/
+
+web/
+├── index.html
+├── app.js
+├── styles.css
+├── lab.html
+├── lab.js
+├── lab.css
+└── favicon.svg
+
+src/
+├── analysis/
+├── api/
+├── backtest/
+├── checker/
+├── cli/
+├── data/
+├── db/
+├── domain/
+├── finance/
+├── generator/
+├── lab/
+├── lotteries/
+├── persistence/
+└── index.ts
+```
+
+## Próximos milestones
+
+1. tracking de apostas efetivamente realizadas;
+2. atualização/conferência automática pós-sorteio;
+3. estratégias configuráveis pela interface;
+4. execução assíncrona de experimentos longos;
+5. camada de interpretação por IA.
+
+## Aviso
+
+O projeto organiza e mede estratégias de composição de jogos. Ele não garante prêmio, não prevê sorteios e não altera a probabilidade matemática individual de uma combinação válida.
