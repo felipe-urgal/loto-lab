@@ -5,6 +5,7 @@ import { getLotteryConfig } from "../src/lotteries/config.js";
 import { evaluateRankingQuality } from "../src/analysis/rankQuality.js";
 import { evaluateWalkForwardWeights } from "../src/analysis/walkForward.js";
 import { pairedSignFlipNull } from "../src/analysis/nullSimulation.js";
+import { backtestMegaSena } from "../src/backtest/megaSena.js";
 
 function megaHistory(count: number): Contest[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -39,8 +40,20 @@ test("ranking quality does not leak contests after the requested evaluation peri
   assert.deepEqual(first, second);
 });
 
-test("walk-forward freezes tuned weights inside each future block and exposes a null benchmark", () => {
-  const result = evaluateWalkForwardWeights(megaHistory(150), getLotteryConfig("mega-sena"), {
+test("ranking quality limits the actual evaluation work to maxRounds", () => {
+  const result = evaluateRankingQuality(megaHistory(120), getLotteryConfig("mega-sena"), {
+    model: "score-v2",
+    warmupContests: 20,
+    maxRounds: 7,
+  });
+
+  assert.equal(result.rounds, 7);
+  assert.equal(result.series.length, 7);
+  assert.equal(result.series[0]?.contest, 114);
+});
+
+test("walk-forward freezes tuned weights inside each future block and exposes a weighted null benchmark", () => {
+  const result = evaluateWalkForwardWeights(megaHistory(155), getLotteryConfig("mega-sena"), {
     warmupContests: 20,
     trainingWindow: 50,
     validationBlock: 20,
@@ -54,10 +67,55 @@ test("walk-forward freezes tuned weights inside each future block and exposes a 
   assert.equal(result.nullBenchmark.samples, 500);
   assert.ok(result.nullBenchmark.p05 <= result.nullBenchmark.p50);
   assert.ok(result.nullBenchmark.p50 <= result.nullBenchmark.p95);
+  assert.ok(Math.abs(result.nullBenchmark.observed - result.deltaVsDefault) <= 0.000001);
 });
 
-test("paired sign-flip null simulation is deterministic", () => {
-  const first = pairedSignFlipNull([0.01, -0.02, 0.03, 0.01], 400, "same-seed");
-  const second = pairedSignFlipNull([0.01, -0.02, 0.03, 0.01], 400, "same-seed");
+test("walk-forward does not use contests after endContest", () => {
+  const original = megaHistory(150);
+  const mutated = original.map((contest) => contest.number > 110
+    ? { ...contest, numbers: [1, 2, 3, 4, 5, 6] }
+    : contest);
+  const options = {
+    warmupContests: 20,
+    trainingWindow: 50,
+    validationBlock: 10,
+    nullSamples: 200,
+    startContest: 80,
+    endContest: 110,
+  };
+
+  const first = evaluateWalkForwardWeights(original, getLotteryConfig("mega-sena"), options);
+  const second = evaluateWalkForwardWeights(mutated, getLotteryConfig("mega-sena"), options);
   assert.deepEqual(first, second);
+  assert.ok(first.folds.every((fold) => fold.testEndContest <= 110));
+});
+
+test("targets whose immediate predecessor is missing are skipped consistently", () => {
+  const history = megaHistory(60).filter((contest) => contest.number !== 50);
+  const quality = evaluateRankingQuality(history, getLotteryConfig("mega-sena"), {
+    model: "score-v2",
+    warmupContests: 20,
+    startContest: 48,
+    endContest: 53,
+    maxRounds: 0,
+  });
+  const backtest = backtestMegaSena(history, {
+    gameCount: 1,
+    warmupContests: 20,
+    startContest: 48,
+    endContest: 53,
+  });
+
+  assert.ok(!quality.series.some((round) => round.contest === 51));
+  assert.ok(!backtest.rounds.some((round) => round.contest === 51));
+  assert.ok(quality.series.some((round) => round.contest === 52));
+  assert.ok(backtest.rounds.some((round) => round.contest === 52));
+});
+
+test("paired sign-flip null simulation is deterministic and honors weights", () => {
+  const first = pairedSignFlipNull([0.1, -0.1], 400, "same-seed", [9, 1]);
+  const second = pairedSignFlipNull([0.1, -0.1], 400, "same-seed", [9, 1]);
+
+  assert.deepEqual(first, second);
+  assert.equal(first.observed, 0.08);
 });
