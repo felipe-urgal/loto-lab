@@ -2,7 +2,7 @@ import type { AnalysisModel, Contest, GeneratedGame } from "../domain/types.js";
 import { buildNumberAnalysis } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
-import { selectPortfolioCandidates } from "./portfolio.js";
+import { buildPortfolioShortlist, selectPortfolioCandidates } from "./portfolio.js";
 import {
   buildMetadata,
   combinationIterator,
@@ -111,11 +111,17 @@ export function generateLotofacilGames(
       }
     };
 
-    return topRankedCandidates(
-      candidates(),
-      24,
-      (a, b) => b.rank - a.rank || (a.tieKey ?? a.numbers.join("-")).localeCompare(b.tieKey ?? b.numbers.join("-")),
-    );
+    if (gameCount === 1) {
+      return topRankedCandidates(
+        candidates(),
+        24,
+        (a, b) => b.rank - a.rank || (a.tieKey ?? a.numbers.join("-")).localeCompare(b.tieKey ?? b.numbers.join("-")),
+      );
+    }
+    return buildPortfolioShortlist(candidates(), 24, {
+      explorationLimit: 4096,
+      diversityPenalty: policy.variableReusePenalty,
+    });
   });
 
   const portfolio = selectPortfolioCandidates(candidateGroups, generationMode, random, {
