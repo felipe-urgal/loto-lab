@@ -15,14 +15,26 @@ import {
 } from "./http.js";
 import { enforceRateLimit, FixedWindowRateLimiter } from "./rateLimit.js";
 import { expensiveAnalysisGate } from "./workGate.js";
-import { runStrategyLabInWorker } from "./workerClient.js";
+import { AnalysisCancelledError, runStrategyLabInWorker } from "./workerClient.js";
 
 const labLimiter = new FixedWindowRateLimiter({ limit: 4, windowMs: 10 * 60_000 });
+const STRATEGY_LAB_TIMEOUT_MS = 60_000;
+const MAX_ESTIMATED_LAB_GAME_EVALUATIONS = 750_000;
 
 function parseExperiment(value: unknown): StrategyLabExperiment {
   if (value === undefined || value === null || value === "") return "fixed-core";
   if (value === "fixed-core" || value === "external-rules" || value === "score-model") return value;
   throw new ApiError(400, "INVALID_ARGUMENT", "experiment must be fixed-core, external-rules or score-model");
+}
+
+function estimateLabGameEvaluations(
+  experiment: StrategyLabExperiment,
+  lookbackContests: number,
+  gameCount: number,
+  randomSamples: number,
+): number {
+  const strategyVariants = experiment === "external-rules" ? 9 : 3;
+  return lookbackContests * gameCount * (randomSamples + strategyVariants + 2);
 }
 
 export async function serveStrategyLab(
@@ -76,6 +88,20 @@ export async function serveStrategyLab(
       throw new ApiError(400, "INVALID_ARGUMENT", "startContest must be less than or equal to endContest");
     }
 
+    const estimatedGameEvaluations = estimateLabGameEvaluations(
+      experiment,
+      lookbackContests,
+      gameCount,
+      randomSamples,
+    );
+    if (estimatedGameEvaluations > MAX_ESTIMATED_LAB_GAME_EVALUATIONS) {
+      throw new ApiError(
+        400,
+        "ANALYSIS_TOO_LARGE",
+        "Requested Strategy Lab run is too large. Reduce contests, games per contest, or random controls.",
+      );
+    }
+
     const release = expensiveAnalysisGate.acquire();
     if (!release) {
       throw new ApiError(429, "ANALYSIS_BUSY", "Another backtest or Strategy Lab analysis is already running");
@@ -106,18 +132,46 @@ export async function serveStrategyLab(
         ...(startContest !== undefined ? { startContest } : {}),
         ...(endContest !== undefined ? { endContest } : {}),
       };
-      const result = await runStrategyLabInWorker(contests, workerInput);
 
-      sendJson(response, 200, result, corsOrigin);
-      return true;
+      const controller = new AbortController();
+      let timedOut = false;
+      const timeout = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, STRATEGY_LAB_TIMEOUT_MS);
+      timeout.unref?.();
+      const abortWorker = () => controller.abort();
+      request.once("aborted", abortWorker);
+      response.once("close", abortWorker);
+
+      try {
+        const result = await runStrategyLabInWorker(contests, workerInput, controller.signal);
+        if (response.destroyed || response.writableEnded) return true;
+        sendJson(response, 200, result, corsOrigin);
+        return true;
+      } catch (error) {
+        if (error instanceof AnalysisCancelledError) {
+          if (timedOut) {
+            throw new ApiError(504, "ANALYSIS_TIMEOUT", "Strategy Lab exceeded the 60 second execution limit");
+          }
+          if (request.destroyed || response.destroyed) return true;
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+        request.off("aborted", abortWorker);
+        response.off("close", abortWorker);
+      }
     } finally {
       release();
     }
   } catch (error) {
     if (error instanceof ApiError) {
-      sendJson(response, error.statusCode, {
-        error: { code: error.code, message: error.message },
-      }, corsOrigin);
+      if (!response.destroyed && !response.writableEnded) {
+        sendJson(response, error.statusCode, {
+          error: { code: error.code, message: error.message },
+        }, corsOrigin);
+      }
       return true;
     }
     throw error;
