@@ -12,6 +12,7 @@ import {
   runStrategyLabInWorker,
 } from "../api/workerClient.js";
 import { expensiveAnalysisGate } from "../api/workGate.js";
+import { logEvent } from "../observability/log.js";
 
 const managers = new WeakMap<Pool, AnalysisJobManager>();
 
@@ -53,6 +54,7 @@ export class AnalysisJobManager {
 
   async enqueue(kind: AnalysisJobKind, lottery: AnalysisJobRecord["lottery"], input: Record<string, unknown>): Promise<AnalysisJobRecord> {
     const job = await this.repository.create(kind, lottery, input);
+    logEvent("info", "analysis_job_enqueued", { jobId: job.id, kind, lottery });
     this.kick();
     return job;
   }
@@ -63,6 +65,7 @@ export class AnalysisJobManager {
       this.explicitCancels.add(id);
       this.activeControllers.get(id)?.abort();
     }
+    if (job) logEvent("info", "analysis_job_cancel_requested", { jobId: id, status: job.status });
     return job;
   }
 
@@ -102,7 +105,7 @@ export class AnalysisJobManager {
       const result = await runBacktestInWorker(
         this.services,
         job.input as unknown as RunBacktestRequest,
-        { signal, enforceHttpRoundLimit: false },
+        { signal },
       );
       return result as unknown as Record<string, unknown>;
     }
@@ -129,20 +132,35 @@ export class AnalysisJobManager {
         job = await this.repository.claimNext();
         if (!job) return;
 
+        const startedAt = Date.now();
+        logEvent("info", "analysis_job_started", { jobId: job.id, kind: job.kind, lottery: job.lottery });
         const controller = new AbortController();
         this.activeControllers.set(job.id, controller);
         try {
           const result = await this.execute(job, controller.signal);
           const latest = await this.repository.findById(job.id);
-          if (latest?.cancelRequested) await this.repository.markCancelled(job.id);
-          else await this.repository.complete(job.id, result);
+          if (latest?.cancelRequested) {
+            await this.repository.markCancelled(job.id);
+            logEvent("info", "analysis_job_cancelled", { jobId: job.id, durationMs: Date.now() - startedAt });
+          } else {
+            await this.repository.complete(job.id, result);
+            logEvent("info", "analysis_job_completed", { jobId: job.id, durationMs: Date.now() - startedAt });
+          }
         } catch (error) {
           if (error instanceof AnalysisCancelledError) {
             if (!this.stopped || this.explicitCancels.has(job.id)) {
               await this.repository.markCancelled(job.id).catch(() => undefined);
             }
+            logEvent("info", "analysis_job_cancelled", { jobId: job.id, durationMs: Date.now() - startedAt });
           } else {
-            await this.repository.fail(job.id, serializedError(error)).catch(() => undefined);
+            const serialized = serializedError(error);
+            await this.repository.fail(job.id, serialized).catch(() => undefined);
+            logEvent("error", "analysis_job_failed", {
+              jobId: job.id,
+              durationMs: Date.now() - startedAt,
+              code: serialized.code,
+              message: serialized.message,
+            });
           }
         } finally {
           this.activeControllers.delete(job.id);
@@ -152,8 +170,6 @@ export class AnalysisJobManager {
         release();
       }
 
-      // Yield between jobs so HTTP and timers get a chance to progress even
-      // when a large backlog exists.
       await delay(0);
     }
   }
