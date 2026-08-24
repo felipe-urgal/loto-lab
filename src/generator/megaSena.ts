@@ -300,7 +300,10 @@ export function generateMegaSenaGames(
   });
 
   const portfolio = selectPortfolioCandidates(candidateGroups, generationMode, random, {
-    overlapPenalty: policy.variableReusePenalty,
+    // A mesma reutilização que era penalizada cartão a cartão agora aparece em
+    // todos os pares do portfólio. Na Mega, damos prioridade forte à cobertura
+    // disjunta das variáveis quando o espaço de candidatos permite isso.
+    overlapPenalty: policy.variableReusePenalty * 4,
     beamWidth: 96,
     diversifiedPoolSize: 8,
   });
