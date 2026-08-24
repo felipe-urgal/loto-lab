@@ -1,4 +1,5 @@
 import type { AnalysisModel, AnalysisWeights, Contest, LotteryConfig } from "../domain/types.js";
+import { eligibleTargetIndexes } from "./contestEligibility.js";
 import { buildNumberAnalysis } from "./scoring.js";
 
 export interface RankingQualityRound {
@@ -72,6 +73,7 @@ export function evaluateRankingQuality(
 ): RankingQualityResult {
   const model = options.model ?? "score-v2";
   const warmupContests = options.warmupContests ?? 20;
+  const maxRounds = options.maxRounds ?? 500;
   const scoped = contests
     .filter((contest) => contest.lottery === config.id)
     .sort((a, b) => a.number - b.number);
@@ -79,25 +81,27 @@ export function evaluateRankingQuality(
     { length: config.maxNumber - config.minNumber + 1 },
     (_, index) => config.minNumber + index,
   );
-  const eligible: RankingQualityRound[] = [];
+  const targetIndexes = eligibleTargetIndexes(scoped, {
+    warmupContests,
+    ...(options.startContest !== undefined ? { startContest: options.startContest } : {}),
+    ...(options.endContest !== undefined ? { endContest: options.endContest } : {}),
+    ...(maxRounds > 0 ? { maxRounds } : {}),
+  });
+  const series: RankingQualityRound[] = [];
 
-  for (let index = warmupContests; index < scoped.length; index += 1) {
+  for (const index of targetIndexes) {
     const target = scoped[index]!;
-    if (options.startContest !== undefined && target.number < options.startContest) continue;
-    if (options.endContest !== undefined && target.number > options.endContest) continue;
     const history = scoped.slice(0, index);
     const analysis = buildNumberAnalysis(history, config, options.weights, model);
     const scores = new Map(analysis.map((row) => [row.number, row.score]));
     const drawn = new Set(target.numbers);
-    eligible.push({
+    series.push({
       contest: target.number,
       auc: round(roundAuc(scores, drawn, universe)),
       meanDrawnPercentile: round(meanDrawnPercentile(scores, drawn, universe)),
     });
   }
 
-  const maxRounds = options.maxRounds ?? 500;
-  const series = maxRounds > 0 ? eligible.slice(-maxRounds) : eligible;
   const auc = series.length === 0
     ? 0.5
     : series.reduce((sum, roundItem) => sum + roundItem.auc, 0) / series.length;
