@@ -39,6 +39,11 @@ export interface RandomControlResult {
   summary: BacktestSummary;
 }
 
+export interface RandomControlSample {
+  seed: string;
+  summary: BacktestSummary;
+}
+
 function sampleNumbers(lottery: LotteryId, random: () => number): number[] {
   const config = getLotteryConfig(lottery);
   const pool = Array.from(
@@ -106,4 +111,21 @@ export function backtestRandomControl(
     rounds,
     summary: summarizeBacktestRounds(rounds),
   };
+}
+
+export function sampleRandomControls(
+  contests: Contest[],
+  options: Omit<RandomControlOptions, "seed">,
+  samples = 100,
+  seedPrefix = "loto-lab-random-distribution-v2",
+): RandomControlSample[] {
+  if (!Number.isInteger(samples) || samples < 10 || samples > 500) {
+    throw new Error("randomSamples must be an integer between 10 and 500");
+  }
+
+  return Array.from({ length: samples }, (_, index) => {
+    const seed = `${seedPrefix}:${index + 1}`;
+    const result = backtestRandomControl(contests, { ...options, seed });
+    return { seed, summary: result.summary };
+  });
 }
