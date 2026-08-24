@@ -4,6 +4,7 @@ import type { ContestSource } from "../data/source.js";
 import { isLotteryAgendaSource } from "../data/source.js";
 import { CaixaContestSource } from "../data/caixa.js";
 import { bootstrapLotteryHistory } from "../data/bootstrap.js";
+import { hasCompletePrizeSchedule } from "../finance/prizes.js";
 import { PostgresAgendaRepository } from "../persistence/agendaRepository.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import {
@@ -16,6 +17,7 @@ import { logEvent } from "../observability/log.js";
 
 const LOTTERIES: LotteryId[] = ["mega-sena", "lotofacil", "dia-de-sorte"];
 const SYNC_ADVISORY_LOCK = 1515015;
+const FINANCIAL_REPAIR_WINDOW = 20;
 
 export class OperationAlreadyRunningError extends Error {
   constructor() {
@@ -33,6 +35,8 @@ export interface LotteryOperationResult {
   fetched?: number;
   failedContests?: number;
   totalStored?: number;
+  financialRefreshed?: number;
+  financialRefreshFailed?: number;
   reconciledRealBets?: number;
   error?: string;
 }
@@ -55,6 +59,35 @@ export interface RunOperationalSyncOptions {
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+async function refreshIncompleteFinancialContests(
+  source: ContestSource,
+  contests: PostgresContestRepository,
+  lottery: LotteryId,
+): Promise<{ refreshed: number; failed: number }> {
+  const recent = await contests.list({ lottery, order: "desc", limit: FINANCIAL_REPAIR_WINDOW });
+  const incomplete = recent.filter((contest) => !hasCompletePrizeSchedule(contest));
+  if (incomplete.length === 0) return { refreshed: 0, failed: 0 };
+
+  const settled = await Promise.allSettled(
+    incomplete.map((contest) => source.fetchContest(lottery, contest.number)),
+  );
+  const successful = settled
+    .filter((result): result is PromiseFulfilledResult<Awaited<ReturnType<ContestSource["fetchContest"]>>> => result.status === "fulfilled")
+    .map((result) => result.value);
+  if (successful.length > 0) await contests.upsertMany(successful);
+
+  const failed = settled.length - successful.length;
+  if (failed > 0) {
+    logEvent("warn", "financial_schedule_refresh_partial", {
+      lottery,
+      attempted: incomplete.length,
+      refreshed: successful.length,
+      failed,
+    });
+  }
+  return { refreshed: successful.length, failed };
 }
 
 export async function runOperationalSync(
@@ -95,6 +128,8 @@ export async function runOperationalSync(
 
         const latest = await source.fetchContest(lottery);
         await contests.upsertMany([latest]);
+        const financialRepair = await refreshIncompleteFinancialContests(source, contests, lottery);
+
         let nextContest: number | undefined;
         let nextDrawDate: string | undefined;
         if (isLotteryAgendaSource(source)) {
@@ -104,10 +139,11 @@ export async function runOperationalSync(
           nextDrawDate = snapshot.nextDrawDate;
         }
         const reconciledRealBets = await realBets.reconcilePending(lottery);
+        const partial = bootstrap.failed > 0 || financialRepair.failed > 0;
 
         lotteries.push({
           lottery,
-          status: bootstrap.failed > 0 ? "partial" : "success",
+          status: partial ? "partial" : "success",
           latestOfficialContest: bootstrap.latestOfficialContest,
           ...(nextContest !== undefined ? { nextContest } : {}),
           ...(nextDrawDate !== undefined ? { nextDrawDate } : {}),
@@ -115,6 +151,8 @@ export async function runOperationalSync(
           fetched: bootstrap.fetched,
           failedContests: bootstrap.failed,
           totalStored: bootstrap.totalStored,
+          financialRefreshed: financialRepair.refreshed,
+          financialRefreshFailed: financialRepair.failed,
           reconciledRealBets,
         });
       } catch (error) {
