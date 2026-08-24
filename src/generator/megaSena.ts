@@ -9,12 +9,12 @@ import {
   type MegaSenaGameRules,
 } from "./megaSenaRules.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
+import { selectPortfolioCandidates } from "./portfolio.js";
 import {
   buildStratifiedCandidatePool,
   combinationIterator,
   GENERATION_POLICY,
   generationRandom,
-  selectRankedCandidate,
   selectWeightedItem,
   topRankedCandidates,
   type GenerationMode,
@@ -257,19 +257,15 @@ export function generateMegaSenaGames(
   const scoreByNumber = new Map(analysis.map((row) => [row.number, row.score]));
   const variableCount = config.drawSize - fixedCount;
   const candidatePool = buildCandidatePool(analysis, fixedSet, excludedSet, fixedCount, rules);
-  const usedVariables = new Map<number, number>();
   const parityTargets = [3, 4, 2];
-  const games: GeneratedGame[] = [];
   const policy = GENERATION_POLICY.megaSena;
 
-  for (let gameIndex = 0; gameIndex < gameCount; gameIndex += 1) {
+  const candidateGroups = Array.from({ length: gameCount }, (_, gameIndex) => {
     const targetOdd = rules.equalParity ? 3 : parityTargets[gameIndex % parityTargets.length]!;
-
     const candidates = function* () {
       for (const variableNumbers of combinationIterator(candidatePool, variableCount)) {
         const numbers = [...fixedNumbers, ...variableNumbers].sort((a, b) => a - b);
         if (!matchesMegaSenaRules(numbers, rules)) continue;
-
         const metadata = buildMetadata(numbers, lastContest);
         const game: GeneratedGame = {
           lottery: "mega-sena",
@@ -284,44 +280,39 @@ export function generateMegaSenaGames(
           (total, number) => total + (scoreByNumber.get(number) ?? 0),
           0,
         );
-        const reused = variableNumbers.reduce(
-          (total, number) => total + (usedVariables.get(number) ?? 0),
-          0,
-        );
         const parityPenalty = Math.abs(metadata.odd - targetOdd) * policy.parityPenalty;
         const repeatPenalty = Math.max(0, metadata.repeatedFromLastContest.length - 2) * policy.repeatExcessPenalty;
-        const reusePenalty = reused * policy.variableReusePenalty;
 
         yield {
           variableNumbers,
           numbers,
           metadata,
-          rank: baseScore - parityPenalty - repeatPenalty - reusePenalty,
+          rank: baseScore - parityPenalty - repeatPenalty,
         };
       }
     };
 
-    const ranked = topRankedCandidates(
+    return topRankedCandidates(
       candidates(),
       24,
       (a, b) => b.rank - a.rank || a.numbers.join("-").localeCompare(b.numbers.join("-")),
     );
-    const winner = selectRankedCandidate(ranked, generationMode, random, 6);
-    if (!winner) {
-      throw new Error("Unable to generate a Mega-Sena game with the requested constraints");
-    }
+  });
 
-    for (const number of winner.variableNumbers) {
-      usedVariables.set(number, (usedVariables.get(number) ?? 0) + 1);
-    }
-    games.push({
-      lottery: "mega-sena",
-      numbers: winner.numbers,
-      fixedNumbers: [...fixedNumbers],
-      variableNumbers: [...winner.variableNumbers].sort((a, b) => a - b),
-      metadata: winner.metadata,
-    });
+  const portfolio = selectPortfolioCandidates(candidateGroups, generationMode, random, {
+    overlapPenalty: policy.variableReusePenalty,
+    beamWidth: 96,
+    diversifiedPoolSize: 8,
+  });
+  if (portfolio.length !== gameCount) {
+    throw new Error("Unable to generate a Mega-Sena portfolio with the requested constraints");
   }
 
-  return games;
+  return portfolio.map((winner) => ({
+    lottery: "mega-sena",
+    numbers: winner.numbers,
+    fixedNumbers: [...fixedNumbers],
+    variableNumbers: [...winner.variableNumbers].sort((a, b) => a - b),
+    metadata: winner.metadata,
+  }));
 }
