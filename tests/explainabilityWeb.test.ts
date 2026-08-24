@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 
 async function source(path: string): Promise<string> {
-  return readFile(new URL(`../${path}`, import.meta.url), "utf8");
+  return readFile(resolve(process.cwd(), path), "utf8");
 }
 
 test("Generator explainability layer exposes the five-step flow and methodology guardrails", async () => {
@@ -25,7 +26,7 @@ test("Generator explainability layer exposes the five-step flow and methodology 
   assert.match(css, /g2-education-grid/);
 });
 
-test("Strategy Lab UI exposes score-model comparison and random benchmark distribution", async () => {
+test("Strategy Lab UI exposes score-model, random distribution and predictive validation", async () => {
   const html = await source("web/lab.html");
   const javascript = await source("web/lab.js");
 
@@ -38,4 +39,7 @@ test("Strategy Lab UI exposes score-model comparison and random benchmark distri
   assert.match(javascript, /distribution\.p50/);
   assert.match(javascript, /distribution\.p95/);
   assert.match(javascript, /strategyPercentile/);
+  assert.match(javascript, /rankingQuality/);
+  assert.match(javascript, /walkForward/);
+  assert.match(javascript, /AUC/);
 });
