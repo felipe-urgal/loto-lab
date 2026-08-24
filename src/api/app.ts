@@ -343,36 +343,8 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
         return;
       }
 
-      if (method === "GET" && pathname === "/api/v1/strategies") {
-        const lotteryParam = url.searchParams.get("lottery");
-        const lottery = lotteryParam === null ? undefined : parseLottery(lotteryParam);
-        const items = await services.strategies.list(lottery);
-        sendJson(response, 200, { items }, corsOrigin);
-        return;
-      }
-
-      if (method === "POST" && pathname === "/api/v1/strategies") {
-        const body = await readJsonBody(request);
-        const slug = requiredString(body.slug, "slug", 100);
-        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
-          throw new ApiError(400, "INVALID_ARGUMENT", "slug must contain lowercase letters, numbers and hyphens only");
-        }
-        const lottery = parseLottery(body.lottery);
-        const name = requiredString(body.name, "name");
-        const methodologyVersion = requiredString(body.methodologyVersion, "methodologyVersion", 80);
-        if (body.config !== undefined && !isRecord(body.config)) {
-          throw new ApiError(400, "INVALID_ARGUMENT", "config must be a JSON object");
-        }
-        const strategy = await services.upsertStrategy({
-          slug,
-          lottery,
-          name,
-          methodologyVersion,
-          config: body.config ?? {},
-        });
-        sendJson(response, 201, strategy, corsOrigin);
-        return;
-      }
+      // Strategy endpoints live exclusively in serveStrategies() so their validation,
+      // versioning and immutable-history semantics cannot drift from a legacy copy.
 
       if (method === "POST" && pathname === "/api/v1/backtests/run") {
         if (!enforceRateLimit(request, response, backtestLimiter, "backtest")) return;
