@@ -1,4 +1,4 @@
-import type { AnalysisModel, Contest, LotteryConfig } from "../domain/types.js";
+import type { AnalysisModel, AnalysisWeights, Contest, LotteryConfig } from "../domain/types.js";
 import { buildNumberAnalysis } from "./scoring.js";
 
 export interface RankingQualityRound {
@@ -63,6 +63,7 @@ export function evaluateRankingQuality(
   config: LotteryConfig,
   options: {
     model?: AnalysisModel;
+    weights?: AnalysisWeights;
     warmupContests?: number;
     startContest?: number;
     endContest?: number;
@@ -85,7 +86,7 @@ export function evaluateRankingQuality(
     if (options.startContest !== undefined && target.number < options.startContest) continue;
     if (options.endContest !== undefined && target.number > options.endContest) continue;
     const history = scoped.slice(0, index);
-    const analysis = buildNumberAnalysis(history, config, undefined, model);
+    const analysis = buildNumberAnalysis(history, config, options.weights, model);
     const scores = new Map(analysis.map((row) => [row.number, row.score]));
     const drawn = new Set(target.numbers);
     eligible.push({
