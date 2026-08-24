@@ -1,10 +1,12 @@
-import type { Contest, GeneratedGame } from "../domain/types.js";
+import type { AnalysisModel, Contest, GeneratedGame } from "../domain/types.js";
 import { buildNumberAnalysis } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
 import {
   buildMetadata,
+  buildStratifiedCandidatePool,
   combinationIterator,
+  GENERATION_POLICY,
   generationRandom,
   scoreMap,
   selectProfiledFixedNumbers,
@@ -26,6 +28,7 @@ export interface DiaDeSorteGeneratorOptions {
   excludedNumbers?: number[];
   constraints?: GenerationConstraints;
   referenceContestNumber?: number | null;
+  analysisModel?: AnalysisModel;
 }
 
 const LUCKY_MONTHS = [
@@ -84,13 +87,21 @@ interface NormalizedDiaDeSorteGeneratorOptions {
   excludedNumbers: number[];
   constraints?: GenerationConstraints;
   referenceContestNumber?: number | null;
+  analysisModel: AnalysisModel;
 }
 
 function normalizeOptions(
   value: number | DiaDeSorteGeneratorOptions,
 ): NormalizedDiaDeSorteGeneratorOptions {
   if (typeof value === "number") {
-    return { gameCount: value, fixedCount: 3, generationMode: "deterministic", fixedNumbers: [], excludedNumbers: [] };
+    return {
+      gameCount: value,
+      fixedCount: 3,
+      generationMode: "deterministic",
+      fixedNumbers: [],
+      excludedNumbers: [],
+      analysisModel: "score-v2",
+    };
   }
   return {
     gameCount: value.gameCount ?? 2,
@@ -101,6 +112,7 @@ function normalizeOptions(
     excludedNumbers: value.excludedNumbers ?? [],
     ...(value.constraints !== undefined ? { constraints: value.constraints } : {}),
     ...(value.referenceContestNumber !== undefined ? { referenceContestNumber: value.referenceContestNumber } : {}),
+    analysisModel: value.analysisModel ?? "score-v2",
   };
 }
 
@@ -117,6 +129,7 @@ export function generateDiaDeSorteGames(
     excludedNumbers,
     constraints,
     referenceContestNumber,
+    analysisModel,
   } = normalizeOptions(options);
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
@@ -137,7 +150,7 @@ export function generateDiaDeSorteGames(
     : referenceContestNumber === null
       ? undefined
       : scoped.find((contest) => contest.number === referenceContestNumber);
-  const analysis = buildNumberAnalysis(scoped, config);
+  const analysis = buildNumberAnalysis(scoped, config, undefined, analysisModel);
   if (fixedCount === 0 && manualFixed.length > 0) {
     throw new Error("Manual fixed numbers require a fixed core");
   }
@@ -157,16 +170,13 @@ export function generateDiaDeSorteGames(
   const scores = scoreMap(analysis);
   const variableCount = config.drawSize - fixedCount;
   const poolSize = fixedCount === 0 ? 13 : fixedCount === 2 ? 14 : 18;
-  const candidatePool = analysis
-    .filter((row) => !fixedSet.has(row.number) && !excludedSet.has(row.number))
-    .sort((a, b) => b.score - a.score || a.number - b.number)
-    .slice(0, poolSize)
-    .map((row) => row.number);
+  const candidatePool = buildStratifiedCandidatePool(analysis, fixedSet, excludedSet, poolSize);
   const usedVariables = new Map<number, number>();
   const repeatTargets = [1, 2, 1, 2];
   const oddTargets = [3, 4, 3, 4];
   const luckyMonths = rankLuckyMonths(scoped);
   const games: GeneratedGame[] = [];
+  const policy = GENERATION_POLICY.diaDeSorte;
 
   for (let gameIndex = 0; gameIndex < gameCount; gameIndex += 1) {
     const targetRepeat = lastContest ? repeatTargets[gameIndex % repeatTargets.length]! : 0;
@@ -196,10 +206,10 @@ export function generateDiaDeSorteGames(
         );
         const repeatPenalty = Math.abs(
           metadata.repeatedFromLastContest.length - targetRepeat,
-        ) * 35;
-        const parityPenalty = Math.abs(metadata.odd - targetOdd) * 22;
-        const sumPenalty = Math.abs(metadata.sum - 112) * 0.25;
-        const reusePenalty = reused * 45;
+        ) * policy.repeatDistancePenalty;
+        const parityPenalty = Math.abs(metadata.odd - targetOdd) * policy.parityDistancePenalty;
+        const sumPenalty = Math.abs(metadata.sum - 112) * policy.sumDistancePenalty;
+        const reusePenalty = reused * policy.variableReusePenalty;
 
         yield {
           variableNumbers,
