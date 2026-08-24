@@ -61,25 +61,43 @@ test("no-score generation is deterministic without falling back to the lowest nu
   assert.ok(first[0]?.fixedNumbers.some((number) => number > 6));
 });
 
-test("random evidence treats exact ties as neutral", () => {
-  const evidence = evaluateRandomEvidence(Array.from({ length: 20 }, () => 0.25), 0.25, 3);
+test("random evidence treats exact ties as neutral when inference resolution is sufficient", () => {
+  const evidence = evaluateRandomEvidence(Array.from({ length: 100 }, () => 0.25), 0.25, 3, 50);
 
   assert.equal(evidence.percentile, 0.5);
   assert.equal(evidence.rawUpperPValue, 1);
   assert.equal(evidence.rawLowerPValue, 1);
   assert.equal(evidence.adjustedUpperPValue, 1);
+  assert.equal(evidence.resolutionSufficient, true);
+  assert.equal(evidence.sampleSizeSufficient, true);
   assert.equal(evidence.status, "no-evidence");
 });
 
-test("multiple-comparison correction prevents the best of many variants from being promoted too easily", () => {
+test("random evidence separates insufficient historical sample from lack of signal", () => {
   const controls = Array.from({ length: 100 }, (_, index) => index);
-  const threeVariants = evaluateRandomEvidence(controls, 100, 3);
-  const nineVariants = evaluateRandomEvidence(controls, 100, 9);
+  const evidence = evaluateRandomEvidence(controls, 100, 3, 10);
+
+  assert.equal(evidence.resolutionSufficient, true);
+  assert.equal(evidence.sampleSizeSufficient, false);
+  assert.equal(evidence.minimumObservationRounds, 30);
+  assert.equal(evidence.status, "insufficient-sample");
+});
+
+test("multiple-comparison correction exposes when Monte Carlo resolution cannot reach alpha", () => {
+  const controls100 = Array.from({ length: 100 }, (_, index) => index);
+  const threeVariants = evaluateRandomEvidence(controls100, 100, 3, 50);
+  const nineVariants100 = evaluateRandomEvidence(controls100, 100, 9, 50);
+  const controls250 = Array.from({ length: 250 }, (_, index) => index);
+  const nineVariants250 = evaluateRandomEvidence(controls250, 250, 9, 50);
 
   assert.equal(threeVariants.status, "beats-random");
-  assert.equal(nineVariants.status, "inconclusive");
-  assert.ok(nineVariants.adjustedUpperPValue > 0.05);
-  assert.ok(nineVariants.adjustedUpperPValue > threeVariants.adjustedUpperPValue);
+  assert.equal(threeVariants.minimumSamplesForAlpha, 59);
+  assert.equal(nineVariants100.status, "insufficient-resolution");
+  assert.equal(nineVariants100.resolutionSufficient, false);
+  assert.equal(nineVariants100.minimumSamplesForAlpha, 179);
+  assert.ok(nineVariants100.minimumAchievableAdjustedPValue > 0.05);
+  assert.equal(nineVariants250.resolutionSufficient, true);
+  assert.equal(nineVariants250.status, "beats-random");
 });
 
 test("random control is reproducible and can produce a distribution of controls", () => {
@@ -110,6 +128,18 @@ test("random control is reproducible and can produce a distribution of controls"
   assert.equal(distribution.length, 10);
   assert.equal(new Set(distribution.map((sample) => sample.seed)).size, 10);
   assert.ok(distribution.every((sample) => sample.summary.totalGames === 40));
+});
+
+test("strategy lab rejects periods with no eligible targets instead of manufacturing a winner", () => {
+  const contests = contestsFor("mega-sena", 40, 6, 60);
+  assert.throws(() => compareStrategyLab(contests, {
+    lottery: "mega-sena",
+    gameCount: 1,
+    warmupContests: 5,
+    startContest: 100,
+    endContest: 110,
+    randomSamples: 10,
+  }), /no eligible contests/i);
 });
 
 test("strategy lab compares fixed-core presets and exposes v2 random evidence without changing legacy fields", () => {
@@ -147,8 +177,12 @@ test("strategy lab compares fixed-core presets and exposes v2 random evidence wi
     assert.ok(result.benchmark.rawPValue >= 0 && result.benchmark.rawPValue <= 1);
     assert.ok(result.benchmark.adjustedPValue >= result.benchmark.rawPValue);
     assert.equal(result.benchmark.familySize, 3);
+    assert.equal(result.benchmark.observationRounds, 10);
+    assert.equal(result.benchmark.sampleSizeSufficient, false);
+    assert.equal(result.benchmark.status, "insufficient-sample");
     assert.equal(result.benchmark.controlKey, "random-control");
     assert.equal(result.benchmark.control.summary.testedContests, 10);
+    assert.equal(result.benchmark.medianControl.key, "random-control-near-median");
     assert.equal(result.benchmark.medianControl.summary.testedContests, 10);
     // v1 compatibility remains independent from the v2 evidence classification.
     assert.equal(result.benchmark.beatsRandom, result.benchmark.delta > 0);
@@ -178,7 +212,7 @@ test("strategy lab compares Score v2, Score v1 and no-score without leakage", ()
   assert.ok(result.walkForward);
 });
 
-test("strategy lab external-rules family applies correction across all nine variants", () => {
+test("strategy lab external-rules family exposes the higher Monte Carlo resolution requirement", () => {
   const contests = contestsFor("mega-sena", 24, 6, 60);
   const result = compareStrategyLab(contests, {
     lottery: "mega-sena",
@@ -187,7 +221,7 @@ test("strategy lab external-rules family applies correction across all nine vari
     warmupContests: 5,
     lookbackContests: 10,
     bucketSize: 5,
-    randomSamples: 10,
+    randomSamples: 100,
   });
 
   const keys = new Set(result.variants.map((variant) => variant.key));
@@ -205,6 +239,8 @@ test("strategy lab external-rules family applies correction across all nine vari
   assert.ok(result.variants.every((variant) => variant.fixedCount === 0));
   assert.ok(result.variants.every((variant) => variant.summary.testedContests === 10));
   assert.equal(result.benchmark.controlKey, "random-control");
-  assert.equal(result.benchmark.distribution.samples, 10);
+  assert.equal(result.benchmark.distribution.samples, 100);
   assert.equal(result.benchmark.familySize, 9);
+  assert.equal(result.benchmark.minimumRandomSamples, 179);
+  assert.equal(result.benchmark.resolutionSufficient, false);
 });
