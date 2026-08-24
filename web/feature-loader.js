@@ -81,7 +81,9 @@ async function ensureViewFeatures() {
     // the previous refinements as a functional fallback instead of breaking the view.
     const styleReady = await loadStyle("my-games-v2");
     const moduleReady = styleReady ? await loadModule("my-games-v2") : false;
-    if (!moduleReady) {
+    if (moduleReady) {
+      await loadModule("real-bet-auditability");
+    } else {
       await Promise.all([
         loadStyle("real-bets"),
         loadStyle("my-games-management"),
