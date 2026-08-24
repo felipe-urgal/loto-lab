@@ -14,12 +14,45 @@ import { runOperationalSync, type SyncAllDetails } from "../src/operations/sync.
 
 function contest(lottery: LotteryId, number: number): Contest {
   if (lottery === "mega-sena") {
-    return { lottery, number, date: `2026-08-${String(number).padStart(2, "0")}`, numbers: [1, 2, 3, 4, 5, 6], prizeTiers: [{ description: "6 acertos", winners: 0, prizeValue: 0 }] };
+    return {
+      lottery,
+      number,
+      date: `2026-08-${String(number).padStart(2, "0")}`,
+      numbers: [1, 2, 3, 4, 5, 6],
+      prizeTiers: [
+        { description: "6 acertos", winners: 0, prizeValue: 0 },
+        { description: "5 acertos", winners: 0, prizeValue: 0 },
+        { description: "4 acertos", winners: 0, prizeValue: 0 },
+      ],
+    };
   }
   if (lottery === "lotofacil") {
-    return { lottery, number, date: `2026-08-${String(number).padStart(2, "0")}`, numbers: Array.from({ length: 15 }, (_, index) => index + 1), prizeTiers: [{ description: "15 acertos", winners: 0, prizeValue: 0 }] };
+    return {
+      lottery,
+      number,
+      date: `2026-08-${String(number).padStart(2, "0")}`,
+      numbers: Array.from({ length: 15 }, (_, index) => index + 1),
+      prizeTiers: [15, 14, 13, 12, 11].map((hits) => ({
+        description: `${hits} acertos`,
+        winners: 0,
+        prizeValue: 0,
+      })),
+    };
   }
-  return { lottery, number, date: `2026-08-${String(number).padStart(2, "0")}`, numbers: [1, 2, 3, 4, 5, 6, 7], luckyMonth: "Janeiro", prizeTiers: [{ description: "7 acertos", winners: 0, prizeValue: 0 }] };
+  return {
+    lottery,
+    number,
+    date: `2026-08-${String(number).padStart(2, "0")}`,
+    numbers: [1, 2, 3, 4, 5, 6, 7],
+    luckyMonth: "Janeiro",
+    prizeTiers: [
+      { description: "7 acertos", winners: 0, prizeValue: 0 },
+      { description: "6 acertos", winners: 0, prizeValue: 0 },
+      { description: "5 acertos", winners: 0, prizeValue: 0 },
+      { description: "4 acertos", winners: 0, prizeValue: 0 },
+      { description: "Mês da Sorte", winners: 0, prizeValue: 0 },
+    ],
+  };
 }
 
 class FakeContestSource implements ContestSource {
