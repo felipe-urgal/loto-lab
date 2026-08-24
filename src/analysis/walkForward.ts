@@ -79,6 +79,8 @@ export function evaluateWalkForwardWeights(
     validationBlock?: number;
     profiles?: WeightProfile[];
     nullSamples?: number;
+    startContest?: number;
+    endContest?: number;
   } = {},
 ): WalkForwardResult {
   const warmupContests = Math.max(10, Math.round(options.warmupContests ?? 20));
@@ -90,9 +92,23 @@ export function evaluateWalkForwardWeights(
     .sort((a, b) => a.number - b.number);
   const folds: WalkForwardFold[] = [];
 
-  let testStartIndex = Math.min(scoped.length, warmupContests + trainingWindow);
-  while (testStartIndex < scoped.length) {
-    const testEndIndex = Math.min(scoped.length, testStartIndex + validationBlock);
+  const minimumTestIndex = Math.min(scoped.length, warmupContests + trainingWindow);
+  const requestedStartIndex = options.startContest === undefined
+    ? minimumTestIndex
+    : scoped.findIndex((contest) => contest.number >= options.startContest);
+  let testStartIndex = Math.max(
+    minimumTestIndex,
+    requestedStartIndex < 0 ? scoped.length : requestedStartIndex,
+  );
+  const endExclusive = options.endContest === undefined
+    ? scoped.length
+    : (() => {
+      const index = scoped.findIndex((contest) => contest.number > options.endContest!);
+      return index < 0 ? scoped.length : index;
+    })();
+
+  while (testStartIndex < endExclusive) {
+    const testEndIndex = Math.min(endExclusive, testStartIndex + validationBlock);
     const trainEnd = scoped[testStartIndex - 1];
     const testStart = scoped[testStartIndex];
     const testEnd = scoped[testEndIndex - 1];
@@ -133,20 +149,20 @@ export function evaluateWalkForwardWeights(
       maxRounds: 0,
     });
     const testRounds = Math.min(tuned.rounds, baseline.rounds);
-    const delta = tuned.auc - baseline.auc;
-
-    folds.push({
-      trainEndContest: trainEnd.number,
-      testStartContest: testStart.number,
-      testEndContest: testEnd.number,
-      testRounds,
-      selectedProfile: selected.profile.key,
-      selectedLabel: selected.profile.label,
-      trainAuc: selected.quality.auc,
-      tunedTestAuc: tuned.auc,
-      defaultTestAuc: baseline.auc,
-      deltaVsDefault: round(delta),
-    });
+    if (testRounds > 0) {
+      folds.push({
+        trainEndContest: trainEnd.number,
+        testStartContest: testStart.number,
+        testEndContest: testEnd.number,
+        testRounds,
+        selectedProfile: selected.profile.key,
+        selectedLabel: selected.profile.label,
+        trainAuc: selected.quality.auc,
+        tunedTestAuc: tuned.auc,
+        defaultTestAuc: baseline.auc,
+        deltaVsDefault: round(tuned.auc - baseline.auc),
+      });
+    }
     testStartIndex = testEndIndex;
   }
 
@@ -154,10 +170,12 @@ export function evaluateWalkForwardWeights(
   const tunedAuc = weightedMean(folds.map((fold) => ({ value: fold.tunedTestAuc, weight: fold.testRounds })));
   const defaultAuc = weightedMean(folds.map((fold) => ({ value: fold.defaultTestAuc, weight: fold.testRounds })));
   const pairedDifferences = folds.map((fold) => fold.deltaVsDefault);
+  const foldWeights = folds.map((fold) => fold.testRounds);
   const nullBenchmark = pairedSignFlipNull(
     pairedDifferences,
     options.nullSamples ?? 2000,
     `walk-forward:${config.id}:${folds.map((fold) => `${fold.testStartContest}-${fold.testEndContest}`).join("|")}`,
+    foldWeights,
   );
 
   return {
