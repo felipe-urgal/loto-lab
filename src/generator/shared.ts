@@ -6,6 +6,25 @@ export interface RankedCandidate {
   rank: number;
 }
 
+export const GENERATION_POLICY = {
+  megaSena: {
+    parityPenalty: 20,
+    repeatExcessPenalty: 30,
+    variableReusePenalty: 80,
+  },
+  lotofacil: {
+    repeatDistancePenalty: 35,
+    parityDistancePenalty: 22,
+    variableReusePenalty: 28,
+  },
+  diaDeSorte: {
+    repeatDistancePenalty: 35,
+    parityDistancePenalty: 22,
+    sumDistancePenalty: 0.25,
+    variableReusePenalty: 45,
+  },
+} as const;
+
 export function* combinationIterator<T>(items: T[], size: number): Generator<T[]> {
   if (!Number.isInteger(size) || size < 0 || size > items.length) return;
 
@@ -77,6 +96,43 @@ export function buildMetadata(
 
 export function scoreMap(analysis: NumberAnalysis[]): Map<number, number> {
   return new Map(analysis.map((row) => [row.number, row.score]));
+}
+
+export function buildStratifiedCandidatePool(
+  analysis: NumberAnalysis[],
+  fixedSet: Set<number>,
+  excludedSet: Set<number>,
+  limit: number,
+): number[] {
+  if (!Number.isInteger(limit) || limit < 1) return [];
+  const available = analysis
+    .filter((row) => !fixedSet.has(row.number) && !excludedSet.has(row.number))
+    .sort((a, b) => b.score - a.score || a.number - b.number);
+  if (available.length <= limit) return available.map((row) => row.number);
+
+  const selected = new Set<number>();
+  const quotas = {
+    strong: Math.max(1, Math.floor(limit * 0.5)),
+    balanced: Math.max(1, Math.floor(limit * 0.35)),
+    cold: Math.max(1, Math.floor(limit * 0.15)),
+  } as const;
+
+  for (const tier of ["strong", "balanced", "cold"] as const) {
+    let added = 0;
+    for (const row of available) {
+      if (row.tier !== tier || selected.has(row.number)) continue;
+      selected.add(row.number);
+      added += 1;
+      if (added >= quotas[tier] || selected.size >= limit) break;
+    }
+  }
+
+  for (const row of available) {
+    if (selected.size >= limit) break;
+    selected.add(row.number);
+  }
+
+  return [...selected];
 }
 
 export function selectWeightedItem<T>(
