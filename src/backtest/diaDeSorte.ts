@@ -1,4 +1,4 @@
-import type { Contest, GeneratedGame } from "../domain/types.js";
+import type { AnalysisModel, Contest, GeneratedGame } from "../domain/types.js";
 import { evaluateGames, type GameCheckResult } from "../checker/evaluate.js";
 import {
   generateDiaDeSorteGames,
@@ -12,6 +12,7 @@ export interface DiaDeSorteBacktestOptions {
   warmupContests?: number;
   startContest?: number;
   endContest?: number;
+  analysisModel?: AnalysisModel;
 }
 
 export interface DiaDeSorteBacktestRound {
@@ -36,6 +37,7 @@ export interface DiaDeSorteBacktestResult {
     gameCount: number;
     fixedCount: DiaDeSorteFixedCount;
     warmupContests: number;
+    analysisModel: AnalysisModel;
   };
 }
 
@@ -46,6 +48,7 @@ export function backtestDiaDeSorte(
   const gameCount = options.gameCount ?? 4;
   const fixedCount = options.fixedCount ?? 3;
   const warmupContests = options.warmupContests ?? 20;
+  const analysisModel = options.analysisModel ?? "score-v2";
 
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
@@ -69,7 +72,7 @@ export function backtestDiaDeSorte(
 
     // Anti-leakage: only draws before the target are visible to the generator.
     const history = scoped.slice(0, index);
-    const generatedGames = generateDiaDeSorteGames(history, { gameCount, fixedCount });
+    const generatedGames = generateDiaDeSorteGames(history, { gameCount, fixedCount, analysisModel });
     const checks = evaluateGames(generatedGames, target);
     const luckyMonthHits = checks.filter((check) => check.luckyMonthHit).length;
 
@@ -96,6 +99,6 @@ export function backtestDiaDeSorte(
       luckyMonthHits,
       luckyMonthRate: baseSummary.totalGames === 0 ? 0 : luckyMonthHits / baseSummary.totalGames,
     },
-    strategy: { gameCount, fixedCount, warmupContests },
+    strategy: { gameCount, fixedCount, warmupContests, analysisModel },
   };
 }
