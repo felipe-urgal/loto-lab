@@ -1,106 +1,204 @@
-# Modos de geração
+# Geração de jogos
 
-O Loto Lab separa geração para uso real de geração para experimentos históricos.
+O Loto Lab separa **análise**, **composição**, **diversificação**, **restrições** e **auditoria do lote**.
 
-## Princípio
+A geração organiza escolhas. Ela não prevê o próximo sorteio e não aumenta a probabilidade matemática individual de uma combinação válida.
 
-A metodologia continua calculando score, núcleo, repetição, paridade, soma e demais filtros. A diversidade não substitui essas regras por sorteio puro.
+## Fluxo da tela
 
-## Modo determinístico
+A página **Gerar Jogos** foi organizada para responder, nesta ordem:
 
-Usado por padrão no core, backtests, CLI histórica e Laboratório.
+1. **Análise** — quais dados e qual concurso-alvo estão sendo usados?
+2. **Núcleo fixo** — quais dezenas serão compartilhadas entre os jogos?
+3. **Variáveis** — como o restante do lote ganha cobertura e diversidade?
+4. **Restrições** — quais faixas estruturais foram aplicadas?
+5. **Auditoria** — qual foi o núcleo, a amplitude e a sobreposição do lote resultante?
 
-Mesma entrada produz exatamente a mesma saída.
+A interface mantém os controles avançados existentes, mas explica por que cada etapa existe e o que ela **não** significa.
 
-Isso é obrigatório para:
+## Score v2
 
-- comparar estratégias de forma justa;
-- reproduzir um backtest;
-- investigar uma regressão;
-- garantir que o resultado do experimento não dependa de sorte interna do gerador.
+O gerador operacional passa a usar `score-v2` por padrão.
 
-Exemplo direto no core:
+O Score v2 preserva as cinco janelas da metodologia:
 
-```ts
-const games = generateMegaSenaGames(history, {
-  gameCount: 2,
-  generationMode: "deterministic",
-});
+- histórico total;
+- ano atual;
+- mês atual;
+- últimos 10 concursos;
+- últimos 20 concursos.
+
+Os pesos continuam configurados como hipótese inicial:
+
+| Janela | Peso |
+| --- | ---: |
+| Ano atual | 30% |
+| Últimos 20 | 25% |
+| Mês atual | 20% |
+| Histórico | 15% |
+| Últimos 10 | 10% |
+
+A diferença está na leitura de cada janela. Em vez de transformar automaticamente o menor valor em `0` e o maior em `100`, o Score v2 compara a frequência observada com a frequência esperada para uma dezena sob sorteios uniformes e considera o tamanho da amostra.
+
+Em termos operacionais:
+
+```text
+frequência observada
+        ↓
+comparação com frequência esperada
+        ↓
+desvio padronizado pelo tamanho da amostra
+        ↓
+escala centrada em 50
 ```
 
-## Modo diversificado
+`50` representa aproximadamente o comportamento esperado da janela. Valores acima ou abaixo representam desvio histórico, não probabilidade futura.
 
-É o padrão do endpoint `POST /api/v1/games/generate`, usado pela tela **Gerar jogos**.
+## Grupos strong / balanced / cold
 
-O processo é:
+O modelo anterior (`score-v1`) dividia o ranking em terços e, portanto, sempre produzia grupos `strong` e `cold`, mesmo quando as diferenças eram pequenas.
 
-1. calcula a análise normalmente;
-2. calcula o núcleo normalmente;
-3. gera e ranqueia as combinações variáveis com as mesmas regras da metodologia;
-4. considera somente um pequeno grupo das melhores combinações do ranking;
-5. escolhe de forma ponderada dentro desse grupo, favorecendo as posições mais altas;
-6. aplica a penalização de reutilização normalmente entre os jogos do lote.
+O Score v2 deixa de forçar essa divisão.
 
-Assim, clicar em **Gerar novamente** pode produzir outro lote sem abandonar os critérios metodológicos.
+Uma dezena só entra em `strong` quando existe sinal positivo em pelo menos duas janelas e o score agregado também fica acima da faixa neutra. `cold` segue a lógica simétrica. As demais permanecem `balanced`.
 
-## Seed
+Isso aproxima o código da metodologia funcional: forte em múltiplas janelas, intermediária quando os sinais são mistos e fria quando várias janelas ficam abaixo da referência.
 
-Toda geração diversificada tem uma `seed`.
+Os rótulos continuam descritivos. Eles não significam “mais provável”, “menos provável” ou “está para sair”.
 
-A seed é salva em `generated_game_batches.generator_options` junto com `generationMode`.
+## Modelos comparáveis
 
-Exemplo de configuração persistida:
+O core mantém três variantes explícitas:
 
-```json
-{
-  "gameCount": 2,
-  "generationMode": "diversified",
-  "seed": "c71352d0-3d39-4a98-86ca-6ee947fbd950"
-}
-```
+- `score-v2` — modelo operacional, ajustado pelo tamanho da amostra;
+- `score-v1` — modelo legado baseado em normalização min/max;
+- `no-score` — controle estrutural com todas as dezenas neutras.
 
-A mesma seed, com o mesmo histórico e configuração, reproduz exatamente o mesmo lote.
-
-Exemplo pela API sem persistir novamente:
-
-```http
-POST /api/v1/games/generate
-Content-Type: application/json
-
-{
-  "lottery": "mega-sena",
-  "gameCount": 2,
-  "targetContestNumber": 3047,
-  "generationMode": "diversified",
-  "seed": "c71352d0-3d39-4a98-86ca-6ee947fbd950",
-  "persist": false
-}
-```
+O Laboratório consegue comparar as três no mesmo recorte histórico. Assim uma mudança no score pode ser medida antes de ser tratada como melhoria.
 
 ## Núcleo fixo
 
-No modo diversificado, o núcleo não é sorteado aleatoriamente a cada clique.
+Padrões operacionais:
 
-Para o mesmo histórico e a mesma estratégia, ele continua sendo calculado pelo método de seleção do núcleo. A variação acontece principalmente nas dezenas variáveis.
+| Loteria | Núcleo padrão |
+| --- | ---: |
+| Mega-Sena | 3 |
+| Lotofácil | 8 |
+| Dia de Sorte | 3 |
 
-Isso preserva a ideia de **núcleo compartilhado + cobertura diversificada**.
+As variantes de tamanho de núcleo permanecem disponíveis no Laboratório.
 
-## Proteção contra lotes repetidos
+O núcleo combina perfis complementares das janelas, além de respeitar dezenas fixadas ou excluídas manualmente pelo usuário.
 
-Quando a API gera um lote diversificado e persistido sem seed fornecida pelo usuário, ela consulta os lotes recentes da mesma loteria e concurso-alvo.
+## Variáveis e cobertura estratificada
 
-Se o conjunto de jogos já existir, uma nova seed é gerada e a seleção é repetida, até um limite de tentativas.
+Mega-Sena e Dia de Sorte deixam de formar o pool variável exclusivamente pelo topo do ranking.
 
-A proteção vale para novas gerações. Lotes idênticos criados antes deste mecanismo continuam no histórico, porque podem fazer parte de auditoria ou de apostas reais.
+O pool passa a reservar espaço para os três perfis:
 
-## Backtests e Laboratório
+- aproximadamente 50% `strong` quando disponíveis;
+- aproximadamente 35% `balanced`;
+- aproximadamente 15% `cold`;
+- o restante é preenchido pela ordenação geral quando um grupo não possui candidatos suficientes.
 
-Backtests e Laboratório não usam esse sorteio ponderado.
+O objetivo é evitar que a geração contradiga a própria metodologia, que permite dezenas intermediárias e eventualmente frias como instrumento de diversificação.
 
-Eles continuam chamando os geradores no modo determinístico. Portanto, a introdução da geração diversificada para uso real não muda retroativamente resultados de backtest nem torna comparações não reproduzíveis.
+Isso **não** pressupõe reversão à média no próximo sorteio. A finalidade é cobertura controlada do lote.
 
-## Probabilidade
+## Política explícita do gerador
 
-Diversificar lotes não altera a probabilidade matemática individual de uma combinação específica ser sorteada.
+As penalizações heurísticas que já existiam foram centralizadas em `GENERATION_POLICY`.
 
-A finalidade é evitar que a aplicação apresente sempre o mesmo lote quando existem várias combinações de qualidade metodológica semelhante e permitir melhor cobertura entre apostas escolhidas pelo usuário.
+Hoje elas controlam:
+
+- distância da meta de pares/ímpares;
+- excesso ou distância da meta de repetição;
+- distância de soma no Dia de Sorte;
+- reutilização de dezenas variáveis entre cartões.
+
+Centralizar esses valores não os transforma em parâmetros validados. O ganho é torná-los visíveis e testáveis como política do gerador, em vez de números espalhados pelo código.
+
+## Diversificação do lote
+
+A geração continua selecionando os jogos sequencialmente, mas considera o lote já construído ao ranquear o próximo cartão.
+
+Dezenas variáveis reutilizadas recebem penalização. O objetivo é aumentar:
+
+- dezenas únicas no lote;
+- variáveis únicas;
+- amplitude entre cartões;
+
+reduzindo sobreposição desnecessária.
+
+O `GenerationBatchAudit` informa:
+
+- núcleo compartilhado;
+- dezenas únicas no lote;
+- variáveis únicas;
+- sobreposição média, mínima e máxima;
+- espaço combinatório elegível.
+
+Uma evolução futura pode transformar essa seleção sequencial em otimização global do portfólio inteiro. Essa etapa ainda não é declarada como implementada.
+
+## Filtros estruturais
+
+Paridade, repetição e soma continuam desligados por padrão na experiência avançada e mostram o baseline matemático condicionado às escolhas manuais.
+
+O usuário pode ativá-los conscientemente.
+
+Restringir o universo não faz uma combinação individual ficar mais provável. Esses filtros servem para definir o tipo de cobertura desejada.
+
+## Modo determinístico e diversificado
+
+### Determinístico
+
+Usado em backtests e Laboratório.
+
+Mesma entrada produz a mesma saída. Isso é necessário para comparação reproduzível.
+
+### Diversificado
+
+Usado na experiência de geração real.
+
+O motor:
+
+1. calcula a análise;
+2. seleciona o núcleo;
+3. forma o pool de candidatos;
+4. ranqueia combinações pelas regras da metodologia;
+5. mantém uma shortlist das melhores;
+6. escolhe de forma ponderada dentro da shortlist usando uma seed;
+7. penaliza reutilização ao montar o restante do lote.
+
+A mesma seed, com o mesmo histórico e a mesma configuração, reproduz o mesmo lote.
+
+## Explicabilidade na página
+
+A tela mostra explicitamente:
+
+- **Por que este lote será gerado assim?** antes da geração;
+- a sequência Análise → Núcleo → Variáveis → Restrições → Auditoria;
+- **Como ler este jogo** em cada cartão gerado;
+- **Por que este lote foi aceito?** depois da prévia;
+- avisos separados sobre previsão, score e cobertura estrutural;
+- atalho para validar hipóteses no Laboratório.
+
+A regra de produto é simples:
+
+> O usuário deve conseguir gerar sem estudar estatística, mas deve conseguir auditar cada decisão quando quiser aprofundar.
+
+## Regra de segurança conceitual
+
+Nunca interpretar a geração como previsão.
+
+O Loto Lab pode dizer:
+
+- “esta dezena ficou acima do esperado na amostra”;
+- “este lote possui maior diversidade entre os cartões”;
+- “esta estratégia ficou no percentil X contra controles aleatórios”.
+
+Não deve dizer:
+
+- “esta dezena tem mais chance no próximo sorteio”;
+- “esta dezena está para sair”;
+- “este jogo é mais provável de ser sorteado”.
