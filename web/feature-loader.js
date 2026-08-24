@@ -74,6 +74,8 @@ async function ensureViewFeatures() {
     // Generator 2.0 owns the advanced workspace. The basic generator rendered
     // by app.js remains the fallback when this optional module cannot mount.
     await loadStyledModule("generation-v2");
+    // Readiness keeps derived local defaults aligned with the latest conditioned plan.
+    await loadModule("generation-readiness");
     // Explainability is additive: if it fails, the audited generator remains usable.
     await loadStyledModule("generation-explainability");
   } else if (view === "games") {

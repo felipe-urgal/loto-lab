@@ -63,6 +63,41 @@ function installWhyPanel(shell) {
   side.prepend(panel);
 }
 
+function repeatedCount(gameCard) {
+  const row = [...gameCard.querySelectorAll(".g2-game-meta span")]
+    .find((node) => node.textContent?.trim().startsWith("Repetidas"));
+  const value = Number(row?.querySelector("strong")?.textContent);
+  return Number.isInteger(value) ? value : null;
+}
+
+function installLotofacilReadiness(preview) {
+  if (document.querySelector("#lottery-select")?.value !== "lotofacil") return;
+  if (preview.querySelector("[data-g2-lotofacil-readiness]")) return;
+
+  const repeated = [...preview.querySelectorAll(".g2-game")]
+    .map(repeatedCount)
+    .filter((value) => value !== null);
+  if (repeated.length === 0) return;
+
+  const acceptable = repeated.filter((value) => value >= 7 && value <= 11).length;
+  const preferred = repeated.filter((value) => value >= 8 && value <= 10).length;
+  const allAcceptable = acceptable === repeated.length;
+  const panel = document.createElement("section");
+  panel.className = "panel g2-card g2-preview-rationale";
+  panel.dataset.g2LotofacilReadiness = "true";
+  panel.innerHTML = `
+    <div class="g2-card-head"><div><strong>${allAcceptable ? "✓" : "⚠"} Perfil da Lotofácil</strong><span>Conferência da repetição em relação ao concurso imediatamente anterior.</span></div></div>
+    <div class="g2-rationale-grid">
+      <div><strong>${acceptable}/${repeated.length} na faixa aceitável</strong><span>A metodologia padrão usa 7–11 repetidas como guardrail amplo.</span></div>
+      <div><strong>${preferred}/${repeated.length} na faixa preferida</strong><span>8–10 continua sendo uma preferência de composição, não uma promessa de desempenho.</span></div>
+      <div><strong>Repetidas por jogo</strong><span>${repeated.join(" · ")}</span></div>
+      <div><strong>${allAcceptable ? "Perfil padrão respeitado" : "Perfil padrão alterado"}</strong><span>${allAcceptable ? "O lote permanece dentro do perfil documentado." : "Um filtro explícito pode ter sobrescrito o guardrail padrão; revise antes de salvar."}</span></div>
+    </div>`;
+  const actions = preview.querySelector(".g2-result-actions");
+  if (actions) actions.before(panel);
+  else preview.append(panel);
+}
+
 function decoratePreview(shell) {
   const preview = shell.querySelector(".g2-preview");
   if (!preview || preview.dataset.explainabilityReady === "true") return;
@@ -87,6 +122,8 @@ function decoratePreview(shell) {
     gameCard.append(reason);
   });
 
+  installLotofacilReadiness(preview);
+
   const rationale = document.createElement("section");
   rationale.className = "panel g2-card g2-preview-rationale";
   rationale.innerHTML = `
@@ -94,7 +131,7 @@ function decoratePreview(shell) {
     <div class="g2-rationale-grid">
       <div><strong>✓ Núcleo</strong><span>Compartilhado conforme a configuração escolhida.</span></div>
       <div><strong>✓ Variáveis</strong><span>Selecionadas por score + diversidade, com penalização de reutilização.</span></div>
-      <div><strong>✓ Restrições</strong><span>Todos os jogos respeitam os filtros habilitados.</span></div>
+      <div><strong>✓ Restrições</strong><span>Todos os jogos respeitam os filtros habilitados e o perfil padrão aplicável.</span></div>
       <div><strong>✓ Auditoria</strong><span>Seed, histórico e fingerprint permitem reproduzir exatamente a prévia.</span></div>
     </div>`;
   preview.append(rationale);
