@@ -41,6 +41,12 @@ export class RealBetService {
       throw new Error(`CONTEST_TARGET_MISMATCH:${batch.targetContestNumber}:${contestNumber}`);
     }
 
+    // A real-performance record must be auditable without hindsight. If the
+    // official result is already stored, this batch belongs in backtest/history,
+    // not in the live real-bet KPI.
+    const knownResult = await this.contests.findByNumber(batch.lottery, contestNumber);
+    if (knownResult) throw new Error(`RESULT_ALREADY_KNOWN:${contestNumber}`);
+
     const positions = input.gamePositions?.length
       ? [...new Set(input.gamePositions)]
       : batch.games.map((_, index) => index + 1);
@@ -72,13 +78,16 @@ export class RealBetService {
       throw error;
     }
 
-    return (await this.reconcile(created.id)) ?? created;
+    return created;
   }
 
   async reconcile(id: number): Promise<RealBetRecord | undefined> {
     const bet = await this.realBets.findById(id);
     if (!bet) return undefined;
-    if (bet.status === "checked") return bet;
+
+    // A statistical check can finish before CAIXA publishes every financial
+    // tier. Keep such records reconcilable until totalPrizeValue is known.
+    if (bet.status === "checked" && bet.totalPrizeValue !== undefined) return bet;
 
     const contest = await this.contests.findByNumber(bet.lottery, bet.contestNumber);
     if (!contest) return bet;
@@ -89,12 +98,15 @@ export class RealBetService {
 
   async reconcilePending(lottery?: LotteryId): Promise<number> {
     const pending = await this.realBets.listPending(lottery);
-    let checked = 0;
+    let financiallyResolved = 0;
     for (const bet of pending) {
+      const beforeKnown = bet.totalPrizeValue !== undefined;
       const after = await this.reconcile(bet.id);
-      if (after?.status === "checked") checked += 1;
+      if (after?.status === "checked" && after.totalPrizeValue !== undefined && !beforeKnown) {
+        financiallyResolved += 1;
+      }
     }
-    return checked;
+    return financiallyResolved;
   }
 
   async list(lottery: LotteryId, limit = 50): Promise<{ items: RealBetRecord[]; summary: RealBetSummary }> {
