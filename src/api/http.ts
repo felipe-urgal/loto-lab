@@ -68,6 +68,34 @@ function normalizedOrigin(value: string): string | undefined {
   }
 }
 
+function firstHeaderValue(value: string | string[] | undefined): string | undefined {
+  const first = Array.isArray(value) ? value[0] : value;
+  return first?.split(",", 1)[0]?.trim() || undefined;
+}
+
+/**
+ * Resolve the origin that is allowed to issue browser mutations.
+ *
+ * A configured public/CORS origin is authoritative. When none is configured
+ * (local development, tests, direct localhost use), derive the origin from the
+ * request Host instead of assuming a fixed localhost port. Browsers cannot
+ * choose an arbitrary Host header during CSRF, so this preserves same-origin
+ * protection without breaking legitimate alternate local ports/hosts.
+ */
+export function resolveMutationExpectedOrigin(
+  request: IncomingMessage,
+  configuredOrigin?: string,
+): string {
+  const configured = configuredOrigin ? normalizedOrigin(configuredOrigin) : undefined;
+  if (configured) return configured;
+
+  const host = firstHeaderValue(request.headers.host);
+  if (!host) return "http://localhost";
+  const forwardedProto = firstHeaderValue(request.headers["x-forwarded-proto"])?.toLowerCase();
+  const protocol = forwardedProto === "https" ? "https" : "http";
+  return normalizedOrigin(`${protocol}://${host}`) ?? "http://localhost";
+}
+
 export function requireSameOriginMutation(
   request: IncomingMessage,
   response: ServerResponse,
