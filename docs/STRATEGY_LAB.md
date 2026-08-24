@@ -1,6 +1,6 @@
 # Laboratório de Estratégias
 
-O Laboratório compara variações da metodologia sobre exatamente o mesmo recorte histórico.
+O Laboratório compara variações da metodologia sobre o mesmo recorte histórico.
 
 A finalidade é medir hipóteses de composição, não prever sorteios.
 
@@ -10,51 +10,37 @@ A finalidade é medir hipóteses de composição, não prever sorteios.
 
 Toda comparação é reproduzível pelo core. O resultado do concurso-alvo nunca é entregue ao gerador antes da geração daquele round.
 
+Além de proteção contra vazamento futuro, a validação histórica agora aplica uma regra comum de elegibilidade: um concurso só é usado como alvo quando o seu predecessor imediato existe na base. Uma lacuna não pode transformar um concurso mais antigo em “concurso anterior”.
+
 ## Experimentos
 
 ### 1. Núcleo fixo
 
 Compara o tamanho do núcleo mantendo o restante da execução igual.
 
-#### Mega-Sena
-
-- 0 fixas + 6 variáveis;
-- 2 fixas + 4 variáveis;
-- 3 fixas + 3 variáveis.
-
-#### Lotofácil
-
-- 8 fixas + 7 variáveis;
-- 9 fixas + 6 variáveis;
-- 10 fixas + 5 variáveis.
-
-#### Dia de Sorte
-
-- 0 fixas + 7 variáveis;
-- 2 fixas + 5 variáveis;
-- 3 fixas + 4 variáveis.
+- Mega-Sena: 0, 2 ou 3 fixas;
+- Lotofácil: 8, 9 ou 10 fixas;
+- Dia de Sorte: 0, 2 ou 3 fixas.
 
 Os padrões operacionais continuam 3 fixas na Mega-Sena, 8 na Lotofácil e 3 no Dia de Sorte enquanto não houver evidência robusta para mudar.
 
 ### 2. Modelos de score
 
-O experimento `score-model` isola o efeito do ranking mantendo o núcleo operacional de cada loteria.
-
-Variantes:
+O experimento `score-model` compara:
 
 - `score-v2` — desvio em relação ao esperado ajustado pelo tamanho da amostra;
 - `score-v1` — normalização min/max legada;
-- `no-score` — controle estrutural com todas as dezenas neutras.
+- `no-score` — controle estrutural com score neutro.
 
-A pergunta é direta:
+A pergunta é:
 
 > **O ranking adiciona valor mensurável além da estrutura do gerador?**
 
-Nenhuma variante é promovida apenas porque ficou em primeiro lugar em um único período.
+O `no-score` não usa mais o número da dezena como desempate implícito. Quando vários candidatos ficam empatados, uma ordem pseudoaleatória estável e reproduzível é derivada do contexto histórico. Assim o controle não favorece sistematicamente dezenas menores como `01`, `02`, `03`.
 
 ### 3. Regras externas da Mega-Sena
 
-O experimento `external-rules` permanece separado do tamanho do núcleo e está disponível somente para Mega-Sena.
+O experimento `external-rules` permanece separado e está disponível somente para Mega-Sena.
 
 Ele formaliza como hipóteses reproduzíveis:
 
@@ -72,180 +58,229 @@ Grupo utilizado:
 
 Todas as variantes usam `fixedCount = 0` para não confundir efeito da regra externa com efeito de núcleo.
 
-Essas regras não são tratadas como verdade matemática. São hipóteses experimentais.
+Essas regras são hipóteses experimentais, não verdade matemática.
 
 ## Controle aleatório por distribuição
 
-O laboratório não compara a melhor estratégia apenas contra uma única amostra aleatória.
+Cada execução gera entre 10 e 500 controles aleatórios reproduzíveis; a interface usa 100 por padrão.
 
-Cada execução pode gerar entre 10 e 500 controles aleatórios reproduzíveis; a interface usa 100 por padrão.
+Cada controle usa:
 
-Cada controle:
+- a mesma loteria;
+- o mesmo período elegível;
+- a mesma quantidade de jogos por concurso;
+- o mesmo aquecimento;
+- seeds reproduzíveis;
+- o mesmo checker estatístico e financeiro.
 
-- usa a mesma loteria;
-- usa o mesmo período;
-- usa a mesma quantidade de jogos por concurso;
-- usa o mesmo aquecimento;
-- não consulta score, frequência, núcleo ou regras experimentais;
-- não recebe o resultado-alvo antes da geração;
-- utiliza seed estável;
-- passa pelo mesmo checker estatístico e financeiro.
+O controle não consulta score, núcleo ou regras experimentais e nunca vê o resultado-alvo antes de gerar os jogos.
 
-A distribuição expõe:
+A distribuição informa:
 
-- `P05` — percentil 5 dos controles;
+- `P05`;
 - `P50` — mediana;
-- `P95` — percentil 95;
-- percentil da melhor estratégia dentro da distribuição.
+- `P95`;
+- percentil mid-rank da estratégia;
+- p-value empírico de cauda;
+- p-value ajustado pela quantidade de variantes testadas.
 
-O laboratório também mantém uma série temporal concreta de um controle próximo da mediana para permitir comparação no gráfico.
+Uma amostra concreta próxima da mediana é mantida apenas para tabela e gráfico. A evidência é calculada sobre a distribuição inteira.
+
+## Empates são neutros
+
+Métricas como taxa de premiação são discretas e podem produzir muitos empates.
+
+Por isso o percentil visual usa **mid-rank**:
+
+```text
+abaixo + 0,5 × empatados
+───────────────────────
+       amostras
+```
+
+Para uma afirmação de superioridade, empate conta contra a hipótese:
+
+```text
+p superior = (1 + controles >= estratégia) / (N + 1)
+```
+
+O `+1` evita p-value Monte Carlo igual a zero.
+
+Se a estratégia obtiver exatamente o mesmo resultado que todos os controles, seu percentil é `0,500` e a conclusão é `no-evidence`, nunca `beats-random`.
+
+## Correção por múltiplas comparações
+
+O Laboratório não compara a melhor entre várias estratégias como se ela tivesse sido escolhida antes do experimento.
+
+A melhor variante é selecionada no período, mas sua evidência usa uma correção Bonferroni pela quantidade de variantes da família:
+
+```text
+p ajustado = min(1, p empírico × número de variantes)
+```
+
+Hoje:
+
+- núcleo fixo: 3 variantes;
+- modelos de score: 3 variantes;
+- regras externas da Mega-Sena: 9 variantes.
+
+Isso reduz o risco de declarar uma estratégia vencedora apenas porque muitas hipóteses foram tentadas.
 
 ## Status de evidência
 
-A melhor estratégia recebe uma leitura explícita:
-
 ### `beats-random`
 
-Percentil maior ou igual a 95%.
+Exige simultaneamente:
 
-Leitura de produto:
+- resultado acima da mediana dos controles;
+- p-value superior **ajustado** `<= 0,05`.
 
-> venceu do random neste recorte.
+Leitura:
 
-Isso ainda não prova capacidade preditiva. O resultado precisa persistir em períodos futuros.
+> há evidência histórica de resultado acima dos controles neste recorte, mesmo após corrigir a quantidade de variantes testadas.
+
+Ainda não é prova de capacidade preditiva futura.
 
 ### `inconclusive`
 
-Percentil entre 90% e 95%.
-
-Leitura:
-
-> sinal interessante, mas ainda perto da borda da distribuição.
+Existe sinal na cauda (`p bruto <= 0,10`), mas ele não sustenta a conclusão após os controles aplicados.
 
 ### `no-evidence`
 
-Entre os percentis centrais.
-
-Leitura:
-
-> a estratégia está dentro do comportamento compatível com o acaso neste recorte.
-
-Esse resultado é útil. Evita promover complexidade sem benefício mensurável.
+O resultado permanece compatível com o comportamento dos controles aleatórios.
 
 ### `underperforms-random`
 
-Percentil menor ou igual a 5%.
+Exige resultado abaixo da mediana e p-value inferior ajustado `<= 0,05`.
 
-Leitura:
+## Compatibilidade da API v1
 
-> a hipótese ficou entre os piores controles e merece revisão ou descarte.
+O PR introduz `schemaVersion: 2` na resposta do Strategy Lab.
+
+Para evitar uma quebra silenciosa de consumidores existentes, estes campos mantêm a semântica antiga:
+
+- `benchmark.control` — controle aleatório de seed fixa legado;
+- `benchmark.delta` — diferença para esse controle legado;
+- `benchmark.beatsRandom` — `delta > 0` no contrato legado.
+
+A interface nova **não** usa esses campos para concluir evidência.
+
+Os campos autoritativos v2 são:
+
+- `benchmark.medianControl`;
+- `benchmark.medianDelta`;
+- `benchmark.strategyPercentile`;
+- `benchmark.status`;
+- `benchmark.rawPValue`;
+- `benchmark.adjustedPValue`;
+- `benchmark.familySize`;
+- `benchmark.distribution`.
 
 ## Qualidade preditiva do ranking
 
-O experimento `score-model` mede também se o ranking colocou os números realmente sorteados acima dos números não sorteados **antes de cada concurso**.
+O experimento `score-model` mede se o ranking colocou os números realmente sorteados acima dos não sorteados **antes de cada concurso**.
 
 A métrica principal é AUC:
 
-- `0,500` — equivalente a ordenação sem informação;
-- acima de `0,500` — números sorteados tenderam a aparecer mais acima no ranking;
-- abaixo de `0,500` — o ranking ficou invertido em relação ao resultado futuro.
+- `0,500` — ordenação sem informação;
+- acima de `0,500` — sorteados tenderam a ficar acima no ranking;
+- abaixo de `0,500` — ranking historicamente invertido.
 
-O cálculo é feito round a round. Para cada concurso-alvo, o score usa somente concursos anteriores.
+O cálculo usa somente concursos anteriores ao alvo e ignora alvos cujo predecessor imediato está ausente.
 
-`no-score` é um controle importante: como todas as dezenas ficam empatadas, sua AUC é exatamente `0,500`.
+`maxRounds` é aplicado antes do cálculo pesado: limitar a 100 rounds significa processar até 100 alvos elegíveis, e não calcular tudo para depois descartar o excedente.
 
-A AUC mede a qualidade da ordenação. Ela não significa que uma dezena individual ganhou probabilidade matemática maior.
+AUC mede qualidade histórica de ordenação; não altera a probabilidade matemática individual de uma dezena.
 
 ## Walk-forward de pesos
 
-Os pesos do Score v2 podem ser avaliados por validação temporal fora da amostra.
-
-O processo implementado é:
+O processo é:
 
 ```text
-histórico disponível
+histórico anterior
       ↓
 janela de treino
       ↓
-compara perfis de pesos por AUC
+compara perfis por AUC
       ↓
-escolhe um perfil
+escolhe perfil
       ↓
-congela os pesos
+congela pesos
       ↓
-avalia no próximo bloco futuro
+avalia bloco futuro
       ↓
-anda a janela e repete
+repete
 ```
 
-Perfis iniciais avaliados:
+Perfis iniciais:
 
 - padrão;
 - longo prazo;
 - recência;
 - janelas equilibradas.
 
-A escolha do perfil usa apenas a janela de treino. O perfil escolhido fica congelado dentro do bloco futuro, mesmo que os resultados desse bloco comecem a chegar.
+O walk-forward respeita `startContest` e `endContest` informados para a análise. Concursos posteriores ao `endContest` não entram em fold, métrica ou seleção.
 
-O relatório mostra:
+Dados anteriores ao início podem ser usados como treino, pois já estariam disponíveis naquele momento histórico.
 
-- AUC escolhida no treino;
-- AUC do perfil escolhido no bloco futuro;
-- AUC dos pesos padrão no mesmo bloco;
-- delta fora da amostra;
-- quantidade de folds e concursos efetivamente testados.
+## Null do ganho walk-forward
 
-Essa validação não promove automaticamente o perfil vencedor. Ela mede se a otimização histórica continuou funcionando depois da escolha.
+O ganho entre pesos otimizados e padrão usa null pareado por sign-flip.
 
-## Simulador nulo para ganho walk-forward
+Cada fold mantém sua magnitude e recebe sinal aleatório sob a hipótese nula.
 
-O delta entre “pesos otimizados” e “pesos padrão” não possui uma distribuição teórica simples que seja útil para a interface.
+A estatística simulada usa os **mesmos pesos por número de concursos** usados no delta mostrado na interface. Assim `nullBenchmark.observed` corresponde ao mesmo estimando agregado exibido como `deltaVsDefault`.
 
-Por isso o Laboratório usa um **null pareado por sign-flip** sobre os deltas dos folds:
+São apresentados:
 
-1. mantém a magnitude do ganho/perda de cada fold;
-2. inverte aleatoriamente o sinal sob a hipótese nula de que a otimização não possui direção consistente;
-3. repete a simulação com seed reproduzível;
-4. calcula P05, P50, P95 e p-value bilateral empírico.
+- P05;
+- P50;
+- P95;
+- percentil mid-rank;
+- p-value bilateral empírico.
 
-Assim um ganho médio pequeno pode ser corretamente interpretado como compatível com ruído quando permanece dentro da distribuição nula.
+## Lacunas históricas
+
+Estratégias, controles aleatórios e AUC usam a mesma regra:
+
+```text
+#100
+#101
+#103
+```
+
+Nesse caso `#103` não é alvo elegível, porque `#102` está ausente. O sistema não trata `#101` como seu concurso anterior.
+
+Quando a continuidade é retomada:
+
+```text
+#103
+#104
+```
+
+`#104` volta a ser elegível, porque seu predecessor imediato existe.
 
 ## Métrica principal do backtest de jogos
 
-Se estratégias e controles possuem cobertura financeira suficiente, o ranking usa:
+Se todas as variantes e todos os controles possuem cobertura financeira suficiente, o ranking usa ROI.
 
-1. ROI;
-2. taxa de premiação;
-3. média de acertos por jogo;
-4. tamanho do núcleo como último desempate quando aplicável.
+Caso contrário, usa taxa de premiação.
 
-Se a cobertura financeira é incompleta:
+Os critérios secundários continuam apenas como desempate de ordenação. A comparação contra random usa a mesma métrica principal escolhida.
 
-1. taxa de premiação;
-2. média de acertos;
-3. melhor número de acertos;
-4. tamanho do núcleo como desempate.
+A AUC fica separada porque responde a outra pergunta: qualidade da ordenação das dezenas.
 
-A comparação com a distribuição aleatória usa a mesma métrica escolhida para o ranking.
+## Limites operacionais
 
-A AUC é apresentada separadamente porque responde a outra pergunta: qualidade preditiva da ordenação das dezenas.
+O endpoint roda em worker thread e possui:
 
-## Série histórica por blocos
+- rate limit;
+- gate para uma análise cara por vez;
+- limite estimado de avaliações antes de iniciar;
+- timeout de 60 segundos;
+- cancelamento quando a requisição é abortada ou a conexão fecha.
 
-Os rounds são agrupados em blocos para mostrar estabilidade ao longo do período.
-
-Para cada bloco são recalculados:
-
-- média de acertos;
-- média de acertos do núcleo quando aplicável;
-- taxa de premiação;
-- ROI;
-- cobertura financeira;
-- resultado líquido.
-
-O gráfico mostra as estratégias e um controle aleatório próximo da mediana da distribuição.
-
-No experimento de regras externas, somente o Top 3 aparece no gráfico para preservar legibilidade; todas as variantes continuam na tabela.
+Uma solicitação excessiva retorna `ANALYSIS_TOO_LARGE`. Uma análise que excede o tempo retorna `ANALYSIS_TIMEOUT`.
 
 ## API
 
@@ -254,21 +289,7 @@ POST /api/v1/lab/compare
 Content-Type: application/json
 ```
 
-### Núcleo fixo
-
-```json
-{
-  "lottery": "lotofacil",
-  "experiment": "fixed-core",
-  "gameCount": 4,
-  "warmupContests": 20,
-  "lookbackContests": 200,
-  "bucketSize": 25,
-  "randomSamples": 100
-}
-```
-
-### Modelos de score
+Exemplo:
 
 ```json
 {
@@ -282,34 +303,21 @@ Content-Type: application/json
 }
 ```
 
-A resposta desse experimento inclui também `rankingQuality` e `walkForward`.
-
-### Regras externas
-
-```json
-{
-  "lottery": "mega-sena",
-  "experiment": "external-rules",
-  "gameCount": 2,
-  "warmupContests": 20,
-  "lookbackContests": 200,
-  "bucketSize": 25,
-  "randomSamples": 100
-}
-```
-
 Também podem ser informados `startContest` e `endContest`.
 
-## Contrato do benchmark
-
-A resposta inclui, entre outros campos:
+Exemplo resumido de resposta v2:
 
 ```json
 {
+  "schemaVersion": 2,
   "benchmark": {
     "basis": "roi",
     "strategyPercentile": 0.96,
-    "status": "beats-random",
+    "rawPValue": 0.03,
+    "adjustedPValue": 0.09,
+    "familySize": 3,
+    "status": "inconclusive",
+    "medianDelta": 0.04,
     "distribution": {
       "samples": 100,
       "p05": -0.38,
@@ -320,27 +328,12 @@ A resposta inclui, entre outros campos:
 }
 ```
 
-Os valores acima são apenas exemplo de formato.
-
-## Interface
-
-A tela do Laboratório explica:
-
-- qual hipótese está sendo testada;
-- quantos controles aleatórios serão simulados;
-- qual métrica está definindo o ranking;
-- P05/P50/P95 da distribuição aleatória;
-- percentil da melhor estratégia;
-- status de evidência;
-- evolução por blocos;
-- AUC dos modelos no experimento de score;
-- resultado do walk-forward e distribuição nula do ganho;
-- diferença entre “venceu do random”, “inconclusivo”, “sem evidência” e “abaixo do random”.
+Os valores são apenas exemplo de formato. O exemplo mostra por que “percentil alto” e “evidência ajustada” não são a mesma coisa.
 
 ## Interpretação correta
 
-O laboratório mede comportamento histórico de regras reproduzíveis.
+O Laboratório mede comportamento histórico de regras reproduzíveis.
 
 Ele não demonstra que sorteios futuros deixaram de ser aleatórios e não torna uma combinação individual mais provável.
 
-Quanto mais hipóteses forem testadas, maior o risco de overfitting. Resultados precisam ser avaliados em vários períodos, contra controles e, quando parâmetros forem escolhidos pelos próprios dados, em validação futura separada.
+Quanto mais hipóteses forem testadas, maior o risco de data snooping. Por isso a conclusão usa controles aleatórios, correção por múltiplas comparações e validação temporal fora da amostra quando parâmetros são escolhidos pelos próprios dados.
