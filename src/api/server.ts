@@ -7,7 +7,7 @@ import { logEvent } from "../observability/log.js";
 import { serveFeatureRoutes } from "./routes.js";
 import { serveWebAsset } from "./web.js";
 import { loadAppAuthConfig, requireAppAuthentication } from "./auth.js";
-import { requireSameOriginMutation } from "./http.js";
+import { requireSameOriginMutation, resolveMutationExpectedOrigin } from "./http.js";
 
 export interface LotoLabServerOptions extends ApiServerOptions {
   aiProvider?: AiInterpretationProvider;
@@ -22,10 +22,9 @@ function isHealthPath(pathname: string): boolean {
 export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const apiHandler = createApiRequestHandler(options);
   const auth = loadAppAuthConfig();
-  const expectedOrigin = options.corsOrigin
+  const configuredOrigin = options.corsOrigin
     ?? process.env.API_CORS_ORIGIN
-    ?? process.env.PUBLIC_ORIGIN
-    ?? "http://localhost:3000";
+    ?? process.env.PUBLIC_ORIGIN;
 
   return createServer(async (request, response) => {
     const requestId = randomUUID();
@@ -37,12 +36,14 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
       if (!isHealthPath(url.pathname) && !requireAppAuthentication(request, response, auth)) {
         return;
       }
+      const expectedOrigin = resolveMutationExpectedOrigin(request, configuredOrigin);
       if (!isHealthPath(url.pathname) && !requireSameOriginMutation(request, response, expectedOrigin)) {
         logEvent("warn", "cross_origin_mutation_blocked", {
           requestId,
           method,
           pathname: url.pathname,
           origin: request.headers.origin,
+          expectedOrigin,
           fetchSite: request.headers["sec-fetch-site"],
         });
         return;
