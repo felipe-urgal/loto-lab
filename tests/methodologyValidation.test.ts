@@ -1,11 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { Contest } from "../src/domain/types.js";
+import { eligibleTargetIndexes } from "../src/analysis/contestEligibility.js";
 import { getLotteryConfig } from "../src/lotteries/config.js";
 import { evaluateRankingQuality } from "../src/analysis/rankQuality.js";
 import { evaluateWalkForwardWeights } from "../src/analysis/walkForward.js";
 import { pairedSignFlipNull } from "../src/analysis/nullSimulation.js";
 import { backtestMegaSena } from "../src/backtest/megaSena.js";
+import { estimateStrategyLabWorkUnits } from "../src/api/strategyLab.js";
+import { resolveStrategyLabPeriod } from "../src/lab/strategyLab.js";
 
 function megaHistory(count: number): Contest[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -110,6 +113,38 @@ test("targets whose immediate predecessor is missing are skipped consistently", 
   assert.ok(!backtest.rounds.some((round) => round.contest === 51));
   assert.ok(quality.series.some((round) => round.contest === 52));
   assert.ok(backtest.rounds.some((round) => round.contest === 52));
+});
+
+test("Strategy Lab work budget uses the effective explicit period instead of lookbackContests", () => {
+  const history = megaHistory(300);
+  const options = {
+    lottery: "mega-sena" as const,
+    experiment: "external-rules" as const,
+    warmupContests: 20,
+    startContest: 21,
+    endContest: 300,
+    lookbackContests: 10,
+  };
+  const period = resolveStrategyLabPeriod(history, options);
+  const eligibleTargets = eligibleTargetIndexes(history, {
+    warmupContests: 20,
+    startContest: period.startContest,
+    endContest: period.endContest,
+  }).length;
+
+  const actualPeriodBudget = estimateStrategyLabWorkUnits("external-rules", eligibleTargets, 10, 500);
+  const incorrectLookbackBudget = estimateStrategyLabWorkUnits("external-rules", 10, 10, 500);
+
+  assert.deepEqual(period, { startContest: 21, endContest: 300 });
+  assert.equal(eligibleTargets, 280);
+  assert.ok(actualPeriodBudget > 750_000);
+  assert.ok(incorrectLookbackBudget < 750_000);
+});
+
+test("score-model work budget includes predictive analysis overhead", () => {
+  const fixedCore = estimateStrategyLabWorkUnits("fixed-core", 100, 2, 100);
+  const scoreModel = estimateStrategyLabWorkUnits("score-model", 100, 2, 100);
+  assert.ok(scoreModel > fixedCore);
 });
 
 test("paired sign-flip null simulation is deterministic and honors weights", () => {
