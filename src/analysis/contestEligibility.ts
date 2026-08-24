@@ -17,6 +17,20 @@ export function hasImmediatePredecessor(contests: Contest[], index: number): boo
   return contests[index - 1]!.number === contests[index]!.number - 1;
 }
 
+/**
+ * Returns only the latest contiguous suffix of a contest series. Recent windows
+ * must not silently jump across a missing contest: when continuity restarts, the
+ * available recent sample simply becomes smaller until enough draws accumulate.
+ */
+export function continuousSuffix(contests: Contest[]): Contest[] {
+  if (contests.length <= 1) return [...contests];
+  let start = contests.length - 1;
+  while (start > 0 && contests[start - 1]!.number === contests[start]!.number - 1) {
+    start -= 1;
+  }
+  return contests.slice(start);
+}
+
 export function eligibleTargetIndexes(
   contests: Contest[],
   options: EligibleTargetOptions,
