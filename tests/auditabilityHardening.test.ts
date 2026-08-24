@@ -50,8 +50,13 @@ const completeTiers = [
   { description: "4 acertos", winners: 100, prizeValue: 777 },
 ];
 
+const correctedCompleteTiers = [
+  ...partialTiers,
+  { description: "4 acertos", winners: 100, prizeValue: 888 },
+];
+
 test(
-  "real-bet finance remains reconcilable and complete prize schedules never downgrade",
+  "real-bet finance remains reconcilable, complete schedules never downgrade and official corrections are audited",
   { skip: !process.env.DATABASE_URL },
   async (t) => {
     const pool = createPostgresPool({ max: 3 });
@@ -91,12 +96,31 @@ test(
     const checked = await service.realBets.findById(bet.id);
     assert.equal(checked?.totalPrizeValue, 777);
     assert.equal(checked?.netResult, 771);
+    assert.ok(checked?.checkedAt);
+    const firstCheckedAt = checked!.checkedAt;
 
     await contests.upsertMany([contest(partialTiers)]);
     const preserved = await contests.findByNumber("mega-sena", TARGET);
     assert.ok(preserved);
     assert.equal(hasCompletePrizeSchedule(preserved), true);
     assert.equal(preserved.prizeTiers?.find((tier) => tier.description === "4 acertos")?.prizeValue, 777);
+
+    await contests.upsertMany([contest(correctedCompleteTiers)]);
+    const correction = await service.reconcileContestNumbers("mega-sena", [TARGET]);
+    assert.deepEqual(correction, { financiallyResolved: 0, financiallyRevised: 1 });
+
+    const revised = await service.realBets.findById(bet.id);
+    assert.equal(revised?.totalPrizeValue, 888);
+    assert.equal(revised?.netResult, 882);
+    assert.equal(revised?.checkedAt, firstCheckedAt);
+
+    const revisions = await service.realBets.listFinancialRevisions(bet.id);
+    assert.equal(revisions.length, 1);
+    assert.equal(revisions[0]?.previousTotalPrizeValue, 777);
+    assert.equal(revisions[0]?.newTotalPrizeValue, 888);
+    assert.equal(revisions[0]?.previousNetResult, 771);
+    assert.equal(revisions[0]?.newNetResult, 882);
+    assert.equal(revisions[0]?.reason, "official-prize-refresh");
   },
 );
 
