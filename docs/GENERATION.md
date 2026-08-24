@@ -18,7 +18,7 @@ A interface mantém os controles avançados existentes, mas explica por que cada
 
 ## Score v2
 
-O gerador operacional passa a usar `score-v2` por padrão.
+O gerador operacional usa `score-v2` por padrão.
 
 O Score v2 preserva as cinco janelas da metodologia:
 
@@ -74,7 +74,7 @@ O core mantém três variantes explícitas:
 - `score-v1` — modelo legado baseado em normalização min/max;
 - `no-score` — controle estrutural com todas as dezenas neutras.
 
-O Laboratório consegue comparar as três no mesmo recorte histórico. Assim uma mudança no score pode ser medida antes de ser tratada como melhoria.
+O Laboratório compara as três no mesmo recorte histórico e também mede a qualidade preditiva do ranking via AUC. Assim uma mudança no score pode ser medida antes de ser tratada como melhoria.
 
 ## Núcleo fixo
 
@@ -107,28 +107,39 @@ Isso **não** pressupõe reversão à média no próximo sorteio. A finalidade �
 
 ## Política explícita do gerador
 
-As penalizações heurísticas que já existiam foram centralizadas em `GENERATION_POLICY`.
+As penalizações heurísticas foram centralizadas em `GENERATION_POLICY`.
 
 Hoje elas controlam:
 
 - distância da meta de pares/ímpares;
 - excesso ou distância da meta de repetição;
 - distância de soma no Dia de Sorte;
-- reutilização de dezenas variáveis entre cartões.
+- sobreposição de dezenas variáveis entre cartões do mesmo lote.
 
 Centralizar esses valores não os transforma em parâmetros validados. O ganho é torná-los visíveis e testáveis como política do gerador, em vez de números espalhados pelo código.
 
-## Diversificação do lote
+## Otimização global do lote
 
-A geração continua selecionando os jogos sequencialmente, mas considera o lote já construído ao ranquear o próximo cartão.
+A geração não escolhe mais um cartão definitivo e depois tenta compensar a reutilização nos cartões seguintes.
 
-Dezenas variáveis reutilizadas recebem penalização. O objetivo é aumentar:
+Para cada posição do lote o motor:
+
+1. constrói combinações que respeitam as restrições;
+2. calcula o score local daquela posição — incluindo a meta própria de paridade, repetição, soma e demais regras aplicáveis;
+3. mantém uma shortlist de candidatos fortes;
+4. combina as shortlists em um **beam search de portfólio**;
+5. avalia o conjunto pela soma dos scores locais menos a penalidade de sobreposição entre as dezenas variáveis;
+6. seleciona o melhor portfólio determinístico, ou um dos portfólios de topo de forma ponderada quando a geração é diversificada.
+
+A função `selectPortfolioCandidates` otimiza, portanto, uma função de objetivo do lote inteiro. O beam search limita o custo computacional sem voltar ao comportamento puramente sequencial.
+
+O objetivo é aumentar:
 
 - dezenas únicas no lote;
 - variáveis únicas;
 - amplitude entre cartões;
 
-reduzindo sobreposição desnecessária.
+reduzindo sobreposição desnecessária, sem sacrificar as metas estruturais de cada posição.
 
 O `GenerationBatchAudit` informa:
 
@@ -137,8 +148,6 @@ O `GenerationBatchAudit` informa:
 - variáveis únicas;
 - sobreposição média, mínima e máxima;
 - espaço combinatório elegível.
-
-Uma evolução futura pode transformar essa seleção sequencial em otimização global do portfólio inteiro. Essa etapa ainda não é declarada como implementada.
 
 ## Filtros estruturais
 
@@ -164,11 +173,11 @@ O motor:
 
 1. calcula a análise;
 2. seleciona o núcleo;
-3. forma o pool de candidatos;
+3. forma os pools de candidatos;
 4. ranqueia combinações pelas regras da metodologia;
-5. mantém uma shortlist das melhores;
-6. escolhe de forma ponderada dentro da shortlist usando uma seed;
-7. penaliza reutilização ao montar o restante do lote.
+5. mantém uma shortlist por posição do lote;
+6. otimiza o portfólio completo por score e diversidade;
+7. escolhe de forma ponderada entre os melhores portfólios usando uma seed.
 
 A mesma seed, com o mesmo histórico e a mesma configuração, reproduz o mesmo lote.
 
