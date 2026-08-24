@@ -16,6 +16,7 @@ import {
   GENERATION_POLICY,
   generationRandom,
   selectWeightedItem,
+  topRankedCandidates,
   type GenerationMode,
 } from "./shared.js";
 
@@ -291,6 +292,14 @@ export function generateMegaSenaGames(
         };
       }
     };
+
+    if (gameCount === 1) {
+      return topRankedCandidates(
+        candidates(),
+        24,
+        (a, b) => b.rank - a.rank || a.numbers.join("-").localeCompare(b.numbers.join("-")),
+      );
+    }
 
     // The final shortlist remains compact (24), but it is selected from the
     // whole algorithmic pool so high-score candidates do not crowd out every
