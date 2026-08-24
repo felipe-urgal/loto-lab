@@ -12,6 +12,7 @@ import {
   parseStrategyLabOptions,
   validateStrategyLabExecution,
 } from "./strategyLabInput.js";
+export { estimateStrategyLabWorkUnits } from "./strategyLabInput.js";
 import { expensiveAnalysisGate } from "./workGate.js";
 import {
   AnalysisCancelledError,
