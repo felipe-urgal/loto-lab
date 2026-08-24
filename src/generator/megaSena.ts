@@ -9,14 +9,13 @@ import {
   type MegaSenaGameRules,
 } from "./megaSenaRules.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
-import { selectPortfolioCandidates } from "./portfolio.js";
+import { buildPortfolioShortlist, selectPortfolioCandidates } from "./portfolio.js";
 import {
   buildStratifiedCandidatePool,
   combinationIterator,
   GENERATION_POLICY,
   generationRandom,
   selectWeightedItem,
-  topRankedCandidates,
   type GenerationMode,
 } from "./shared.js";
 
@@ -259,6 +258,7 @@ export function generateMegaSenaGames(
   const candidatePool = buildCandidatePool(analysis, fixedSet, excludedSet, fixedCount, rules);
   const parityTargets = [3, 4, 2];
   const policy = GENERATION_POLICY.megaSena;
+  const portfolioOverlapPenalty = policy.variableReusePenalty * 4;
 
   const candidateGroups = Array.from({ length: gameCount }, (_, gameIndex) => {
     const targetOdd = rules.equalParity ? 3 : parityTargets[gameIndex % parityTargets.length]!;
@@ -292,18 +292,17 @@ export function generateMegaSenaGames(
       }
     };
 
-    return topRankedCandidates(
-      candidates(),
-      24,
-      (a, b) => b.rank - a.rank || a.numbers.join("-").localeCompare(b.numbers.join("-")),
-    );
+    // The final shortlist remains compact (24), but it is selected from the
+    // whole algorithmic pool so high-score candidates do not crowd out every
+    // disjoint alternative before the global portfolio optimization starts.
+    return buildPortfolioShortlist(candidates(), 24, {
+      explorationLimit: 4096,
+      diversityPenalty: portfolioOverlapPenalty,
+    });
   });
 
   const portfolio = selectPortfolioCandidates(candidateGroups, generationMode, random, {
-    // A mesma reutilização que era penalizada cartão a cartão agora aparece em
-    // todos os pares do portfólio. Na Mega, damos prioridade forte à cobertura
-    // disjunta das variáveis quando o espaço de candidatos permite isso.
-    overlapPenalty: policy.variableReusePenalty * 4,
+    overlapPenalty: portfolioOverlapPenalty,
     beamWidth: 96,
     diversifiedPoolSize: 8,
   });
