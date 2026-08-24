@@ -17,6 +17,7 @@ import {
 } from "./shared.js";
 
 const config = getLotteryConfig("lotofacil");
+const DEFAULT_ACCEPTABLE_REPEAT_RANGE = { min: 7, max: 11 } as const;
 
 export interface LotofacilGeneratorOptions {
   gameCount?: number;
@@ -28,6 +29,20 @@ export interface LotofacilGeneratorOptions {
   constraints?: GenerationConstraints;
   referenceContestNumber?: number | null;
   analysisModel?: AnalysisModel;
+}
+
+function matchesDefaultRepeatProfile(
+  repeatedCount: number,
+  lastContest: Contest | undefined,
+  constraints: GenerationConstraints | undefined,
+): boolean {
+  // The documented Lotofácil methodology treats 7–11 repeats as the broad
+  // acceptable range and 8–10 as the preferred ranking target. Keep the broad
+  // range as a default guardrail, but let an explicit repeated constraint from
+  // the caller override it so manual experiments remain intentional/auditable.
+  if (!lastContest || constraints?.repeated) return true;
+  return repeatedCount >= DEFAULT_ACCEPTABLE_REPEAT_RANGE.min
+    && repeatedCount <= DEFAULT_ACCEPTABLE_REPEAT_RANGE.max;
 }
 
 export function generateLotofacilGames(
@@ -94,6 +109,7 @@ export function generateLotofacilGames(
         const numbers = [...fixedNumbers, ...variableNumbers].sort((a, b) => a - b);
         const metadata = buildMetadata(numbers, lastContest, true);
         const game: GeneratedGame = { lottery: "lotofacil", numbers, fixedNumbers, variableNumbers, metadata };
+        if (!matchesDefaultRepeatProfile(metadata.repeatedFromLastContest.length, lastContest, options.constraints)) continue;
         if (!matchesGenerationConstraints(game, options.constraints)) continue;
         const variableScore = variableNumbers.reduce((total, number) => total + (scores.get(number) ?? 0), 0);
         const repeatPenalty = Math.abs(metadata.repeatedFromLastContest.length - targetRepeat) * policy.repeatDistancePenalty;
