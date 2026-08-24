@@ -5,7 +5,11 @@ import {
   estimateStrategyLabWorkUnits,
   parseStrategyLabOptions,
 } from "../src/api/strategyLabInput.js";
-import { ApiError, requireSameOriginMutation } from "../src/api/http.js";
+import {
+  ApiError,
+  requireSameOriginMutation,
+  resolveMutationExpectedOrigin,
+} from "../src/api/http.js";
 
 test("Strategy Lab parser keeps synchronous and queued experiments on the same contract", () => {
   const score = parseStrategyLabOptions({ experiment: "score-model" }, "mega-sena");
@@ -29,12 +33,19 @@ test("Strategy Lab work estimate grows with variants, games and controls", () =>
   assert.ok(external > fixed);
 });
 
-function mutationRequest(origin?: string, fetchSite?: string) {
+function mutationRequest(
+  origin?: string,
+  fetchSite?: string,
+  host?: string,
+  forwardedProto?: string,
+) {
   return {
     method: "POST",
     headers: {
       ...(origin ? { origin } : {}),
       ...(fetchSite ? { "sec-fetch-site": fetchSite } : {}),
+      ...(host ? { host } : {}),
+      ...(forwardedProto ? { "x-forwarded-proto": forwardedProto } : {}),
     },
   } as unknown as IncomingMessage;
 }
@@ -77,4 +88,24 @@ test("same-origin mutation guard blocks cross-site browser POSTs but keeps non-b
 
   const cli = responseRecorder();
   assert.equal(requireSameOriginMutation(mutationRequest(), cli.response, "https://loto.example"), true);
+});
+
+test("mutation origin follows the actual request host when no public origin is configured", () => {
+  const local = mutationRequest(
+    "http://127.0.0.1:3099",
+    "same-origin",
+    "127.0.0.1:3099",
+  );
+  const localOrigin = resolveMutationExpectedOrigin(local);
+  assert.equal(localOrigin, "http://127.0.0.1:3099");
+  assert.equal(requireSameOriginMutation(local, responseRecorder().response, localOrigin), true);
+
+  const proxied = mutationRequest(
+    "https://loto.example",
+    "same-origin",
+    "loto.example",
+    "https",
+  );
+  assert.equal(resolveMutationExpectedOrigin(proxied), "https://loto.example");
+  assert.equal(resolveMutationExpectedOrigin(proxied, "https://public.example"), "https://public.example");
 });
