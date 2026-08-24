@@ -25,8 +25,8 @@ O Score v2 preserva as cinco janelas da metodologia:
 - histórico total;
 - ano atual;
 - mês atual;
-- últimos 10 concursos;
-- últimos 20 concursos.
+- últimos 10 concursos do sufixo contínuo mais recente;
+- últimos 20 concursos do sufixo contínuo mais recente.
 
 Pesos iniciais:
 
@@ -52,13 +52,33 @@ escala centrada em 50
 
 `50` representa aproximadamente o comportamento esperado da janela. Valores acima ou abaixo representam desvio histórico, não probabilidade futura.
 
+### Continuidade das janelas recentes
+
+`recent10` e `recent20` não atravessam lacunas internas da base.
+
+Exemplo:
+
+```text
+#100
+#101
+#103
+#104
+#105
+```
+
+Para uma análise em `#105`, a janela recente contínua começa em `#103`; `#101` não é puxado artificialmente para completar 10 ou 20 concursos.
+
+Se só existirem 3 concursos consecutivos depois da lacuna, as duas janelas usam uma amostra de 3. O Score v2 já reduz a força do desvio por causa do tamanho efetivo da amostra.
+
 ## Grupos strong / balanced / cold
 
 O `score-v1` dividia o ranking em terços e sempre produzia grupos `strong` e `cold`, mesmo quando as diferenças eram pequenas.
 
 O Score v2 não força essa divisão.
 
-Uma dezena só entra em `strong` quando existe sinal positivo em pelo menos duas janelas e o score agregado fica acima da faixa neutra. `cold` segue a lógica simétrica. As demais permanecem `balanced`.
+Uma dezena só entra em `strong` quando existe comportamento positivo em pelo menos duas janelas e o score agregado fica acima da faixa neutra. `cold` segue a lógica simétrica. As demais permanecem `balanced`.
+
+As cinco janelas são **sobrepostas**, não independentes. Portanto, esses grupos descrevem consistência entre horizontes; não representam múltiplas confirmações estatísticas independentes.
 
 Os rótulos são descritivos. Eles não significam “mais provável”, “menos provável” ou “está para sair”.
 
@@ -133,7 +153,7 @@ Para cada posição do lote o motor:
 
 1. constrói combinações elegíveis;
 2. calcula o score local;
-3. mantém uma shortlist;
+3. preserva uma fronteira compacta que combina score e diversidade;
 4. combina as shortlists em **beam search de portfólio**;
 5. avalia a soma dos scores locais menos a sobreposição de variáveis;
 6. seleciona o melhor portfólio determinístico ou um portfólio de topo ponderado no modo diversificado.
@@ -152,9 +172,17 @@ O(N log K)
 
 em vez de ordenar o conjunto Top-K a cada candidato.
 
-Na Mega-Sena com mais de um cartão, a shortlist final continua compacta, mas é escolhida a partir de uma exploração maior para não eliminar todas as alternativas disjuntas antes do beam search.
+Quando há **mais de um cartão**, Mega-Sena, Lotofácil e Dia de Sorte examinam uma fronteira mais ampla antes de fechar as 24 alternativas de cada posição. `buildPortfolioShortlist` escolhe essas 24 considerando score local e reutilização de variáveis, para que o beam search não receba apenas candidatos quase idênticos.
 
-A otimização de performance não altera a função objetivo nem o critério de ordenação final. Há teste que compara o heap contra uma ordenação completa.
+Quando há **um único jogo**, não existe objetivo de diversidade entre cartões. Nesse caso o motor mantém o caminho mais barato de Top 24 local.
+
+A fronteira final continua compacta; ampliar a exploração não significa carregar milhares de combinações para o beam search.
+
+A otimização de performance não altera a função objetivo final do portfólio. Há testes para:
+
+- equivalência do heap com ordenação completa;
+- preservação de uma alternativa disjunta com score local um pouco menor;
+- diversidade efetiva em lotes de Mega-Sena, Lotofácil e Dia de Sorte.
 
 ## Auditoria do lote
 
@@ -176,7 +204,7 @@ Restringir o universo não torna uma combinação individual mais provável.
 
 ### Determinístico
 
-Usado em backtests e Laboratório. Mesma entrada produz a mesma saída.
+Usado em backtests e Laboratório. Mesma entrada produz exatamente a mesma saída.
 
 ### Diversificado
 
@@ -188,7 +216,7 @@ O motor:
 2. seleciona o núcleo;
 3. forma pools;
 4. ranqueia combinações;
-5. mantém shortlists;
+5. mantém shortlists diversas;
 6. otimiza o portfólio completo;
 7. escolhe ponderadamente entre portfólios de topo usando uma seed.
 
