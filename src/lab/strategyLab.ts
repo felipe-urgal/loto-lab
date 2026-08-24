@@ -1,4 +1,4 @@
-import type { Contest, LotteryId } from "../domain/types.js";
+import type { AnalysisModel, Contest, LotteryId } from "../domain/types.js";
 import { backtestMegaSena } from "../backtest/megaSena.js";
 import { backtestLotofacil } from "../backtest/lotofacil.js";
 import { backtestDiaDeSorte } from "../backtest/diaDeSorte.js";
@@ -12,9 +12,14 @@ import {
   type BacktestSummary,
   type SummarizableRound,
 } from "../backtest/shared.js";
-import { backtestRandomControl } from "./randomControl.js";
+import {
+  backtestRandomControl,
+  sampleRandomControls,
+  type RandomControlSample,
+} from "./randomControl.js";
 
-export type StrategyLabExperiment = "fixed-core" | "external-rules";
+export type StrategyLabExperiment = "fixed-core" | "external-rules" | "score-model";
+export type StrategyEvidenceStatus = "beats-random" | "inconclusive" | "no-evidence" | "underperforms-random";
 
 export interface StrategyLabOptions {
   lottery: LotteryId;
@@ -25,6 +30,7 @@ export interface StrategyLabOptions {
   endContest?: number;
   lookbackContests?: number;
   bucketSize?: number;
+  randomSamples?: number;
 }
 
 export interface StrategyLabPoint {
@@ -46,8 +52,16 @@ export interface StrategyLabVariant {
   label: string;
   fixedCount: number;
   rules?: MegaSenaGameRules;
+  analysisModel?: AnalysisModel;
   summary: BacktestSummary;
   series: StrategyLabPoint[];
+}
+
+export interface StrategyLabBenchmarkDistribution {
+  samples: number;
+  p05: number;
+  p50: number;
+  p95: number;
 }
 
 export interface StrategyLabBenchmark {
@@ -56,6 +70,9 @@ export interface StrategyLabBenchmark {
   basis: "roi" | "prizeRate";
   delta: number;
   beatsRandom: boolean;
+  strategyPercentile: number;
+  status: StrategyEvidenceStatus;
+  distribution: StrategyLabBenchmarkDistribution;
   control: StrategyLabVariant;
 }
 
@@ -67,6 +84,7 @@ export interface StrategyLabResult {
   gameCount: number;
   warmupContests: number;
   bucketSize: number;
+  randomSamples: number;
   rankingBasis: "roi" | "prizeRate";
   winner?: string;
   benchmark: StrategyLabBenchmark;
@@ -85,7 +103,7 @@ interface MegaExternalVariant {
 }
 
 const MEGA_EXTERNAL_VARIANTS: MegaExternalVariant[] = [
-  { key: "mega-rules-baseline", label: "Score atual · sem filtro externo", rules: {} },
+  { key: "mega-rules-baseline", label: "Score v2 · sem filtro externo", rules: {} },
   { key: "mega-rules-group-2", label: "Grupo das 26 · mínimo 2", rules: { minPreferredGroup: 2 } },
   { key: "mega-rules-group-3", label: "Grupo das 26 · mínimo 3", rules: { minPreferredGroup: 3 } },
   { key: "mega-rules-no-consecutive", label: "Sem dezenas consecutivas", rules: { avoidConsecutive: true } },
@@ -94,6 +112,12 @@ const MEGA_EXTERNAL_VARIANTS: MegaExternalVariant[] = [
   { key: "mega-rules-quadrants", label: "Todos os 4 quadrantes", rules: { minQuadrants: 4 } },
   { key: "mega-rules-article-2", label: "Artigo completo · grupo 2+", rules: ARTICLE_RULES_GROUP_2 },
   { key: "mega-rules-article-3", label: "Artigo completo · grupo 3+", rules: ARTICLE_RULES_GROUP_3 },
+];
+
+const SCORE_MODEL_VARIANTS: Array<{ key: string; label: string; model: AnalysisModel }> = [
+  { key: "score-v2", label: "Score v2 · evidência ajustada", model: "score-v2" },
+  { key: "score-v1", label: "Score v1 · min/max", model: "score-v1" },
+  { key: "no-score", label: "Sem score · controle estrutural", model: "no-score" },
 ];
 
 function integerInRange(value: number, name: string, min: number, max: number): number {
@@ -148,12 +172,14 @@ function toVariant(
   summary: BacktestSummary,
   bucketSize: number,
   rules?: MegaSenaGameRules,
+  analysisModel?: AnalysisModel,
 ): StrategyLabVariant {
   return {
     key,
     label,
     fixedCount,
     ...(rules ? { rules } : {}),
+    ...(analysisModel ? { analysisModel } : {}),
     summary,
     series: seriesFor(rounds, bucketSize),
   };
@@ -165,9 +191,78 @@ function compareMegaExternalRules(
   bucketSize: number,
 ): StrategyLabVariant[] {
   return MEGA_EXTERNAL_VARIANTS.map((variant) => {
-    const result = backtestMegaSena(contests, { ...common, fixedCount: 0, rules: variant.rules });
-    return toVariant(variant.key, variant.label, 0, result.rounds, result.summary, bucketSize, variant.rules);
+    const result = backtestMegaSena(contests, { ...common, fixedCount: 0, rules: variant.rules, analysisModel: "score-v2" });
+    return toVariant(variant.key, variant.label, 0, result.rounds, result.summary, bucketSize, variant.rules, "score-v2");
   });
+}
+
+function compareScoreModels(
+  contests: Contest[],
+  lottery: LotteryId,
+  common: { gameCount: number; warmupContests: number; startContest?: number; endContest?: number },
+  bucketSize: number,
+): StrategyLabVariant[] {
+  return SCORE_MODEL_VARIANTS.map((variant) => {
+    if (lottery === "mega-sena") {
+      const result = backtestMegaSena(contests, { ...common, fixedCount: 3, analysisModel: variant.model });
+      return toVariant(`mega-${variant.key}`, variant.label, 3, result.rounds, result.summary, bucketSize, undefined, variant.model);
+    }
+    if (lottery === "lotofacil") {
+      const result = backtestLotofacil(contests, { ...common, fixedCount: 8, analysisModel: variant.model });
+      return toVariant(`lotofacil-${variant.key}`, variant.label, 8, result.rounds, result.summary, bucketSize, undefined, variant.model);
+    }
+    const result = backtestDiaDeSorte(contests, { ...common, fixedCount: 3, analysisModel: variant.model });
+    return toVariant(`dia-${variant.key}`, variant.label, 3, result.rounds, result.summary, bucketSize, undefined, variant.model);
+  });
+}
+
+function metricValue(summary: BacktestSummary, basis: "roi" | "prizeRate"): number {
+  return basis === "roi" ? summary.roi : summary.prizeRate;
+}
+
+function percentile(values: number[], probability: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const position = (sorted.length - 1) * probability;
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  if (lower === upper) return sorted[lower]!;
+  const fraction = position - lower;
+  return sorted[lower]! * (1 - fraction) + sorted[upper]! * fraction;
+}
+
+function percentileRank(values: number[], value: number): number {
+  if (values.length === 0) return 0.5;
+  const belowOrEqual = values.filter((candidate) => candidate <= value).length;
+  return belowOrEqual / values.length;
+}
+
+function evidenceStatus(percentileValue: number): StrategyEvidenceStatus {
+  if (percentileValue >= 0.95) return "beats-random";
+  if (percentileValue >= 0.9) return "inconclusive";
+  if (percentileValue <= 0.05) return "underperforms-random";
+  return "no-evidence";
+}
+
+function medianRandomControl(
+  contests: Contest[],
+  lottery: LotteryId,
+  common: { gameCount: number; warmupContests: number; startContest?: number; endContest?: number },
+  bucketSize: number,
+  samples: RandomControlSample[],
+  basis: "roi" | "prizeRate",
+): StrategyLabVariant {
+  const ordered = [...samples].sort((a, b) => metricValue(a.summary, basis) - metricValue(b.summary, basis));
+  const medianSample = ordered[Math.floor((ordered.length - 1) / 2)]!;
+  const result = backtestRandomControl(contests, { lottery, ...common, seed: medianSample.seed });
+  return toVariant(
+    "random-control",
+    "Controle aleatório · mediana",
+    0,
+    result.rounds,
+    result.summary,
+    bucketSize,
+  );
 }
 
 export function compareStrategyLab(contests: Contest[], options: StrategyLabOptions): StrategyLabResult {
@@ -179,6 +274,7 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
   const gameCount = integerInRange(options.gameCount ?? (options.lottery === "mega-sena" ? 2 : 4), "gameCount", 1, 20);
   const warmupContests = integerInRange(options.warmupContests ?? 20, "warmupContests", 1, 5000);
   const bucketSize = integerInRange(options.bucketSize ?? 25, "bucketSize", 5, 200);
+  const randomSamples = integerInRange(options.randomSamples ?? 100, "randomSamples", 10, 500);
   const period = resolvePeriod(contests, options);
   const common = {
     gameCount,
@@ -188,37 +284,33 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
   };
 
   let variants: StrategyLabVariant[];
-  if (options.lottery === "mega-sena" && experiment === "external-rules") {
+  if (experiment === "score-model") {
+    variants = compareScoreModels(contests, options.lottery, common, bucketSize);
+  } else if (options.lottery === "mega-sena" && experiment === "external-rules") {
     variants = compareMegaExternalRules(contests, common, bucketSize);
   } else if (options.lottery === "mega-sena") {
     variants = ([0, 2, 3] as const).map((fixedCount) => {
-      const result = backtestMegaSena(contests, { ...common, fixedCount });
-      return toVariant(`mega-${fixedCount}-fixas`, fixedCount === 0 ? "Sem núcleo fixo" : `${fixedCount} fixas`, fixedCount, result.rounds, result.summary, bucketSize);
+      const result = backtestMegaSena(contests, { ...common, fixedCount, analysisModel: "score-v2" });
+      return toVariant(`mega-${fixedCount}-fixas`, fixedCount === 0 ? "Sem núcleo fixo" : `${fixedCount} fixas`, fixedCount, result.rounds, result.summary, bucketSize, undefined, "score-v2");
     });
   } else if (options.lottery === "lotofacil") {
     variants = ([8, 9, 10] as const).map((fixedCount) => {
-      const result = backtestLotofacil(contests, { ...common, fixedCount });
-      return toVariant(`lotofacil-${fixedCount}-fixas`, `${fixedCount} fixas`, fixedCount, result.rounds, result.summary, bucketSize);
+      const result = backtestLotofacil(contests, { ...common, fixedCount, analysisModel: "score-v2" });
+      return toVariant(`lotofacil-${fixedCount}-fixas`, `${fixedCount} fixas`, fixedCount, result.rounds, result.summary, bucketSize, undefined, "score-v2");
     });
   } else {
     variants = ([0, 2, 3] as const).map((fixedCount) => {
-      const result = backtestDiaDeSorte(contests, { ...common, fixedCount });
-      return toVariant(`dia-${fixedCount}-fixas`, fixedCount === 0 ? "Sem núcleo fixo" : `${fixedCount} fixas`, fixedCount, result.rounds, result.summary, bucketSize);
+      const result = backtestDiaDeSorte(contests, { ...common, fixedCount, analysisModel: "score-v2" });
+      return toVariant(`dia-${fixedCount}-fixas`, fixedCount === 0 ? "Sem núcleo fixo" : `${fixedCount} fixas`, fixedCount, result.rounds, result.summary, bucketSize, undefined, "score-v2");
     });
   }
 
-  const randomControl = backtestRandomControl(contests, { lottery: options.lottery, ...common });
-  const control = toVariant(
-    "random-control",
-    "Controle aleatório",
-    0,
-    randomControl.rounds,
-    randomControl.summary,
-    bucketSize,
-  );
-
-  const hasReliableFinance = [...variants, control].every((variant) => variant.summary.financialCoverage >= 0.8);
+  const randomDistribution = sampleRandomControls(contests, { lottery: options.lottery, ...common }, randomSamples);
+  const firstRandom = randomDistribution[0];
+  const hasReliableFinance = variants.every((variant) => variant.summary.financialCoverage >= 0.8)
+    && Boolean(firstRandom && firstRandom.summary.financialCoverage >= 0.8);
   const rankingBasis = hasReliableFinance ? "roi" : "prizeRate";
+
   variants.sort((a, b) => {
     if (rankingBasis === "roi") {
       return b.summary.roi - a.summary.roi || b.summary.prizeRate - a.summary.prizeRate || b.summary.averageHitsPerGame - a.summary.averageHitsPerGame || a.fixedCount - b.fixedCount;
@@ -226,10 +318,16 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
     return b.summary.prizeRate - a.summary.prizeRate || b.summary.averageHitsPerGame - a.summary.averageHitsPerGame || b.summary.maxHits - a.summary.maxHits || a.fixedCount - b.fixedCount;
   });
 
+  const control = medianRandomControl(contests, options.lottery, common, bucketSize, randomDistribution, rankingBasis);
   const bestStrategy = variants[0];
-  const controlValue = rankingBasis === "roi" ? control.summary.roi : control.summary.prizeRate;
-  const strategyValue = bestStrategy ? (rankingBasis === "roi" ? bestStrategy.summary.roi : bestStrategy.summary.prizeRate) : controlValue;
-  const delta = strategyValue - controlValue;
+  const randomValues = randomDistribution.map((sample) => metricValue(sample.summary, rankingBasis));
+  const strategyValue = bestStrategy ? metricValue(bestStrategy.summary, rankingBasis) : percentile(randomValues, 0.5);
+  const p05 = percentile(randomValues, 0.05);
+  const p50 = percentile(randomValues, 0.5);
+  const p95 = percentile(randomValues, 0.95);
+  const strategyPercentile = percentileRank(randomValues, strategyValue);
+  const status = evidenceStatus(strategyPercentile);
+  const delta = strategyValue - p50;
 
   return {
     lottery: options.lottery,
@@ -238,6 +336,7 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
     gameCount,
     warmupContests,
     bucketSize,
+    randomSamples,
     rankingBasis,
     ...(bestStrategy ? { winner: bestStrategy.key } : {}),
     benchmark: {
@@ -245,7 +344,10 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
       ...(bestStrategy ? { bestStrategyKey: bestStrategy.key } : {}),
       basis: rankingBasis,
       delta,
-      beatsRandom: delta > 0,
+      beatsRandom: status === "beats-random",
+      strategyPercentile,
+      status,
+      distribution: { samples: randomSamples, p05, p50, p95 },
       control,
     },
     variants,
