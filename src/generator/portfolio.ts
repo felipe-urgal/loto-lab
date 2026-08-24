@@ -1,5 +1,5 @@
 import type { GenerationMode, RankedCandidate } from "./shared.js";
-import { selectWeightedItem } from "./shared.js";
+import { selectWeightedItem, topRankedCandidates } from "./shared.js";
 
 export interface PortfolioCandidate extends RankedCandidate {
   numbers: number[];
@@ -10,6 +10,11 @@ export interface PortfolioSelectionOptions {
   overlapPenalty: number;
   beamWidth?: number;
   diversifiedPoolSize?: number;
+}
+
+export interface PortfolioShortlistOptions {
+  explorationLimit?: number;
+  diversityPenalty: number;
 }
 
 interface PortfolioState<T extends PortfolioCandidate> {
@@ -25,6 +30,66 @@ function overlap(left: number[], right: number[]): number {
 
 function candidateKey(candidate: PortfolioCandidate): string {
   return [...candidate.numbers].sort((a, b) => a - b).join("-");
+}
+
+function localDiversityScore<T extends PortfolioCandidate>(
+  selected: T[],
+  candidate: T,
+  diversityPenalty: number,
+): number {
+  return candidate.rank - selected.reduce(
+    (total, existing) => total + overlap(existing.variableNumbers, candidate.variableNumbers) * diversityPenalty,
+    0,
+  );
+}
+
+/**
+ * Builds a compact frontier for the global portfolio optimizer.
+ *
+ * Keeping only the highest local scores can accidentally remove every
+ * disjoint alternative before the global optimizer sees them. This helper
+ * first explores a wider ranked set, then greedily keeps representatives
+ * that trade a small local-score loss for variable-number diversity.
+ */
+export function buildPortfolioShortlist<T extends PortfolioCandidate>(
+  candidates: Iterable<T>,
+  limit: number,
+  options: PortfolioShortlistOptions,
+): T[] {
+  const shortlistLimit = Math.max(1, Math.round(limit));
+  if (!Number.isFinite(options.diversityPenalty) || options.diversityPenalty < 0) {
+    throw new Error("Portfolio shortlist diversity penalty must be a non-negative number");
+  }
+  const explorationLimit = Math.max(
+    shortlistLimit,
+    Math.round(options.explorationLimit ?? Math.max(256, shortlistLimit * 16)),
+  );
+  const explored = topRankedCandidates(
+    candidates,
+    explorationLimit,
+    (a, b) => b.rank - a.rank || candidateKey(a).localeCompare(candidateKey(b)),
+  );
+  if (explored.length <= shortlistLimit) return explored;
+
+  const selected: T[] = [];
+  const remaining = [...explored];
+  while (selected.length < shortlistLimit && remaining.length > 0) {
+    let winnerIndex = 0;
+    let winnerScore = Number.NEGATIVE_INFINITY;
+    let winnerKey = "";
+    for (let index = 0; index < remaining.length; index += 1) {
+      const candidate = remaining[index]!;
+      const score = localDiversityScore(selected, candidate, options.diversityPenalty);
+      const key = candidateKey(candidate);
+      if (score > winnerScore || (score === winnerScore && key.localeCompare(winnerKey) < 0)) {
+        winnerScore = score;
+        winnerIndex = index;
+        winnerKey = key;
+      }
+    }
+    selected.push(remaining.splice(winnerIndex, 1)[0]!);
+  }
+  return selected;
 }
 
 function incrementalPortfolioScore<T extends PortfolioCandidate>(
