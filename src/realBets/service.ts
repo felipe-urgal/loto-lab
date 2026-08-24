@@ -37,6 +37,9 @@ export class RealBetService {
 
     const contestNumber = input.contestNumber ?? batch.targetContestNumber;
     if (!contestNumber) throw new Error("CONTEST_NUMBER_REQUIRED");
+    if (batch.targetContestNumber !== undefined && contestNumber !== batch.targetContestNumber) {
+      throw new Error(`CONTEST_TARGET_MISMATCH:${batch.targetContestNumber}:${contestNumber}`);
+    }
 
     const positions = input.gamePositions?.length
       ? [...new Set(input.gamePositions)]
