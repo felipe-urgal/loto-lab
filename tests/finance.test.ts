@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { Contest, GeneratedGame } from "../src/domain/types.js";
 import { simpleBetPriceForContest } from "../src/finance/pricing.js";
-import { resolvePrizeValue } from "../src/finance/prizes.js";
+import { hasCompletePrizeSchedule, resolvePrizeValue } from "../src/finance/prizes.js";
 import { evaluateGame } from "../src/checker/evaluate.js";
 
 function contest(overrides: Partial<Contest> & Pick<Contest, "lottery" | "number" | "date">): Contest {
@@ -40,11 +40,52 @@ test("resolvePrizeValue uses the real rateio stored in the contest", () => {
     ],
   });
 
+  assert.equal(hasCompletePrizeSchedule(target), true);
   assert.deepEqual(resolvePrizeValue(target, 12), {
     numberPrizeValue: 14,
     totalPrizeValue: 14,
   });
-  assert.deepEqual(resolvePrizeValue(target, 10), { totalPrizeValue: 0 });
+  assert.deepEqual(resolvePrizeValue(target, 10), {
+    numberPrizeValue: 0,
+    totalPrizeValue: 0,
+  });
+});
+
+test("qualifying hit stays financially unknown when its prize tier is missing", () => {
+  const incomplete = contest({
+    lottery: "mega-sena",
+    number: 3000,
+    date: "2026-08-20",
+    prizeTiers: [
+      { description: "6 acertos", winners: 0, prizeValue: 0 },
+      { description: "5 acertos", winners: 20, prizeValue: 50_000 },
+    ],
+  });
+
+  assert.equal(hasCompletePrizeSchedule(incomplete), false);
+  assert.deepEqual(resolvePrizeValue(incomplete, 4), {});
+  assert.deepEqual(resolvePrizeValue(incomplete, 3), {
+    numberPrizeValue: 0,
+    totalPrizeValue: 0,
+  });
+});
+
+test("Dia de Sorte requires the lucky-month tier when the month hits", () => {
+  const incomplete = contest({
+    lottery: "dia-de-sorte",
+    number: 1276,
+    date: "2026-08-19",
+    luckyMonth: "Junho",
+    prizeTiers: [
+      { description: "7 acertos", winners: 0, prizeValue: 0 },
+      { description: "6 acertos", winners: 10, prizeValue: 4250.55 },
+      { description: "5 acertos", winners: 500, prizeValue: 25 },
+      { description: "4 acertos", winners: 5000, prizeValue: 5 },
+    ],
+  });
+
+  assert.equal(hasCompletePrizeSchedule(incomplete), false);
+  assert.deepEqual(resolvePrizeValue(incomplete, 3, true), { numberPrizeValue: 0 });
 });
 
 test("Dia de Sorte combines number prize and Mes da Sorte prize", () => {
