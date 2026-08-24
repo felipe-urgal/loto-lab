@@ -2,7 +2,9 @@ export type RandomEvidenceStatus =
   | "beats-random"
   | "inconclusive"
   | "no-evidence"
-  | "underperforms-random";
+  | "underperforms-random"
+  | "insufficient-resolution"
+  | "insufficient-sample";
 
 export interface RandomEvidenceResult {
   percentile: number;
@@ -12,8 +14,18 @@ export interface RandomEvidenceResult {
   adjustedUpperPValue: number;
   adjustedLowerPValue: number;
   familySize: number;
+  alpha: number;
+  minimumAchievableAdjustedPValue: number;
+  minimumSamplesForAlpha: number;
+  resolutionSufficient: boolean;
+  observationRounds?: number;
+  minimumObservationRounds: number;
+  sampleSizeSufficient: boolean;
   status: RandomEvidenceStatus;
 }
+
+const DEFAULT_ALPHA = 0.05;
+const DEFAULT_MIN_OBSERVATION_ROUNDS = 30;
 
 export function percentile(values: number[], probability: number): number {
   if (values.length === 0) return 0;
@@ -33,13 +45,44 @@ export function midRankPercentile(values: number[], value: number): number {
   return (below + tied * 0.5) / values.length;
 }
 
+export function minimumRandomSamplesForAdjustedAlpha(
+  familySize: number,
+  alpha = DEFAULT_ALPHA,
+): number {
+  const normalizedFamilySize = Math.max(1, Math.round(familySize));
+  if (!Number.isFinite(alpha) || alpha <= 0 || alpha >= 1) return Number.MAX_SAFE_INTEGER;
+  return Math.max(1, Math.ceil(normalizedFamilySize / alpha - 1));
+}
+
 export function evaluateRandomEvidence(
   values: number[],
   value: number,
   familySize = 1,
+  observationRounds?: number,
 ): RandomEvidenceResult {
   const valid = values.filter(Number.isFinite);
   const normalizedFamilySize = Math.max(1, Math.round(familySize));
+  const alpha = DEFAULT_ALPHA;
+  const minimumObservationRounds = DEFAULT_MIN_OBSERVATION_ROUNDS;
+  const minimumSamplesForAlpha = minimumRandomSamplesForAdjustedAlpha(normalizedFamilySize, alpha);
+  const minimumAchievableAdjustedPValue = valid.length === 0
+    ? 1
+    : Math.min(1, normalizedFamilySize / (valid.length + 1));
+  const resolutionSufficient = minimumAchievableAdjustedPValue <= alpha;
+  const sampleSizeSufficient = observationRounds === undefined
+    || observationRounds >= minimumObservationRounds;
+
+  const common = {
+    familySize: normalizedFamilySize,
+    alpha,
+    minimumAchievableAdjustedPValue,
+    minimumSamplesForAlpha,
+    resolutionSufficient,
+    ...(observationRounds !== undefined ? { observationRounds } : {}),
+    minimumObservationRounds,
+    sampleSizeSufficient,
+  };
+
   if (valid.length === 0 || !Number.isFinite(value)) {
     return {
       percentile: 0.5,
@@ -48,7 +91,7 @@ export function evaluateRandomEvidence(
       rawLowerPValue: 1,
       adjustedUpperPValue: 1,
       adjustedLowerPValue: 1,
-      familySize: normalizedFamilySize,
+      ...common,
       status: "no-evidence",
     };
   }
@@ -62,8 +105,10 @@ export function evaluateRandomEvidence(
   const median = percentile(valid, 0.5);
 
   let status: RandomEvidenceStatus = "no-evidence";
-  if (value > median && adjustedUpperPValue <= 0.05) status = "beats-random";
-  else if (value < median && adjustedLowerPValue <= 0.05) status = "underperforms-random";
+  if (!sampleSizeSufficient) status = "insufficient-sample";
+  else if (!resolutionSufficient) status = "insufficient-resolution";
+  else if (value > median && adjustedUpperPValue <= alpha) status = "beats-random";
+  else if (value < median && adjustedLowerPValue <= alpha) status = "underperforms-random";
   else if (rawUpperPValue <= 0.1 || rawLowerPValue <= 0.1) status = "inconclusive";
 
   return {
@@ -73,7 +118,7 @@ export function evaluateRandomEvidence(
     rawLowerPValue,
     adjustedUpperPValue,
     adjustedLowerPValue,
-    familySize: normalizedFamilySize,
+    ...common,
     status,
   };
 }
