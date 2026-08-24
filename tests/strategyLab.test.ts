@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import type { Contest, LotteryId } from "../src/domain/types.js";
 import { generateMegaSenaGames } from "../src/generator/megaSena.js";
 import { generateDiaDeSorteGames } from "../src/generator/diaDeSorte.js";
-import { backtestRandomControl } from "../src/lab/randomControl.js";
+import { backtestRandomControl, sampleRandomControls } from "../src/lab/randomControl.js";
 import { compareStrategyLab } from "../src/lab/strategyLab.js";
 
 function contestsFor(
@@ -41,7 +41,7 @@ test("Mega-Sena and Dia de Sorte generators support experimental fixed-core size
   assert.ok(diaThree.every((game) => game.fixedNumbers.length === 3 && game.variableNumbers.length === 4));
 });
 
-test("random control is reproducible for the same period and seed", () => {
+test("random control is reproducible and can produce a distribution of controls", () => {
   const contests = contestsFor("lotofacil", 20, 15, 25);
   const options = {
     lottery: "lotofacil" as const,
@@ -54,14 +54,24 @@ test("random control is reproducible for the same period and seed", () => {
 
   const first = backtestRandomControl(contests, options);
   const second = backtestRandomControl(contests, options);
-
   assert.deepEqual(first, second);
   assert.equal(first.rounds.length, 10);
   assert.equal(first.summary.totalGames, 40);
   assert.ok(first.rounds.every((round) => round.checks.every((check) => check.fixedHits === 0)));
+
+  const distribution = sampleRandomControls(contests, {
+    lottery: "lotofacil",
+    gameCount: 4,
+    warmupContests: 5,
+    startContest: 11,
+    endContest: 20,
+  }, 10, "distribution-test");
+  assert.equal(distribution.length, 10);
+  assert.equal(new Set(distribution.map((sample) => sample.seed)).size, 10);
+  assert.ok(distribution.every((sample) => sample.summary.totalGames === 40));
 });
 
-test("strategy lab compares the expected presets and exposes a random benchmark", () => {
+test("strategy lab compares fixed-core presets and exposes a random distribution benchmark", () => {
   const fixtures = [
     { lottery: "mega-sena" as const, drawSize: 6, maxNumber: 60, expected: [0, 2, 3] },
     { lottery: "lotofacil" as const, drawSize: 15, maxNumber: 25, expected: [8, 9, 10] },
@@ -76,12 +86,10 @@ test("strategy lab compares the expected presets and exposes a random benchmark"
       warmupContests: 5,
       lookbackContests: 10,
       bucketSize: 5,
+      randomSamples: 10,
     });
 
-    assert.deepEqual(
-      result.variants.map((variant) => variant.fixedCount).sort((a, b) => a - b),
-      fixture.expected,
-    );
+    assert.deepEqual(result.variants.map((variant) => variant.fixedCount).sort((a, b) => a - b), fixture.expected);
     assert.equal(result.experiment, "fixed-core");
     assert.equal(result.variants.length, 3);
     assert.equal(result.startContest, 9);
@@ -89,14 +97,35 @@ test("strategy lab compares the expected presets and exposes a random benchmark"
     assert.ok(result.winner);
     assert.ok(result.variants.every((variant) => variant.summary.testedContests === 10));
     assert.ok(result.variants.every((variant) => variant.series.length === 2));
-
+    assert.equal(result.randomSamples, 10);
+    assert.equal(result.benchmark.distribution.samples, 10);
+    assert.ok(result.benchmark.distribution.p05 <= result.benchmark.distribution.p50);
+    assert.ok(result.benchmark.distribution.p50 <= result.benchmark.distribution.p95);
+    assert.ok(result.benchmark.strategyPercentile >= 0 && result.benchmark.strategyPercentile <= 1);
+    assert.equal(result.benchmark.beatsRandom, result.benchmark.status === "beats-random");
     assert.equal(result.benchmark.controlKey, "random-control");
-    assert.equal(result.benchmark.control.key, "random-control");
     assert.equal(result.benchmark.control.summary.testedContests, 10);
-    assert.equal(result.benchmark.control.series.length, 2);
-    assert.equal(result.benchmark.basis, result.rankingBasis);
-    assert.equal(result.benchmark.beatsRandom, result.benchmark.delta > 0);
   }
+});
+
+test("strategy lab compares Score v2, Score v1 and no-score without leakage", () => {
+  const contests = contestsFor("mega-sena", 24, 6, 60);
+  const result = compareStrategyLab(contests, {
+    lottery: "mega-sena",
+    experiment: "score-model",
+    gameCount: 1,
+    warmupContests: 5,
+    lookbackContests: 10,
+    bucketSize: 5,
+    randomSamples: 10,
+  });
+
+  const models = new Set(result.variants.map((variant) => variant.analysisModel));
+  assert.equal(result.experiment, "score-model");
+  assert.equal(result.variants.length, 3);
+  assert.deepEqual(models, new Set(["score-v2", "score-v1", "no-score"]));
+  assert.ok(result.variants.every((variant) => variant.fixedCount === 3));
+  assert.ok(result.variants.every((variant) => variant.summary.testedContests === 10));
 });
 
 test("strategy lab exposes external Mega-Sena rules and a separate random benchmark", () => {
@@ -108,6 +137,7 @@ test("strategy lab exposes external Mega-Sena rules and a separate random benchm
     warmupContests: 5,
     lookbackContests: 10,
     bucketSize: 5,
+    randomSamples: 10,
   });
 
   const keys = new Set(result.variants.map((variant) => variant.key));
@@ -125,5 +155,5 @@ test("strategy lab exposes external Mega-Sena rules and a separate random benchm
   assert.ok(result.variants.every((variant) => variant.fixedCount === 0));
   assert.ok(result.variants.every((variant) => variant.summary.testedContests === 10));
   assert.equal(result.benchmark.controlKey, "random-control");
-  assert.equal(result.benchmark.control.summary.testedContests, 10);
+  assert.equal(result.benchmark.distribution.samples, 10);
 });
