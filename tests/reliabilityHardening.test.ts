@@ -39,14 +39,16 @@ function mutationRequest(origin?: string, fetchSite?: string) {
   } as unknown as IncomingMessage;
 }
 
+type RecordedResponse = ServerResponse & { body?: string };
+
 function responseRecorder() {
   const headers = new Map<string, string>();
   const response = {
     statusCode: 200,
-    setHeader(name: string, value: string) { headers.set(name.toLowerCase(), String(value)); },
-    end(body?: string) { this.body = body; },
     body: undefined as string | undefined,
-  } as unknown as ServerResponse & { body?: string };
+    setHeader(name: string, value: string) { headers.set(name.toLowerCase(), String(value)); },
+    end(body?: string) { response.body = body; },
+  } as unknown as RecordedResponse;
   return { response, headers };
 }
 
