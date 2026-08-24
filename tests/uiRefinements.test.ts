@@ -66,5 +66,5 @@ test("UI refinement assets are lazy-loaded for the main app and served for strat
   assert.equal(labApp.status, 200);
   const labAppSource = await labApp.text();
   assert.match(labAppSource, /external-rules/);
-  assert.match(labAppSource, /grupo das 26/i);
+  assert.match(labAppSource, /quantidade de variantes comparadas/i);
 });
