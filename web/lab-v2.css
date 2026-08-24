@@ -8,6 +8,27 @@
 .lab-distribution .is-strategy { border: 1px solid rgba(101,214,164,.3); background: var(--accent-soft); }
 .lab-distribution .is-strategy strong { color: var(--accent-strong); }
 
+.lab-predictive-evidence { grid-column: 1 / -1; padding: 20px; display: grid; gap: 16px; }
+.lab-evidence-head strong { display: block; margin-top: 5px; font-size: 15px; }
+.lab-evidence-head p { margin: 6px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.lab-evidence-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.lab-evidence-card { padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); display: grid; gap: 5px; }
+.lab-evidence-card span { color: var(--muted); font-size: 9px; }
+.lab-evidence-card strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.lab-evidence-card small { color: var(--muted-2); font-size: 9px; line-height: 1.45; }
+.lab-evidence-card.is-positive { border-color: rgba(101,214,164,.3); }
+.lab-evidence-card.is-positive strong { color: var(--accent-strong); }
+.lab-evidence-card.is-negative { border-color: rgba(239,125,140,.3); }
+.lab-evidence-card.is-negative strong { color: var(--danger); }
+.lab-walk-forward { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(250px, .7fr); gap: 12px; padding-top: 16px; border-top: 1px solid var(--border); align-items: stretch; }
+.lab-walk-forward > div:first-child { padding: 2px 0; }
+.lab-walk-forward strong { display: block; margin-top: 5px; font-size: 14px; }
+.lab-walk-forward p { margin: 6px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.lab-null-box { padding: 13px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); display: grid; gap: 5px; }
+.lab-null-box span { color: var(--muted-2); font-size: 9px; text-transform: uppercase; letter-spacing: .05em; }
+.lab-null-box strong { font-size: 18px; }
+.lab-null-box small { color: var(--muted); font-size: 9px; line-height: 1.45; }
+
 .lab-guide { padding: 20px; }
 .lab-guide h2 { margin: 0 0 14px; font-size: 15px; }
 .lab-guide-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
@@ -19,6 +40,8 @@
   .lab-distribution { min-width: 0; width: 100%; }
   .lab-benchmark-card { align-items: stretch; flex-direction: column; }
   .lab-guide-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lab-evidence-grid { grid-template-columns: 1fr; }
+  .lab-walk-forward { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
