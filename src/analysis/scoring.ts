@@ -6,6 +6,7 @@ import type {
   NumberAnalysis,
   NumberTier,
 } from "../domain/types.js";
+import { continuousSuffix } from "./contestEligibility.js";
 import { calculateFrequency, numberRange } from "./frequency.js";
 
 export const DEFAULT_WEIGHTS: AnalysisWeights = {
@@ -88,6 +89,8 @@ function classifyByRank(rows: Omit<NumberAnalysis, "tier">[]): NumberAnalysis[] 
 
 function classifyByEvidence(rows: Omit<NumberAnalysis, "tier">[]): NumberAnalysis[] {
   return rows.map((row) => {
+    // These windows deliberately overlap. Multiple positive windows mean
+    // descriptive consistency across horizons, not independent confirmations.
     const windows = [row.historical, row.year, row.month, row.recent10, row.recent20];
     const positiveWindows = windows.filter((value) => value >= POSITIVE_WINDOW_THRESHOLD).length;
     const negativeWindows = windows.filter((value) => value <= NEGATIVE_WINDOW_THRESHOLD).length;
@@ -119,14 +122,15 @@ function scopedWindows(contests: Contest[], config: LotteryConfig) {
   const referenceDate = scoped.at(-1)!.date;
   const yearPrefix = referenceDate.slice(0, 4);
   const monthPrefix = referenceDate.slice(0, 7);
+  const continuousRecent = continuousSuffix(scoped);
 
   return {
     scoped,
     historical: scoped,
     year: scoped.filter((contest) => contest.date.startsWith(yearPrefix)),
     month: scoped.filter((contest) => contest.date.startsWith(monthPrefix)),
-    recent10: scoped.slice(-10),
-    recent20: scoped.slice(-20),
+    recent10: continuousRecent.slice(-10),
+    recent20: continuousRecent.slice(-20),
   };
 }
 
