@@ -94,8 +94,13 @@ export class PostgresAnalysisJobRepository {
     const result = await this.pool.query(
       `
         UPDATE analysis_jobs
-        SET status = 'queued', started_at = NULL, finished_at = NULL,
-            error = jsonb_build_object('message', 'Job recovered after process restart')
+        SET status = CASE WHEN cancel_requested THEN 'cancelled' ELSE 'queued' END,
+            started_at = CASE WHEN cancel_requested THEN started_at ELSE NULL END,
+            finished_at = CASE WHEN cancel_requested THEN NOW() ELSE NULL END,
+            error = CASE
+              WHEN cancel_requested THEN jsonb_build_object('message', 'Cancellation completed after process restart')
+              ELSE jsonb_build_object('message', 'Job recovered after process restart')
+            END
         WHERE status = 'running'
       `,
     );
