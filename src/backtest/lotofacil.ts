@@ -1,4 +1,4 @@
-import type { Contest, GeneratedGame } from "../domain/types.js";
+import type { AnalysisModel, Contest, GeneratedGame } from "../domain/types.js";
 import { evaluateGames, type GameCheckResult } from "../checker/evaluate.js";
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { summarizeBacktestRounds, type BacktestSummary } from "./shared.js";
@@ -9,6 +9,7 @@ export interface LotofacilBacktestOptions {
   warmupContests?: number;
   startContest?: number;
   endContest?: number;
+  analysisModel?: AnalysisModel;
 }
 
 export interface LotofacilBacktestRound {
@@ -28,6 +29,7 @@ export interface LotofacilBacktestResult {
     gameCount: number;
     fixedCount: 8 | 9 | 10;
     warmupContests: number;
+    analysisModel: AnalysisModel;
   };
 }
 
@@ -38,6 +40,7 @@ export function backtestLotofacil(
   const gameCount = options.gameCount ?? 4;
   const fixedCount = options.fixedCount ?? 8;
   const warmupContests = options.warmupContests ?? 20;
+  const analysisModel = options.analysisModel ?? "score-v2";
 
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
@@ -61,7 +64,7 @@ export function backtestLotofacil(
 
     // Anti-leakage: the target draw and all future draws are invisible here.
     const history = scoped.slice(0, index);
-    const generatedGames = generateLotofacilGames(history, { gameCount, fixedCount });
+    const generatedGames = generateLotofacilGames(history, { gameCount, fixedCount, analysisModel });
     const checks = evaluateGames(generatedGames, target);
 
     rounds.push({
@@ -78,6 +81,6 @@ export function backtestLotofacil(
   return {
     rounds,
     summary: summarizeBacktestRounds(rounds),
-    strategy: { gameCount, fixedCount, warmupContests },
+    strategy: { gameCount, fixedCount, warmupContests, analysisModel },
   };
 }
