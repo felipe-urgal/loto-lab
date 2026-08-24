@@ -4,6 +4,7 @@ import { selectWeightedItem, topRankedCandidates } from "./shared.js";
 export interface PortfolioCandidate extends RankedCandidate {
   numbers: number[];
   variableNumbers: number[];
+  tieKey?: string;
 }
 
 export interface PortfolioSelectionOptions {
@@ -29,7 +30,7 @@ function overlap(left: number[], right: number[]): number {
 }
 
 function candidateKey(candidate: PortfolioCandidate): string {
-  return [...candidate.numbers].sort((a, b) => a - b).join("-");
+  return candidate.tieKey ?? [...candidate.numbers].sort((a, b) => a - b).join("-");
 }
 
 function localDiversityScore<T extends PortfolioCandidate>(
@@ -44,19 +45,6 @@ function localDiversityScore<T extends PortfolioCandidate>(
   return candidate.rank - reusedVariables * diversityPenalty;
 }
 
-/**
- * Builds a compact frontier for the global portfolio optimizer.
- *
- * Keeping only the highest local scores can accidentally remove every
- * disjoint alternative before the global optimizer sees them. This helper
- * first explores a wider ranked set, then greedily keeps representatives
- * that trade a small local-score loss for variable-number diversity.
- *
- * The accumulated overlap is represented by a usage counter per variable.
- * This is exactly equivalent to summing pairwise overlaps against every
- * already-selected candidate, but avoids rescanning the selected frontier
- * for every candidate at every shortlist step.
- */
 export function buildPortfolioShortlist<T extends PortfolioCandidate>(
   candidates: Iterable<T>,
   limit: number,
