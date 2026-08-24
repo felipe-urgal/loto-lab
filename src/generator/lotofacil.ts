@@ -1,10 +1,11 @@
-import type { Contest, GeneratedGame } from "../domain/types.js";
+import type { AnalysisModel, Contest, GeneratedGame } from "../domain/types.js";
 import { buildNumberAnalysis } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
 import {
   buildMetadata,
   combinationIterator,
+  GENERATION_POLICY,
   generationRandom,
   gridExtremePenalty,
   scoreMap,
@@ -25,6 +26,7 @@ export interface LotofacilGeneratorOptions {
   excludedNumbers?: number[];
   constraints?: GenerationConstraints;
   referenceContestNumber?: number | null;
+  analysisModel?: AnalysisModel;
 }
 
 export function generateLotofacilGames(
@@ -37,6 +39,7 @@ export function generateLotofacilGames(
   const random = generationRandom(generationMode, options.seed);
   const manualFixed = options.fixedNumbers ?? [];
   const excludedNumbers = options.excludedNumbers ?? [];
+  const analysisModel = options.analysisModel ?? "score-v2";
 
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
@@ -56,7 +59,7 @@ export function generateLotofacilGames(
     : options.referenceContestNumber === null
       ? undefined
       : scoped.find((contest) => contest.number === options.referenceContestNumber);
-  const analysis = buildNumberAnalysis(scoped, config);
+  const analysis = buildNumberAnalysis(scoped, config, undefined, analysisModel);
   const fixedNumbers = selectProfiledFixedNumbers(
     analysis,
     fixedCount,
@@ -79,6 +82,7 @@ export function generateLotofacilGames(
   const repeatTargets = [8, 9, 10, 8];
   const oddTargets = [8, 7, 9, 6];
   const games: GeneratedGame[] = [];
+  const policy = GENERATION_POLICY.lotofacil;
 
   for (let gameIndex = 0; gameIndex < gameCount; gameIndex += 1) {
     const targetRepeat = lastContest ? repeatTargets[gameIndex % repeatTargets.length]! : 0;
@@ -107,11 +111,11 @@ export function generateLotofacilGames(
         );
         const repeatPenalty = Math.abs(
           metadata.repeatedFromLastContest.length - targetRepeat,
-        ) * 35;
-        const parityPenalty = Math.abs(metadata.odd - targetOdd) * 22;
+        ) * policy.repeatDistancePenalty;
+        const parityPenalty = Math.abs(metadata.odd - targetOdd) * policy.parityDistancePenalty;
         const linePenalty = gridExtremePenalty(metadata.lineDistribution);
         const columnPenalty = gridExtremePenalty(metadata.columnDistribution);
-        const reusePenalty = reused * 28;
+        const reusePenalty = reused * policy.variableReusePenalty;
 
         yield {
           variableNumbers,
