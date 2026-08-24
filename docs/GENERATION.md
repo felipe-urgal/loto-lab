@@ -28,7 +28,7 @@ O Score v2 preserva as cinco janelas da metodologia:
 - últimos 10 concursos;
 - últimos 20 concursos.
 
-Os pesos continuam configurados como hipótese inicial:
+Pesos iniciais:
 
 | Janela | Peso |
 | --- | ---: |
@@ -38,9 +38,7 @@ Os pesos continuam configurados como hipótese inicial:
 | Histórico | 15% |
 | Últimos 10 | 10% |
 
-A diferença está na leitura de cada janela. Em vez de transformar automaticamente o menor valor em `0` e o maior em `100`, o Score v2 compara a frequência observada com a frequência esperada para uma dezena sob sorteios uniformes e considera o tamanho da amostra.
-
-Em termos operacionais:
+Em vez de normalizar automaticamente menor e maior frequência para `0` e `100`, o Score v2 compara a frequência observada com a esperada sob sorteios uniformes e considera o tamanho da amostra.
 
 ```text
 frequência observada
@@ -56,25 +54,38 @@ escala centrada em 50
 
 ## Grupos strong / balanced / cold
 
-O modelo anterior (`score-v1`) dividia o ranking em terços e, portanto, sempre produzia grupos `strong` e `cold`, mesmo quando as diferenças eram pequenas.
+O `score-v1` dividia o ranking em terços e sempre produzia grupos `strong` e `cold`, mesmo quando as diferenças eram pequenas.
 
-O Score v2 deixa de forçar essa divisão.
+O Score v2 não força essa divisão.
 
-Uma dezena só entra em `strong` quando existe sinal positivo em pelo menos duas janelas e o score agregado também fica acima da faixa neutra. `cold` segue a lógica simétrica. As demais permanecem `balanced`.
+Uma dezena só entra em `strong` quando existe sinal positivo em pelo menos duas janelas e o score agregado fica acima da faixa neutra. `cold` segue a lógica simétrica. As demais permanecem `balanced`.
 
-Isso aproxima o código da metodologia funcional: forte em múltiplas janelas, intermediária quando os sinais são mistos e fria quando várias janelas ficam abaixo da referência.
-
-Os rótulos continuam descritivos. Eles não significam “mais provável”, “menos provável” ou “está para sair”.
+Os rótulos são descritivos. Eles não significam “mais provável”, “menos provável” ou “está para sair”.
 
 ## Modelos comparáveis
 
-O core mantém três variantes explícitas:
+O core mantém três variantes:
 
-- `score-v2` — modelo operacional, ajustado pelo tamanho da amostra;
-- `score-v1` — modelo legado baseado em normalização min/max;
+- `score-v2` — modelo operacional ajustado pelo tamanho da amostra;
+- `score-v1` — modelo legado min/max;
 - `no-score` — controle estrutural com todas as dezenas neutras.
 
-O Laboratório compara as três no mesmo recorte histórico e também mede a qualidade preditiva do ranking via AUC. Assim uma mudança no score pode ser medida antes de ser tratada como melhoria.
+### Neutralidade do `no-score`
+
+Um score neutro não pode significar “prefira o menor ID”.
+
+Antes do hardening, empates terminavam em `a.number - b.number`, o que fazia um controle neutro tender a escolher dezenas como `01`, `02`, `03`.
+
+No `no-score`, os desempates agora usam uma ordem pseudoaleatória **estável e reproduzível**, derivada do contexto histórico. A mesma entrada produz a mesma ordem, mas nenhuma dezena ganha preferência só por ter número menor.
+
+Essa ordem é aplicada de forma consistente em:
+
+- escolha do núcleo;
+- formação do pool de candidatos;
+- shortlist;
+- desempate do portfólio.
+
+Assim o experimento `score-v1 × score-v2 × no-score` compara o efeito do ranking sem introduzir um viés artificial por ID.
 
 ## Núcleo fixo
 
@@ -88,82 +99,84 @@ Padrões operacionais:
 
 As variantes de tamanho de núcleo permanecem disponíveis no Laboratório.
 
-O núcleo combina perfis complementares das janelas, além de respeitar dezenas fixadas ou excluídas manualmente pelo usuário.
+O núcleo combina perfis complementares das janelas e respeita dezenas fixadas ou excluídas manualmente.
 
 ## Variáveis e cobertura estratificada
 
 Mega-Sena e Dia de Sorte deixam de formar o pool variável exclusivamente pelo topo do ranking.
 
-O pool passa a reservar espaço para os três perfis:
+O pool reserva aproximadamente:
 
-- aproximadamente 50% `strong` quando disponíveis;
-- aproximadamente 35% `balanced`;
-- aproximadamente 15% `cold`;
-- o restante é preenchido pela ordenação geral quando um grupo não possui candidatos suficientes.
+- 50% `strong`, quando disponíveis;
+- 35% `balanced`;
+- 15% `cold`;
+- vagas restantes preenchidas pela ordenação geral.
 
-O objetivo é evitar que a geração contradiga a própria metodologia, que permite dezenas intermediárias e eventualmente frias como instrumento de diversificação.
-
-Isso **não** pressupõe reversão à média no próximo sorteio. A finalidade é cobertura controlada do lote.
+A finalidade é cobertura controlada, não pressuposição de reversão à média.
 
 ## Política explícita do gerador
 
-As penalizações heurísticas foram centralizadas em `GENERATION_POLICY`.
-
-Hoje elas controlam:
+As penalizações heurísticas ficam centralizadas em `GENERATION_POLICY` e controlam:
 
 - distância da meta de pares/ímpares;
 - excesso ou distância da meta de repetição;
 - distância de soma no Dia de Sorte;
-- sobreposição de dezenas variáveis entre cartões do mesmo lote.
+- sobreposição de dezenas variáveis entre cartões.
 
-Centralizar esses valores não os transforma em parâmetros validados. O ganho é torná-los visíveis e testáveis como política do gerador, em vez de números espalhados pelo código.
+Centralizar não transforma esses valores em parâmetros validados; apenas os torna auditáveis e testáveis.
 
 ## Otimização global do lote
 
-A geração não escolhe mais um cartão definitivo e depois tenta compensar a reutilização nos cartões seguintes.
+A geração não escolhe um cartão definitivo e depois tenta compensar nos seguintes.
 
 Para cada posição do lote o motor:
 
-1. constrói combinações que respeitam as restrições;
-2. calcula o score local daquela posição — incluindo a meta própria de paridade, repetição, soma e demais regras aplicáveis;
-3. mantém uma shortlist de candidatos fortes;
-4. combina as shortlists em um **beam search de portfólio**;
-5. avalia o conjunto pela soma dos scores locais menos a penalidade de sobreposição entre as dezenas variáveis;
-6. seleciona o melhor portfólio determinístico, ou um dos portfólios de topo de forma ponderada quando a geração é diversificada.
+1. constrói combinações elegíveis;
+2. calcula o score local;
+3. mantém uma shortlist;
+4. combina as shortlists em **beam search de portfólio**;
+5. avalia a soma dos scores locais menos a sobreposição de variáveis;
+6. seleciona o melhor portfólio determinístico ou um portfólio de topo ponderado no modo diversificado.
 
-A função `selectPortfolioCandidates` otimiza, portanto, uma função de objetivo do lote inteiro. O beam search limita o custo computacional sem voltar ao comportamento puramente sequencial.
+O objetivo é aumentar dezenas e variáveis únicas e reduzir sobreposição desnecessária sem abandonar as metas estruturais de cada cartão.
 
-O objetivo é aumentar:
+## Shortlist e performance
 
-- dezenas únicas no lote;
-- variáveis únicas;
-- amplitude entre cartões;
+A shortlist precisa preservar candidatos fortes sem ordenar novamente um vetor crescente para cada combinação examinada.
 
-reduzindo sobreposição desnecessária, sem sacrificar as metas estruturais de cada posição.
+`topRankedCandidates` usa um heap limitado ao tamanho `K` da fronteira. O custo de manter o Top-K passa a ser aproximadamente:
+
+```text
+O(N log K)
+```
+
+em vez de ordenar o conjunto Top-K a cada candidato.
+
+Na Mega-Sena com mais de um cartão, a shortlist final continua compacta, mas é escolhida a partir de uma exploração maior para não eliminar todas as alternativas disjuntas antes do beam search.
+
+A otimização de performance não altera a função objetivo nem o critério de ordenação final. Há teste que compara o heap contra uma ordenação completa.
+
+## Auditoria do lote
 
 O `GenerationBatchAudit` informa:
 
 - núcleo compartilhado;
-- dezenas únicas no lote;
+- dezenas únicas;
 - variáveis únicas;
 - sobreposição média, mínima e máxima;
 - espaço combinatório elegível.
 
 ## Filtros estruturais
 
-Paridade, repetição e soma continuam desligados por padrão na experiência avançada e mostram o baseline matemático condicionado às escolhas manuais.
+Paridade, repetição e soma servem para definir o tipo de cobertura desejada.
 
-O usuário pode ativá-los conscientemente.
-
-Restringir o universo não faz uma combinação individual ficar mais provável. Esses filtros servem para definir o tipo de cobertura desejada.
+Restringir o universo não torna uma combinação individual mais provável.
 
 ## Modo determinístico e diversificado
 
 ### Determinístico
 
-Usado em backtests e Laboratório.
-
-Mesma entrada produz a mesma saída. Isso é necessário para comparação reproduzível.
+Usado em backtests e Laboratório. Mesma entrada produz a mesma saída.
 
 ### Diversificado
 
@@ -173,38 +186,34 @@ O motor:
 
 1. calcula a análise;
 2. seleciona o núcleo;
-3. forma os pools de candidatos;
-4. ranqueia combinações pelas regras da metodologia;
-5. mantém uma shortlist por posição do lote;
-6. otimiza o portfólio completo por score e diversidade;
-7. escolhe de forma ponderada entre os melhores portfólios usando uma seed.
+3. forma pools;
+4. ranqueia combinações;
+5. mantém shortlists;
+6. otimiza o portfólio completo;
+7. escolhe ponderadamente entre portfólios de topo usando uma seed.
 
-A mesma seed, com o mesmo histórico e a mesma configuração, reproduz o mesmo lote.
+A mesma seed, histórico e configuração reproduzem o lote.
 
 ## Explicabilidade na página
 
-A tela mostra explicitamente:
+A tela mostra:
 
-- **Por que este lote será gerado assim?** antes da geração;
-- a sequência Análise → Núcleo → Variáveis → Restrições → Auditoria;
-- **Como ler este jogo** em cada cartão gerado;
-- **Por que este lote foi aceito?** depois da prévia;
+- **Por que este lote será gerado assim?**;
+- Análise → Núcleo → Variáveis → Restrições → Auditoria;
+- **Como ler este jogo** em cada cartão;
+- **Por que este lote foi aceito?**;
 - avisos separados sobre previsão, score e cobertura estrutural;
-- atalho para validar hipóteses no Laboratório.
-
-A regra de produto é simples:
+- atalho para o Laboratório.
 
 > O usuário deve conseguir gerar sem estudar estatística, mas deve conseguir auditar cada decisão quando quiser aprofundar.
 
 ## Regra de segurança conceitual
 
-Nunca interpretar a geração como previsão.
-
 O Loto Lab pode dizer:
 
 - “esta dezena ficou acima do esperado na amostra”;
 - “este lote possui maior diversidade entre os cartões”;
-- “esta estratégia ficou no percentil X contra controles aleatórios”.
+- “esta estratégia apresentou determinada evidência contra controles aleatórios”.
 
 Não deve dizer:
 
