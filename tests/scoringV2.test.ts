@@ -31,6 +31,22 @@ test("Score v2 does not manufacture strong/cold tiers when every window is exact
   assert.ok(analysis.every((row) => row.historical === 50 && row.recent10 === 50 && row.recent20 === 50));
 });
 
+test("Score v2 recent windows stop at the latest internal history gap", () => {
+  const config = getLotteryConfig("mega-sena");
+  const history = balancedMegaHistory().filter((contest) => contest.number !== 25);
+  const continuousTail = history.filter((contest) => contest.number >= 26);
+
+  const withGap = buildNumberAnalysis(history, config, undefined, "score-v2");
+  const tailOnly = buildNumberAnalysis(continuousTail, config, undefined, "score-v2");
+
+  assert.equal(continuousTail.length, 5);
+  for (const row of withGap) {
+    const tailRow = tailOnly.find((candidate) => candidate.number === row.number)!;
+    assert.equal(row.recent10, tailRow.recent10);
+    assert.equal(row.recent20, tailRow.recent20);
+  }
+});
+
 test("no-score model is a structural control with neutral ranking", () => {
   const config = getLotteryConfig("mega-sena");
   const analysis = buildNumberAnalysis(balancedMegaHistory(1), config, undefined, "no-score");
