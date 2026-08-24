@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { createApiRequestHandler, type ApiServerOptions } from "./app.js";
 import type { AiInterpretationProvider } from "../ai/types.js";
@@ -27,6 +28,8 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
     ?? "http://localhost:3000";
 
   return createServer(async (request, response) => {
+    const requestId = randomUUID();
+    response.setHeader("X-Request-Id", requestId);
     try {
       const method = request.method ?? "GET";
       const url = new URL(request.url ?? "/", "http://localhost");
@@ -36,6 +39,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
       }
       if (!isHealthPath(url.pathname) && !requireSameOriginMutation(request, response, expectedOrigin)) {
         logEvent("warn", "cross_origin_mutation_blocked", {
+          requestId,
           method,
           pathname: url.pathname,
           origin: request.headers.origin,
@@ -49,6 +53,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
       await apiHandler(request, response);
     } catch (error) {
       logEvent("error", "web_request_failed", {
+        requestId,
         method: request.method ?? "GET",
         pathname: request.url ?? "/",
         message: error instanceof Error ? error.message : String(error),
