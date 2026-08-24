@@ -11,6 +11,16 @@ import {
 export const STRATEGY_LAB_TIMEOUT_MS = 60_000;
 export const MAX_ESTIMATED_LAB_WORK_UNITS = 750_000;
 
+export type ParsedStrategyLabOptions = StrategyLabOptions & {
+  lottery: LotteryId;
+  experiment: StrategyLabExperiment;
+  gameCount: number;
+  warmupContests: number;
+  lookbackContests: number;
+  bucketSize: number;
+  randomSamples: number;
+};
+
 export function parseStrategyLabExperiment(value: unknown): StrategyLabExperiment {
   if (value === undefined || value === null || value === "") return "fixed-core";
   if (value === "fixed-core" || value === "external-rules" || value === "score-model") return value;
@@ -20,7 +30,7 @@ export function parseStrategyLabExperiment(value: unknown): StrategyLabExperimen
 export function parseStrategyLabOptions(
   values: Record<string, unknown>,
   lottery: LotteryId,
-): StrategyLabOptions {
+): ParsedStrategyLabOptions {
   const experiment = parseStrategyLabExperiment(values.experiment);
   if (experiment === "external-rules" && lottery !== "mega-sena") {
     throw new ApiError(400, "INVALID_ARGUMENT", "external-rules experiment is available only for Mega-Sena");
@@ -84,7 +94,7 @@ export function estimateStrategyLabWorkUnits(
 
 export function validateStrategyLabExecution(
   contests: Contest[],
-  input: StrategyLabOptions,
+  input: ParsedStrategyLabOptions,
 ): { eligibleTargets: number; estimatedWorkUnits: number } {
   if (contests.length <= input.warmupContests) {
     throw new ApiError(
@@ -116,7 +126,7 @@ export function validateStrategyLabExecution(
     input.experiment,
     eligibleTargets,
     input.gameCount,
-    input.randomSamples ?? (input.experiment === "external-rules" ? 250 : 100),
+    input.randomSamples,
   );
   if (estimatedWorkUnits > MAX_ESTIMATED_LAB_WORK_UNITS) {
     throw new ApiError(
