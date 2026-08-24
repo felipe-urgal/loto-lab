@@ -76,7 +76,7 @@ Essas regras não são tratadas como verdade matemática. São hipóteses experi
 
 ## Controle aleatório por distribuição
 
-O laboratório não compara mais a melhor estratégia apenas contra uma única amostra aleatória.
+O laboratório não compara a melhor estratégia apenas contra uma única amostra aleatória.
 
 Cada execução pode gerar entre 10 e 500 controles aleatórios reproduzíveis; a interface usa 100 por padrão.
 
@@ -140,7 +140,77 @@ Leitura:
 
 > a hipótese ficou entre os piores controles e merece revisão ou descarte.
 
-## Métrica principal
+## Qualidade preditiva do ranking
+
+O experimento `score-model` mede também se o ranking colocou os números realmente sorteados acima dos números não sorteados **antes de cada concurso**.
+
+A métrica principal é AUC:
+
+- `0,500` — equivalente a ordenação sem informação;
+- acima de `0,500` — números sorteados tenderam a aparecer mais acima no ranking;
+- abaixo de `0,500` — o ranking ficou invertido em relação ao resultado futuro.
+
+O cálculo é feito round a round. Para cada concurso-alvo, o score usa somente concursos anteriores.
+
+`no-score` é um controle importante: como todas as dezenas ficam empatadas, sua AUC é exatamente `0,500`.
+
+A AUC mede a qualidade da ordenação. Ela não significa que uma dezena individual ganhou probabilidade matemática maior.
+
+## Walk-forward de pesos
+
+Os pesos do Score v2 podem ser avaliados por validação temporal fora da amostra.
+
+O processo implementado é:
+
+```text
+histórico disponível
+      ↓
+janela de treino
+      ↓
+compara perfis de pesos por AUC
+      ↓
+escolhe um perfil
+      ↓
+congela os pesos
+      ↓
+avalia no próximo bloco futuro
+      ↓
+anda a janela e repete
+```
+
+Perfis iniciais avaliados:
+
+- padrão;
+- longo prazo;
+- recência;
+- janelas equilibradas.
+
+A escolha do perfil usa apenas a janela de treino. O perfil escolhido fica congelado dentro do bloco futuro, mesmo que os resultados desse bloco comecem a chegar.
+
+O relatório mostra:
+
+- AUC escolhida no treino;
+- AUC do perfil escolhido no bloco futuro;
+- AUC dos pesos padrão no mesmo bloco;
+- delta fora da amostra;
+- quantidade de folds e concursos efetivamente testados.
+
+Essa validação não promove automaticamente o perfil vencedor. Ela mede se a otimização histórica continuou funcionando depois da escolha.
+
+## Simulador nulo para ganho walk-forward
+
+O delta entre “pesos otimizados” e “pesos padrão” não possui uma distribuição teórica simples que seja útil para a interface.
+
+Por isso o Laboratório usa um **null pareado por sign-flip** sobre os deltas dos folds:
+
+1. mantém a magnitude do ganho/perda de cada fold;
+2. inverte aleatoriamente o sinal sob a hipótese nula de que a otimização não possui direção consistente;
+3. repete a simulação com seed reproduzível;
+4. calcula P05, P50, P95 e p-value bilateral empírico.
+
+Assim um ganho médio pequeno pode ser corretamente interpretado como compatível com ruído quando permanece dentro da distribuição nula.
+
+## Métrica principal do backtest de jogos
 
 Se estratégias e controles possuem cobertura financeira suficiente, o ranking usa:
 
@@ -157,6 +227,8 @@ Se a cobertura financeira é incompleta:
 4. tamanho do núcleo como desempate.
 
 A comparação com a distribuição aleatória usa a mesma métrica escolhida para o ranking.
+
+A AUC é apresentada separadamente porque responde a outra pergunta: qualidade preditiva da ordenação das dezenas.
 
 ## Série histórica por blocos
 
@@ -210,6 +282,8 @@ Content-Type: application/json
 }
 ```
 
+A resposta desse experimento inclui também `rankingQuality` e `walkForward`.
+
 ### Regras externas
 
 ```json
@@ -259,27 +333,9 @@ A tela do Laboratório explica:
 - percentil da melhor estratégia;
 - status de evidência;
 - evolução por blocos;
+- AUC dos modelos no experimento de score;
+- resultado do walk-forward e distribuição nula do ganho;
 - diferença entre “venceu do random”, “inconclusivo”, “sem evidência” e “abaixo do random”.
-
-## Walk-forward
-
-A distribuição aleatória reduz o risco de concluir a partir de uma única seed, mas não substitui validação temporal fora da amostra.
-
-A próxima fronteira metodológica continua sendo **walk-forward** para parâmetros escolhidos por otimização:
-
-```text
-janela de treino
-      ↓
-escolha de parâmetros
-      ↓
-janela futura intocada
-      ↓
-avaliação
-      ↓
-anda a janela e repete
-```
-
-Pesos, penalidades e metas não devem ser promovidos porque performaram bem na mesma janela usada para escolhê-los.
 
 ## Interpretação correta
 
