@@ -42,6 +42,14 @@ function serviceError(error: unknown): ApiError | undefined {
   if (error.message.startsWith("REAL_BET_ALREADY_EXISTS:")) {
     return new ApiError(409, "REAL_BET_ALREADY_EXISTS", "This generated batch is already marked as a real bet");
   }
+  if (error.message.startsWith("CONTEST_TARGET_MISMATCH:")) {
+    const [, expected, received] = error.message.split(":");
+    return new ApiError(
+      409,
+      "CONTEST_TARGET_MISMATCH",
+      `This batch targets contest ${expected}; it cannot be registered as a real bet for contest ${received}`,
+    );
+  }
   if (error.message === "CONTEST_NUMBER_REQUIRED") {
     return new ApiError(400, "CONTEST_NUMBER_REQUIRED", "A contest number is required for a real bet");
   }
