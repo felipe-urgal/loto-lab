@@ -12,6 +12,11 @@ import {
   type RunBacktestRequest,
   type RunBacktestResponse,
 } from "./services.js";
+import { STRATEGY_LAB_TIMEOUT_MS } from "./strategyLabInput.js";
+
+export const ANALYSIS_WORKER_TIMEOUT_MS = 60_000;
+const ANALYSIS_WORKER_OLD_GENERATION_MB = 256;
+const ANALYSIS_WORKER_YOUNG_GENERATION_MB = 64;
 
 interface WorkerErrorPayload {
   name: string;
@@ -44,30 +49,78 @@ export class AnalysisCancelledError extends Error {
   }
 }
 
-function runWorker<T>(workerData: unknown, signal?: AbortSignal): Promise<T> {
+export class AnalysisTimeoutError extends Error {
+  readonly code = "ANALYSIS_TIMEOUT";
+
+  constructor(readonly timeoutMs = ANALYSIS_WORKER_TIMEOUT_MS) {
+    super(`Analysis worker exceeded the ${timeoutMs}ms execution limit`);
+    this.name = "AnalysisTimeoutError";
+  }
+}
+
+interface WorkerExecutionOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  maxOldGenerationSizeMb?: number;
+  maxYoungGenerationSizeMb?: number;
+}
+
+function runWorker<T>(workerData: unknown, options: WorkerExecutionOptions = {}): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    if (signal?.aborted) {
+    const timeoutMs = options.timeoutMs ?? ANALYSIS_WORKER_TIMEOUT_MS;
+    if (!Number.isFinite(timeoutMs) || timeoutMs < 1000 || timeoutMs > 10 * 60_000) {
+      reject(new Error("Analysis worker timeout must be between 1000 and 600000 ms"));
+      return;
+    }
+    if (options.signal?.aborted) {
       reject(new AnalysisCancelledError());
       return;
     }
 
-    const worker = new Worker(new URL("./analysisWorker.js", import.meta.url), { workerData });
-    let settled = false;
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL("./analysisWorker.js", import.meta.url), {
+        workerData,
+        name: "loto-lab-analysis",
+        resourceLimits: {
+          maxOldGenerationSizeMb: options.maxOldGenerationSizeMb ?? ANALYSIS_WORKER_OLD_GENERATION_MB,
+          maxYoungGenerationSizeMb: options.maxYoungGenerationSizeMb ?? ANALYSIS_WORKER_YOUNG_GENERATION_MB,
+        },
+      });
+    } catch (error) {
+      reject(error);
+      return;
+    }
 
-    const cleanup = () => signal?.removeEventListener("abort", onAbort);
+    let settled = false;
+    let timeout: NodeJS.Timeout | undefined;
+
+    const cleanup = () => {
+      if (timeout) clearTimeout(timeout);
+      options.signal?.removeEventListener("abort", onAbort);
+    };
     const finish = (callback: () => void) => {
       if (settled) return;
       settled = true;
       cleanup();
       callback();
     };
+    const terminate = () => void worker.terminate().catch(() => undefined);
     const onAbort = () => {
       finish(() => {
-        void worker.terminate().catch(() => undefined);
+        terminate();
         reject(new AnalysisCancelledError());
       });
     };
-    signal?.addEventListener("abort", onAbort, { once: true });
+
+    options.signal?.addEventListener("abort", onAbort, { once: true });
+    timeout = setTimeout(() => {
+      finish(() => {
+        terminate();
+        reject(new AnalysisTimeoutError(timeoutMs));
+      });
+    }, timeoutMs);
+    timeout.unref?.();
 
     worker.once("message", (message: WorkerMessage<T>) => {
       finish(() => {
@@ -106,6 +159,7 @@ function eligibleRoundCount(contests: Contest[], input: RunBacktestRequest): num
 export interface RunBacktestWorkerOptions {
   signal?: AbortSignal;
   enforceHttpRoundLimit?: boolean;
+  timeoutMs?: number;
 }
 
 export async function runBacktestInWorker(
@@ -121,7 +175,7 @@ export async function runBacktestInWorker(
 
   const computed = await runWorker<ComputedBacktest>(
     { kind: "backtest", contests, input },
-    options.signal,
+    { signal: options.signal, timeoutMs: options.timeoutMs ?? ANALYSIS_WORKER_TIMEOUT_MS },
   );
   if (!input.persist) {
     return {
@@ -156,5 +210,8 @@ export async function runStrategyLabInWorker(
   input: StrategyLabOptions,
   signal?: AbortSignal,
 ): Promise<StrategyLabResult> {
-  return runWorker<StrategyLabResult>({ kind: "strategy-lab", contests, input }, signal);
+  return runWorker<StrategyLabResult>(
+    { kind: "strategy-lab", contests, input },
+    { signal, timeoutMs: STRATEGY_LAB_TIMEOUT_MS },
+  );
 }
