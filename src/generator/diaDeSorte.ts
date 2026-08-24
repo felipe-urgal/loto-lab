@@ -2,6 +2,7 @@ import type { AnalysisModel, Contest, GeneratedGame } from "../domain/types.js";
 import { buildNumberAnalysis } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
+import { selectPortfolioCandidates } from "./portfolio.js";
 import {
   buildMetadata,
   buildStratifiedCandidatePool,
@@ -10,7 +11,6 @@ import {
   generationRandom,
   scoreMap,
   selectProfiledFixedNumbers,
-  selectRankedCandidate,
   topRankedCandidates,
   type GenerationMode,
 } from "./shared.js";
@@ -171,17 +171,15 @@ export function generateDiaDeSorteGames(
   const variableCount = config.drawSize - fixedCount;
   const poolSize = fixedCount === 0 ? 13 : fixedCount === 2 ? 14 : 18;
   const candidatePool = buildStratifiedCandidatePool(analysis, fixedSet, excludedSet, poolSize);
-  const usedVariables = new Map<number, number>();
   const repeatTargets = [1, 2, 1, 2];
   const oddTargets = [3, 4, 3, 4];
   const luckyMonths = rankLuckyMonths(scoped);
-  const games: GeneratedGame[] = [];
   const policy = GENERATION_POLICY.diaDeSorte;
 
-  for (let gameIndex = 0; gameIndex < gameCount; gameIndex += 1) {
+  const candidateGroups = Array.from({ length: gameCount }, (_, gameIndex) => {
     const targetRepeat = lastContest ? repeatTargets[gameIndex % repeatTargets.length]! : 0;
     const targetOdd = oddTargets[gameIndex % oddTargets.length]!;
-
+    const luckyMonth = luckyMonths[gameIndex % luckyMonths.length];
     const candidates = function* () {
       for (const variableNumbers of combinationIterator(candidatePool, variableCount)) {
         const numbers = [...fixedNumbers, ...variableNumbers].sort((a, b) => a - b);
@@ -191,7 +189,7 @@ export function generateDiaDeSorteGames(
           numbers,
           fixedNumbers,
           variableNumbers,
-          luckyMonth: luckyMonths[gameIndex % luckyMonths.length],
+          ...(luckyMonth ? { luckyMonth } : {}),
           metadata,
         };
         if (!matchesGenerationConstraints(game, constraints)) continue;
@@ -200,54 +198,50 @@ export function generateDiaDeSorteGames(
           (total, number) => total + (scores.get(number) ?? 0),
           0,
         );
-        const reused = variableNumbers.reduce(
-          (total, number) => total + (usedVariables.get(number) ?? 0),
-          0,
-        );
         const repeatPenalty = Math.abs(
           metadata.repeatedFromLastContest.length - targetRepeat,
         ) * policy.repeatDistancePenalty;
         const parityPenalty = Math.abs(metadata.odd - targetOdd) * policy.parityDistancePenalty;
         const sumPenalty = Math.abs(metadata.sum - 112) * policy.sumDistancePenalty;
-        const reusePenalty = reused * policy.variableReusePenalty;
 
         yield {
           variableNumbers,
           numbers,
           metadata,
+          ...(luckyMonth ? { luckyMonth } : {}),
           rank:
             variableScore -
             repeatPenalty -
             parityPenalty -
-            sumPenalty -
-            reusePenalty,
+            sumPenalty,
         };
       }
     };
 
-    const ranked = topRankedCandidates(
+    return topRankedCandidates(
       candidates(),
       24,
       (a, b) =>
         b.rank - a.rank ||
         a.numbers.join("-").localeCompare(b.numbers.join("-")),
     );
-    const winner = selectRankedCandidate(ranked, generationMode, random, 6);
-    if (!winner) throw new Error("Unable to generate a Dia de Sorte game with the requested constraints");
+  });
 
-    for (const number of winner.variableNumbers) {
-      usedVariables.set(number, (usedVariables.get(number) ?? 0) + 1);
-    }
-
-    games.push({
-      lottery: "dia-de-sorte",
-      numbers: winner.numbers,
-      fixedNumbers: [...fixedNumbers],
-      variableNumbers: [...winner.variableNumbers].sort((a, b) => a - b),
-      luckyMonth: luckyMonths[gameIndex % luckyMonths.length],
-      metadata: winner.metadata,
-    });
+  const portfolio = selectPortfolioCandidates(candidateGroups, generationMode, random, {
+    overlapPenalty: policy.variableReusePenalty,
+    beamWidth: 96,
+    diversifiedPoolSize: 8,
+  });
+  if (portfolio.length !== gameCount) {
+    throw new Error("Unable to generate a Dia de Sorte portfolio with the requested constraints");
   }
 
-  return games;
+  return portfolio.map((winner, index) => ({
+    lottery: "dia-de-sorte",
+    numbers: winner.numbers,
+    fixedNumbers: [...fixedNumbers],
+    variableNumbers: [...winner.variableNumbers].sort((a, b) => a - b),
+    luckyMonth: (winner as typeof winner & { luckyMonth?: string }).luckyMonth ?? luckyMonths[index % luckyMonths.length],
+    metadata: winner.metadata,
+  }));
 }
