@@ -40,29 +40,44 @@ function seededRandom(seed: string): () => number {
   };
 }
 
+function weightedMean(values: number[], weights: number[]): number {
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  if (totalWeight <= 0) return 0;
+  return values.reduce((sum, value, index) => sum + value * weights[index]!, 0) / totalWeight;
+}
+
 export function pairedSignFlipNull(
   pairedDifferences: number[],
   samples = 1000,
   seed = "loto-lab:null-sign-flip:v1",
+  weights?: number[],
 ): NullDistributionSummary {
-  const valid = pairedDifferences.filter(Number.isFinite);
-  const observed = valid.length === 0
-    ? 0
-    : valid.reduce((sum, value) => sum + value, 0) / valid.length;
+  const valid: Array<{ difference: number; weight: number }> = [];
+  for (let index = 0; index < pairedDifferences.length; index += 1) {
+    const difference = pairedDifferences[index]!;
+    const weight = weights?.[index] ?? 1;
+    if (!Number.isFinite(difference) || !Number.isFinite(weight) || weight <= 0) continue;
+    valid.push({ difference, weight });
+  }
+
   if (valid.length === 0) {
     return { samples: 0, observed: 0, p05: 0, p50: 0, p95: 0, percentile: 0.5, twoSidedPValue: 1 };
   }
 
+  const differences = valid.map((item) => item.difference);
+  const validWeights = valid.map((item) => item.weight);
+  const observed = weightedMean(differences, validWeights);
   const count = Math.max(100, Math.min(10_000, Math.round(samples)));
   const random = seededRandom(seed);
   const simulated: number[] = [];
+
   for (let sample = 0; sample < count; sample += 1) {
-    let total = 0;
-    for (const difference of valid) total += (random() < 0.5 ? -1 : 1) * difference;
-    simulated.push(total / valid.length);
+    const signed = differences.map((difference) => (random() < 0.5 ? -1 : 1) * difference);
+    simulated.push(weightedMean(signed, validWeights));
   }
 
-  const belowOrEqual = simulated.filter((value) => value <= observed).length;
+  const below = simulated.filter((value) => value < observed).length;
+  const tied = simulated.filter((value) => value === observed).length;
   const atLeastAsExtreme = simulated.filter((value) => Math.abs(value) >= Math.abs(observed)).length;
   return {
     samples: count,
@@ -70,7 +85,7 @@ export function pairedSignFlipNull(
     p05: round(quantile(simulated, 0.05)),
     p50: round(quantile(simulated, 0.5)),
     p95: round(quantile(simulated, 0.95)),
-    percentile: round(belowOrEqual / count),
+    percentile: round((below + tied * 0.5) / count),
     twoSidedPValue: round((atLeastAsExtreme + 1) / (count + 1)),
   };
 }
