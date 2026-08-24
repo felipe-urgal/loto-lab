@@ -1,11 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { selectPortfolioCandidates } from "../src/generator/portfolio.js";
+import { buildPortfolioShortlist, selectPortfolioCandidates } from "../src/generator/portfolio.js";
 import { createSeededRandom } from "../src/generator/shared.js";
 
 function candidate(numbers: number[], rank: number) {
   return { numbers, variableNumbers: numbers, rank };
 }
+
+test("portfolio shortlist keeps lower-ranked disjoint alternatives visible", () => {
+  const crowded = Array.from({ length: 12 }, (_, index) => candidate([1, 2, index + 3], 100 - index));
+  const disjoint = candidate([20, 21, 22], 82);
+  const shortlist = buildPortfolioShortlist([...crowded, disjoint], 4, {
+    explorationLimit: 32,
+    diversityPenalty: 20,
+  });
+
+  assert.ok(shortlist.some((item) => item.numbers.join("-") === "20-21-22"));
+});
 
 test("portfolio optimizer trades a small local score loss for lower global overlap", () => {
   const groups = [
