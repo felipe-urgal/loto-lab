@@ -50,6 +50,7 @@ function formatPercent(value) { return typeof value === "number" && Number.isFin
 function formatPercentagePoints(value) { if (typeof value !== "number" || !Number.isFinite(value)) return "—"; const points = value * 100; return `${points > 0 ? "+" : ""}${points.toFixed(1).replace(".", ",")} p.p.`; }
 function formatCurrency(value) { return typeof value === "number" && Number.isFinite(value) ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value) : "—"; }
 function compactCurrency(value) { const abs = Math.abs(value); const sign = value < 0 ? "−" : ""; if (abs >= 1_000_000) return `${sign}R$ ${(abs / 1_000_000).toFixed(1).replace(".", ",")} mi`; if (abs >= 1_000) return `${sign}R$ ${(abs / 1_000).toFixed(1).replace(".", ",")} mil`; return `${sign}R$ ${abs.toFixed(0)}`; }
+function formatAuc(value) { return typeof value === "number" && Number.isFinite(value) ? value.toFixed(3).replace(".", ",") : "—"; }
 
 async function api(path, options = {}) {
   const response = await fetch(`${API}${path}`, { ...options, headers: options.body ? { "Content-Type": "application/json", ...(options.headers || {}) } : options.headers });
@@ -72,7 +73,7 @@ function updateLotteryCopy(resetGames = false) {
 
   if (experiment === "score-model") {
     title.textContent = `${config.label}: Score v1 × Score v2 × sem score`;
-    description.textContent = "Isola o valor do ranking: o núcleo operacional é mantido e apenas o modelo de score muda. Score v2 ajusta o desvio pelo tamanho da amostra.";
+    description.textContent = "Isola o valor do ranking e mede também AUC fora da amostra. O walk-forward escolhe pesos só no passado e congela a escolha no bloco seguinte.";
   } else if (experiment === "external-rules") {
     title.textContent = "Mega-Sena: validação de regras externas";
     description.textContent = "Testa isoladamente grupo das 26, consecutivas, colunas, paridade e quadrantes sem promover essas regras automaticamente.";
@@ -87,7 +88,7 @@ function updateLotteryCopy(resetGames = false) {
   resultsRoot.hidden = true;
   message.hidden = false;
   setMessage("", "Pronto para comparar", experiment === "score-model"
-    ? "O mesmo gerador será testado com Score v2, Score v1 e sem score, sempre contra uma distribuição aleatória."
+    ? "O mesmo gerador será testado com Score v2, Score v1 e sem score, contra random e com qualidade preditiva medida sem vazamento futuro."
     : experiment === "external-rules"
       ? "As regras externas são hipóteses experimentais. O resultado não altera a metodologia principal automaticamente."
       : "Compare núcleos no mesmo período e interprete o resultado contra uma distribuição de controles aleatórios.");
@@ -117,16 +118,25 @@ function statusCopy(status) {
   return { label: "Sem evidência", tone: "neutral", copy: "Dentro da distribuição normal do acaso." };
 }
 
+function renderPredictiveEvidence(result) {
+  if (!Array.isArray(result.rankingQuality) || result.rankingQuality.length === 0) return "";
+  const qualityCards = result.rankingQuality.map((item) => {
+    const delta = item.quality.deltaFromRandom;
+    const tone = delta > 0.01 ? "positive" : delta < -0.01 ? "negative" : "neutral";
+    return `<div class="lab-evidence-card is-${tone}"><span>${escapeHtml(item.label)}</span><strong>AUC ${formatAuc(item.quality.auc)}</strong><small>${formatPercentagePoints(delta)} vs 0,500 · ${item.quality.rounds} concursos</small></div>`;
+  }).join("");
+  const walk = result.walkForward;
+  const walkMarkup = walk ? `<div class="lab-walk-forward"><div><span class="lab-eyebrow">Otimização walk-forward</span><strong>${formatAuc(walk.tunedAuc)} AUC otimizado vs ${formatAuc(walk.defaultAuc)} padrão</strong><p>${walk.folds.length} folds · ${walk.totalTestRounds} concursos realmente fora da amostra. Pesos escolhidos no treino e congelados em cada bloco futuro.</p></div><div class="lab-null-box"><span>Ganho observado</span><strong>${formatPercentagePoints(walk.deltaVsDefault)}</strong><small>Null P05 ${formatPercentagePoints(walk.nullBenchmark.p05)} · P95 ${formatPercentagePoints(walk.nullBenchmark.p95)} · p bilateral ${formatPercent(walk.nullBenchmark.twoSidedPValue)}</small></div></div>` : "";
+  return `<section class="panel lab-predictive-evidence"><div class="lab-evidence-head"><div><span class="lab-eyebrow">Qualidade preditiva</span><strong>O ranking colocou os números sorteados acima dos não sorteados?</strong><p>AUC 0,500 equivale a ordenação sem informação. Esta métrica avalia o ranking antes de cada concurso, sem olhar o resultado futuro.</p></div></div><div class="lab-evidence-grid">${qualityCards}</div>${walkMarkup}</section>`;
+}
+
 function renderBenchmark(result) {
   const benchmark = result.benchmark;
   const bestStrategy = result.variants.find((variant) => variant.key === benchmark.bestStrategyKey);
   if (!bestStrategy) return "";
   const status = statusCopy(benchmark.status);
   const metricLabel = benchmark.basis === "roi" ? "ROI" : "taxa de premiação";
-  return `<article class="panel lab-benchmark-card is-${status.tone}">
-    <div class="lab-benchmark-main"><span class="lab-eyebrow">Benchmark · ${benchmark.distribution.samples} controles</span><strong>${escapeHtml(bestStrategy.label)} · ${status.label}</strong><p>${status.copy} Percentil ${formatPercent(benchmark.strategyPercentile)}; diferença para a mediana: ${formatPercentagePoints(benchmark.delta)} em ${metricLabel}.</p></div>
-    <div class="lab-distribution"><div><span>P05</span><strong>${formatPercent(benchmark.distribution.p05)}</strong></div><div><span>P50</span><strong>${formatPercent(benchmark.distribution.p50)}</strong></div><div><span>P95</span><strong>${formatPercent(benchmark.distribution.p95)}</strong></div><div class="is-strategy"><span>Estratégia</span><strong>${formatPercent(rankingPrimary(bestStrategy, benchmark.basis).raw)}</strong></div></div>
-  </article>`;
+  return `<article class="panel lab-benchmark-card is-${status.tone}"><div class="lab-benchmark-main"><span class="lab-eyebrow">Benchmark · ${benchmark.distribution.samples} controles</span><strong>${escapeHtml(bestStrategy.label)} · ${status.label}</strong><p>${status.copy} Percentil ${formatPercent(benchmark.strategyPercentile)}; diferença para a mediana: ${formatPercentagePoints(benchmark.delta)} em ${metricLabel}.</p></div><div class="lab-distribution"><div><span>P05</span><strong>${formatPercent(benchmark.distribution.p05)}</strong></div><div><span>P50</span><strong>${formatPercent(benchmark.distribution.p50)}</strong></div><div><span>P95</span><strong>${formatPercent(benchmark.distribution.p95)}</strong></div><div class="is-strategy"><span>Estratégia</span><strong>${formatPercent(rankingPrimary(bestStrategy, benchmark.basis).raw)}</strong></div></div></article>`;
 }
 
 function renderRanking(result) {
@@ -136,7 +146,7 @@ function renderRanking(result) {
     const winner = index === 0;
     return `<article class="panel lab-strategy-card ${winner ? "is-winner" : ""}"><div class="lab-rank-row"><span class="lab-rank-number">${index + 1}</span><span class="badge ${winner ? "positive" : ""}">${escapeHtml(variantBadge(result, variant, index))}</span></div><h3>${escapeHtml(variant.label)}</h3><p>${variant.summary.testedContests} concursos · ${variant.summary.totalGames} jogos simulados</p><div class="lab-primary-metric"><span>${primary.label}</span><strong class="${tone}">${primary.value}</strong></div><div class="lab-mini-metrics"><div class="lab-mini-metric"><span>Acertos médios</span><strong>${variant.summary.averageHitsPerGame.toFixed(2).replace(".", ",")}</strong></div><div class="lab-mini-metric"><span>Melhor</span><strong>${variant.summary.maxHits}</strong></div><div class="lab-mini-metric"><span>Cobertura</span><strong>${formatPercent(variant.summary.financialCoverage)}</strong></div></div></article>`;
   }).join("");
-  rankingRoot.innerHTML = `${renderBenchmark(result)}${cards}`;
+  rankingRoot.innerHTML = `${renderBenchmark(result)}${cards}${renderPredictiveEvidence(result)}`;
 }
 
 function renderTable(result) {
@@ -187,7 +197,7 @@ function renderResult(result) {
 
 async function runComparison(event) {
   event?.preventDefault(); runButton.disabled = true; runButton.textContent = "Comparando..."; message.hidden = false; resultsRoot.hidden = true;
-  setMessage("running", "Executando backtests", "Estratégias e controles aleatórios estão usando exatamente o mesmo recorte e somente dados anteriores a cada concurso-alvo.");
+  setMessage("running", "Executando backtests", "Estratégias, AUC e controles aleatórios estão usando somente a informação disponível antes de cada concurso-alvo.");
   try {
     const payload = await api("/lab/compare", { method: "POST", body: JSON.stringify({ lottery: selectedLottery(), experiment: selectedExperiment(), gameCount: Number(gamesInput.value), warmupContests: Number(warmupInput.value), lookbackContests: Number(lookbackInput.value), bucketSize: Number(bucketInput.value), randomSamples: Number(randomSamplesInput.value) }) });
     renderResult(payload);
