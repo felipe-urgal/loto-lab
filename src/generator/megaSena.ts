@@ -1,4 +1,4 @@
-import type { Contest, GeneratedGame, NumberAnalysis } from "../domain/types.js";
+import type { AnalysisModel, Contest, GeneratedGame, NumberAnalysis } from "../domain/types.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { buildNumberAnalysis } from "../analysis/scoring.js";
 import {
@@ -10,7 +10,9 @@ import {
 } from "./megaSenaRules.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
 import {
+  buildStratifiedCandidatePool,
   combinationIterator,
+  GENERATION_POLICY,
   generationRandom,
   selectRankedCandidate,
   selectWeightedItem,
@@ -33,6 +35,7 @@ export interface MegaSenaGeneratorOptions {
   excludedNumbers?: number[];
   constraints?: GenerationConstraints;
   referenceContestNumber?: number | null;
+  analysisModel?: AnalysisModel;
 }
 
 function bestUnused(
@@ -107,13 +110,22 @@ interface NormalizedMegaSenaGeneratorOptions {
   excludedNumbers: number[];
   constraints?: GenerationConstraints;
   referenceContestNumber?: number | null;
+  analysisModel: AnalysisModel;
 }
 
 function normalizeOptions(
   value: number | MegaSenaGeneratorOptions,
 ): NormalizedMegaSenaGeneratorOptions {
   if (typeof value === "number") {
-    return { gameCount: value, fixedCount: 3, generationMode: "deterministic", rules: {}, fixedNumbers: [], excludedNumbers: [] };
+    return {
+      gameCount: value,
+      fixedCount: 3,
+      generationMode: "deterministic",
+      rules: {},
+      fixedNumbers: [],
+      excludedNumbers: [],
+      analysisModel: "score-v2",
+    };
   }
   return {
     gameCount: value.gameCount ?? 2,
@@ -125,6 +137,7 @@ function normalizeOptions(
     excludedNumbers: value.excludedNumbers ?? [],
     ...(value.constraints !== undefined ? { constraints: value.constraints } : {}),
     ...(value.referenceContestNumber !== undefined ? { referenceContestNumber: value.referenceContestNumber } : {}),
+    analysisModel: value.analysisModel ?? "score-v2",
   };
 }
 
@@ -145,7 +158,7 @@ function buildCandidatePool(
 
   if (fixedCount !== 0 || !hasRules(rules)) {
     const poolSize = fixedCount === 0 ? 14 : fixedCount === 2 ? 18 : 24;
-    return ranked.slice(0, poolSize).map((row) => row.number);
+    return buildStratifiedCandidatePool(analysis, fixedSet, excludedSet, poolSize);
   }
 
   const selected = new Set<number>();
@@ -219,6 +232,7 @@ export function generateMegaSenaGames(
     excludedNumbers,
     constraints,
     referenceContestNumber,
+    analysisModel,
   } = normalizeOptions(options);
   if (!Number.isInteger(gameCount) || gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
@@ -231,7 +245,7 @@ export function generateMegaSenaGames(
   const scoped = contests
     .filter((contest) => contest.lottery === "mega-sena")
     .sort((a, b) => a.number - b.number);
-  const analysis = buildNumberAnalysis(scoped, config);
+  const analysis = buildNumberAnalysis(scoped, config, undefined, analysisModel);
   const lastContest = referenceContestNumber === undefined
     ? scoped.at(-1)
     : referenceContestNumber === null
@@ -246,6 +260,7 @@ export function generateMegaSenaGames(
   const usedVariables = new Map<number, number>();
   const parityTargets = [3, 4, 2];
   const games: GeneratedGame[] = [];
+  const policy = GENERATION_POLICY.megaSena;
 
   for (let gameIndex = 0; gameIndex < gameCount; gameIndex += 1) {
     const targetOdd = rules.equalParity ? 3 : parityTargets[gameIndex % parityTargets.length]!;
@@ -273,9 +288,9 @@ export function generateMegaSenaGames(
           (total, number) => total + (usedVariables.get(number) ?? 0),
           0,
         );
-        const parityPenalty = Math.abs(metadata.odd - targetOdd) * 20;
-        const repeatPenalty = Math.max(0, metadata.repeatedFromLastContest.length - 2) * 30;
-        const reusePenalty = reused * 80;
+        const parityPenalty = Math.abs(metadata.odd - targetOdd) * policy.parityPenalty;
+        const repeatPenalty = Math.max(0, metadata.repeatedFromLastContest.length - 2) * policy.repeatExcessPenalty;
+        const reusePenalty = reused * policy.variableReusePenalty;
 
         yield {
           variableNumbers,
