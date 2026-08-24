@@ -1,8 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { eligibleTargetIndexes } from "../analysis/contestEligibility.js";
 import type {
   StrategyLabExperiment,
   StrategyLabOptions,
 } from "../lab/strategyLab.js";
+import { resolveStrategyLabPeriod } from "../lab/strategyLab.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import type { ApiServerOptions } from "./app.js";
 import {
@@ -19,7 +21,7 @@ import { AnalysisCancelledError, runStrategyLabInWorker } from "./workerClient.j
 
 const labLimiter = new FixedWindowRateLimiter({ limit: 4, windowMs: 10 * 60_000 });
 const STRATEGY_LAB_TIMEOUT_MS = 60_000;
-const MAX_ESTIMATED_LAB_GAME_EVALUATIONS = 750_000;
+const MAX_ESTIMATED_LAB_WORK_UNITS = 750_000;
 
 function parseExperiment(value: unknown): StrategyLabExperiment {
   if (value === undefined || value === null || value === "") return "fixed-core";
@@ -27,14 +29,18 @@ function parseExperiment(value: unknown): StrategyLabExperiment {
   throw new ApiError(400, "INVALID_ARGUMENT", "experiment must be fixed-core, external-rules or score-model");
 }
 
-function estimateLabGameEvaluations(
+export function estimateStrategyLabWorkUnits(
   experiment: StrategyLabExperiment,
-  lookbackContests: number,
+  eligibleTargets: number,
   gameCount: number,
   randomSamples: number,
 ): number {
   const strategyVariants = experiment === "external-rules" ? 9 : 3;
-  return lookbackContests * gameCount * (randomSamples + strategyVariants + 2);
+  const backtestUnits = eligibleTargets * gameCount * (randomSamples + strategyVariants + 2);
+  // Score-model also computes three ranking-quality series plus walk-forward
+  // profile selection. These are cheaper than full ticket generation, but not free.
+  const scoreAnalysisUnits = experiment === "score-model" ? eligibleTargets * 40 : 0;
+  return backtestUnits + scoreAnalysisUnits;
 }
 
 export async function serveStrategyLab(
@@ -88,17 +94,59 @@ export async function serveStrategyLab(
       throw new ApiError(400, "INVALID_ARGUMENT", "startContest must be less than or equal to endContest");
     }
 
-    const estimatedGameEvaluations = estimateLabGameEvaluations(
+    const contests = await new PostgresContestRepository(options.pool).list({
+      lottery,
+      order: "asc",
+    });
+
+    if (contests.length <= warmupContests) {
+      throw new ApiError(
+        409,
+        "INSUFFICIENT_HISTORY",
+        `At least ${warmupContests + 1} contests are required to compare strategies`,
+      );
+    }
+
+    const workerInput: StrategyLabOptions = {
+      lottery,
       experiment,
+      gameCount,
+      warmupContests,
       lookbackContests,
+      bucketSize,
+      randomSamples,
+      ...(startContest !== undefined ? { startContest } : {}),
+      ...(endContest !== undefined ? { endContest } : {}),
+    };
+    const period = resolveStrategyLabPeriod(contests, workerInput);
+    const scoped = contests
+      .filter((contest) => contest.lottery === lottery)
+      .sort((a, b) => a.number - b.number);
+    const eligibleTargets = eligibleTargetIndexes(scoped, {
+      warmupContests,
+      ...(period.startContest !== undefined ? { startContest: period.startContest } : {}),
+      ...(period.endContest !== undefined ? { endContest: period.endContest } : {}),
+    }).length;
+
+    if (eligibleTargets === 0) {
+      throw new ApiError(
+        409,
+        "EMPTY_PERIOD",
+        "The requested period has no eligible contests after warmup and continuity checks.",
+      );
+    }
+
+    const estimatedWorkUnits = estimateStrategyLabWorkUnits(
+      experiment,
+      eligibleTargets,
       gameCount,
       randomSamples,
     );
-    if (estimatedGameEvaluations > MAX_ESTIMATED_LAB_GAME_EVALUATIONS) {
+    if (estimatedWorkUnits > MAX_ESTIMATED_LAB_WORK_UNITS) {
       throw new ApiError(
         400,
         "ANALYSIS_TOO_LARGE",
-        "Requested Strategy Lab run is too large. Reduce contests, games per contest, or random controls.",
+        "Requested Strategy Lab run is too large. Reduce the effective contest period, games per contest, or random controls.",
       );
     }
 
@@ -108,31 +156,6 @@ export async function serveStrategyLab(
     }
 
     try {
-      const contests = await new PostgresContestRepository(options.pool).list({
-        lottery,
-        order: "asc",
-      });
-
-      if (contests.length <= warmupContests) {
-        throw new ApiError(
-          409,
-          "INSUFFICIENT_HISTORY",
-          `At least ${warmupContests + 1} contests are required to compare strategies`,
-        );
-      }
-
-      const workerInput: StrategyLabOptions = {
-        lottery,
-        experiment,
-        gameCount,
-        warmupContests,
-        lookbackContests,
-        bucketSize,
-        randomSamples,
-        ...(startContest !== undefined ? { startContest } : {}),
-        ...(endContest !== undefined ? { endContest } : {}),
-      };
-
       const controller = new AbortController();
       let timedOut = false;
       const timeout = setTimeout(() => {
