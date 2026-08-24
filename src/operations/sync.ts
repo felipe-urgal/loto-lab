@@ -38,6 +38,7 @@ export interface LotteryOperationResult {
   financialRefreshed?: number;
   financialRefreshFailed?: number;
   reconciledRealBets?: number;
+  revisedRealBets?: number;
   error?: string;
 }
 
@@ -46,6 +47,7 @@ export interface SyncAllDetails {
   successfulLotteries: number;
   failedLotteries: number;
   reconciledRealBets: number;
+  revisedRealBets: number;
   notificationRefresh: "success" | "failed";
   notificationError?: string;
 }
@@ -61,17 +63,37 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function refreshIncompleteFinancialContests(
+async function refreshRelevantFinancialContests(
+  pool: Pool,
   source: ContestSource,
   contests: PostgresContestRepository,
   lottery: LotteryId,
-): Promise<{ refreshed: number; failed: number }> {
+): Promise<{ refreshed: number; failed: number; contestNumbers: number[] }> {
   const recent = await contests.list({ lottery, order: "desc", limit: FINANCIAL_REPAIR_WINDOW });
-  const incomplete = recent.filter((contest) => !hasCompletePrizeSchedule(contest));
-  if (incomplete.length === 0) return { refreshed: 0, failed: 0 };
+  if (recent.length === 0) return { refreshed: 0, failed: 0, contestNumbers: [] };
+
+  const recentNumbers = recent.map((contest) => contest.number);
+  const realBetContests = await pool.query<{ contest_number: number }>(
+    `
+      SELECT DISTINCT contest_number
+      FROM real_bets
+      WHERE lottery = $1
+        AND contest_number = ANY($2::int[])
+    `,
+    [lottery, recentNumbers],
+  );
+  const contestsWithRealBets = new Set(realBetContests.rows.map((row) => row.contest_number));
+
+  // Incomplete schedules must be repaired. Complete schedules are refreshed
+  // only when they affect a real audited bet, allowing official payout
+  // corrections to propagate without multiplying CAIXA requests unnecessarily.
+  const candidates = recent.filter(
+    (contest) => !hasCompletePrizeSchedule(contest) || contestsWithRealBets.has(contest.number),
+  );
+  if (candidates.length === 0) return { refreshed: 0, failed: 0, contestNumbers: [] };
 
   const settled = await Promise.allSettled(
-    incomplete.map((contest) => source.fetchContest(lottery, contest.number)),
+    candidates.map((contest) => source.fetchContest(lottery, contest.number)),
   );
   const successful = settled
     .filter((result): result is PromiseFulfilledResult<Awaited<ReturnType<ContestSource["fetchContest"]>>> => result.status === "fulfilled")
@@ -82,12 +104,16 @@ async function refreshIncompleteFinancialContests(
   if (failed > 0) {
     logEvent("warn", "financial_schedule_refresh_partial", {
       lottery,
-      attempted: incomplete.length,
+      attempted: candidates.length,
       refreshed: successful.length,
       failed,
     });
   }
-  return { refreshed: successful.length, failed };
+  return {
+    refreshed: successful.length,
+    failed,
+    contestNumbers: successful.map((contest) => contest.number),
+  };
 }
 
 export async function runOperationalSync(
@@ -128,7 +154,11 @@ export async function runOperationalSync(
 
         const latest = await source.fetchContest(lottery);
         await contests.upsertMany([latest]);
-        const financialRepair = await refreshIncompleteFinancialContests(source, contests, lottery);
+        const financialRepair = await refreshRelevantFinancialContests(pool, source, contests, lottery);
+        const refreshedReconciliation = await realBets.reconcileContestNumbers(
+          lottery,
+          financialRepair.contestNumbers,
+        );
 
         let nextContest: number | undefined;
         let nextDrawDate: string | undefined;
@@ -138,8 +168,18 @@ export async function runOperationalSync(
           nextContest = snapshot.nextContest;
           nextDrawDate = snapshot.nextDrawDate;
         }
-        const reconciledRealBets = await realBets.reconcilePending(lottery);
+        const pendingResolved = await realBets.reconcilePending(lottery);
+        const reconciledRealBets = refreshedReconciliation.financiallyResolved + pendingResolved;
+        const revisedRealBets = refreshedReconciliation.financiallyRevised;
         const partial = bootstrap.failed > 0 || financialRepair.failed > 0;
+
+        if (revisedRealBets > 0) {
+          logEvent("info", "real_bet_financial_revision_applied", {
+            operationRunId: run.id,
+            lottery,
+            revisedRealBets,
+          });
+        }
 
         lotteries.push({
           lottery,
@@ -154,6 +194,7 @@ export async function runOperationalSync(
           financialRefreshed: financialRepair.refreshed,
           financialRefreshFailed: financialRepair.failed,
           reconciledRealBets,
+          revisedRealBets,
         });
       } catch (error) {
         lotteries.push({ lottery, status: "failed", error: message(error) });
@@ -190,6 +231,7 @@ export async function runOperationalSync(
       successfulLotteries,
       failedLotteries,
       reconciledRealBets: lotteries.reduce((sum, item) => sum + (item.reconciledRealBets ?? 0), 0),
+      revisedRealBets: lotteries.reduce((sum, item) => sum + (item.revisedRealBets ?? 0), 0),
       notificationRefresh,
       ...(notificationError ? { notificationError } : {}),
     };
@@ -201,6 +243,8 @@ export async function runOperationalSync(
       durationMs: Date.now() - startedAt,
       successfulLotteries,
       failedLotteries,
+      reconciledRealBets: details.reconciledRealBets,
+      revisedRealBets: details.revisedRealBets,
       notificationRefresh,
     });
     return finished;
@@ -211,6 +255,7 @@ export async function runOperationalSync(
         successfulLotteries: 0,
         failedLotteries: LOTTERIES.length,
         reconciledRealBets: 0,
+        revisedRealBets: 0,
         notificationRefresh: "failed",
         notificationError: "Operational sync failed before notification refresh",
       };

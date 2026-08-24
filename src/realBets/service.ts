@@ -17,6 +17,11 @@ export interface CreateRealBetRequest {
   playedAt?: string;
 }
 
+export interface RealBetReconciliationSummary {
+  financiallyResolved: number;
+  financiallyRevised: number;
+}
+
 export class RealBetService {
   readonly contests: PostgresContestRepository;
   readonly batches: PostgresGameRepository;
@@ -84,15 +89,46 @@ export class RealBetService {
     const bet = await this.realBets.findById(id);
     if (!bet) return undefined;
 
-    // A statistical check can finish before CAIXA publishes every financial
-    // tier. Keep that state reconcilable until totalPrizeValue is known.
-    if (bet.status === "checked" && bet.totalPrizeValue !== undefined) return bet;
-
     const contest = await this.contests.findByNumber(bet.lottery, bet.contestNumber);
     if (!contest) return bet;
 
     const checks = evaluateGames(bet.games.map((item) => item.game), contest);
     return this.realBets.markChecked(id, checks);
+  }
+
+  async reconcileContestNumbers(
+    lottery: LotteryId,
+    contestNumbers: number[],
+  ): Promise<RealBetReconciliationSummary> {
+    const uniqueContestNumbers = [...new Set(contestNumbers)].filter((value) => Number.isInteger(value) && value > 0);
+    if (uniqueContestNumbers.length === 0) return { financiallyResolved: 0, financiallyRevised: 0 };
+
+    const result = await this.pool.query<{ id: string }>(
+      `
+        SELECT id
+        FROM real_bets
+        WHERE lottery = $1
+          AND contest_number = ANY($2::int[])
+        ORDER BY contest_number, id
+      `,
+      [lottery, uniqueContestNumbers],
+    );
+
+    let financiallyResolved = 0;
+    let financiallyRevised = 0;
+    for (const row of result.rows) {
+      const before = await this.realBets.findById(Number(row.id));
+      if (!before) continue;
+      const after = await this.reconcile(before.id);
+      if (!after || after.totalPrizeValue === undefined) continue;
+      if (before.totalPrizeValue === undefined) {
+        financiallyResolved += 1;
+      } else if (before.totalPrizeValue !== after.totalPrizeValue || before.netResult !== after.netResult) {
+        financiallyRevised += 1;
+      }
+    }
+
+    return { financiallyResolved, financiallyRevised };
   }
 
   async reconcilePending(lottery?: LotteryId): Promise<number> {

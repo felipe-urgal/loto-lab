@@ -130,6 +130,16 @@ export async function serveRealBets(
       return true;
     }
 
+    const revisionsMatch = /^\/api\/v1\/real-bets\/(\d+)\/revisions$/.exec(pathname);
+    if (method === "GET" && revisionsMatch) {
+      const id = parsePositiveInt(revisionsMatch[1], "realBetId");
+      const item = await service.realBets.findById(id);
+      if (!item) throw new ApiError(404, "REAL_BET_NOT_FOUND", `Real bet ${id} was not found`);
+      const revisions = await service.realBets.listFinancialRevisions(id);
+      sendJson(response, 200, { realBetId: id, revisions }, corsOrigin);
+      return true;
+    }
+
     const getMatch = /^\/api\/v1\/real-bets\/([^/]+)$/.exec(pathname);
     if (method === "GET" && getMatch) {
       const lottery = parseLottery(getMatch[1]);

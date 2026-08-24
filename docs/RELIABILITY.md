@@ -89,17 +89,31 @@ Um concurso só entra na cobertura financeira completa quando possui todas as fa
 - Lotofácil: 11, 12, 13, 14 e 15 acertos;
 - Dia de Sorte: 4, 5, 6, 7 acertos e Mês da Sorte.
 
-## Reparação de rateios oficiais
+## Reparação e revisão de rateios oficiais
 
-A sincronização operacional atualiza o concurso mais recente e também revisita os últimos 20 concursos armazenados cuja grade financeira ainda está incompleta.
+A sincronização operacional revisita uma janela dos últimos 20 concursos armazenados.
 
-Além disso, a persistência é monotônica quanto à completude:
+Dentro dessa janela são atualizados:
+
+- concursos cuja grade financeira ainda está incompleta;
+- concursos com grade completa que possuem apostas reais auditáveis associadas.
+
+O segundo caso existe para capturar correções oficiais publicadas depois que um rateio já havia sido considerado completo, sem multiplicar requisições para concursos sem impacto no KPI real.
+
+A persistência continua monotônica quanto à completude:
 
 - grade incompleta existente + grade completa nova → promove para completa;
 - grade completa existente + snapshot incompleto novo → preserva a completa;
 - grade completa existente + grade completa nova → substitui, permitindo correções oficiais de valores.
 
-Assim uma resposta transitória parcial da fonte não destrói informação financeira oficial já conhecida.
+Quando uma nova grade completa altera prêmio ou resultado líquido de uma aposta já financeiramente conferida:
+
+- a aposta e o ROI são recalculados;
+- o `checked_at` original é preservado;
+- a mudança é gravada atomicamente em `real_bet_financial_revisions` com valores anterior/novo e motivo `official-prize-refresh`;
+- `GET /api/v1/real-bets/:id/revisions` expõe a trilha de revisão.
+
+Assim uma resposta transitória parcial não destrói informação já conhecida e uma correção oficial posterior não fica invisível.
 
 ## IA como camada interpretativa
 
@@ -177,7 +191,7 @@ No shutdown por `SIGINT`/`SIGTERM`:
 
 O sync usa advisory lock próprio para impedir duas sincronizações concorrentes. Falha ao atualizar notificações não é silenciosa e transforma uma execução que seria `success` em `partial`.
 
-`SyncAllDetails` também registra reparos financeiros e quantas apostas tiveram o financeiro finalmente resolvido.
+`SyncAllDetails` registra reparos financeiros, quantas apostas tiveram o financeiro finalmente resolvido e quantas apostas já conferidas tiveram ROI revisado por correção oficial.
 
 ## Logs estruturados
 
@@ -190,11 +204,13 @@ Eventos operacionais são emitidos como JSON, incluindo quando aplicável:
 - duração;
 - código e mensagem de erro.
 
+Correções oficiais que alteram apostas reais também emitem `real_bet_financial_revision_applied` com loteria e quantidade de apostas revisadas.
+
 ## Backup e restore
 
 O volume Docker é persistência local, não backup.
 
-`npm run ops:backup` grava primeiro um arquivo `.partial-<pid>`. Somente depois de `pg_dump` terminar com sucesso o arquivo é publicado atomically no nome final `.dump`. Falhas removem o parcial, evitando que um dump truncado pareça válido.
+`npm run ops:backup` grava primeiro um arquivo `.partial-<pid>`. Somente depois de `pg_dump` terminar com sucesso o arquivo é publicado atomicamente no nome final `.dump`. Falhas removem o parcial, evitando que um dump truncado pareça válido.
 
 Backups importantes devem ser copiados para armazenamento fora do host da aplicação e ter retenção periódica definida pelo ambiente de operação.
 

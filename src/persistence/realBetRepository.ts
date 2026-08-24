@@ -55,6 +55,17 @@ export interface RealBetSummary {
   roi?: number;
 }
 
+export interface RealBetFinancialRevisionRecord {
+  id: number;
+  realBetId: number;
+  previousTotalPrizeValue?: number;
+  newTotalPrizeValue?: number;
+  previousNetResult?: number;
+  newNetResult?: number;
+  reason: string;
+  createdAt: string;
+}
+
 interface BetRow {
   id: string;
   batch_id: string;
@@ -82,6 +93,17 @@ interface BetGameRow {
   prize_value: number | null;
 }
 
+interface FinancialRevisionRow {
+  id: string;
+  real_bet_id: string;
+  previous_total_prize_value: number | null;
+  new_total_prize_value: number | null;
+  previous_net_result: number | null;
+  new_net_result: number | null;
+  reason: string;
+  created_at: Date;
+}
+
 function mapGame(lottery: LotteryId, row: BetGameRow): RealBetGameRecord {
   return {
     batchPosition: row.batch_position,
@@ -105,6 +127,10 @@ function isUniqueViolation(error: unknown): boolean {
     "code" in error &&
     (error as { code?: string }).code === "23505",
   );
+}
+
+function sameOptionalNumber(left: number | undefined, right: number | undefined): boolean {
+  return left === right;
 }
 
 export class PostgresRealBetRepository {
@@ -270,6 +296,36 @@ export class PostgresRealBetRepository {
     return this.findMany(result.rows.map((row) => Number(row.id)));
   }
 
+  async listFinancialRevisions(realBetId: number): Promise<RealBetFinancialRevisionRecord[]> {
+    const result = await this.pool.query<FinancialRevisionRow>(
+      `
+        SELECT
+          id,
+          real_bet_id,
+          previous_total_prize_value::float8 AS previous_total_prize_value,
+          new_total_prize_value::float8 AS new_total_prize_value,
+          previous_net_result::float8 AS previous_net_result,
+          new_net_result::float8 AS new_net_result,
+          reason,
+          created_at
+        FROM real_bet_financial_revisions
+        WHERE real_bet_id = $1
+        ORDER BY created_at DESC, id DESC
+      `,
+      [realBetId],
+    );
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      realBetId: Number(row.real_bet_id),
+      ...(row.previous_total_prize_value !== null ? { previousTotalPrizeValue: Number(row.previous_total_prize_value) } : {}),
+      ...(row.new_total_prize_value !== null ? { newTotalPrizeValue: Number(row.new_total_prize_value) } : {}),
+      ...(row.previous_net_result !== null ? { previousNetResult: Number(row.previous_net_result) } : {}),
+      ...(row.new_net_result !== null ? { newNetResult: Number(row.new_net_result) } : {}),
+      reason: row.reason,
+      createdAt: row.created_at.toISOString(),
+    }));
+  }
+
   async markChecked(id: number, checks: GameCheckResult[]): Promise<RealBetRecord> {
     const current = await this.findById(id);
     if (!current) throw new Error(`Real bet ${id} was not found`);
@@ -282,6 +338,10 @@ export class PostgresRealBetRepository {
       ? checks.reduce((sum, check) => sum + check.totalPrizeValue!, 0)
       : undefined;
     const netResult = totalPrizeValue !== undefined ? totalPrizeValue - current.actualCost : undefined;
+    const isOfficialFinancialRevision = current.totalPrizeValue !== undefined && (
+      !sameOptionalNumber(current.totalPrizeValue, totalPrizeValue)
+      || !sameOptionalNumber(current.netResult, netResult)
+    );
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -302,7 +362,7 @@ export class PostgresRealBetRepository {
         `
           UPDATE real_bets
           SET status = 'checked',
-              checked_at = NOW(),
+              checked_at = COALESCE(checked_at, NOW()),
               total_prize_value = $2,
               net_result = $3,
               updated_at = NOW()
@@ -310,6 +370,27 @@ export class PostgresRealBetRepository {
         `,
         [id, totalPrizeValue ?? null, netResult ?? null],
       );
+      if (isOfficialFinancialRevision) {
+        await client.query(
+          `
+            INSERT INTO real_bet_financial_revisions (
+              real_bet_id,
+              previous_total_prize_value,
+              new_total_prize_value,
+              previous_net_result,
+              new_net_result,
+              reason
+            ) VALUES ($1, $2, $3, $4, $5, 'official-prize-refresh')
+          `,
+          [
+            id,
+            current.totalPrizeValue ?? null,
+            totalPrizeValue ?? null,
+            current.netResult ?? null,
+            netResult ?? null,
+          ],
+        );
+      }
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");
