@@ -25,7 +25,7 @@ const evidence: AiEvidenceContext = {
   recentRealBets: [],
 };
 
-test("OpenAI provider sends bounded evidence and parses the insight contract", async () => {
+test("OpenAI provider sends bounded structured evidence and parses the insight contract", async () => {
   let requestUrl = "";
   let requestInit: RequestInit | undefined;
   const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
@@ -60,16 +60,38 @@ test("OpenAI provider sends bounded evidence and parses the insight contract", a
 
   assert.equal(requestUrl, "https://api.openai.com/v1/responses");
   assert.equal(new Headers(requestInit?.headers).get("Authorization"), "Bearer sk-test-secret");
-  const body = JSON.parse(String(requestInit?.body)) as { model: string; instructions: string; input: string };
+  const body = JSON.parse(String(requestInit?.body)) as {
+    model: string;
+    instructions: string;
+    input: string;
+    store: boolean;
+    text: {
+      format: {
+        type: string;
+        name: string;
+        strict: boolean;
+        schema: { required: string[]; additionalProperties: boolean };
+      };
+    };
+  };
   assert.equal(body.model, "gpt-5.6-luna");
   assert.match(body.instructions, /não gere, escolha ou recomende dezenas/i);
   assert.equal(JSON.parse(body.input).evidence.lottery, "mega-sena");
+  assert.equal(body.store, false);
+  assert.equal(body.text.format.type, "json_schema");
+  assert.equal(body.text.format.name, "loto_lab_insight");
+  assert.equal(body.text.format.strict, true);
+  assert.equal(body.text.format.schema.additionalProperties, false);
+  assert.deepEqual(
+    body.text.format.schema.required,
+    ["headline", "summary", "observations", "risks", "nextTests"],
+  );
   assert.equal(result.providerResponseId, "resp_test");
   assert.equal(result.insight.headline, "Sem evidência de vantagem");
   assert.deepEqual(result.insight.nextTests, ["Executar comparação em janela maior."]);
 });
 
-test("OpenAI provider rejects unstructured output", async () => {
+test("OpenAI provider rejects unstructured output defensively", async () => {
   const fetchImpl = (async () => new Response(JSON.stringify({
     id: "resp_invalid",
     model: "gpt-5.6-luna",
