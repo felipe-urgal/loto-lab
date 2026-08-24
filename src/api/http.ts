@@ -3,6 +3,7 @@ import type { LotteryId } from "../domain/types.js";
 
 const LOTTERIES: LotteryId[] = ["mega-sena", "lotofacil", "dia-de-sorte"];
 const MAX_BODY_BYTES = 1024 * 1024;
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export class ApiError extends Error {
   constructor(
@@ -59,6 +60,72 @@ export function parseBoolean(value: unknown, field: string, defaultValue: boolea
   throw new ApiError(400, "INVALID_ARGUMENT", `${field} must be boolean`);
 }
 
+function normalizedOrigin(value: string): string | undefined {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function firstHeaderValue(value: string | string[] | undefined): string | undefined {
+  const first = Array.isArray(value) ? value[0] : value;
+  return first?.split(",", 1)[0]?.trim() || undefined;
+}
+
+/**
+ * Resolve the origin that is allowed to issue browser mutations.
+ *
+ * A configured public/CORS origin is authoritative. When none is configured
+ * (local development, tests, direct localhost use), derive the origin from the
+ * request Host instead of assuming a fixed localhost port. Browsers cannot
+ * choose an arbitrary Host header during CSRF, so this preserves same-origin
+ * protection without breaking legitimate alternate local ports/hosts.
+ */
+export function resolveMutationExpectedOrigin(
+  request: IncomingMessage,
+  configuredOrigin?: string,
+): string {
+  const configured = configuredOrigin ? normalizedOrigin(configuredOrigin) : undefined;
+  if (configured) return configured;
+
+  const host = firstHeaderValue(request.headers.host);
+  if (!host) return "http://localhost";
+  const forwardedProto = firstHeaderValue(request.headers["x-forwarded-proto"])?.toLowerCase();
+  const protocol = forwardedProto === "https" ? "https" : "http";
+  return normalizedOrigin(`${protocol}://${host}`) ?? "http://localhost";
+}
+
+export function requireSameOriginMutation(
+  request: IncomingMessage,
+  response: ServerResponse,
+  expectedOrigin: string,
+): boolean {
+  const method = request.method ?? "GET";
+  if (!MUTATING_METHODS.has(method)) return true;
+
+  const origin = typeof request.headers.origin === "string"
+    ? normalizedOrigin(request.headers.origin)
+    : undefined;
+  const expected = normalizedOrigin(expectedOrigin);
+  const fetchSite = request.headers["sec-fetch-site"];
+  const crossSite = fetchSite === "cross-site";
+  const wrongOrigin = origin !== undefined && expected !== undefined && origin !== expected;
+
+  if (!crossSite && !wrongOrigin) return true;
+
+  response.statusCode = 403;
+  response.setHeader("Cache-Control", "no-store");
+  response.setHeader("Content-Type", "application/json; charset=utf-8");
+  response.end(JSON.stringify({
+    error: {
+      code: "CROSS_ORIGIN_MUTATION_BLOCKED",
+      message: "Cross-origin state-changing requests are not allowed",
+    },
+  }));
+  return false;
+}
+
 export async function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
   let total = 0;
@@ -72,6 +139,11 @@ export async function readJsonBody(request: IncomingMessage): Promise<Record<str
   }
 
   if (chunks.length === 0) return {};
+  const contentType = request.headers["content-type"] ?? "";
+  if (!String(contentType).toLowerCase().includes("application/json")) {
+    throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Request body must use application/json");
+  }
+
   try {
     const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
     if (!isRecord(parsed)) {

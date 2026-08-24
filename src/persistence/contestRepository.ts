@@ -72,7 +72,10 @@ export interface ContestDataStatus {
   contestCount: number;
   firstContest?: number;
   lastContest?: number;
+  /** Backward-compatible alias for internalMissingContestCount. */
   missingContestCount: number;
+  internalMissingContestCount: number;
+  historyBeforeFirstContestCount: number;
   financialContestCount: number;
   financialCoverage: number;
   lastUpdatedAt?: string;
@@ -219,11 +222,33 @@ export class PostgresContestRepository {
           MIN(c.contest_number) AS first_contest,
           MAX(c.contest_number) AS last_contest,
           COUNT(*) FILTER (
-            WHERE EXISTS (
-              SELECT 1
-              FROM contest_prize_tiers p
-              WHERE p.contest_id = c.id
-            )
+            WHERE CASE c.lottery
+              WHEN 'mega-sena' THEN
+                EXISTS (SELECT 1 FROM contest_prize_tiers p WHERE p.contest_id = c.id AND p.description ~* '(^|[^0-9])4[[:space:]]*acertos?')
+                AND EXISTS (SELECT 1 FROM contest_prize_tiers p WHERE p.contest_id = c.id AND p.description ~* '(^|[^0-9])5[[:space:]]*acertos?')
+                AND EXISTS (SELECT 1 FROM contest_prize_tiers p WHERE p.contest_id = c.id AND p.description ~* '(^|[^0-9])6[[:space:]]*acertos?')
+              WHEN 'lotofacil' THEN
+                EXISTS (SELECT 1 FROM contest_prize_tiers p WHERE p.contest_id = c.id AND p.description ~* '(^|[^0-9])11[[:space:]]*acertos?')
+                AND EXISTS (SELECT 1 FROM contest_prize_tiers p WHERE p.contest_id = c.id AND p.description ~* '(^|[^0-9])12[[:space:]]*acertos?')
+                AND EXISTS (SELECT 1 FROM contest_prize_tiers p WHERE p.contest_id = c.id AND p.description ~* '(^|[^0-9])13[[:space:]]*acertos?')
+                AND EXISTS (SELECT 1 FROM contest_prize_tiers p WHERE p.contest_id = c.id AND p.description ~* '(^|[^0-9])14[[:space:]]*acertos?')
+                AND EXISTS (SELECT 1 FROM contest_prize_tiers p WHERE p.contest_id = c.id AND p.description ~* '(^|[^0-9])15[[:space:]]*acertos?')
+              WHEN 'dia-de-sorte' THEN
+                EXISTS (SELECT 1 FROM contest_prize_tiers p WHERE p.contest_id = c.id AND p.description ~* '(^|[^0-9])4[[:space:]]*acertos?')
+                AND EXISTS (SELECT 1 FROM contest_prize_tiers p WHERE p.contest_id = c.id AND p.description ~* '(^|[^0-9])5[[:space:]]*acertos?')
+                AND EXISTS (SELECT 1 FROM contest_prize_tiers p WHERE p.contest_id = c.id AND p.description ~* '(^|[^0-9])6[[:space:]]*acertos?')
+                AND EXISTS (SELECT 1 FROM contest_prize_tiers p WHERE p.contest_id = c.id AND p.description ~* '(^|[^0-9])7[[:space:]]*acertos?')
+                AND EXISTS (
+                  SELECT 1 FROM contest_prize_tiers p
+                  WHERE p.contest_id = c.id
+                    AND (
+                      LOWER(p.description) LIKE '%mês da sorte%'
+                      OR LOWER(p.description) LIKE '%mes da sorte%'
+                      OR LOWER(p.description) LIKE '%mes de sorte%'
+                    )
+                )
+              ELSE FALSE
+            END
           )::text AS financial_contest_count,
           MAX(c.updated_at) AS last_updated_at
         FROM contests c
@@ -235,17 +260,21 @@ export class PostgresContestRepository {
     const row = result.rows[0]!;
     const contestCount = Number(row.contest_count);
     const financialContestCount = Number(row.financial_contest_count);
+    const firstContest = row.first_contest ?? undefined;
     const lastContest = row.last_contest ?? undefined;
-    const missingContestCount = lastContest === undefined
+    const internalMissingContestCount = firstContest === undefined || lastContest === undefined
       ? 0
-      : Math.max(0, lastContest - contestCount);
+      : Math.max(0, (lastContest - firstContest + 1) - contestCount);
+    const historyBeforeFirstContestCount = firstContest === undefined ? 0 : Math.max(0, firstContest - 1);
 
     return {
       lottery,
       contestCount,
-      ...(row.first_contest !== null ? { firstContest: row.first_contest } : {}),
+      ...(firstContest !== undefined ? { firstContest } : {}),
       ...(lastContest !== undefined ? { lastContest } : {}),
-      missingContestCount,
+      missingContestCount: internalMissingContestCount,
+      internalMissingContestCount,
+      historyBeforeFirstContestCount,
       financialContestCount,
       financialCoverage: contestCount === 0 ? 0 : financialContestCount / contestCount,
       ...(row.last_updated_at ? { lastUpdatedAt: row.last_updated_at.toISOString() } : {}),

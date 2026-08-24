@@ -12,6 +12,7 @@ import {
 } from "../persistence/operationRepository.js";
 import { NotificationService } from "../notifications/service.js";
 import { RealBetService } from "../realBets/service.js";
+import { logEvent } from "../observability/log.js";
 
 const LOTTERIES: LotteryId[] = ["mega-sena", "lotofacil", "dia-de-sorte"];
 const SYNC_ADVISORY_LOCK = 1515015;
@@ -41,6 +42,8 @@ export interface SyncAllDetails {
   successfulLotteries: number;
   failedLotteries: number;
   reconciledRealBets: number;
+  notificationRefresh: "success" | "failed";
+  notificationError?: string;
 }
 
 export interface RunOperationalSyncOptions {
@@ -72,9 +75,11 @@ export async function runOperationalSync(
   const operations = new PostgresOperationRepository(pool);
   const source = options.source ?? new CaixaContestSource();
   let run: OperationRunRecord<Record<string, never>> | undefined;
+  const startedAt = Date.now();
 
   try {
     run = await operations.create("sync-all");
+    logEvent("info", "operational_sync_started", { operationRunId: run.id });
     const contests = new PostgresContestRepository(pool);
     const agenda = new PostgresAgendaRepository(pool);
     const realBets = new RealBetService(pool);
@@ -114,23 +119,52 @@ export async function runOperationalSync(
         });
       } catch (error) {
         lotteries.push({ lottery, status: "failed", error: message(error) });
+        logEvent("error", "operational_sync_lottery_failed", {
+          operationRunId: run.id,
+          lottery,
+          message: message(error),
+        });
       }
     }
 
     const successfulLotteries = lotteries.filter((item) => item.status !== "failed").length;
     const failedLotteries = lotteries.length - successfulLotteries;
     const hasPartial = lotteries.some((item) => item.status === "partial");
-    const status: "success" | "partial" | "failed" =
+    let status: "success" | "partial" | "failed" =
       successfulLotteries === 0 ? "failed" : failedLotteries > 0 || hasPartial ? "partial" : "success";
+
+    let notificationRefresh: "success" | "failed" = "success";
+    let notificationError: string | undefined;
+    try {
+      await new NotificationService(pool).refresh();
+    } catch (error) {
+      notificationRefresh = "failed";
+      notificationError = message(error);
+      if (status === "success") status = "partial";
+      logEvent("error", "notification_refresh_failed", {
+        operationRunId: run.id,
+        message: notificationError,
+      });
+    }
+
     const details: SyncAllDetails = {
       lotteries,
       successfulLotteries,
       failedLotteries,
       reconciledRealBets: lotteries.reduce((sum, item) => sum + (item.reconciledRealBets ?? 0), 0),
+      notificationRefresh,
+      ...(notificationError ? { notificationError } : {}),
     };
 
     const finished = await operations.finish(run.id, status, details);
-    await new NotificationService(pool).refresh().catch(() => undefined);
+    logEvent(status === "failed" ? "error" : status === "partial" ? "warn" : "info", "operational_sync_completed", {
+      operationRunId: run.id,
+      status,
+      durationMs: Date.now() - startedAt,
+      successfulLotteries,
+      failedLotteries,
+      notificationRefresh,
+    });
     return finished;
   } catch (error) {
     if (run) {
@@ -139,9 +173,21 @@ export async function runOperationalSync(
         successfulLotteries: 0,
         failedLotteries: LOTTERIES.length,
         reconciledRealBets: 0,
+        notificationRefresh: "failed",
+        notificationError: "Operational sync failed before notification refresh",
       };
       await operations.finish(run.id, "failed", details).catch(() => undefined);
-      await new NotificationService(pool).refresh().catch(() => undefined);
+      await new NotificationService(pool).refresh().catch((refreshError: unknown) => {
+        logEvent("error", "notification_refresh_after_sync_failure_failed", {
+          operationRunId: run?.id,
+          message: message(refreshError),
+        });
+      });
+      logEvent("error", "operational_sync_failed", {
+        operationRunId: run.id,
+        durationMs: Date.now() - startedAt,
+        message: message(error),
+      });
     }
     throw error;
   } finally {

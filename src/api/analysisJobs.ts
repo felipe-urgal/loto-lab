@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { getAnalysisJobManager } from "../analysis/jobManager.js";
-import type { StrategyLabExperiment } from "../lab/strategyLab.js";
+import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import { PostgresStrategyRepository } from "../persistence/strategyRepository.js";
 import type { StrategyVersionRecord } from "../persistence/types.js";
 import type { ApiServerOptions } from "./app.js";
@@ -14,6 +14,11 @@ import {
   sendNoContent,
 } from "./http.js";
 import { enforceRateLimit, FixedWindowRateLimiter } from "./rateLimit.js";
+import { MAX_HTTP_BACKTEST_ROUNDS } from "./services.js";
+import {
+  parseStrategyLabOptions,
+  validateStrategyLabExecution,
+} from "./strategyLabInput.js";
 
 const jobLimiter = new FixedWindowRateLimiter({ limit: 12, windowMs: 10 * 60_000 });
 
@@ -24,12 +29,6 @@ function value(body: Record<string, unknown>, config: Record<string, unknown>, k
 function parseKind(value: unknown): "backtest" | "strategy-lab" {
   if (value === "backtest" || value === "strategy-lab") return value;
   throw new ApiError(400, "INVALID_ARGUMENT", "kind must be backtest or strategy-lab");
-}
-
-function parseExperiment(value: unknown): StrategyLabExperiment {
-  if (value === undefined || value === null || value === "") return "fixed-core";
-  if (value === "fixed-core" || value === "external-rules") return value;
-  throw new ApiError(400, "INVALID_ARGUMENT", "experiment must be fixed-core or external-rules");
 }
 
 function parseFixedCount(value: unknown): 8 | 9 | 10 {
@@ -62,6 +61,29 @@ function validateRange(startContest: number | undefined, endContest: number | un
   if (startContest !== undefined && endContest !== undefined && startContest > endContest) {
     throw new ApiError(400, "INVALID_ARGUMENT", "startContest must be less than or equal to endContest");
   }
+}
+
+async function validateBacktestExecution(
+  options: ApiServerOptions,
+  lottery: ReturnType<typeof parseLottery>,
+  warmupContests: number,
+  startContest?: number,
+  endContest?: number,
+): Promise<number> {
+  const contests = await new PostgresContestRepository(options.pool).list({ lottery, order: "asc" });
+  const eligibleRounds = contests
+    .slice(warmupContests)
+    .filter((contest) => startContest === undefined || contest.number >= startContest)
+    .filter((contest) => endContest === undefined || contest.number <= endContest)
+    .length;
+  if (eligibleRounds > MAX_HTTP_BACKTEST_ROUNDS) {
+    throw new ApiError(
+      400,
+      "ANALYSIS_TOO_LARGE",
+      `Backtest would process ${eligibleRounds} contests; the safe limit is ${MAX_HTTP_BACKTEST_ROUNDS}`,
+    );
+  }
+  return eligibleRounds;
 }
 
 export async function serveAnalysisJobs(
@@ -98,27 +120,36 @@ export async function serveAnalysisJobs(
       const lottery = parseLottery(body.lottery);
       const strategy = await strategyVersion(options, body, lottery);
       const config = strategy.version?.config ?? {};
-      const gameCount = parsePositiveInt(value(body, config, "gameCount"), "gameCount", {
-        min: 1,
-        max: 20,
-        defaultValue: lottery === "mega-sena" ? 2 : 4,
-      });
-      const warmupContests = parsePositiveInt(value(body, config, "warmupContests"), "warmupContests", {
-        min: 1,
-        max: 2000,
-        defaultValue: 20,
-      });
-      const startContest = parseOptionalPositiveInt(value(body, config, "startContest"), "startContest");
-      const endContest = parseOptionalPositiveInt(value(body, config, "endContest"), "endContest");
-      validateRange(startContest, endContest);
+      const merged = { ...config, ...body };
 
       let input: Record<string, unknown>;
       if (kind === "backtest") {
+        const gameCount = parsePositiveInt(value(body, config, "gameCount"), "gameCount", {
+          min: 1,
+          max: 10,
+          defaultValue: lottery === "mega-sena" ? 2 : 4,
+        });
+        const warmupContests = parsePositiveInt(value(body, config, "warmupContests"), "warmupContests", {
+          min: 1,
+          max: 500,
+          defaultValue: 20,
+        });
+        const startContest = parseOptionalPositiveInt(value(body, config, "startContest"), "startContest");
+        const endContest = parseOptionalPositiveInt(value(body, config, "endContest"), "endContest");
+        validateRange(startContest, endContest);
+        const eligibleRounds = await validateBacktestExecution(
+          options,
+          lottery,
+          warmupContests,
+          startContest,
+          endContest,
+        );
         input = {
           lottery,
           gameCount,
           warmupContests,
           persist: true,
+          eligibleRounds,
           ...(lottery === "lotofacil" ? { fixedCount: parseFixedCount(value(body, config, "fixedCount")) } : {}),
           ...(startContest !== undefined ? { startContest } : {}),
           ...(endContest !== undefined ? { endContest } : {}),
@@ -126,27 +157,13 @@ export async function serveAnalysisJobs(
           ...(strategy.version ? { strategyVersionId: strategy.version.id } : {}),
         };
       } else {
-        const experiment = parseExperiment(value(body, config, "experiment"));
-        if (experiment === "external-rules" && lottery !== "mega-sena") {
-          throw new ApiError(400, "INVALID_ARGUMENT", "external-rules experiment is available only for Mega-Sena");
-        }
+        const labInput = parseStrategyLabOptions(merged, lottery);
+        const contests = await new PostgresContestRepository(options.pool).list({ lottery, order: "asc" });
+        const budget = validateStrategyLabExecution(contests, labInput);
         input = {
-          lottery,
-          experiment,
-          gameCount,
-          warmupContests,
-          lookbackContests: parsePositiveInt(value(body, config, "lookbackContests"), "lookbackContests", {
-            min: 10,
-            max: 2000,
-            defaultValue: 200,
-          }),
-          bucketSize: parsePositiveInt(value(body, config, "bucketSize"), "bucketSize", {
-            min: 5,
-            max: 250,
-            defaultValue: 25,
-          }),
-          ...(startContest !== undefined ? { startContest } : {}),
-          ...(endContest !== undefined ? { endContest } : {}),
+          ...labInput,
+          eligibleTargets: budget.eligibleTargets,
+          estimatedWorkUnits: budget.estimatedWorkUnits,
           ...(strategy.version ? { strategyVersionId: strategy.version.id } : {}),
         };
       }

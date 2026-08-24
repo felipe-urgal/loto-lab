@@ -22,6 +22,15 @@ const RANKING_LABELS = {
   roi: "ROI",
 };
 
+const EVIDENCE_LABELS = {
+  "beats-random": "evidência favorável",
+  inconclusive: "inconclusiva",
+  "no-evidence": "sem evidência",
+  "underperforms-random": "evidência desfavorável",
+  "insufficient-resolution": "resolução insuficiente",
+  "insufficient-sample": "amostra insuficiente",
+};
+
 const form = document.querySelector("#job-form");
 const kind = document.querySelector("#job-kind");
 const lottery = document.querySelector("#job-lottery");
@@ -35,6 +44,7 @@ const end = document.querySelector("#job-end");
 const experiment = document.querySelector("#job-experiment");
 const lookback = document.querySelector("#job-lookback");
 const bucket = document.querySelector("#job-bucket");
+const randomSamples = document.querySelector("#job-random-samples");
 const labFields = [...document.querySelectorAll("[data-lab-field]")];
 const refreshButton = document.querySelector("#jobs-refresh");
 const listRoot = document.querySelector("#jobs-list");
@@ -54,6 +64,7 @@ function syncFields() {
     if (option.value === "external-rules") option.disabled = lottery.value !== "mega-sena";
   });
   if (lottery.value !== "mega-sena" && experiment.value === "external-rules") experiment.value = "fixed-core";
+  if (experiment.value === "external-rules" && Number(randomSamples.value) < 250) randomSamples.value = "250";
 }
 
 function applyConfig(config = {}) {
@@ -63,6 +74,7 @@ function applyConfig(config = {}) {
   experiment.value = config.experiment ?? experiment.value;
   lookback.value = config.lookbackContests ?? lookback.value;
   bucket.value = config.bucketSize ?? bucket.value;
+  randomSamples.value = config.randomSamples ?? randomSamples.value;
   syncFields();
 }
 
@@ -103,6 +115,19 @@ async function loadStrategies(preferredVersionId) {
   }
 }
 
+function strategyResult(job) {
+  const benchmark = job.result?.benchmark || {};
+  const status = EVIDENCE_LABELS[benchmark.status] || benchmark.status || "não classificada";
+  const best = job.result?.variants?.find((variant) => variant.key === job.result?.winner);
+  const bestLabel = best?.label || job.result?.winner || "empate/indefinido";
+  const ranking = RANKING_LABELS[job.result?.rankingBasis] || job.result?.rankingBasis || "—";
+  const adjustedP = typeof benchmark.adjustedPValue === "number"
+    ? benchmark.adjustedPValue.toFixed(4).replace(".", ",")
+    : "—";
+  const samples = benchmark.distribution?.samples ?? job.result?.randomSamples ?? job.input?.randomSamples ?? "—";
+  return `<div class="job-result"><strong>Laboratório concluído</strong><span>Melhor no período: ${escapeHtml(bestLabel)} · evidência ${escapeHtml(status)} · p ajustado ${escapeHtml(adjustedP)} · ${escapeHtml(samples)} controles · classificação por ${escapeHtml(ranking)}</span></div>`;
+}
+
 function jobResult(job) {
   if (job.status === "running") return '<div class="job-running"><span class="spinner"></span>Processando em processo dedicado</div>';
   if (job.status === "queued") return '<div class="job-result">Aguardando disponibilidade para análises.</div>';
@@ -115,8 +140,7 @@ function jobResult(job) {
     return `<div class="job-result"><strong>Teste histórico ${job.result.id ? `#${job.result.id}` : "concluído"}</strong><span>${job.result.roundCount ?? "—"} concursos · ROI ${escapeHtml(formatPercent(summary.roi))} · cobertura ${escapeHtml(formatPercent(summary.financialCoverage))}</span></div>`;
   }
 
-  const ranking = RANKING_LABELS[job.result.rankingBasis] || job.result.rankingBasis || "—";
-  return `<div class="job-result"><strong>Laboratório concluído</strong><span>Vencedor: ${escapeHtml(job.result.winner || "empate/indefinido")} · ${job.result.variants?.length ?? 0} variantes · classificação por ${escapeHtml(ranking)}</span></div>`;
+  return strategyResult(job);
 }
 
 function renderJobs() {
@@ -140,6 +164,7 @@ function renderJobs() {
           ${strategyVersionId ? `<span>estratégia #${strategyVersionId}</span>` : ""}
           <span>${job.input?.gameCount ?? "—"} jogos</span>
           <span>aquecimento ${job.input?.warmupContests ?? "—"}</span>
+          ${job.kind === "strategy-lab" ? `<span>${job.input?.randomSamples ?? "—"} controles</span>` : ""}
           ${job.startedAt ? `<span>início ${escapeHtml(formatDateTime(job.startedAt))}</span>` : ""}
           ${job.finishedAt ? `<span>fim ${escapeHtml(formatDateTime(job.finishedAt))}</span>` : ""}
         </div>
@@ -184,7 +209,12 @@ form.addEventListener("submit", async (event) => {
     if (start.value) body.startContest = Number(start.value);
     if (end.value) body.endContest = Number(end.value);
     if (lottery.value === "lotofacil") body.fixedCount = Number(fixed.value);
-    if (kind.value === "strategy-lab") { body.experiment = experiment.value; body.lookbackContests = Number(lookback.value); body.bucketSize = Number(bucket.value); }
+    if (kind.value === "strategy-lab") {
+      body.experiment = experiment.value;
+      body.lookbackContests = Number(lookback.value);
+      body.bucketSize = Number(bucket.value);
+      body.randomSamples = Number(randomSamples.value);
+    }
     const job = await api("/analysis-jobs", { method: "POST", body: JSON.stringify(body) });
     toast(`Execução #${job.id} entrou na fila.`);
     await loadJobs(false);
@@ -208,6 +238,7 @@ strategySelect.addEventListener("change", () => {
   else if (selectedHistoricalVersion?.id === Number(strategySelect.value)) applyConfig(selectedHistoricalVersion.config);
 });
 kind.addEventListener("change", syncFields);
+experiment.addEventListener("change", syncFields);
 lottery.addEventListener("change", async () => {
   localStorage.setItem("loto-lab:lottery", lottery.value);
   syncFields();

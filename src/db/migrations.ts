@@ -1,10 +1,29 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 
 export interface MigrationResult {
   applied: string[];
   skipped: string[];
+}
+
+const MIGRATION_LOCK_WAIT_MS = 15_000;
+const MIGRATION_LOCK_RETRY_MS = 250;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function acquireMigrationLock(client: PoolClient): Promise<void> {
+  const deadline = Date.now() + MIGRATION_LOCK_WAIT_MS;
+  while (Date.now() < deadline) {
+    const result = await client.query<{ locked: boolean }>(
+      "SELECT pg_try_advisory_lock(hashtext('loto_lab_migrations')) AS locked",
+    );
+    if (result.rows[0]?.locked) return;
+    await delay(MIGRATION_LOCK_RETRY_MS);
+  }
+  throw new Error(`Timed out after ${MIGRATION_LOCK_WAIT_MS}ms waiting for the migration advisory lock`);
 }
 
 export async function runMigrations(
@@ -14,9 +33,11 @@ export async function runMigrations(
   const client = await pool.connect();
   const applied: string[] = [];
   const skipped: string[] = [];
+  let lockAcquired = false;
 
   try {
-    await client.query("SELECT pg_advisory_lock(hashtext('loto_lab_migrations'))");
+    await acquireMigrationLock(client);
+    lockAcquired = true;
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         name TEXT PRIMARY KEY,
@@ -56,7 +77,9 @@ export async function runMigrations(
 
     return { applied, skipped };
   } finally {
-    await client.query("SELECT pg_advisory_unlock(hashtext('loto_lab_migrations'))").catch(() => undefined);
+    if (lockAcquired) {
+      await client.query("SELECT pg_advisory_unlock(hashtext('loto_lab_migrations'))").catch(() => undefined);
+    }
     client.release();
   }
 }
