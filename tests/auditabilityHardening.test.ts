@@ -1,0 +1,148 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import type { Contest, GeneratedGame } from "../src/domain/types.js";
+import { createPostgresPool } from "../src/db/client.js";
+import { runMigrations } from "../src/db/migrations.js";
+import { hasCompletePrizeSchedule } from "../src/finance/prizes.js";
+import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
+import { PostgresGameRepository } from "../src/persistence/gameRepository.js";
+import { RealBetService } from "../src/realBets/service.js";
+import {
+  acquireRuntimeInstanceLock,
+  RuntimeInstanceAlreadyActiveError,
+} from "../src/operations/runtimeLock.js";
+import { validatePublicExposure } from "../src/api/publicExposure.js";
+
+const TARGET = 990001;
+
+function testGame(): GeneratedGame {
+  return {
+    lottery: "mega-sena",
+    numbers: [1, 2, 3, 4, 20, 30],
+    fixedNumbers: [1, 2, 3],
+    variableNumbers: [4, 20, 30],
+    metadata: {
+      odd: 2,
+      even: 4,
+      sum: 60,
+      repeatedFromLastContest: [],
+    },
+  };
+}
+
+function contest(prizeTiers: Contest["prizeTiers"]): Contest {
+  return {
+    lottery: "mega-sena",
+    number: TARGET,
+    date: "2099-01-01",
+    numbers: [1, 2, 3, 4, 40, 50],
+    ...(prizeTiers ? { prizeTiers } : {}),
+  };
+}
+
+const partialTiers = [
+  { description: "6 acertos", winners: 0, prizeValue: 0 },
+  { description: "5 acertos", winners: 2, prizeValue: 50000 },
+];
+
+const completeTiers = [
+  ...partialTiers,
+  { description: "4 acertos", winners: 100, prizeValue: 777 },
+];
+
+test(
+  "real-bet finance remains reconcilable and complete prize schedules never downgrade",
+  { skip: !process.env.DATABASE_URL },
+  async (t) => {
+    const pool = createPostgresPool({ max: 3 });
+    await runMigrations(pool);
+    const contests = new PostgresContestRepository(pool);
+    const games = new PostgresGameRepository(pool);
+    const service = new RealBetService(pool);
+
+    await pool.query("DELETE FROM contests WHERE lottery = 'mega-sena' AND contest_number = $1", [TARGET]);
+    const batch = await games.saveBatch({
+      lottery: "mega-sena",
+      targetContestNumber: TARGET,
+      generatorOptions: { test: "auditability-hardening" },
+      games: [testGame()],
+    });
+
+    t.after(async () => {
+      await pool.query("DELETE FROM real_bets WHERE batch_id = $1", [batch.id]).catch(() => undefined);
+      await pool.query("DELETE FROM generated_game_batches WHERE id = $1", [batch.id]).catch(() => undefined);
+      await pool.query("DELETE FROM contests WHERE lottery = 'mega-sena' AND contest_number = $1", [TARGET]).catch(() => undefined);
+      await pool.end();
+    });
+
+    const bet = await service.create({ batchId: batch.id, actualCost: 6 });
+    assert.equal(bet.status, "awaiting_result");
+    assert.equal(bet.totalPrizeValue, undefined);
+
+    await contests.upsertMany([contest(partialTiers)]);
+    const statisticallyChecked = await service.reconcile(bet.id);
+    assert.equal(statisticallyChecked?.status, "checked");
+    assert.equal(statisticallyChecked?.totalPrizeValue, undefined);
+    assert.equal(statisticallyChecked?.netResult, undefined);
+
+    await contests.upsertMany([contest(completeTiers)]);
+    const financiallyResolved = await service.reconcilePending("mega-sena");
+    assert.equal(financiallyResolved, 1);
+    const checked = await service.realBets.findById(bet.id);
+    assert.equal(checked?.totalPrizeValue, 777);
+    assert.equal(checked?.netResult, 771);
+
+    await contests.upsertMany([contest(partialTiers)]);
+    const preserved = await contests.findByNumber("mega-sena", TARGET);
+    assert.ok(preserved);
+    assert.equal(hasCompletePrizeSchedule(preserved), true);
+    assert.equal(preserved.prizeTiers?.find((tier) => tier.description === "4 acertos")?.prizeValue, 777);
+  },
+);
+
+test(
+  "runtime instance advisory lock rejects a second active process",
+  { skip: !process.env.DATABASE_URL },
+  async () => {
+    const pool = createPostgresPool({ max: 3 });
+    const first = await acquireRuntimeInstanceLock(pool);
+    try {
+      await assert.rejects(
+        () => acquireRuntimeInstanceLock(pool),
+        RuntimeInstanceAlreadyActiveError,
+      );
+    } finally {
+      await first.release();
+    }
+
+    const second = await acquireRuntimeInstanceLock(pool);
+    await second.release();
+    await pool.end();
+  },
+);
+
+test("public exposure guard requires auth and HTTPS outside loopback", () => {
+  assert.doesNotThrow(() => validatePublicExposure({ API_HOST: "127.0.0.1" }));
+
+  assert.throws(
+    () => validatePublicExposure({ API_HOST: "0.0.0.0" }),
+    /requires APP_AUTH_USER and APP_AUTH_PASSWORD/i,
+  );
+
+  assert.throws(
+    () => validatePublicExposure({
+      API_HOST: "0.0.0.0",
+      APP_AUTH_USER: "loto-admin",
+      APP_AUTH_PASSWORD: "long-random-password",
+      PUBLIC_ORIGIN: "http://example.test",
+    }),
+    /requires an https:\/\/ PUBLIC_ORIGIN/i,
+  );
+
+  assert.doesNotThrow(() => validatePublicExposure({
+    API_HOST: "0.0.0.0",
+    APP_AUTH_USER: "loto-admin",
+    APP_AUTH_PASSWORD: "long-random-password",
+    PUBLIC_ORIGIN: "https://example.test",
+  }));
+});
