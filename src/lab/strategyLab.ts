@@ -1,4 +1,7 @@
 import type { AnalysisModel, Contest, LotteryId } from "../domain/types.js";
+import { getLotteryConfig } from "../lotteries/config.js";
+import { evaluateRankingQuality, type RankingQualityResult } from "../analysis/rankQuality.js";
+import { evaluateWalkForwardWeights, type WalkForwardResult } from "../analysis/walkForward.js";
 import { backtestMegaSena } from "../backtest/megaSena.js";
 import { backtestLotofacil } from "../backtest/lotofacil.js";
 import { backtestDiaDeSorte } from "../backtest/diaDeSorte.js";
@@ -76,6 +79,12 @@ export interface StrategyLabBenchmark {
   control: StrategyLabVariant;
 }
 
+export interface StrategyLabRankingQuality {
+  model: AnalysisModel;
+  label: string;
+  quality: RankingQualityResult;
+}
+
 export interface StrategyLabResult {
   lottery: LotteryId;
   experiment: StrategyLabExperiment;
@@ -89,6 +98,8 @@ export interface StrategyLabResult {
   winner?: string;
   benchmark: StrategyLabBenchmark;
   variants: StrategyLabVariant[];
+  rankingQuality?: StrategyLabRankingQuality[];
+  walkForward?: WalkForwardResult;
 }
 
 interface LabRound extends SummarizableRound {
@@ -265,6 +276,26 @@ function medianRandomControl(
   );
 }
 
+function rankingQualityForExperiment(
+  contests: Contest[],
+  lottery: LotteryId,
+  period: { startContest?: number; endContest?: number },
+  warmupContests: number,
+): StrategyLabRankingQuality[] {
+  const config = getLotteryConfig(lottery);
+  return SCORE_MODEL_VARIANTS.map((variant) => ({
+    model: variant.model,
+    label: variant.label,
+    quality: evaluateRankingQuality(contests, config, {
+      model: variant.model,
+      warmupContests,
+      ...(period.startContest !== undefined ? { startContest: period.startContest } : {}),
+      ...(period.endContest !== undefined ? { endContest: period.endContest } : {}),
+      maxRounds: 500,
+    }),
+  }));
+}
+
 export function compareStrategyLab(contests: Contest[], options: StrategyLabOptions): StrategyLabResult {
   const experiment = options.experiment ?? "fixed-core";
   if (experiment === "external-rules" && options.lottery !== "mega-sena") {
@@ -328,6 +359,17 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
   const strategyPercentile = percentileRank(randomValues, strategyValue);
   const status = evidenceStatus(strategyPercentile);
   const delta = strategyValue - p50;
+  const rankingQuality = experiment === "score-model"
+    ? rankingQualityForExperiment(contests, options.lottery, period, warmupContests)
+    : undefined;
+  const walkForward = experiment === "score-model"
+    ? evaluateWalkForwardWeights(contests, getLotteryConfig(options.lottery), {
+      warmupContests,
+      trainingWindow: Math.max(50, Math.min(200, options.lookbackContests ?? 200)),
+      validationBlock: bucketSize,
+      nullSamples: 2000,
+    })
+    : undefined;
 
   return {
     lottery: options.lottery,
@@ -351,5 +393,7 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
       control,
     },
     variants,
+    ...(rankingQuality ? { rankingQuality } : {}),
+    ...(walkForward ? { walkForward } : {}),
   };
 }
