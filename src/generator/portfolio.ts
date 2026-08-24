@@ -33,14 +33,15 @@ function candidateKey(candidate: PortfolioCandidate): string {
 }
 
 function localDiversityScore<T extends PortfolioCandidate>(
-  selected: T[],
+  variableUsage: Map<number, number>,
   candidate: T,
   diversityPenalty: number,
 ): number {
-  return candidate.rank - selected.reduce(
-    (total, existing) => total + overlap(existing.variableNumbers, candidate.variableNumbers) * diversityPenalty,
+  const reusedVariables = candidate.variableNumbers.reduce(
+    (total, value) => total + (variableUsage.get(value) ?? 0),
     0,
   );
+  return candidate.rank - reusedVariables * diversityPenalty;
 }
 
 /**
@@ -50,6 +51,11 @@ function localDiversityScore<T extends PortfolioCandidate>(
  * disjoint alternative before the global optimizer sees them. This helper
  * first explores a wider ranked set, then greedily keeps representatives
  * that trade a small local-score loss for variable-number diversity.
+ *
+ * The accumulated overlap is represented by a usage counter per variable.
+ * This is exactly equivalent to summing pairwise overlaps against every
+ * already-selected candidate, but avoids rescanning the selected frontier
+ * for every candidate at every shortlist step.
  */
 export function buildPortfolioShortlist<T extends PortfolioCandidate>(
   candidates: Iterable<T>,
@@ -73,13 +79,14 @@ export function buildPortfolioShortlist<T extends PortfolioCandidate>(
 
   const selected: T[] = [];
   const remaining = [...explored];
+  const variableUsage = new Map<number, number>();
   while (selected.length < shortlistLimit && remaining.length > 0) {
     let winnerIndex = 0;
     let winnerScore = Number.NEGATIVE_INFINITY;
     let winnerKey = "";
     for (let index = 0; index < remaining.length; index += 1) {
       const candidate = remaining[index]!;
-      const score = localDiversityScore(selected, candidate, options.diversityPenalty);
+      const score = localDiversityScore(variableUsage, candidate, options.diversityPenalty);
       const key = candidateKey(candidate);
       if (score > winnerScore || (score === winnerScore && key.localeCompare(winnerKey) < 0)) {
         winnerScore = score;
@@ -87,7 +94,11 @@ export function buildPortfolioShortlist<T extends PortfolioCandidate>(
         winnerKey = key;
       }
     }
-    selected.push(remaining.splice(winnerIndex, 1)[0]!);
+    const winner = remaining.splice(winnerIndex, 1)[0]!;
+    selected.push(winner);
+    for (const value of winner.variableNumbers) {
+      variableUsage.set(value, (variableUsage.get(value) ?? 0) + 1);
+    }
   }
   return selected;
 }
