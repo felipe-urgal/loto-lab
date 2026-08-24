@@ -1,4 +1,5 @@
 import type { AnalysisModel, Contest, GeneratedGame } from "../domain/types.js";
+import { eligibleTargetIndexes } from "../analysis/contestEligibility.js";
 import { evaluateGames, type GameCheckResult } from "../checker/evaluate.js";
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { summarizeBacktestRounds, type BacktestSummary } from "./shared.js";
@@ -42,31 +43,25 @@ export function backtestLotofacil(
   const warmupContests = options.warmupContests ?? 20;
   const analysisModel = options.analysisModel ?? "score-v2";
 
-  if (!Number.isInteger(gameCount) || gameCount < 1) {
-    throw new Error("gameCount must be a positive integer");
-  }
-  if (![8, 9, 10].includes(fixedCount)) {
-    throw new Error("Lotofacil fixedCount must be 8, 9 or 10");
-  }
-  if (!Number.isInteger(warmupContests) || warmupContests < 1) {
-    throw new Error("warmupContests must be a positive integer");
-  }
+  if (!Number.isInteger(gameCount) || gameCount < 1) throw new Error("gameCount must be a positive integer");
+  if (![8, 9, 10].includes(fixedCount)) throw new Error("Lotofacil fixedCount must be 8, 9 or 10");
+  if (!Number.isInteger(warmupContests) || warmupContests < 1) throw new Error("warmupContests must be a positive integer");
 
   const scoped = contests
     .filter((contest) => contest.lottery === "lotofacil")
     .sort((a, b) => a.number - b.number);
   const rounds: LotofacilBacktestRound[] = [];
+  const targetIndexes = eligibleTargetIndexes(scoped, {
+    warmupContests,
+    ...(options.startContest !== undefined ? { startContest: options.startContest } : {}),
+    ...(options.endContest !== undefined ? { endContest: options.endContest } : {}),
+  });
 
-  for (let index = warmupContests; index < scoped.length; index += 1) {
+  for (const index of targetIndexes) {
     const target = scoped[index]!;
-    if (options.startContest !== undefined && target.number < options.startContest) continue;
-    if (options.endContest !== undefined && target.number > options.endContest) continue;
-
-    // Anti-leakage: the target draw and all future draws are invisible here.
     const history = scoped.slice(0, index);
     const generatedGames = generateLotofacilGames(history, { gameCount, fixedCount, analysisModel });
     const checks = evaluateGames(generatedGames, target);
-
     rounds.push({
       contest: target.number,
       date: target.date,
