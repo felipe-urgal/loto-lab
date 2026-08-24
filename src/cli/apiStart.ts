@@ -35,6 +35,36 @@ function autoSyncEnabled(value: string | undefined): boolean {
   return value === "1" || value.toLowerCase() === "true";
 }
 
+function enabled(value: string | undefined): boolean {
+  return value === "1" || value?.toLowerCase() === "true";
+}
+
+function isLoopbackBind(value: string): boolean {
+  return value === "127.0.0.1" || value === "::1" || value.toLowerCase() === "localhost";
+}
+
+function validatePublicExposure(): void {
+  const bindAddress = process.env.PUBLIC_BIND_ADDRESS;
+  if (!bindAddress || isLoopbackBind(bindAddress)) return;
+  if (enabled(process.env.ALLOW_INSECURE_PUBLIC_HTTP)) {
+    logEvent("warn", "insecure_public_http_allowed", { bindAddress });
+    return;
+  }
+
+  const publicOrigin = process.env.PUBLIC_ORIGIN ?? process.env.API_CORS_ORIGIN;
+  let protocol: string | undefined;
+  try {
+    protocol = publicOrigin ? new URL(publicOrigin).protocol : undefined;
+  } catch {
+    throw new Error("PUBLIC_ORIGIN must be a valid absolute URL when the app is exposed publicly");
+  }
+  if (protocol !== "https:") {
+    throw new Error(
+      "Public APP_BIND requires an https:// PUBLIC_ORIGIN because HTTP Basic credentials must not travel over plaintext HTTP. Use a TLS reverse proxy or explicitly set ALLOW_INSECURE_PUBLIC_HTTP=true for an intentional exception.",
+    );
+  }
+}
+
 function closeServer(server: ReturnType<typeof createLotoLabServer>): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     server.close((error) => {
@@ -61,6 +91,7 @@ async function withDeadline(promise: Promise<unknown>, timeoutMs: number): Promi
 }
 
 async function main(): Promise<void> {
+  validatePublicExposure();
   const pool = createPostgresPool();
   await runMigrations(pool);
 
