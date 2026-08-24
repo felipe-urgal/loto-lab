@@ -1,4 +1,5 @@
-import type { Contest, GeneratedGame } from "../domain/types.js";
+import type { AnalysisModel, Contest, GeneratedGame } from "../domain/types.js";
+import { eligibleTargetIndexes } from "../analysis/contestEligibility.js";
 import { evaluateGames, type GameCheckResult } from "../checker/evaluate.js";
 import {
   generateDiaDeSorteGames,
@@ -12,6 +13,7 @@ export interface DiaDeSorteBacktestOptions {
   warmupContests?: number;
   startContest?: number;
   endContest?: number;
+  analysisModel?: AnalysisModel;
 }
 
 export interface DiaDeSorteBacktestRound {
@@ -36,6 +38,7 @@ export interface DiaDeSorteBacktestResult {
     gameCount: number;
     fixedCount: DiaDeSorteFixedCount;
     warmupContests: number;
+    analysisModel: AnalysisModel;
   };
 }
 
@@ -46,33 +49,28 @@ export function backtestDiaDeSorte(
   const gameCount = options.gameCount ?? 4;
   const fixedCount = options.fixedCount ?? 3;
   const warmupContests = options.warmupContests ?? 20;
+  const analysisModel = options.analysisModel ?? "score-v2";
 
-  if (!Number.isInteger(gameCount) || gameCount < 1) {
-    throw new Error("gameCount must be a positive integer");
-  }
-  if (![0, 2, 3].includes(fixedCount)) {
-    throw new Error("Dia de Sorte fixedCount must be 0, 2 or 3");
-  }
-  if (!Number.isInteger(warmupContests) || warmupContests < 1) {
-    throw new Error("warmupContests must be a positive integer");
-  }
+  if (!Number.isInteger(gameCount) || gameCount < 1) throw new Error("gameCount must be a positive integer");
+  if (![0, 2, 3].includes(fixedCount)) throw new Error("Dia de Sorte fixedCount must be 0, 2 or 3");
+  if (!Number.isInteger(warmupContests) || warmupContests < 1) throw new Error("warmupContests must be a positive integer");
 
   const scoped = contests
     .filter((contest) => contest.lottery === "dia-de-sorte")
     .sort((a, b) => a.number - b.number);
   const rounds: DiaDeSorteBacktestRound[] = [];
+  const targetIndexes = eligibleTargetIndexes(scoped, {
+    warmupContests,
+    ...(options.startContest !== undefined ? { startContest: options.startContest } : {}),
+    ...(options.endContest !== undefined ? { endContest: options.endContest } : {}),
+  });
 
-  for (let index = warmupContests; index < scoped.length; index += 1) {
+  for (const index of targetIndexes) {
     const target = scoped[index]!;
-    if (options.startContest !== undefined && target.number < options.startContest) continue;
-    if (options.endContest !== undefined && target.number > options.endContest) continue;
-
-    // Anti-leakage: only draws before the target are visible to the generator.
     const history = scoped.slice(0, index);
-    const generatedGames = generateDiaDeSorteGames(history, { gameCount, fixedCount });
+    const generatedGames = generateDiaDeSorteGames(history, { gameCount, fixedCount, analysisModel });
     const checks = evaluateGames(generatedGames, target);
     const luckyMonthHits = checks.filter((check) => check.luckyMonthHit).length;
-
     rounds.push({
       contest: target.number,
       date: target.date,
@@ -88,7 +86,6 @@ export function backtestDiaDeSorte(
 
   const baseSummary = summarizeBacktestRounds(rounds);
   const luckyMonthHits = rounds.reduce((total, round) => total + round.luckyMonthHits, 0);
-
   return {
     rounds,
     summary: {
@@ -96,6 +93,6 @@ export function backtestDiaDeSorte(
       luckyMonthHits,
       luckyMonthRate: baseSummary.totalGames === 0 ? 0 : luckyMonthHits / baseSummary.totalGames,
     },
-    strategy: { gameCount, fixedCount, warmupContests },
+    strategy: { gameCount, fixedCount, warmupContests, analysisModel },
   };
 }

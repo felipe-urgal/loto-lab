@@ -10,25 +10,159 @@
     <link rel="stylesheet" href="/assets/styles.css" />
     <link rel="stylesheet" href="/assets/ui-foundation.css" />
     <link rel="stylesheet" href="/assets/lab.css" />
+    <link rel="stylesheet" href="/assets/lab-v2.css" />
     <link rel="stylesheet" href="/assets/refinements.css" />
   </head>
   <body data-active-nav="lab">
     <div class="app-shell">
       <aside class="sidebar" aria-label="Navegação principal">
-        <a class="brand" href="/#dashboard" aria-label="Loto Lab - Painel"><span class="brand-mark" aria-hidden="true">L</span><span class="brand-copy"><strong>Loto Lab</strong><small>Console de estratégias</small></span></a>
+        <a class="brand" href="/#dashboard" aria-label="Loto Lab - Painel">
+          <span class="brand-mark" aria-hidden="true">L</span>
+          <span class="brand-copy"><strong>Loto Lab</strong><small>Console de estratégias</small></span>
+        </a>
         <nav class="main-nav" data-shell-nav aria-label="Seções do Loto Lab"></nav>
-        <div class="sidebar-footer"><div class="status-row" id="lab-api-status" aria-live="polite"><span class="status-dot"></span><span>Verificando API</span></div><p>Compare hipóteses.<br />Não ajuste ao resultado.</p></div>
+        <div class="sidebar-footer">
+          <div class="status-row" id="lab-api-status" aria-live="polite">
+            <span class="status-dot"></span><span>Verificando API</span>
+          </div>
+          <p>Compare hipóteses.<br />Não ajuste ao resultado.</p>
+        </div>
       </aside>
+
       <main class="main-area">
-        <header class="topbar"><div class="topbar-copy"><h1>Laboratório</h1><p>Compare estratégias no mesmo período, com os mesmos dados e sem vazamento futuro.</p></div><div class="topbar-actions"><label class="select-control" for="lab-lottery"><span>Loteria</span><select id="lab-lottery"><option value="mega-sena">Mega-Sena</option><option value="lotofacil">Lotofácil</option><option value="dia-de-sorte">Dia de Sorte</option></select></label></div></header>
-        <section class="content lab-content"><div class="stack">
-          <section class="lab-intro panel"><div><span class="lab-eyebrow">Comparação controlada</span><h2 id="lab-title">Mega-Sena: núcleo fixo</h2><p id="lab-description">Compara 0, 2 e 3 dezenas fixas usando exatamente os mesmos concursos.</p></div><div class="lab-history-status" id="lab-history-status">Carregando cobertura da base...</div></section>
-          <section class="panel form-panel"><form id="lab-form"><div class="form-grid lab-form-grid"><div class="field"><label for="lab-lookback">Concursos analisados</label><select id="lab-lookback"><option value="50">Últimos 50</option><option value="100" selected>Últimos 100</option><option value="200">Últimos 200</option><option value="500">Últimos 500</option></select></div><div class="field"><label for="lab-games">Jogos por concurso</label><input id="lab-games" type="number" min="1" max="20" value="2" /></div><div class="field"><label for="lab-bucket">Bloco do gráfico</label><select id="lab-bucket"><option value="10">10 concursos</option><option value="25" selected>25 concursos</option><option value="50">50 concursos</option></select></div><div class="field"><label for="lab-warmup">Aquecimento</label><input id="lab-warmup" type="number" min="1" max="5000" value="20" /></div></div><div class="form-actions"><span class="form-note">A classificação usa ROI quando a cobertura financeira é suficiente; caso contrário usa taxa de premiação.</span><button class="button primary lab-run-button" id="lab-run" type="submit">Executar comparação</button></div></form></section>
-          <section class="lab-message panel" id="lab-message"><strong>Pronto para comparar</strong><p>Escolha o período e execute. O laboratório não altera a metodologia principal nem salva um “vencedor” automaticamente.</p></section>
-          <section id="lab-results" hidden><div class="stack"><div class="section-head"><div><h2>Classificação do período</h2><p id="lab-period-copy"></p></div><span class="lab-basis" id="lab-basis"></span></div><div class="lab-ranking" id="lab-ranking"></div><section class="panel lab-chart-panel"><div class="lab-chart-head"><div><h2>Evolução por blocos</h2><p>Observe consistência; um pico isolado não torna a estratégia superior.</p></div><label class="field lab-metric-select" for="lab-metric"><span>Métrica</span><select id="lab-metric"><option value="averageHitsPerGame">Média de acertos</option><option value="prizeRate">Taxa de premiação</option><option value="roi">ROI</option><option value="netResult">Resultado líquido</option></select></label></div><div class="lab-chart" id="lab-chart"></div></section><section><div class="section-head"><div><h2>Métricas comparadas</h2><p>Mesmo número de jogos e mesmo recorte histórico.</p></div></div><div class="panel table-wrap"><table><thead><tr><th>Estratégia</th><th>Acertos médios</th><th>Núcleo médio</th><th>Melhor</th><th>Premiação</th><th>Cobertura</th><th>ROI</th><th>Resultado</th></tr></thead><tbody id="lab-table-body"></tbody></table></div></section></div></section>
-        </div></section>
+        <header class="topbar">
+          <div class="topbar-copy">
+            <h1>Laboratório de Estratégias</h1>
+            <p>Hipótese → regra → backtest → benchmark → evidência → decisão.</p>
+          </div>
+          <div class="topbar-actions">
+            <label class="select-control" for="lab-lottery">
+              <span>Loteria</span>
+              <select id="lab-lottery">
+                <option value="mega-sena">Mega-Sena</option>
+                <option value="lotofacil">Lotofácil</option>
+                <option value="dia-de-sorte">Dia de Sorte</option>
+              </select>
+            </label>
+          </div>
+        </header>
+
+        <section class="content lab-content">
+          <div class="stack">
+            <section class="lab-intro panel">
+              <div>
+                <span class="lab-eyebrow">Comparação controlada</span>
+                <h2 id="lab-title">Mega-Sena: núcleo fixo</h2>
+                <p id="lab-description">Compara estratégias no mesmo recorte, sem vazamento futuro e contra uma distribuição de controles aleatórios.</p>
+              </div>
+              <div class="lab-history-status" id="lab-history-status">Carregando cobertura da base...</div>
+            </section>
+
+            <section class="panel form-panel">
+              <form id="lab-form">
+                <div class="form-grid lab-form-grid">
+                  <div class="field">
+                    <label for="lab-lookback">Concursos analisados</label>
+                    <select id="lab-lookback">
+                      <option value="50">Últimos 50</option>
+                      <option value="100" selected>Últimos 100</option>
+                      <option value="200">Últimos 200</option>
+                      <option value="500">Últimos 500</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="lab-games">Jogos por concurso</label>
+                    <input id="lab-games" type="number" min="1" max="10" value="2" />
+                  </div>
+                  <div class="field">
+                    <label for="lab-bucket">Bloco do gráfico</label>
+                    <select id="lab-bucket">
+                      <option value="10">10 concursos</option>
+                      <option value="25" selected>25 concursos</option>
+                      <option value="50">50 concursos</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="lab-warmup">Aquecimento</label>
+                    <input id="lab-warmup" type="number" min="1" max="500" value="20" />
+                  </div>
+                  <div class="field">
+                    <label for="lab-random-samples">Controles aleatórios</label>
+                    <select id="lab-random-samples">
+                      <option value="25">25 · exploratório</option>
+                      <option value="50">50 · exploratório</option>
+                      <option value="100" selected>100 · mínimo prático (3 variantes)</option>
+                      <option value="250">250 · mínimo prático (9 variantes)</option>
+                      <option value="500">500 · maior resolução</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <span class="form-note">Evidência forte exige resolução Monte Carlo suficiente, pelo menos 30 concursos elegíveis e p empírico significativo após corrigir a quantidade de variantes. Empates contam contra superioridade.</span>
+                  <button class="button primary lab-run-button" id="lab-run" type="submit">Executar comparação</button>
+                </div>
+              </form>
+            </section>
+
+            <section class="lab-message panel" id="lab-message">
+              <strong>Pronto para comparar</strong>
+              <p>Escolha uma hipótese e execute. Resultado histórico isolado não promove estratégia automaticamente.</p>
+            </section>
+
+            <section id="lab-results" hidden>
+              <div class="stack">
+                <div class="section-head">
+                  <div><h2>Classificação do período</h2><p id="lab-period-copy"></p></div>
+                  <span class="lab-basis" id="lab-basis"></span>
+                </div>
+                <div class="lab-ranking" id="lab-ranking"></div>
+
+                <section class="panel lab-chart-panel">
+                  <div class="lab-chart-head">
+                    <div><h2>Evolução por blocos</h2><p>Observe consistência; um pico isolado não torna a estratégia superior.</p></div>
+                    <label class="field lab-metric-select" for="lab-metric">
+                      <span>Métrica</span>
+                      <select id="lab-metric">
+                        <option value="averageHitsPerGame">Média de acertos</option>
+                        <option value="prizeRate">Taxa de premiação</option>
+                        <option value="roi">ROI</option>
+                        <option value="netResult">Resultado líquido</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="lab-chart" id="lab-chart"></div>
+                </section>
+
+                <section>
+                  <div class="section-head">
+                    <div><h2>Métricas comparadas</h2><p>Mesmo número de jogos, mesmo recorte e mesma informação disponível antes de cada concurso elegível.</p></div>
+                  </div>
+                  <div class="panel table-wrap">
+                    <table>
+                      <thead><tr><th>Estratégia</th><th>Acertos médios</th><th>Núcleo médio</th><th>Melhor</th><th>Premiação</th><th>Cobertura</th><th>ROI</th><th>Resultado</th></tr></thead>
+                      <tbody id="lab-table-body"></tbody>
+                    </table>
+                  </div>
+                </section>
+
+                <section class="panel lab-guide">
+                  <h2>Como interpretar</h2>
+                  <div class="lab-guide-grid">
+                    <div><strong>Evidência acima do random</strong><p>A cauda superior permanece significativa depois da correção por múltiplas comparações. Ainda precisa persistir fora deste período.</p></div>
+                    <div><strong>Inconclusivo</strong><p>Existe sinal exploratório, mas ele não sustenta uma conclusão após os controles estatísticos.</p></div>
+                    <div><strong>Resolução insuficiente</strong><p>A quantidade de controles não consegue atingir o limiar ajustado de 5%. Aumente as simulações antes de interpretar ausência de evidência.</p></div>
+                    <div><strong>Amostra histórica pequena</strong><p>Menos de 30 concursos elegíveis não sustentam conclusão inferencial. O resultado permanece apenas exploratório.</p></div>
+                    <div><strong>Sem evidência</strong><p>Com resolução e amostra suficientes, o resultado continua compatível com o comportamento do acaso. Empates são neutros.</p></div>
+                    <div><strong>Evidência abaixo do random</strong><p>A hipótese ficou significativamente abaixo dos controles no recorte e merece revisão.</p></div>
+                  </div>
+                </section>
+              </div>
+            </section>
+          </div>
+        </section>
       </main>
     </div>
+
     <div class="toast-root" id="toast-root" aria-live="assertive"></div>
     <script type="module" src="/assets/shell.js"></script>
     <script type="module" src="/assets/lab.js"></script>

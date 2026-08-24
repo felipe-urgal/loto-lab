@@ -25,6 +25,7 @@ export interface Contest {
 }
 
 export type NumberTier = "strong" | "balanced" | "cold";
+export type AnalysisModel = "score-v1" | "score-v2" | "no-score";
 
 export interface NumberAnalysis {
   number: number;

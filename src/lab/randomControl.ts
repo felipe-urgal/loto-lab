@@ -1,22 +1,13 @@
 import type { Contest, GeneratedGame, LotteryId } from "../domain/types.js";
+import { eligibleTargetIndexes } from "../analysis/contestEligibility.js";
 import { evaluateGames, type GameCheckResult } from "../checker/evaluate.js";
 import { summarizeBacktestRounds, type BacktestSummary } from "../backtest/shared.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { buildMetadata, createSeededRandom } from "../generator/shared.js";
 
 const LUCKY_MONTHS = [
-  "Janeiro",
-  "Fevereiro",
-  "Março",
-  "Abril",
-  "Maio",
-  "Junho",
-  "Julho",
-  "Agosto",
-  "Setembro",
-  "Outubro",
-  "Novembro",
-  "Dezembro",
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ] as const;
 
 export interface RandomControlOptions {
@@ -39,6 +30,11 @@ export interface RandomControlResult {
   summary: BacktestSummary;
 }
 
+export interface RandomControlSample {
+  seed: string;
+  summary: BacktestSummary;
+}
+
 function sampleNumbers(lottery: LotteryId, random: () => number): number[] {
   const config = getLotteryConfig(lottery);
   const pool = Array.from(
@@ -46,12 +42,10 @@ function sampleNumbers(lottery: LotteryId, random: () => number): number[] {
     (_, index) => config.minNumber + index,
   );
   const selected: number[] = [];
-
   while (selected.length < config.drawSize) {
     const index = Math.floor(random() * pool.length);
     selected.push(pool.splice(index, 1)[0]!);
   }
-
   return selected.sort((a, b) => a - b);
 }
 
@@ -71,11 +65,9 @@ function randomGame(
     variableNumbers: [...numbers],
     metadata: buildMetadata(numbers, lastContest, lottery === "lotofacil"),
   };
-
   if (lottery === "dia-de-sorte") {
     game.luckyMonth = LUCKY_MONTHS[Math.floor(random() * LUCKY_MONTHS.length)]!;
   }
-
   return game;
 }
 
@@ -88,13 +80,15 @@ export function backtestRandomControl(
     .sort((a, b) => a.number - b.number);
   const rounds: RandomControlRound[] = [];
   const seed = options.seed ?? "loto-lab-random-control-v1";
+  const targetIndexes = eligibleTargetIndexes(scoped, {
+    warmupContests: options.warmupContests,
+    ...(options.startContest !== undefined ? { startContest: options.startContest } : {}),
+    ...(options.endContest !== undefined ? { endContest: options.endContest } : {}),
+  });
 
-  for (let index = options.warmupContests; index < scoped.length; index += 1) {
+  for (const index of targetIndexes) {
     const target = scoped[index]!;
-    if (options.startContest !== undefined && target.number < options.startContest) continue;
-    if (options.endContest !== undefined && target.number > options.endContest) continue;
-
-    const lastContest = scoped[index - 1];
+    const lastContest = scoped[index - 1]!;
     const games = Array.from({ length: options.gameCount }, (_, gameIndex) =>
       randomGame(options.lottery, target.number, gameIndex, seed, lastContest),
     );
@@ -106,4 +100,20 @@ export function backtestRandomControl(
     rounds,
     summary: summarizeBacktestRounds(rounds),
   };
+}
+
+export function sampleRandomControls(
+  contests: Contest[],
+  options: Omit<RandomControlOptions, "seed">,
+  samples = 100,
+  seedPrefix = "loto-lab-random-distribution-v2",
+): RandomControlSample[] {
+  if (!Number.isInteger(samples) || samples < 10 || samples > 500) {
+    throw new Error("randomSamples must be an integer between 10 and 500");
+  }
+  return Array.from({ length: samples }, (_, index) => {
+    const seed = `${seedPrefix}:${index + 1}`;
+    const result = backtestRandomControl(contests, { ...options, seed });
+    return { seed, summary: result.summary };
+  });
 }

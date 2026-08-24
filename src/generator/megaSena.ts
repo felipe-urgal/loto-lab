@@ -1,4 +1,4 @@
-import type { Contest, GeneratedGame, NumberAnalysis } from "../domain/types.js";
+import type { AnalysisModel, Contest, GeneratedGame, NumberAnalysis } from "../domain/types.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { buildNumberAnalysis } from "../analysis/scoring.js";
 import {
@@ -9,13 +9,17 @@ import {
   type MegaSenaGameRules,
 } from "./megaSenaRules.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
+import { buildPortfolioShortlist, selectPortfolioCandidates } from "./portfolio.js";
 import {
+  buildStratifiedCandidatePool,
   combinationIterator,
+  createStableNumberTieBreaker,
+  GENERATION_POLICY,
   generationRandom,
-  selectRankedCandidate,
   selectWeightedItem,
   topRankedCandidates,
   type GenerationMode,
+  type NumberTieBreaker,
 } from "./shared.js";
 
 const config = getLotteryConfig("mega-sena");
@@ -33,6 +37,7 @@ export interface MegaSenaGeneratorOptions {
   excludedNumbers?: number[];
   constraints?: GenerationConstraints;
   referenceContestNumber?: number | null;
+  analysisModel?: AnalysisModel;
 }
 
 function bestUnused(
@@ -41,12 +46,12 @@ function bestUnused(
   excluded: Set<number>,
   value: (row: NumberAnalysis) => number,
   random?: () => number,
+  tieBreaker?: NumberTieBreaker,
 ): number {
   const ranked = [...analysis]
     .filter((row) => !selected.has(row.number) && !excluded.has(row.number))
-    .sort((a, b) => value(b) - value(a) || b.score - a.score || a.number - b.number);
+    .sort((a, b) => value(b) - value(a) || b.score - a.score || (tieBreaker ? tieBreaker(a.number, b.number) : a.number - b.number));
   const candidate = random ? selectWeightedItem(ranked, random, 6) : ranked[0];
-
   if (!candidate) throw new Error("Unable to select a Mega-Sena fixed number");
   selected.add(candidate.number);
   return candidate.number;
@@ -58,10 +63,9 @@ export function selectMegaSenaFixedNumbers(
   random?: () => number,
   presetNumbers: number[] = [],
   excludedNumbers: number[] = [],
+  tieBreaker?: NumberTieBreaker,
 ): number[] {
-  if (![0, 2, 3].includes(count)) {
-    throw new Error("Mega-Sena fixedCount must be 0, 2 or 3");
-  }
+  if (![0, 2, 3].includes(count)) throw new Error("Mega-Sena fixedCount must be 0, 2 or 3");
   if (new Set(presetNumbers).size !== presetNumbers.length) throw new Error("Fixed numbers must be unique");
   if (presetNumbers.length > count) throw new Error("Manual fixed numbers exceed the configured fixed core");
   const available = new Set(analysis.map((row) => row.number));
@@ -72,29 +76,16 @@ export function selectMegaSenaFixedNumbers(
   if (count === 0) return [];
 
   const selected = new Set<number>(presetNumbers);
-  if (selected.size < count) bestUnused(analysis, selected, excluded, (row) => row.year, random);
-  if (selected.size < count) {
-    bestUnused(analysis, selected, excluded, (row) => row.historical * 0.5 + row.year * 0.5, random);
-  }
-  if (selected.size < count) {
-    bestUnused(analysis, selected, excluded, (row) => row.recent10 * 0.6 + row.month * 0.4, random);
-  }
-
+  if (selected.size < count) bestUnused(analysis, selected, excluded, (row) => row.year, random, tieBreaker);
+  if (selected.size < count) bestUnused(analysis, selected, excluded, (row) => row.historical * 0.5 + row.year * 0.5, random, tieBreaker);
+  if (selected.size < count) bestUnused(analysis, selected, excluded, (row) => row.recent10 * 0.6 + row.month * 0.4, random, tieBreaker);
   return [...selected].sort((a, b) => a - b);
 }
 
 function buildMetadata(numbers: number[], lastContest?: Contest): GeneratedGame["metadata"] {
   const odd = numbers.filter((number) => number % 2 !== 0).length;
-  const repeatedFromLastContest = lastContest
-    ? numbers.filter((number) => lastContest.numbers.includes(number))
-    : [];
-
-  return {
-    odd,
-    even: numbers.length - odd,
-    sum: numbers.reduce((total, number) => total + number, 0),
-    repeatedFromLastContest,
-  };
+  const repeatedFromLastContest = lastContest ? numbers.filter((number) => lastContest.numbers.includes(number)) : [];
+  return { odd, even: numbers.length - odd, sum: numbers.reduce((total, number) => total + number, 0), repeatedFromLastContest };
 }
 
 interface NormalizedMegaSenaGeneratorOptions {
@@ -107,13 +98,12 @@ interface NormalizedMegaSenaGeneratorOptions {
   excludedNumbers: number[];
   constraints?: GenerationConstraints;
   referenceContestNumber?: number | null;
+  analysisModel: AnalysisModel;
 }
 
-function normalizeOptions(
-  value: number | MegaSenaGeneratorOptions,
-): NormalizedMegaSenaGeneratorOptions {
+function normalizeOptions(value: number | MegaSenaGeneratorOptions): NormalizedMegaSenaGeneratorOptions {
   if (typeof value === "number") {
-    return { gameCount: value, fixedCount: 3, generationMode: "deterministic", rules: {}, fixedNumbers: [], excludedNumbers: [] };
+    return { gameCount: value, fixedCount: 3, generationMode: "deterministic", rules: {}, fixedNumbers: [], excludedNumbers: [], analysisModel: "score-v2" };
   }
   return {
     gameCount: value.gameCount ?? 2,
@@ -125,6 +115,7 @@ function normalizeOptions(
     excludedNumbers: value.excludedNumbers ?? [],
     ...(value.constraints !== undefined ? { constraints: value.constraints } : {}),
     ...(value.referenceContestNumber !== undefined ? { referenceContestNumber: value.referenceContestNumber } : {}),
+    analysisModel: value.analysisModel ?? "score-v2",
   };
 }
 
@@ -138,18 +129,18 @@ function buildCandidatePool(
   excludedSet: Set<number>,
   fixedCount: MegaSenaFixedCount,
   rules: MegaSenaGameRules,
+  tieBreaker?: NumberTieBreaker,
 ): number[] {
   const ranked = [...analysis]
     .filter((row) => !fixedSet.has(row.number) && !excludedSet.has(row.number))
-    .sort((a, b) => b.score - a.score || a.number - b.number);
+    .sort((a, b) => b.score - a.score || (tieBreaker ? tieBreaker(a.number, b.number) : a.number - b.number));
 
   if (fixedCount !== 0 || !hasRules(rules)) {
     const poolSize = fixedCount === 0 ? 14 : fixedCount === 2 ? 18 : 24;
-    return ranked.slice(0, poolSize).map((row) => row.number);
+    return buildStratifiedCandidatePool(analysis, fixedSet, excludedSet, poolSize, tieBreaker);
   }
 
   const selected = new Set<number>();
-
   if (rules.minPreferredGroup !== undefined) {
     const wanted = rules.minPreferredGroup + 3;
     let added = 0;
@@ -160,7 +151,6 @@ function buildCandidatePool(
       if (added >= wanted) break;
     }
   }
-
   if (rules.minQuadrants !== undefined) {
     for (const quadrant of [1, 2, 3, 4] as const) {
       let added = 0;
@@ -172,7 +162,6 @@ function buildCandidatePool(
       }
     }
   }
-
   if (rules.equalParity) {
     for (const parity of [0, 1] as const) {
       let added = 0;
@@ -184,7 +173,6 @@ function buildCandidatePool(
       }
     }
   }
-
   if (rules.avoidSameColumn) {
     const represented = new Set<number>();
     for (const row of ranked) {
@@ -195,118 +183,63 @@ function buildCandidatePool(
       if (represented.size >= 6) break;
     }
   }
-
   const targetSize = Math.max(18, selected.size);
   for (const row of ranked) {
     selected.add(row.number);
     if (selected.size >= targetSize) break;
   }
-
   return [...selected];
 }
 
-export function generateMegaSenaGames(
-  contests: Contest[],
-  options: number | MegaSenaGeneratorOptions = 2,
-): GeneratedGame[] {
-  const {
-    gameCount,
-    fixedCount,
-    generationMode,
-    seed,
-    rules,
-    fixedNumbers: manualFixed,
-    excludedNumbers,
-    constraints,
-    referenceContestNumber,
-  } = normalizeOptions(options);
-  if (!Number.isInteger(gameCount) || gameCount < 1) {
-    throw new Error("gameCount must be a positive integer");
-  }
-  if (![0, 2, 3].includes(fixedCount)) {
-    throw new Error("Mega-Sena fixedCount must be 0, 2 or 3");
-  }
+export function generateMegaSenaGames(contests: Contest[], options: number | MegaSenaGeneratorOptions = 2): GeneratedGame[] {
+  const { gameCount, fixedCount, generationMode, seed, rules, fixedNumbers: manualFixed, excludedNumbers, constraints, referenceContestNumber, analysisModel } = normalizeOptions(options);
+  if (!Number.isInteger(gameCount) || gameCount < 1) throw new Error("gameCount must be a positive integer");
+  if (![0, 2, 3].includes(fixedCount)) throw new Error("Mega-Sena fixedCount must be 0, 2 or 3");
 
   const random = generationRandom(generationMode, seed);
-  const scoped = contests
-    .filter((contest) => contest.lottery === "mega-sena")
-    .sort((a, b) => a.number - b.number);
-  const analysis = buildNumberAnalysis(scoped, config);
-  const lastContest = referenceContestNumber === undefined
-    ? scoped.at(-1)
-    : referenceContestNumber === null
-      ? undefined
-      : scoped.find((contest) => contest.number === referenceContestNumber);
-  const fixedNumbers = selectMegaSenaFixedNumbers(analysis, fixedCount, random, manualFixed, excludedNumbers);
+  const scoped = contests.filter((contest) => contest.lottery === "mega-sena").sort((a, b) => a.number - b.number);
+  const analysis = buildNumberAnalysis(scoped, config, undefined, analysisModel);
+  const noScoreSeed = `no-score:mega-sena:${scoped.at(-1)?.number ?? 0}`;
+  const tieBreaker = analysisModel === "no-score" ? createStableNumberTieBreaker(noScoreSeed) : undefined;
+  const neutralRank = tieBreaker
+    ? new Map([...analysis].sort((a, b) => tieBreaker(a.number, b.number)).map((row, index) => [row.number, index]))
+    : undefined;
+  const tieKeyFor = (numbers: number[]) => neutralRank
+    ? numbers.map((number) => neutralRank.get(number) ?? number).sort((a, b) => a - b).map((value) => String(value).padStart(3, "0")).join("-")
+    : undefined;
+  const lastContest = referenceContestNumber === undefined ? scoped.at(-1) : referenceContestNumber === null ? undefined : scoped.find((contest) => contest.number === referenceContestNumber);
+  const fixedNumbers = selectMegaSenaFixedNumbers(analysis, fixedCount, random, manualFixed, excludedNumbers, tieBreaker);
   const fixedSet = new Set(fixedNumbers);
   const excludedSet = new Set(excludedNumbers);
   const scoreByNumber = new Map(analysis.map((row) => [row.number, row.score]));
   const variableCount = config.drawSize - fixedCount;
-  const candidatePool = buildCandidatePool(analysis, fixedSet, excludedSet, fixedCount, rules);
-  const usedVariables = new Map<number, number>();
+  const candidatePool = buildCandidatePool(analysis, fixedSet, excludedSet, fixedCount, rules, tieBreaker);
   const parityTargets = [3, 4, 2];
-  const games: GeneratedGame[] = [];
+  const policy = GENERATION_POLICY.megaSena;
+  const portfolioOverlapPenalty = policy.variableReusePenalty * 4;
 
-  for (let gameIndex = 0; gameIndex < gameCount; gameIndex += 1) {
+  const candidateGroups = Array.from({ length: gameCount }, (_, gameIndex) => {
     const targetOdd = rules.equalParity ? 3 : parityTargets[gameIndex % parityTargets.length]!;
-
     const candidates = function* () {
       for (const variableNumbers of combinationIterator(candidatePool, variableCount)) {
         const numbers = [...fixedNumbers, ...variableNumbers].sort((a, b) => a - b);
         if (!matchesMegaSenaRules(numbers, rules)) continue;
-
         const metadata = buildMetadata(numbers, lastContest);
-        const game: GeneratedGame = {
-          lottery: "mega-sena",
-          numbers,
-          fixedNumbers,
-          variableNumbers,
-          metadata,
-        };
+        const game: GeneratedGame = { lottery: "mega-sena", numbers, fixedNumbers, variableNumbers, metadata };
         if (!matchesGenerationConstraints(game, constraints)) continue;
-
-        const baseScore = variableNumbers.reduce(
-          (total, number) => total + (scoreByNumber.get(number) ?? 0),
-          0,
-        );
-        const reused = variableNumbers.reduce(
-          (total, number) => total + (usedVariables.get(number) ?? 0),
-          0,
-        );
-        const parityPenalty = Math.abs(metadata.odd - targetOdd) * 20;
-        const repeatPenalty = Math.max(0, metadata.repeatedFromLastContest.length - 2) * 30;
-        const reusePenalty = reused * 80;
-
-        yield {
-          variableNumbers,
-          numbers,
-          metadata,
-          rank: baseScore - parityPenalty - repeatPenalty - reusePenalty,
-        };
+        const baseScore = variableNumbers.reduce((total, number) => total + (scoreByNumber.get(number) ?? 0), 0);
+        const parityPenalty = Math.abs(metadata.odd - targetOdd) * policy.parityPenalty;
+        const repeatPenalty = Math.max(0, metadata.repeatedFromLastContest.length - 2) * policy.repeatExcessPenalty;
+        yield { variableNumbers, numbers, metadata, ...(tieKeyFor(numbers) ? { tieKey: tieKeyFor(numbers) } : {}), rank: baseScore - parityPenalty - repeatPenalty };
       }
     };
-
-    const ranked = topRankedCandidates(
-      candidates(),
-      24,
-      (a, b) => b.rank - a.rank || a.numbers.join("-").localeCompare(b.numbers.join("-")),
-    );
-    const winner = selectRankedCandidate(ranked, generationMode, random, 6);
-    if (!winner) {
-      throw new Error("Unable to generate a Mega-Sena game with the requested constraints");
+    if (gameCount === 1) {
+      return topRankedCandidates(candidates(), 24, (a, b) => b.rank - a.rank || (a.tieKey ?? a.numbers.join("-")).localeCompare(b.tieKey ?? b.numbers.join("-")));
     }
+    return buildPortfolioShortlist(candidates(), 24, { explorationLimit: 4096, diversityPenalty: portfolioOverlapPenalty });
+  });
 
-    for (const number of winner.variableNumbers) {
-      usedVariables.set(number, (usedVariables.get(number) ?? 0) + 1);
-    }
-    games.push({
-      lottery: "mega-sena",
-      numbers: winner.numbers,
-      fixedNumbers: [...fixedNumbers],
-      variableNumbers: [...winner.variableNumbers].sort((a, b) => a - b),
-      metadata: winner.metadata,
-    });
-  }
-
-  return games;
+  const portfolio = selectPortfolioCandidates(candidateGroups, generationMode, random, { overlapPenalty: portfolioOverlapPenalty, beamWidth: 96, diversifiedPoolSize: 8 });
+  if (portfolio.length !== gameCount) throw new Error("Unable to generate a Mega-Sena portfolio with the requested constraints");
+  return portfolio.map((winner) => ({ lottery: "mega-sena", numbers: winner.numbers, fixedNumbers: [...fixedNumbers], variableNumbers: [...winner.variableNumbers].sort((a, b) => a - b), metadata: winner.metadata }));
 }

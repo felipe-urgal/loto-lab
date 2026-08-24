@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import type { Contest, LotteryId } from "../src/domain/types.js";
 import { generateMegaSenaGames } from "../src/generator/megaSena.js";
 import { generateDiaDeSorteGames } from "../src/generator/diaDeSorte.js";
-import { backtestRandomControl } from "../src/lab/randomControl.js";
+import { backtestRandomControl, sampleRandomControls } from "../src/lab/randomControl.js";
+import { evaluateRandomEvidence } from "../src/lab/randomEvidence.js";
 import { compareStrategyLab } from "../src/lab/strategyLab.js";
 
 function contestsFor(
@@ -16,7 +17,8 @@ function contestsFor(
     lottery,
     number: index + 1,
     date: `2026-01-${String((index % 28) + 1).padStart(2, "0")}`,
-    numbers: Array.from({ length: drawSize }, (_, offset) => ((index * 3 + offset) % maxNumber) + 1).sort((a, b) => a - b),
+    numbers: Array.from({ length: drawSize }, (_, offset) => ((index * 3 + offset) % maxNumber) + 1)
+      .sort((a, b) => a - b),
     ...(lottery === "dia-de-sorte" ? { luckyMonth: "Janeiro" } : {}),
   }));
 }
@@ -41,7 +43,64 @@ test("Mega-Sena and Dia de Sorte generators support experimental fixed-core size
   assert.ok(diaThree.every((game) => game.fixedNumbers.length === 3 && game.variableNumbers.length === 4));
 });
 
-test("random control is reproducible for the same period and seed", () => {
+test("no-score generation is deterministic without falling back to the lowest number ids", () => {
+  const history = contestsFor("mega-sena", 24, 6, 60);
+  const first = generateMegaSenaGames(history, {
+    gameCount: 1,
+    fixedCount: 3,
+    analysisModel: "no-score",
+  });
+  const second = generateMegaSenaGames(history, {
+    gameCount: 1,
+    fixedCount: 3,
+    analysisModel: "no-score",
+  });
+
+  assert.deepEqual(first, second);
+  assert.notDeepEqual(first[0]?.fixedNumbers, [1, 2, 3]);
+  assert.ok(first[0]?.fixedNumbers.some((number) => number > 6));
+});
+
+test("random evidence treats exact ties as neutral when inference resolution is sufficient", () => {
+  const evidence = evaluateRandomEvidence(Array.from({ length: 100 }, () => 0.25), 0.25, 3, 50);
+
+  assert.equal(evidence.percentile, 0.5);
+  assert.equal(evidence.rawUpperPValue, 1);
+  assert.equal(evidence.rawLowerPValue, 1);
+  assert.equal(evidence.adjustedUpperPValue, 1);
+  assert.equal(evidence.resolutionSufficient, true);
+  assert.equal(evidence.sampleSizeSufficient, true);
+  assert.equal(evidence.status, "no-evidence");
+});
+
+test("random evidence separates insufficient historical sample from lack of signal", () => {
+  const controls = Array.from({ length: 100 }, (_, index) => index);
+  const evidence = evaluateRandomEvidence(controls, 100, 3, 10);
+
+  assert.equal(evidence.resolutionSufficient, true);
+  assert.equal(evidence.sampleSizeSufficient, false);
+  assert.equal(evidence.minimumObservationRounds, 30);
+  assert.equal(evidence.status, "insufficient-sample");
+});
+
+test("multiple-comparison correction exposes when Monte Carlo resolution cannot reach alpha", () => {
+  const controls100 = Array.from({ length: 100 }, (_, index) => index);
+  const threeVariants = evaluateRandomEvidence(controls100, 100, 3, 50);
+  const nineVariants100 = evaluateRandomEvidence(controls100, 100, 9, 50);
+  const controls250 = Array.from({ length: 250 }, (_, index) => index);
+  const nineVariants250 = evaluateRandomEvidence(controls250, 250, 9, 50);
+
+  assert.equal(threeVariants.status, "beats-random");
+  assert.equal(threeVariants.minimumSamplesForAlpha, 59);
+  assert.equal(nineVariants100.status, "insufficient-resolution");
+  assert.equal(nineVariants100.resolutionSufficient, false);
+  assert.equal(nineVariants100.minimumSamplesForAlpha, 179);
+  assert.ok(nineVariants100.minimumAchievableAdjustedPValue > 0.05);
+  assert.equal(nineVariants250.resolutionSufficient, true);
+  assert.equal(nineVariants250.status, "beats-random");
+});
+
+test("random control is reproducible and can produce a distribution of controls", () => {
   const contests = contestsFor("lotofacil", 20, 15, 25);
   const options = {
     lottery: "lotofacil" as const,
@@ -54,14 +113,36 @@ test("random control is reproducible for the same period and seed", () => {
 
   const first = backtestRandomControl(contests, options);
   const second = backtestRandomControl(contests, options);
-
   assert.deepEqual(first, second);
   assert.equal(first.rounds.length, 10);
   assert.equal(first.summary.totalGames, 40);
   assert.ok(first.rounds.every((round) => round.checks.every((check) => check.fixedHits === 0)));
+
+  const distribution = sampleRandomControls(contests, {
+    lottery: "lotofacil",
+    gameCount: 4,
+    warmupContests: 5,
+    startContest: 11,
+    endContest: 20,
+  }, 10, "distribution-test");
+  assert.equal(distribution.length, 10);
+  assert.equal(new Set(distribution.map((sample) => sample.seed)).size, 10);
+  assert.ok(distribution.every((sample) => sample.summary.totalGames === 40));
 });
 
-test("strategy lab compares the expected presets and exposes a random benchmark", () => {
+test("strategy lab rejects periods with no eligible targets instead of manufacturing a winner", () => {
+  const contests = contestsFor("mega-sena", 40, 6, 60);
+  assert.throws(() => compareStrategyLab(contests, {
+    lottery: "mega-sena",
+    gameCount: 1,
+    warmupContests: 5,
+    startContest: 100,
+    endContest: 110,
+    randomSamples: 10,
+  }), /no eligible contests/i);
+});
+
+test("strategy lab compares fixed-core presets and exposes v2 random evidence without changing legacy fields", () => {
   const fixtures = [
     { lottery: "mega-sena" as const, drawSize: 6, maxNumber: 60, expected: [0, 2, 3] },
     { lottery: "lotofacil" as const, drawSize: 15, maxNumber: 25, expected: [8, 9, 10] },
@@ -76,12 +157,11 @@ test("strategy lab compares the expected presets and exposes a random benchmark"
       warmupContests: 5,
       lookbackContests: 10,
       bucketSize: 5,
+      randomSamples: 10,
     });
 
-    assert.deepEqual(
-      result.variants.map((variant) => variant.fixedCount).sort((a, b) => a - b),
-      fixture.expected,
-    );
+    assert.equal(result.schemaVersion, 2);
+    assert.deepEqual(result.variants.map((variant) => variant.fixedCount).sort((a, b) => a - b), fixture.expected);
     assert.equal(result.experiment, "fixed-core");
     assert.equal(result.variants.length, 3);
     assert.equal(result.startContest, 9);
@@ -89,17 +169,50 @@ test("strategy lab compares the expected presets and exposes a random benchmark"
     assert.ok(result.winner);
     assert.ok(result.variants.every((variant) => variant.summary.testedContests === 10));
     assert.ok(result.variants.every((variant) => variant.series.length === 2));
-
+    assert.equal(result.randomSamples, 10);
+    assert.equal(result.benchmark.distribution.samples, 10);
+    assert.ok(result.benchmark.distribution.p05 <= result.benchmark.distribution.p50);
+    assert.ok(result.benchmark.distribution.p50 <= result.benchmark.distribution.p95);
+    assert.ok(result.benchmark.strategyPercentile >= 0 && result.benchmark.strategyPercentile <= 1);
+    assert.ok(result.benchmark.rawPValue >= 0 && result.benchmark.rawPValue <= 1);
+    assert.ok(result.benchmark.adjustedPValue >= result.benchmark.rawPValue);
+    assert.equal(result.benchmark.familySize, 3);
+    assert.equal(result.benchmark.observationRounds, 10);
+    assert.equal(result.benchmark.sampleSizeSufficient, false);
+    assert.equal(result.benchmark.status, "insufficient-sample");
     assert.equal(result.benchmark.controlKey, "random-control");
-    assert.equal(result.benchmark.control.key, "random-control");
     assert.equal(result.benchmark.control.summary.testedContests, 10);
-    assert.equal(result.benchmark.control.series.length, 2);
-    assert.equal(result.benchmark.basis, result.rankingBasis);
+    assert.equal(result.benchmark.medianControl.key, "random-control-near-median");
+    assert.equal(result.benchmark.medianControl.summary.testedContests, 10);
+    // v1 compatibility remains independent from the v2 evidence classification.
     assert.equal(result.benchmark.beatsRandom, result.benchmark.delta > 0);
   }
 });
 
-test("strategy lab exposes external Mega-Sena rules and a separate random benchmark", () => {
+test("strategy lab compares Score v2, Score v1 and no-score without leakage", () => {
+  const contests = contestsFor("mega-sena", 24, 6, 60);
+  const result = compareStrategyLab(contests, {
+    lottery: "mega-sena",
+    experiment: "score-model",
+    gameCount: 1,
+    warmupContests: 5,
+    lookbackContests: 10,
+    bucketSize: 5,
+    randomSamples: 10,
+  });
+
+  const models = new Set(result.variants.map((variant) => variant.analysisModel));
+  assert.equal(result.experiment, "score-model");
+  assert.equal(result.variants.length, 3);
+  assert.deepEqual(models, new Set(["score-v2", "score-v1", "no-score"]));
+  assert.ok(result.variants.every((variant) => variant.fixedCount === 3));
+  assert.ok(result.variants.every((variant) => variant.summary.testedContests === 10));
+  assert.equal(result.benchmark.familySize, 3);
+  assert.ok(result.rankingQuality);
+  assert.ok(result.walkForward);
+});
+
+test("strategy lab external-rules family exposes the higher Monte Carlo resolution requirement", () => {
   const contests = contestsFor("mega-sena", 24, 6, 60);
   const result = compareStrategyLab(contests, {
     lottery: "mega-sena",
@@ -108,6 +221,7 @@ test("strategy lab exposes external Mega-Sena rules and a separate random benchm
     warmupContests: 5,
     lookbackContests: 10,
     bucketSize: 5,
+    randomSamples: 100,
   });
 
   const keys = new Set(result.variants.map((variant) => variant.key));
@@ -125,5 +239,8 @@ test("strategy lab exposes external Mega-Sena rules and a separate random benchm
   assert.ok(result.variants.every((variant) => variant.fixedCount === 0));
   assert.ok(result.variants.every((variant) => variant.summary.testedContests === 10));
   assert.equal(result.benchmark.controlKey, "random-control");
-  assert.equal(result.benchmark.control.summary.testedContests, 10);
+  assert.equal(result.benchmark.distribution.samples, 100);
+  assert.equal(result.benchmark.familySize, 9);
+  assert.equal(result.benchmark.minimumRandomSamples, 179);
+  assert.equal(result.benchmark.resolutionSufficient, false);
 });
