@@ -91,6 +91,13 @@ export interface StrategyLabBenchmark {
   adjustedPValue: number;
   lowerAdjustedPValue: number;
   familySize: number;
+  alpha: number;
+  minimumAchievableAdjustedPValue: number;
+  minimumRandomSamples: number;
+  resolutionSufficient: boolean;
+  observationRounds: number;
+  minimumObservationRounds: number;
+  sampleSizeSufficient: boolean;
   distribution: StrategyLabBenchmarkDistribution;
 }
 
@@ -179,7 +186,7 @@ function seriesFor(rounds: LabRound[], bucketSize: number): StrategyLabPoint[] {
   return result;
 }
 
-function resolvePeriod(
+export function resolveStrategyLabPeriod(
   contests: Contest[],
   options: StrategyLabOptions,
 ): { startContest?: number; endContest?: number } {
@@ -282,7 +289,7 @@ function randomControlVariant(
   return toVariant(key, label, 0, result.rounds, result.summary, bucketSize);
 }
 
-function medianRandomControl(
+function nearMedianRandomControl(
   contests: Contest[],
   lottery: LotteryId,
   common: { gameCount: number; warmupContests: number; startContest?: number; endContest?: number },
@@ -291,15 +298,15 @@ function medianRandomControl(
   basis: "roi" | "prizeRate",
 ): StrategyLabVariant {
   const ordered = [...samples].sort((a, b) => metricValue(a.summary, basis) - metricValue(b.summary, basis));
-  const medianSample = ordered[Math.floor((ordered.length - 1) / 2)]!;
+  const centerSample = ordered[Math.floor((ordered.length - 1) / 2)]!;
   return randomControlVariant(
     contests,
     lottery,
     common,
     bucketSize,
-    medianSample.seed,
-    "random-control-median",
-    "Controle aleatório · mediana",
+    centerSample.seed,
+    "random-control-near-median",
+    "Controle aleatório · próximo da mediana",
   );
 }
 
@@ -323,6 +330,17 @@ function rankingQualityForExperiment(
   }));
 }
 
+function assertComparableVariants(variants: StrategyLabVariant[]): number {
+  const testedContests = variants[0]?.summary.testedContests ?? 0;
+  if (testedContests === 0) {
+    throw new Error("Strategy Lab has no eligible contests in the requested period");
+  }
+  if (variants.some((variant) => variant.summary.testedContests !== testedContests)) {
+    throw new Error("Strategy Lab variants were evaluated on different contest counts");
+  }
+  return testedContests;
+}
+
 export function compareStrategyLab(contests: Contest[], options: StrategyLabOptions): StrategyLabResult {
   const experiment = options.experiment ?? "fixed-core";
   if (experiment === "external-rules" && options.lottery !== "mega-sena") {
@@ -338,7 +356,7 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
   const warmupContests = integerInRange(options.warmupContests ?? 20, "warmupContests", 1, 5000);
   const bucketSize = integerInRange(options.bucketSize ?? 25, "bucketSize", 5, 200);
   const randomSamples = integerInRange(options.randomSamples ?? 100, "randomSamples", 10, 500);
-  const period = resolvePeriod(contests, options);
+  const period = resolveStrategyLabPeriod(contests, options);
   const common = {
     gameCount,
     warmupContests,
@@ -407,11 +425,16 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
     });
   }
 
+  const observationRounds = assertComparableVariants(variants);
   const randomDistribution = sampleRandomControls(
     contests,
     { lottery: options.lottery, ...common },
     randomSamples,
   );
+  if (randomDistribution.some((sample) => sample.summary.testedContests !== observationRounds)) {
+    throw new Error("Strategy Lab random controls were evaluated on a different contest count");
+  }
+
   const hasReliableFinance = variants.every((variant) => variant.summary.financialCoverage >= 0.8)
     && randomDistribution.every((sample) => sample.summary.financialCoverage >= 0.8);
   const rankingBasis = hasReliableFinance ? "roi" : "prizeRate";
@@ -438,7 +461,7 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
     "random-control",
     "Controle aleatório",
   );
-  const medianControl = medianRandomControl(
+  const medianControl = nearMedianRandomControl(
     contests,
     options.lottery,
     common,
@@ -446,14 +469,14 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
     randomDistribution,
     rankingBasis,
   );
-  const bestStrategy = variants[0];
+  const bestStrategy = variants[0]!;
   const randomValues = randomDistribution.map((sample) => metricValue(sample.summary, rankingBasis));
   const p05 = percentile(randomValues, 0.05);
   const p50 = percentile(randomValues, 0.5);
   const p95 = percentile(randomValues, 0.95);
-  const strategyValue = bestStrategy ? metricValue(bestStrategy.summary, rankingBasis) : p50;
+  const strategyValue = metricValue(bestStrategy.summary, rankingBasis);
   const familySize = Math.max(1, variants.length);
-  const evidence = evaluateRandomEvidence(randomValues, strategyValue, familySize);
+  const evidence = evaluateRandomEvidence(randomValues, strategyValue, familySize, observationRounds);
   const legacyControlValue = metricValue(legacyControl.summary, rankingBasis);
 
   const rankingQuality = experiment === "score-model"
@@ -481,10 +504,10 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
     bucketSize,
     randomSamples,
     rankingBasis,
-    ...(bestStrategy ? { winner: bestStrategy.key } : {}),
+    winner: bestStrategy.key,
     benchmark: {
       controlKey: legacyControl.key,
-      ...(bestStrategy ? { bestStrategyKey: bestStrategy.key } : {}),
+      bestStrategyKey: bestStrategy.key,
       basis: rankingBasis,
       delta: legacyDelta,
       beatsRandom: legacyDelta > 0,
@@ -498,6 +521,13 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
       adjustedPValue: evidence.adjustedUpperPValue,
       lowerAdjustedPValue: evidence.adjustedLowerPValue,
       familySize: evidence.familySize,
+      alpha: evidence.alpha,
+      minimumAchievableAdjustedPValue: evidence.minimumAchievableAdjustedPValue,
+      minimumRandomSamples: evidence.minimumSamplesForAlpha,
+      resolutionSufficient: evidence.resolutionSufficient,
+      observationRounds,
+      minimumObservationRounds: evidence.minimumObservationRounds,
+      sampleSizeSufficient: evidence.sampleSizeSufficient,
       distribution: { samples: randomSamples, p05, p50, p95 },
     },
     variants,
