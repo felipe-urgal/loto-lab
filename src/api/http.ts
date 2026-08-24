@@ -3,6 +3,7 @@ import type { LotteryId } from "../domain/types.js";
 
 const LOTTERIES: LotteryId[] = ["mega-sena", "lotofacil", "dia-de-sorte"];
 const MAX_BODY_BYTES = 1024 * 1024;
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export class ApiError extends Error {
   constructor(
@@ -59,6 +60,44 @@ export function parseBoolean(value: unknown, field: string, defaultValue: boolea
   throw new ApiError(400, "INVALID_ARGUMENT", `${field} must be boolean`);
 }
 
+function normalizedOrigin(value: string): string | undefined {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+export function requireSameOriginMutation(
+  request: IncomingMessage,
+  response: ServerResponse,
+  expectedOrigin: string,
+): boolean {
+  const method = request.method ?? "GET";
+  if (!MUTATING_METHODS.has(method)) return true;
+
+  const origin = typeof request.headers.origin === "string"
+    ? normalizedOrigin(request.headers.origin)
+    : undefined;
+  const expected = normalizedOrigin(expectedOrigin);
+  const fetchSite = request.headers["sec-fetch-site"];
+  const crossSite = fetchSite === "cross-site";
+  const wrongOrigin = origin !== undefined && expected !== undefined && origin !== expected;
+
+  if (!crossSite && !wrongOrigin) return true;
+
+  response.statusCode = 403;
+  response.setHeader("Cache-Control", "no-store");
+  response.setHeader("Content-Type", "application/json; charset=utf-8");
+  response.end(JSON.stringify({
+    error: {
+      code: "CROSS_ORIGIN_MUTATION_BLOCKED",
+      message: "Cross-origin state-changing requests are not allowed",
+    },
+  }));
+  return false;
+}
+
 export async function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
   let total = 0;
@@ -72,6 +111,11 @@ export async function readJsonBody(request: IncomingMessage): Promise<Record<str
   }
 
   if (chunks.length === 0) return {};
+  const contentType = request.headers["content-type"] ?? "";
+  if (!String(contentType).toLowerCase().includes("application/json")) {
+    throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Request body must use application/json");
+  }
+
   try {
     const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
     if (!isRecord(parsed)) {
