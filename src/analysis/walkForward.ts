@@ -87,23 +87,25 @@ export function evaluateWalkForwardWeights(
   const trainingWindow = Math.max(25, Math.round(options.trainingWindow ?? 100));
   const validationBlock = Math.max(10, Math.round(options.validationBlock ?? 25));
   const profiles = options.profiles?.length ? options.profiles : SCORE_V2_WEIGHT_PROFILES;
+  const requestedStartContest = options.startContest;
+  const requestedEndContest = options.endContest;
   const scoped = contests
     .filter((contest) => contest.lottery === config.id)
     .sort((a, b) => a.number - b.number);
   const folds: WalkForwardFold[] = [];
 
   const minimumTestIndex = Math.min(scoped.length, warmupContests + trainingWindow);
-  const requestedStartIndex = options.startContest === undefined
+  const requestedStartIndex = requestedStartContest === undefined
     ? minimumTestIndex
-    : scoped.findIndex((contest) => contest.number >= options.startContest);
+    : scoped.findIndex((contest) => contest.number >= requestedStartContest);
   let testStartIndex = Math.max(
     minimumTestIndex,
     requestedStartIndex < 0 ? scoped.length : requestedStartIndex,
   );
-  const endExclusive = options.endContest === undefined
+  const endExclusive = requestedEndContest === undefined
     ? scoped.length
     : (() => {
-      const index = scoped.findIndex((contest) => contest.number > options.endContest!);
+      const index = scoped.findIndex((contest) => contest.number > requestedEndContest);
       return index < 0 ? scoped.length : index;
     })();
 
