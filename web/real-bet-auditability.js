@@ -36,6 +36,17 @@ const observer = new MutationObserver((mutations) => {
 observer.observe(document.documentElement, { childList: true, subtree: true });
 hardenForms();
 
+// My Games creates the form synchronously in the button's target listener.
+// This bubbling listener runs immediately afterwards, so the target is locked
+// before the same browser task can inspect or interact with the new form. The
+// MutationObserver above remains as a fallback for forms inserted by any other
+// code path.
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element) || !target.closest("[data-mg2-mark-bet]")) return;
+  hardenForms();
+});
+
 // Capture before the feature form handler so a DOM-tampered target cannot send
 // an inconsistent request even though the backend independently enforces it.
 document.addEventListener("submit", (event) => {
