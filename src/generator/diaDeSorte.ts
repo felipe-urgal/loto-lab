@@ -142,6 +142,9 @@ export function generateDiaDeSorteGames(contests: Contest[], options: number | D
       for (const variableNumbers of combinationIterator(candidatePool, variableCount)) {
         const numbers = [...fixedNumbers, ...variableNumbers].sort((a, b) => a - b);
         const metadata = buildMetadata(numbers, lastContest);
+        // Portfolio diversity must not buy its way out of the established
+        // structural envelope of 3–4 odd numbers for Dia de Sorte.
+        if (metadata.odd < 3 || metadata.odd > 4) continue;
         const game: GeneratedGame = { lottery: "dia-de-sorte", numbers, fixedNumbers, variableNumbers, ...(luckyMonth ? { luckyMonth } : {}), metadata };
         if (!matchesGenerationConstraints(game, constraints)) continue;
         const variableScore = variableNumbers.reduce((total, number) => total + (scores.get(number) ?? 0), 0);
