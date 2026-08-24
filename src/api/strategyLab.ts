@@ -21,8 +21,8 @@ const labLimiter = new FixedWindowRateLimiter({ limit: 4, windowMs: 10 * 60_000 
 
 function parseExperiment(value: unknown): StrategyLabExperiment {
   if (value === undefined || value === null || value === "") return "fixed-core";
-  if (value === "fixed-core" || value === "external-rules") return value;
-  throw new ApiError(400, "INVALID_ARGUMENT", "experiment must be fixed-core or external-rules");
+  if (value === "fixed-core" || value === "external-rules" || value === "score-model") return value;
+  throw new ApiError(400, "INVALID_ARGUMENT", "experiment must be fixed-core, external-rules or score-model");
 }
 
 export async function serveStrategyLab(
@@ -64,6 +64,11 @@ export async function serveStrategyLab(
       max: 100,
       defaultValue: 25,
     });
+    const randomSamples = parsePositiveInt(body.randomSamples, "randomSamples", {
+      min: 10,
+      max: 500,
+      defaultValue: 100,
+    });
     const startContest = parseOptionalPositiveInt(body.startContest, "startContest");
     const endContest = parseOptionalPositiveInt(body.endContest, "endContest");
 
@@ -97,6 +102,7 @@ export async function serveStrategyLab(
         warmupContests,
         lookbackContests,
         bucketSize,
+        randomSamples,
         ...(startContest !== undefined ? { startContest } : {}),
         ...(endContest !== undefined ? { endContest } : {}),
       };
