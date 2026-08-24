@@ -68,15 +68,23 @@ export interface StrategyLabBenchmarkDistribution {
 }
 
 export interface StrategyLabBenchmark {
+  /** Legacy v1 comparison against the fixed seeded control. */
   controlKey: string;
   bestStrategyKey?: string;
   basis: "roi" | "prizeRate";
   delta: number;
   beatsRandom: boolean;
+  control: StrategyLabVariant;
+  /** v2 evidence fields. These are authoritative for product interpretation. */
+  medianControl: StrategyLabVariant;
+  medianDelta: number;
   strategyPercentile: number;
   status: StrategyEvidenceStatus;
+  rawPValue: number;
+  adjustedPValue: number;
+  lowerAdjustedPValue: number;
+  familySize: number;
   distribution: StrategyLabBenchmarkDistribution;
-  control: StrategyLabVariant;
 }
 
 export interface StrategyLabRankingQuality {
@@ -86,6 +94,7 @@ export interface StrategyLabRankingQuality {
 }
 
 export interface StrategyLabResult {
+  schemaVersion: 2;
   lottery: LotteryId;
   experiment: StrategyLabExperiment;
   startContest?: number;
@@ -167,10 +176,8 @@ function resolvePeriod(contests: Contest[], options: StrategyLabOptions): { star
   const scoped = contests.filter((contest) => contest.lottery === options.lottery).sort((a, b) => a.number - b.number);
   const latest = scoped.at(-1)?.number;
   if (latest === undefined) return {};
-
   const endContest = options.endContest ?? latest;
   if (options.startContest !== undefined) return { startContest: options.startContest, endContest };
-
   const lookback = integerInRange(options.lookbackContests ?? 200, "lookbackContests", 10, 5000);
   return { startContest: Math.max(1, endContest - lookback + 1), endContest };
 }
@@ -242,17 +249,48 @@ function percentile(values: number[], probability: number): number {
   return sorted[lower]! * (1 - fraction) + sorted[upper]! * fraction;
 }
 
-function percentileRank(values: number[], value: number): number {
+export function midRankPercentile(values: number[], value: number): number {
   if (values.length === 0) return 0.5;
-  const belowOrEqual = values.filter((candidate) => candidate <= value).length;
-  return belowOrEqual / values.length;
+  const below = values.filter((candidate) => candidate < value).length;
+  const tied = values.filter((candidate) => candidate === value).length;
+  return (below + tied * 0.5) / values.length;
 }
 
-function evidenceStatus(percentileValue: number): StrategyEvidenceStatus {
-  if (percentileValue >= 0.95) return "beats-random";
-  if (percentileValue >= 0.9) return "inconclusive";
-  if (percentileValue <= 0.05) return "underperforms-random";
+function empiricalPValues(values: number[], value: number, familySize: number) {
+  if (values.length === 0) {
+    return { rawUpper: 1, adjustedUpper: 1, adjustedLower: 1 };
+  }
+  const upper = (1 + values.filter((candidate) => candidate >= value).length) / (values.length + 1);
+  const lower = (1 + values.filter((candidate) => candidate <= value).length) / (values.length + 1);
+  return {
+    rawUpper: upper,
+    adjustedUpper: Math.min(1, upper * familySize),
+    adjustedLower: Math.min(1, lower * familySize),
+  };
+}
+
+function evidenceStatus(
+  value: number,
+  median: number,
+  pValues: ReturnType<typeof empiricalPValues>,
+): StrategyEvidenceStatus {
+  if (value > median && pValues.adjustedUpper <= 0.05) return "beats-random";
+  if (value < median && pValues.adjustedLower <= 0.05) return "underperforms-random";
+  if (pValues.rawUpper <= 0.1 || pValues.adjustedLower <= 0.1) return "inconclusive";
   return "no-evidence";
+}
+
+function randomControlVariant(
+  contests: Contest[],
+  lottery: LotteryId,
+  common: { gameCount: number; warmupContests: number; startContest?: number; endContest?: number },
+  bucketSize: number,
+  seed: string | undefined,
+  key: string,
+  label: string,
+): StrategyLabVariant {
+  const result = backtestRandomControl(contests, { lottery, ...common, ...(seed ? { seed } : {}) });
+  return toVariant(key, label, 0, result.rounds, result.summary, bucketSize);
 }
 
 function medianRandomControl(
@@ -265,15 +303,7 @@ function medianRandomControl(
 ): StrategyLabVariant {
   const ordered = [...samples].sort((a, b) => metricValue(a.summary, basis) - metricValue(b.summary, basis));
   const medianSample = ordered[Math.floor((ordered.length - 1) / 2)]!;
-  const result = backtestRandomControl(contests, { lottery, ...common, seed: medianSample.seed });
-  return toVariant(
-    "random-control",
-    "Controle aleatório · mediana",
-    0,
-    result.rounds,
-    result.summary,
-    bucketSize,
-  );
+  return randomControlVariant(contests, lottery, common, bucketSize, medianSample.seed, "random-control-median", "Controle aleatório · mediana");
 }
 
 function rankingQualityForExperiment(
@@ -337,9 +367,8 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
   }
 
   const randomDistribution = sampleRandomControls(contests, { lottery: options.lottery, ...common }, randomSamples);
-  const firstRandom = randomDistribution[0];
   const hasReliableFinance = variants.every((variant) => variant.summary.financialCoverage >= 0.8)
-    && Boolean(firstRandom && firstRandom.summary.financialCoverage >= 0.8);
+    && randomDistribution.every((sample) => sample.summary.financialCoverage >= 0.8);
   const rankingBasis = hasReliableFinance ? "roi" : "prizeRate";
 
   variants.sort((a, b) => {
@@ -349,16 +378,20 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
     return b.summary.prizeRate - a.summary.prizeRate || b.summary.averageHitsPerGame - a.summary.averageHitsPerGame || b.summary.maxHits - a.summary.maxHits || a.fixedCount - b.fixedCount;
   });
 
-  const control = medianRandomControl(contests, options.lottery, common, bucketSize, randomDistribution, rankingBasis);
+  const legacyControl = randomControlVariant(contests, options.lottery, common, bucketSize, undefined, "random-control", "Controle aleatório");
+  const medianControl = medianRandomControl(contests, options.lottery, common, bucketSize, randomDistribution, rankingBasis);
   const bestStrategy = variants[0];
   const randomValues = randomDistribution.map((sample) => metricValue(sample.summary, rankingBasis));
-  const strategyValue = bestStrategy ? metricValue(bestStrategy.summary, rankingBasis) : percentile(randomValues, 0.5);
   const p05 = percentile(randomValues, 0.05);
   const p50 = percentile(randomValues, 0.5);
   const p95 = percentile(randomValues, 0.95);
-  const strategyPercentile = percentileRank(randomValues, strategyValue);
-  const status = evidenceStatus(strategyPercentile);
-  const delta = strategyValue - p50;
+  const strategyValue = bestStrategy ? metricValue(bestStrategy.summary, rankingBasis) : p50;
+  const legacyControlValue = metricValue(legacyControl.summary, rankingBasis);
+  const strategyPercentile = midRankPercentile(randomValues, strategyValue);
+  const familySize = Math.max(1, variants.length);
+  const pValues = empiricalPValues(randomValues, strategyValue, familySize);
+  const status = evidenceStatus(strategyValue, p50, pValues);
+
   const rankingQuality = experiment === "score-model"
     ? rankingQualityForExperiment(contests, options.lottery, period, warmupContests)
     : undefined;
@@ -368,10 +401,14 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
       trainingWindow: Math.max(50, Math.min(200, options.lookbackContests ?? 200)),
       validationBlock: bucketSize,
       nullSamples: 2000,
+      ...(period.startContest !== undefined ? { startContest: period.startContest } : {}),
+      ...(period.endContest !== undefined ? { endContest: period.endContest } : {}),
     })
     : undefined;
 
+  const legacyDelta = strategyValue - legacyControlValue;
   return {
+    schemaVersion: 2,
     lottery: options.lottery,
     experiment,
     ...period,
@@ -382,15 +419,21 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
     rankingBasis,
     ...(bestStrategy ? { winner: bestStrategy.key } : {}),
     benchmark: {
-      controlKey: control.key,
+      controlKey: legacyControl.key,
       ...(bestStrategy ? { bestStrategyKey: bestStrategy.key } : {}),
       basis: rankingBasis,
-      delta,
-      beatsRandom: status === "beats-random",
+      delta: legacyDelta,
+      beatsRandom: legacyDelta > 0,
+      control: legacyControl,
+      medianControl,
+      medianDelta: strategyValue - p50,
       strategyPercentile,
       status,
+      rawPValue: pValues.rawUpper,
+      adjustedPValue: pValues.adjustedUpper,
+      lowerAdjustedPValue: pValues.adjustedLower,
+      familySize,
       distribution: { samples: randomSamples, p05, p50, p95 },
-      control,
     },
     variants,
     ...(rankingQuality ? { rankingQuality } : {}),
