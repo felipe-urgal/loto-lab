@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import type { Contest, LotteryId } from "../src/domain/types.js";
+import { generateDiaDeSorteGames } from "../src/generator/diaDeSorte.js";
+import { generateLotofacilGames } from "../src/generator/lotofacil.js";
 import { buildPortfolioShortlist, selectPortfolioCandidates } from "../src/generator/portfolio.js";
 import { createSeededRandom, topRankedCandidates } from "../src/generator/shared.js";
 
@@ -10,6 +13,22 @@ function candidate(numbers: number[], rank: number, tieKey?: string) {
     rank,
     ...(tieKey ? { tieKey } : {}),
   };
+}
+
+function historyFor(lottery: LotteryId, count: number, drawSize: number, maxNumber: number): Contest[] {
+  return Array.from({ length: count }, (_, index) => ({
+    lottery,
+    number: index + 1,
+    date: `2026-01-${String((index % 28) + 1).padStart(2, "0")}`,
+    numbers: Array.from({ length: drawSize }, (_, offset) => ((index * 5 + offset * 7) % maxNumber) + 1)
+      .sort((a, b) => a - b),
+    ...(lottery === "dia-de-sorte" ? { luckyMonth: "Janeiro" } : {}),
+  }));
+}
+
+function variableOverlap(left: number[], right: number[]): number {
+  const rightSet = new Set(right);
+  return left.filter((number) => rightSet.has(number)).length;
 }
 
 test("bounded Top-K heap returns the same ordering as a full sort", () => {
@@ -80,4 +99,26 @@ test("diversified portfolio selection is reproducible for the same seed", () => 
   });
 
   assert.deepEqual(first, second);
+});
+
+test("Lotofacil multi-game generation keeps diverse alternatives visible to the portfolio", () => {
+  const games = generateLotofacilGames(historyFor("lotofacil", 32, 15, 25), {
+    gameCount: 2,
+    fixedCount: 8,
+    analysisModel: "no-score",
+  });
+
+  assert.equal(games.length, 2);
+  assert.equal(variableOverlap(games[0]!.variableNumbers, games[1]!.variableNumbers), 0);
+});
+
+test("Dia de Sorte multi-game generation keeps diverse alternatives visible to the portfolio", () => {
+  const games = generateDiaDeSorteGames(historyFor("dia-de-sorte", 32, 7, 31), {
+    gameCount: 2,
+    fixedCount: 3,
+    analysisModel: "no-score",
+  });
+
+  assert.equal(games.length, 2);
+  assert.equal(variableOverlap(games[0]!.variableNumbers, games[1]!.variableNumbers), 0);
 });
