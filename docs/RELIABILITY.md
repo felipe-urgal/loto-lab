@@ -1,6 +1,6 @@
 # Reliability e hardening operacional
 
-Este documento descreve os guardrails compartilhados pelo Loto Lab para evitar divergência entre interfaces, resultados financeiros incorretos e falhas operacionais silenciosas.
+Este documento descreve os guardrails compartilhados pelo Loto Lab para evitar divergência entre interfaces, resultados financeiros incorretos, hindsight acidental e falhas operacionais silenciosas.
 
 ## Contrato único de análises
 
@@ -24,9 +24,9 @@ Limites atuais:
 
 `external-rules` usa 250 controles aleatórios por padrão porque a família possui nove variantes. `fixed-core` e `score-model` usam 100 por padrão.
 
-A UI de Execuções não chama a primeira colocada de “vencedora”. Ela mostra **melhor no período** junto com o status de evidência, p-value ajustado e quantidade de controles.
+A UI não trata a primeira colocada como evidência de superioridade por si só. A interpretação considera status de evidência, p-value ajustado, percentil, resolução Monte Carlo e quantidade de concursos elegíveis.
 
-## Workers
+## Workers e cancelamento
 
 Backtests e Strategy Lab passam pelo mesmo runner protegido:
 
@@ -36,35 +36,52 @@ Backtests e Strategy Lab passam pelo mesmo runner protegido:
 - limite de heap do worker;
 - gate global para impedir análises caras simultâneas.
 
-A fila assíncrona também respeita o limite seguro de 500 rounds de backtest. Enfileirar não é uma forma de contornar os guardrails da API interativa.
+O backtest síncrono e o Laboratório também abortam o worker quando o cliente HTTP desconecta. A fila assíncrona respeita o mesmo limite seguro de rounds; enfileirar não é uma forma de contornar os guardrails da API interativa.
+
+## Modelo de execução: uma instância ativa por banco
+
+O runtime mantém um PostgreSQL advisory lock dedicado durante toda a vida do processo. Uma segunda instância apontando para o mesmo banco falha no startup em vez de executar recoveries concorrentes.
+
+Essa regra torna seguros os recoveries atuais:
+
+- `analysis_jobs` em `running` pertencem à única instância que caiu;
+- `operation_runs` em `running` podem ser marcados como abandonados somente depois que a instância anterior deixou de manter o lock.
+
+O deployment atual é deliberadamente **single-instance por banco**. Escala horizontal futura deve substituir este contrato por ownership/lease/heartbeat antes de permitir múltiplos runtimes ativos.
 
 ## Recuperação de jobs
 
-Após restart:
+Após restart seguro da instância única:
 
 - `running + cancel_requested=false` volta para `queued`;
 - `running + cancel_requested=true` vira `cancelled` imediatamente.
 
 Assim nenhum job cancelado fica preso para sempre em `queued` sem poder ser reivindicado pelo worker.
 
-## Integridade de apostas reais
+## Auditabilidade de apostas reais
 
-Quando um lote gerado possui `targetContestNumber`, uma aposta real criada a partir desse lote deve usar o mesmo concurso.
+`Desempenho real` aceita somente apostas registradas **antes** de o resultado oficial do concurso estar armazenado.
 
-A regra existe em dois níveis:
+Se o resultado já existe na base, a API responde `RESULT_ALREADY_KNOWN`. Comparações retroativas continuam pertencendo a backtests e análises históricas; elas não podem alimentar o KPI de apostas reais.
 
-1. serviço/API, para devolver erro de domínio legível;
-2. trigger PostgreSQL, para impedir inconsistência mesmo fora da API.
+Quando um lote possui `targetContestNumber`, a aposta real deve usar exatamente esse concurso. A regra existe no serviço/API e também na integridade do PostgreSQL.
 
-Isso evita reconciliar um jogo preparado para um concurso contra o resultado financeiro de outro.
+Esse contrato impede:
 
-## Cobertura financeira
+- hindsight acidental;
+- transformar uma geração histórica em aposta real depois do sorteio;
+- reconciliar um lote preparado para um concurso contra outro resultado.
 
-Prêmio zero e dado financeiro desconhecido são estados diferentes.
+## Resultado estatístico x financeiro
 
-- jogo que não alcança nenhuma faixa premiada conhecida: `totalPrizeValue = 0`;
-- jogo que alcança faixa premiada mas o tier necessário está ausente: `totalPrizeValue` fica indefinido;
-- Dia de Sorte com acerto do Mês da Sorte e tier mensal ausente também fica financeiramente indefinido.
+Um resultado pode ser estatisticamente conhecido antes de toda a grade de rateio estar disponível.
+
+Por isso:
+
+- o jogo pode ficar `checked` com `totalPrizeValue` indefinido;
+- `checked + totalPrizeValue IS NULL` continua elegível para reconciliação;
+- quando a grade financeira completa chega, prêmio e resultado líquido são recalculados;
+- prêmio zero e dado financeiro desconhecido permanecem estados diferentes.
 
 Um concurso só entra na cobertura financeira completa quando possui todas as faixas esperadas:
 
@@ -72,7 +89,35 @@ Um concurso só entra na cobertura financeira completa quando possui todas as fa
 - Lotofácil: 11, 12, 13, 14 e 15 acertos;
 - Dia de Sorte: 4, 5, 6, 7 acertos e Mês da Sorte.
 
-Isso impede ROI calculado sobre rateio parcial como se o valor ausente fosse zero.
+## Reparação de rateios oficiais
+
+A sincronização operacional atualiza o concurso mais recente e também revisita os últimos 20 concursos armazenados cuja grade financeira ainda está incompleta.
+
+Além disso, a persistência é monotônica quanto à completude:
+
+- grade incompleta existente + grade completa nova → promove para completa;
+- grade completa existente + snapshot incompleto novo → preserva a completa;
+- grade completa existente + grade completa nova → substitui, permitindo correções oficiais de valores.
+
+Assim uma resposta transitória parcial da fonte não destrói informação financeira oficial já conhecida.
+
+## IA como camada interpretativa
+
+A rota de IA não executa Strategy Lab no event loop HTTP.
+
+O contexto usa o último job `strategy-lab` concluído e persistido para a loteria. A IA recebe, quando disponível:
+
+- melhor configuração no período;
+- `benchmark.status`;
+- p-values ajustados superior e inferior;
+- percentil contra controles aleatórios;
+- suficiência de resolução Monte Carlo;
+- suficiência da amostra histórica;
+- rounds observados, quantidade de controles e tamanho da família comparada.
+
+A chamada à Responses API usa Structured Outputs com JSON Schema estrito e `store: false`. O parser local continua validando defensivamente a resposta.
+
+A regra permanece: **o algoritmo calcula; a IA interpreta**. A IA não escolhe dezenas e não transforma resultado histórico em probabilidade futura.
 
 ## Qualidade da série histórica
 
@@ -95,51 +140,44 @@ O servidor bloqueia a requisição quando:
 
 Clientes não-browser sem header `Origin` continuam suportados para automação local.
 
-Payloads HTTP com corpo precisam usar `Content-Type: application/json`.
+Payloads HTTP com corpo precisam usar `Content-Type: application/json`. Cada resposta recebe `X-Request-Id` para correlação com logs estruturados.
 
-Cada resposta recebe `X-Request-Id`, permitindo correlacionar falhas HTTP com logs estruturados.
+## Autenticação e exposição pública
 
-## Autenticação e HTTPS
+Qualquer bind não-loopback, inclusive o `API_HOST` efetivo da imagem Docker, exige `APP_AUTH_USER` e `APP_AUTH_PASSWORD`.
 
-HTTP Basic só deve trafegar por HTTPS fora de loopback.
+Sem a exceção explícita `ALLOW_INSECURE_PUBLIC_HTTP=true`, bind não-loopback também exige `PUBLIC_ORIGIN=https://...`, porque credenciais HTTP Basic não devem trafegar em texto claro.
 
-No Compose de produção, se `APP_BIND` não for loopback, o runtime exige `PUBLIC_ORIGIN=https://...`.
+Falhas repetidas de autenticação recebem um guardrail local de 20 tentativas por endereço de socket a cada 5 minutos, com `429` e `Retry-After`. Um reverse proxy público ainda deve aplicar seus próprios controles de abuso.
 
-Exceção deliberada para laboratório/rede confiável:
+## Migrations imutáveis
 
-```env
-ALLOW_INSECURE_PUBLIC_HTTP=true
-```
+`schema_migrations` registra SHA-256 do conteúdo de cada migration.
 
-Não use essa exceção em uma rede não confiável.
+Na primeira execução após a adoção do checksum, migrations antigas recebem o checksum atual como baseline. Depois disso, qualquer alteração retroativa de arquivo já aplicado gera `Migration drift detected` e interrompe o startup.
 
-## Migrations
+Mudança de schema deve sempre ser uma migration nova; migrations aplicadas são imutáveis.
 
-O lock de migrations usa tentativa não bloqueante com espera limitada.
+O lock de migrations usa tentativa não bloqueante com espera limitada. Se outra execução mantiver a trava por mais de aproximadamente 15 segundos, o startup falha explicitamente.
 
-Se outra instância mantiver a trava por mais de aproximadamente 15 segundos, o startup falha de forma explícita em vez de aguardar indefinidamente.
+## Startup e shutdown
 
-## Shutdown
+Scheduler e fila de análises só iniciam depois que o listener HTTP está ativo. Falha de `listen()` executa cleanup de startup parcial: fecha servidor, drena jobs quando necessário, libera o runtime lock e encerra o pool.
 
-O shutdown por `SIGINT`/`SIGTERM`:
+No shutdown por `SIGINT`/`SIGTERM`:
 
 1. fecha a aceitação de novas conexões HTTP;
 2. interrompe timers e aborta análises em andamento;
 3. drena servidor, scheduler e fila;
-4. respeita `OPS_SHUTDOWN_TIMEOUT_SECONDS` (25s por padrão);
-5. fecha conexões HTTP restantes ao exceder o deadline;
+4. respeita `OPS_SHUTDOWN_TIMEOUT_SECONDS`;
+5. libera o lock de instância;
 6. encerra o pool PostgreSQL.
 
 ## Sincronização operacional
 
-Falha ao atualizar notificações não é mais silenciosa.
+O sync usa advisory lock próprio para impedir duas sincronizações concorrentes. Falha ao atualizar notificações não é silenciosa e transforma uma execução que seria `success` em `partial`.
 
-`SyncAllDetails` registra:
-
-- `notificationRefresh: success | failed`;
-- `notificationError`, quando aplicável.
-
-Se concursos/agenda sincronizarem mas a atualização de notificações falhar, o run termina como `partial`.
+`SyncAllDetails` também registra reparos financeiros e quantas apostas tiveram o financeiro finalmente resolvido.
 
 ## Logs estruturados
 
@@ -152,55 +190,36 @@ Eventos operacionais são emitidos como JSON, incluindo quando aplicável:
 - duração;
 - código e mensagem de erro.
 
-Isso permite pesquisar um incidente por requisição, job ou sincronização sem depender apenas de texto livre.
-
-## Backup
+## Backup e restore
 
 O volume Docker é persistência local, não backup.
 
-Crie um dump PostgreSQL em formato custom:
+`npm run ops:backup` grava primeiro um arquivo `.partial-<pid>`. Somente depois de `pg_dump` terminar com sucesso o arquivo é publicado atomically no nome final `.dump`. Falhas removem o parcial, evitando que um dump truncado pareça válido.
 
-```bash
-npm run ops:backup
-```
+Backups importantes devem ser copiados para armazenamento fora do host da aplicação e ter retenção periódica definida pelo ambiente de operação.
 
-Ou escolha o caminho:
-
-```bash
-npm run ops:backup -- /caminho/seguro/loto-lab.dump
-```
-
-Os dumps locais em `backups/` e arquivos `*.dump` são ignorados pelo Git.
-
-Copie backups importantes para armazenamento fora do host da aplicação.
-
-## Teste de restore
-
-Um backup não deve ser considerado confiável sem restore testado.
-
-Com a stack de produção ativa:
+Um backup só deve ser considerado confiável depois do restore check:
 
 ```bash
 npm run ops:restore-check -- backups/loto-lab-AAAA-MM-DD.dump
 ```
 
-O comando:
+O comando restaura em banco temporário, verifica tabelas essenciais e remove o banco de teste sem alterar o principal.
 
-1. cria um banco temporário;
-2. restaura o dump com `pg_restore`;
-3. verifica migrations, concursos, estratégias e apostas reais;
-4. remove o banco temporário.
+## Supply chain e builds reproduzíveis
 
-Ele não altera o banco principal.
+Imagens Node/PostgreSQL de produção e CI usam versão exata + digest. GitHub Actions usam commit SHA explícito. Dependabot abre atualizações semanais para npm, Actions e Docker, mantendo a atualização deliberada e revisável.
 
-## CI
+Deploys devem preferir `LOTO_LAB_IMAGE_TAG` derivado do commit/release em vez de reutilizar `latest` como identidade operacional.
 
-Além da suíte TypeScript/PostgreSQL existente, o CI cobre:
+## CI e proteção do `main`
 
+O CI cobre:
+
+- TypeScript e testes PostgreSQL;
 - configuração do Compose;
 - build e smoke da imagem de produção;
 - autenticação HTTP Basic real na imagem;
-- browser real para fluxos principais;
-- smoke adicional de Laboratório, Execuções, Estratégias e IA.
+- browser real para fluxos principais e páginas operacionais.
 
-O objetivo é detectar drift entre subsistemas antes do merge, especialmente quando um contrato evolui em uma tela e deixa outra para trás.
+O repositório deve configurar `main` com proteção/ruleset para exigir PR e o check `CI / test`, bloquear force-push e remoção da branch. Esse controle é configuração administrativa do GitHub e não é substituído pelo arquivo de workflow.

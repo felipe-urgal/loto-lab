@@ -22,7 +22,7 @@ export class RealBetService {
   readonly batches: PostgresGameRepository;
   readonly realBets: PostgresRealBetRepository;
 
-  constructor(pool: Pool) {
+  constructor(private readonly pool: Pool) {
     this.contests = new PostgresContestRepository(pool);
     this.batches = new PostgresGameRepository(pool);
     this.realBets = new PostgresRealBetRepository(pool);
@@ -40,6 +40,11 @@ export class RealBetService {
     if (batch.targetContestNumber !== undefined && contestNumber !== batch.targetContestNumber) {
       throw new Error(`CONTEST_TARGET_MISMATCH:${batch.targetContestNumber}:${contestNumber}`);
     }
+
+    // Real-performance records must be created before the official result is
+    // known. Historical experiments belong in backtests, never in the live KPI.
+    const knownResult = await this.contests.findByNumber(batch.lottery, contestNumber);
+    if (knownResult) throw new Error(`RESULT_ALREADY_KNOWN:${contestNumber}`);
 
     const positions = input.gamePositions?.length
       ? [...new Set(input.gamePositions)]
@@ -72,13 +77,16 @@ export class RealBetService {
       throw error;
     }
 
-    return (await this.reconcile(created.id)) ?? created;
+    return created;
   }
 
   async reconcile(id: number): Promise<RealBetRecord | undefined> {
     const bet = await this.realBets.findById(id);
     if (!bet) return undefined;
-    if (bet.status === "checked") return bet;
+
+    // A statistical check can finish before CAIXA publishes every financial
+    // tier. Keep that state reconcilable until totalPrizeValue is known.
+    if (bet.status === "checked" && bet.totalPrizeValue !== undefined) return bet;
 
     const contest = await this.contests.findByNumber(bet.lottery, bet.contestNumber);
     if (!contest) return bet;
@@ -88,13 +96,31 @@ export class RealBetService {
   }
 
   async reconcilePending(lottery?: LotteryId): Promise<number> {
-    const pending = await this.realBets.listPending(lottery);
-    let checked = 0;
-    for (const bet of pending) {
+    const result = await this.pool.query<{ id: string }>(
+      `
+        SELECT id
+        FROM real_bets
+        WHERE (
+          status IN ('placed', 'awaiting_result')
+          OR (status = 'checked' AND total_prize_value IS NULL)
+        )
+          AND ($1::text IS NULL OR lottery = $1)
+        ORDER BY contest_number, id
+      `,
+      [lottery ?? null],
+    );
+
+    let financiallyResolved = 0;
+    for (const row of result.rows) {
+      const bet = await this.realBets.findById(Number(row.id));
+      if (!bet) continue;
+      const beforeKnown = bet.totalPrizeValue !== undefined;
       const after = await this.reconcile(bet.id);
-      if (after?.status === "checked") checked += 1;
+      if (after?.status === "checked" && after.totalPrizeValue !== undefined && !beforeKnown) {
+        financiallyResolved += 1;
+      }
     }
-    return checked;
+    return financiallyResolved;
   }
 
   async list(lottery: LotteryId, limit = 50): Promise<{ items: RealBetRecord[]; summary: RealBetSummary }> {

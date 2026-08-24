@@ -23,7 +23,11 @@ import {
 } from "./http.js";
 import { enforceRateLimit, FixedWindowRateLimiter } from "./rateLimit.js";
 import { expensiveAnalysisGate } from "./workGate.js";
-import { runBacktestInWorker } from "./workerClient.js";
+import {
+  AnalysisCancelledError,
+  AnalysisTimeoutError,
+  runBacktestInWorker,
+} from "./workerClient.js";
 
 export interface ApiServerOptions {
   pool: Pool;
@@ -373,17 +377,33 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
           throw new ApiError(429, "ANALYSIS_BUSY", "Another backtest or Strategy Lab analysis is already running");
         }
         try {
-          const result = await runBacktestInWorker(services, {
-            lottery,
-            gameCount,
-            warmupContests,
-            ...(fixedCount !== undefined ? { fixedCount } : {}),
-            ...(startContest !== undefined ? { startContest } : {}),
-            ...(endContest !== undefined ? { endContest } : {}),
-            persist,
-          });
-          sendJson(response, persist ? 201 : 200, result, corsOrigin);
-          return;
+          const controller = new AbortController();
+          const abortWorker = () => controller.abort();
+          request.once("aborted", abortWorker);
+          response.once("close", abortWorker);
+          try {
+            const result = await runBacktestInWorker(services, {
+              lottery,
+              gameCount,
+              warmupContests,
+              ...(fixedCount !== undefined ? { fixedCount } : {}),
+              ...(startContest !== undefined ? { startContest } : {}),
+              ...(endContest !== undefined ? { endContest } : {}),
+              persist,
+            }, { signal: controller.signal });
+            if (response.destroyed || response.writableEnded) return;
+            sendJson(response, persist ? 201 : 200, result, corsOrigin);
+            return;
+          } catch (error) {
+            if (error instanceof AnalysisTimeoutError) {
+              throw new ApiError(504, "ANALYSIS_TIMEOUT", "Backtest exceeded the safe execution limit");
+            }
+            if (error instanceof AnalysisCancelledError && (request.destroyed || response.destroyed)) return;
+            throw error;
+          } finally {
+            request.off("aborted", abortWorker);
+            response.off("close", abortWorker);
+          }
         } finally {
           release();
         }

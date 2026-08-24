@@ -50,6 +50,14 @@ function serviceError(error: unknown): ApiError | undefined {
       `This batch targets contest ${expected}; it cannot be registered as a real bet for contest ${received}`,
     );
   }
+  if (error.message.startsWith("RESULT_ALREADY_KNOWN:")) {
+    const contest = error.message.split(":")[1];
+    return new ApiError(
+      409,
+      "RESULT_ALREADY_KNOWN",
+      `Contest ${contest} is already stored. Historical results cannot be registered as live real bets.`,
+    );
+  }
   if (error.message === "CONTEST_NUMBER_REQUIRED") {
     return new ApiError(400, "CONTEST_NUMBER_REQUIRED", "A contest number is required for a real bet");
   }

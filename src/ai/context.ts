@@ -2,10 +2,11 @@ import type { Pool } from "pg";
 import type { LotteryId } from "../domain/types.js";
 import { buildNumberAnalysis, DEFAULT_WEIGHTS } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
-import { compareStrategyLab } from "../lab/strategyLab.js";
+import type { StrategyLabResult } from "../lab/strategyLab.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import { PostgresBacktestRepository } from "../persistence/backtestRepository.js";
 import { PostgresRealBetRepository } from "../persistence/realBetRepository.js";
+import { PostgresAnalysisJobRepository } from "../persistence/analysisJobRepository.js";
 import type {
   AiEvidenceContext,
   AiNumberEvidence,
@@ -25,6 +26,11 @@ function numberEvidence(row: ReturnType<typeof buildNumberAnalysis>[number]): Ai
   };
 }
 
+function strategyLabFromResult(value: Record<string, unknown> | undefined): StrategyLabResult | undefined {
+  if (!value || value.schemaVersion !== 2 || !Array.isArray(value.variants) || !value.benchmark) return undefined;
+  return value as unknown as StrategyLabResult;
+}
+
 export async function buildAiEvidenceContext(
   pool: Pool,
   lottery: LotteryId,
@@ -32,26 +38,22 @@ export async function buildAiEvidenceContext(
   const contestsRepository = new PostgresContestRepository(pool);
   const backtestsRepository = new PostgresBacktestRepository(pool);
   const realBetsRepository = new PostgresRealBetRepository(pool);
+  const jobsRepository = new PostgresAnalysisJobRepository(pool);
 
   const contests = await contestsRepository.list({ lottery, order: "asc" });
   const latestContest = contests.at(-1);
   const analysisRows = buildNumberAnalysis(contests, getLotteryConfig(lottery));
   const ranked = [...analysisRows].sort((a, b) => b.score - a.score || a.number - b.number);
-  const [latestBacktests, realPerformance, recentRealBets] = await Promise.all([
+  const [latestBacktests, realPerformance, recentRealBets, latestStrategyLabJob] = await Promise.all([
     backtestsRepository.listRecentSummaries(lottery, 1),
     realBetsRepository.summary(lottery),
     realBetsRepository.listRecent(lottery, 5),
+    jobsRepository.latestCompleted("strategy-lab", lottery),
   ]);
 
+  const lab = strategyLabFromResult(latestStrategyLabJob?.result);
   let strategyLab: AiEvidenceContext["strategyLab"];
-  if (contests.length >= 30) {
-    const lab = compareStrategyLab(contests, {
-      lottery,
-      lookbackContests: Math.min(100, contests.length),
-      warmupContests: Math.min(20, Math.max(1, contests.length - 1)),
-      gameCount: lottery === "mega-sena" ? 2 : 4,
-      bucketSize: 25,
-    });
+  if (lab && latestStrategyLabJob) {
     const variants: AiStrategyVariantEvidence[] = lab.variants.map((variant) => ({
       key: variant.key,
       label: variant.label,
@@ -65,11 +67,25 @@ export async function buildAiEvidenceContext(
       netResult: variant.summary.netResult,
     }));
     strategyLab = {
+      sourceJobId: latestStrategyLabJob.id,
       ...(lab.startContest !== undefined ? { startContest: lab.startContest } : {}),
       ...(lab.endContest !== undefined ? { endContest: lab.endContest } : {}),
       gameCount: lab.gameCount,
       rankingBasis: lab.rankingBasis,
-      ...(lab.winner ? { winner: lab.winner } : {}),
+      ...(lab.winner ? { bestInPeriod: lab.winner } : {}),
+      benchmark: {
+        status: lab.benchmark.status,
+        basis: lab.benchmark.basis,
+        adjustedPValue: lab.benchmark.adjustedPValue,
+        lowerAdjustedPValue: lab.benchmark.lowerAdjustedPValue,
+        strategyPercentile: lab.benchmark.strategyPercentile,
+        resolutionSufficient: lab.benchmark.resolutionSufficient,
+        sampleSizeSufficient: lab.benchmark.sampleSizeSufficient,
+        observationRounds: lab.benchmark.observationRounds,
+        minimumObservationRounds: lab.benchmark.minimumObservationRounds,
+        randomSamples: lab.randomSamples,
+        familySize: lab.benchmark.familySize,
+      },
       variants,
     };
   }

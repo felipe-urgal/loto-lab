@@ -50,7 +50,8 @@ test(
     `);
 
     const contests = Array.from({ length: 25 }, (_, index) => makeMegaContest(index));
-    await new PostgresContestRepository(pool).upsertMany(contests);
+    const contestRepository = new PostgresContestRepository(pool);
+    await contestRepository.upsertMany(contests);
 
     const server = createLotoLabServer({ pool, corsOrigin: "http://localhost:5173" });
     await new Promise<void>((resolve, reject) => {
@@ -181,7 +182,7 @@ test(
     assert.equal(checked.checks.length, 2);
     assert.ok(checked.checks.every((check) => check.ticketCost === 6));
 
-    const realBetResponse = await fetch(`${baseUrl}/api/v1/real-bets`, {
+    const hindsightRealBet = await fetch(`${baseUrl}/api/v1/real-bets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -189,54 +190,13 @@ test(
         contestNumber: 2624,
         gamePositions: [1],
         actualCost: 6,
-        playedAt: "2026-01-25T12:00:00.000Z",
       }),
     });
-    assert.equal(realBetResponse.status, 201);
-    const realBet = (await realBetResponse.json()) as {
-      id: number;
-      batchId: number;
-      status: string;
-      actualCost: number;
-      totalPrizeValue: number;
-      netResult: number;
-      games: Array<{ batchPosition: number; checkResult?: { hits: number } }>;
-    };
-    assert.ok(realBet.id > 0);
-    assert.equal(realBet.batchId, generated.batchId);
-    assert.equal(realBet.status, "checked");
-    assert.equal(realBet.actualCost, 6);
-    assert.equal(realBet.games.length, 1);
-    assert.equal(realBet.games[0]?.batchPosition, 1);
-    assert.ok(realBet.games[0]?.checkResult);
-    assert.equal(realBet.netResult, realBet.totalPrizeValue - 6);
-
-    const realBetList = await fetch(`${baseUrl}/api/v1/real-bets/mega-sena?limit=5`);
-    assert.equal(realBetList.status, 200);
-    const realBetData = (await realBetList.json()) as {
-      items: Array<{ id: number; status: string }>;
-      summary: {
-        totalBets: number;
-        checkedBets: number;
-        pendingBets: number;
-        actualCost: number;
-        checkedCost: number;
-      };
-    };
-    assert.equal(realBetData.items[0]?.id, realBet.id);
-    assert.equal(realBetData.items[0]?.status, "checked");
-    assert.equal(realBetData.summary.totalBets, 1);
-    assert.equal(realBetData.summary.checkedBets, 1);
-    assert.equal(realBetData.summary.pendingBets, 0);
-    assert.equal(realBetData.summary.actualCost, 6);
-    assert.equal(realBetData.summary.checkedCost, 6);
-
-    const duplicateRealBet = await fetch(`${baseUrl}/api/v1/real-bets`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ batchId: generated.batchId, contestNumber: 2624, actualCost: 12 }),
-    });
-    assert.equal(duplicateRealBet.status, 409);
+    assert.equal(hindsightRealBet.status, 409);
+    assert.equal(
+      ((await hindsightRealBet.json()) as { error: { code: string } }).error.code,
+      "RESULT_ALREADY_KNOWN",
+    );
 
     const backtestResponse = await fetch(`${baseUrl}/api/v1/backtests/run`, {
       method: "POST",
@@ -310,6 +270,92 @@ test(
     assert.ok(lab.variants.every((variant) => variant.summary.testedContests === 10));
     assert.ok(lab.variants.every((variant) => variant.summary.financialCoverage === 1));
     assert.ok(lab.variants.every((variant) => variant.series.length === 2));
+
+    const liveGenerateResponse = await fetch(`${baseUrl}/api/v1/games/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lottery: "mega-sena",
+        gameCount: 2,
+        targetContestNumber: 2625,
+      }),
+    });
+    assert.equal(liveGenerateResponse.status, 201);
+    const liveGenerated = (await liveGenerateResponse.json()) as {
+      batchId: number;
+      games: Array<{ numbers: number[] }>;
+    };
+
+    const realBetResponse = await fetch(`${baseUrl}/api/v1/real-bets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        batchId: liveGenerated.batchId,
+        contestNumber: 2625,
+        gamePositions: [1],
+        actualCost: 6,
+        playedAt: "2026-01-25T12:00:00.000Z",
+      }),
+    });
+    assert.equal(realBetResponse.status, 201);
+    const realBet = (await realBetResponse.json()) as {
+      id: number;
+      batchId: number;
+      status: string;
+      actualCost: number;
+      games: Array<{ batchPosition: number; checkResult?: { hits: number } }>;
+    };
+    assert.ok(realBet.id > 0);
+    assert.equal(realBet.batchId, liveGenerated.batchId);
+    assert.equal(realBet.status, "awaiting_result");
+    assert.equal(realBet.actualCost, 6);
+    assert.equal(realBet.games.length, 1);
+    assert.equal(realBet.games[0]?.batchPosition, 1);
+    assert.equal(realBet.games[0]?.checkResult, undefined);
+
+    const duplicateRealBet = await fetch(`${baseUrl}/api/v1/real-bets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batchId: liveGenerated.batchId, contestNumber: 2625, actualCost: 12 }),
+    });
+    assert.equal(duplicateRealBet.status, 409);
+
+    await contestRepository.upsertMany([makeMegaContest(25)]);
+    const reconcile = await fetch(`${baseUrl}/api/v1/real-bets/reconcile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lottery: "mega-sena" }),
+    });
+    assert.equal(reconcile.status, 200);
+    assert.equal(((await reconcile.json()) as { checked: number }).checked, 1);
+
+    const realBetList = await fetch(`${baseUrl}/api/v1/real-bets/mega-sena?limit=5`);
+    assert.equal(realBetList.status, 200);
+    const realBetData = (await realBetList.json()) as {
+      items: Array<{
+        id: number;
+        status: string;
+        totalPrizeValue?: number;
+        netResult?: number;
+        games: Array<{ checkResult?: { hits: number } }>;
+      }>;
+      summary: {
+        totalBets: number;
+        checkedBets: number;
+        pendingBets: number;
+        actualCost: number;
+        checkedCost: number;
+      };
+    };
+    assert.equal(realBetData.items[0]?.id, realBet.id);
+    assert.equal(realBetData.items[0]?.status, "checked");
+    assert.ok(realBetData.items[0]?.games[0]?.checkResult);
+    assert.equal(realBetData.items[0]?.netResult, (realBetData.items[0]?.totalPrizeValue ?? 0) - 6);
+    assert.equal(realBetData.summary.totalBets, 1);
+    assert.equal(realBetData.summary.checkedBets, 1);
+    assert.equal(realBetData.summary.pendingBets, 0);
+    assert.equal(realBetData.summary.actualCost, 6);
+    assert.equal(realBetData.summary.checkedCost, 6);
 
     const invalid = await fetch(`${baseUrl}/api/v1/contests/not-a-lottery`);
     assert.equal(invalid.status, 400);

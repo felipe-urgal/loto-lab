@@ -90,6 +90,23 @@ export class PostgresAnalysisJobRepository {
     return result.rows.map(mapRow);
   }
 
+  async latestCompleted(kind: AnalysisJobKind, lottery: LotteryId): Promise<AnalysisJobRecord | undefined> {
+    const result = await this.pool.query<AnalysisJobRow>(
+      `
+        SELECT ${SELECT_COLUMNS}
+        FROM analysis_jobs
+        WHERE kind = $1
+          AND lottery = $2
+          AND status = 'completed'
+          AND result IS NOT NULL
+        ORDER BY finished_at DESC NULLS LAST, id DESC
+        LIMIT 1
+      `,
+      [kind, lottery],
+    );
+    return result.rows[0] ? mapRow(result.rows[0]) : undefined;
+  }
+
   async recoverRunning(): Promise<number> {
     const result = await this.pool.query(
       `

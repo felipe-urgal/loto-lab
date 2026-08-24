@@ -21,16 +21,20 @@ Você recebe somente evidências já calculadas pelo sistema. Siga estas regras 
 - destaque amostra pequena, cobertura financeira insuficiente, empate e sobreajuste quando aplicável;
 - sugestões devem ser apenas próximos testes, validações de dados ou comparações metodológicas;
 - responda em português do Brasil;
-- seja conciso e baseado somente no JSON fornecido.
+- seja conciso e baseado somente no JSON fornecido.`;
 
-Retorne SOMENTE JSON válido, sem markdown, exatamente com esta estrutura:
-{
-  "headline": "string",
-  "summary": "string",
-  "observations": ["string"],
-  "risks": ["string"],
-  "nextTests": ["string"]
-}`;
+const INSIGHT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    headline: { type: "string" },
+    summary: { type: "string" },
+    observations: { type: "array", items: { type: "string" }, maxItems: 6 },
+    risks: { type: "array", items: { type: "string" }, maxItems: 6 },
+    nextTests: { type: "array", items: { type: "string" }, maxItems: 6 },
+  },
+  required: ["headline", "summary", "observations", "risks", "nextTests"],
+} as const;
 
 interface OpenAiResponse {
   id?: string;
@@ -163,6 +167,15 @@ export class OpenAiInterpretationProvider implements AiInterpretationProvider {
             focus: request.focus,
             evidence: request.evidence,
           }),
+          text: {
+            format: {
+              type: "json_schema",
+              name: "loto_lab_insight",
+              strict: true,
+              schema: INSIGHT_SCHEMA,
+            },
+          },
+          store: false,
           max_output_tokens: 1400,
         }),
         signal: AbortSignal.timeout(this.timeoutMs),

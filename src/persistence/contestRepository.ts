@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import type { Contest, ContestPrizeTier, LotteryId } from "../domain/types.js";
+import { hasCompletePrizeSchedule } from "../finance/prizes.js";
 
 interface ContestRow {
   id: string;
@@ -116,16 +117,45 @@ export class PostgresContestRepository {
         const contestId = result.rows[0]!.id;
 
         if (contest.prizeTiers !== undefined) {
-          await client.query("DELETE FROM contest_prize_tiers WHERE contest_id = $1", [contestId]);
-          for (const tier of contest.prizeTiers) {
-            await client.query(
+          let shouldReplacePrizeTiers = true;
+
+          // Official APIs can transiently expose only part of the payout table.
+          // Once a complete schedule has been stored, never downgrade it with a
+          // later incomplete snapshot. A new complete schedule can still replace
+          // it, allowing official corrections to propagate.
+          if (!hasCompletePrizeSchedule(contest)) {
+            const existing = await client.query<ContestPrizeTier>(
               `
-                INSERT INTO contest_prize_tiers (
-                  contest_id, description, winners, prize_value
-                ) VALUES ($1, $2, $3, $4)
+                SELECT
+                  description,
+                  winners,
+                  prize_value::float8 AS "prizeValue"
+                FROM contest_prize_tiers
+                WHERE contest_id = $1
+                ORDER BY id
               `,
-              [contestId, tier.description, tier.winners, tier.prizeValue],
+              [contestId],
             );
+            if (existing.rows.length > 0 && hasCompletePrizeSchedule({
+              ...contest,
+              prizeTiers: existing.rows,
+            })) {
+              shouldReplacePrizeTiers = false;
+            }
+          }
+
+          if (shouldReplacePrizeTiers) {
+            await client.query("DELETE FROM contest_prize_tiers WHERE contest_id = $1", [contestId]);
+            for (const tier of contest.prizeTiers) {
+              await client.query(
+                `
+                  INSERT INTO contest_prize_tiers (
+                    contest_id, description, winners, prize_value
+                  ) VALUES ($1, $2, $3, $4)
+                `,
+                [contestId, tier.description, tier.winners, tier.prizeValue],
+              );
+            }
           }
         }
       }

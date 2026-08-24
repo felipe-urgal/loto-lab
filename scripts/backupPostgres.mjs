@@ -1,5 +1,5 @@
 import { createWriteStream } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { link, mkdir, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { pipeline } from "node:stream/promises";
@@ -10,6 +10,7 @@ const user = process.env.POSTGRES_USER || "loto_lab";
 const database = process.env.POSTGRES_DB || "loto_lab";
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const output = resolve(process.argv[2] || `backups/loto-lab-${stamp}.dump`);
+const partial = `${output}.partial-${process.pid}`;
 
 await mkdir(dirname(output), { recursive: true });
 
@@ -20,15 +21,24 @@ const args = [
   "--format=custom", "--no-owner", "--no-privileges",
 ];
 
-const child = spawn("docker", args, { stdio: ["ignore", "pipe", "inherit"] });
-const stream = createWriteStream(output, { flags: "wx" });
-const write = pipeline(child.stdout, stream);
-const exit = new Promise((resolveCode, reject) => {
-  child.once("error", reject);
-  child.once("close", resolveCode);
-});
+try {
+  const child = spawn("docker", args, { stdio: ["ignore", "pipe", "inherit"] });
+  const stream = createWriteStream(partial, { flags: "wx" });
+  const write = pipeline(child.stdout, stream);
+  const exit = new Promise((resolveCode, reject) => {
+    child.once("error", reject);
+    child.once("close", resolveCode);
+  });
 
-const [exitCode] = await Promise.all([exit, write]);
-if (exitCode !== 0) throw new Error(`pg_dump failed with exit code ${exitCode}`);
+  const [exitCode] = await Promise.all([exit, write]);
+  if (exitCode !== 0) throw new Error(`pg_dump failed with exit code ${exitCode}`);
 
-console.log(output);
+  // A hard-link publish is atomic on the same filesystem and fails if the final
+  // path already exists. Incomplete dumps therefore never look like valid backups.
+  await link(partial, output);
+  await rm(partial, { force: true });
+  console.log(output);
+} catch (error) {
+  await rm(partial, { force: true }).catch(() => undefined);
+  throw error;
+}
