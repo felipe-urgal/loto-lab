@@ -146,6 +146,15 @@ function selectedExperiment() {
   return experimentSelect.value;
 }
 
+function minimumPracticalRandomSamples(experiment) {
+  return experiment === "external-rules" ? 250 : 100;
+}
+
+function ensureInferenceResolution(experiment) {
+  const minimum = minimumPracticalRandomSamples(experiment);
+  if (Number(randomSamplesInput.value) < minimum) randomSamplesInput.value = String(minimum);
+}
+
 function updateLotteryCopy(resetGames = false) {
   const lottery = selectedLottery();
   const config = LOTTERIES[lottery];
@@ -156,12 +165,13 @@ function updateLotteryCopy(resetGames = false) {
   }
 
   const experiment = selectedExperiment();
+  ensureInferenceResolution(experiment);
   if (experiment === "score-model") {
     title.textContent = `${config.label}: Score v1 × Score v2 × sem score`;
     description.textContent = "Isola o valor do ranking, mede AUC fora da amostra e faz walk-forward sem olhar concursos futuros.";
   } else if (experiment === "external-rules") {
     title.textContent = "Mega-Sena: validação de regras externas";
-    description.textContent = "Testa regras como hipóteses separadas e corrige a evidência pela quantidade de variantes comparadas.";
+    description.textContent = "Testa regras como hipóteses separadas e corrige a evidência pela quantidade de variantes comparadas. O modo usa pelo menos 250 controles para ter resolução inferencial suficiente.";
   } else {
     title.textContent = `${config.label}: tamanho do núcleo`;
     description.textContent = config.fixedCopy;
@@ -175,7 +185,7 @@ function updateLotteryCopy(resetGames = false) {
   setMessage(
     "",
     "Pronto para comparar",
-    "A evidência usa controles aleatórios, trata empates de forma neutra e ajusta falsos positivos quando várias estratégias são testadas.",
+    "A evidência exige resolução Monte Carlo suficiente, pelo menos 30 concursos elegíveis, trata empates de forma neutra e ajusta falsos positivos quando várias estratégias são testadas.",
   );
   renderHistoryStatus();
 }
@@ -236,22 +246,36 @@ function variantBadge(result, variant, index) {
   return `${variant.fixedCount} fixas`;
 }
 
-function statusCopy(status) {
-  if (status === "beats-random") {
+function statusCopy(benchmark) {
+  if (benchmark.status === "beats-random") {
     return {
       label: "Evidência acima do random",
       tone: "positive",
       copy: "A cauda superior permanece significativa após corrigir o número de variantes testadas.",
     };
   }
-  if (status === "inconclusive") {
+  if (benchmark.status === "insufficient-resolution") {
+    return {
+      label: "Resolução insuficiente",
+      tone: "warning",
+      copy: `Com ${benchmark.distribution.samples} controles, o menor p ajustado possível é ${formatPercent(benchmark.minimumAchievableAdjustedPValue)}. São necessários pelo menos ${benchmark.minimumRandomSamples} controles para tornar 5% matematicamente atingível.`,
+    };
+  }
+  if (benchmark.status === "insufficient-sample") {
+    return {
+      label: "Amostra histórica pequena",
+      tone: "warning",
+      copy: `O recorte possui ${benchmark.observationRounds} concursos elegíveis; o mínimo inferencial é ${benchmark.minimumObservationRounds}. O resultado permanece exploratório.`,
+    };
+  }
+  if (benchmark.status === "inconclusive") {
     return {
       label: "Inconclusivo",
       tone: "warning",
       copy: "Há sinal exploratório, mas ele não passa o limiar ajustado de evidência.",
     };
   }
-  if (status === "underperforms-random") {
+  if (benchmark.status === "underperforms-random") {
     return {
       label: "Evidência abaixo do random",
       tone: "negative",
@@ -261,7 +285,7 @@ function statusCopy(status) {
   return {
     label: "Sem evidência",
     tone: "neutral",
-    copy: "O resultado está compatível com o comportamento dos controles aleatórios neste recorte.",
+    copy: "Com resolução e amostra suficientes, o resultado está compatível com o comportamento dos controles aleatórios neste recorte.",
   };
 }
 
@@ -308,13 +332,13 @@ function renderBenchmark(result) {
   const bestStrategy = result.variants.find((variant) => variant.key === benchmark.bestStrategyKey);
   if (!bestStrategy) return "";
 
-  const status = statusCopy(benchmark.status);
+  const status = statusCopy(benchmark);
   const metricLabel = benchmark.basis === "roi" ? "ROI" : "taxa de premiação";
   return `<article class="panel lab-benchmark-card is-${status.tone}">
     <div class="lab-benchmark-main">
-      <span class="lab-eyebrow">Benchmark · ${benchmark.distribution.samples} controles · ${benchmark.familySize} variante(s)</span>
+      <span class="lab-eyebrow">Benchmark · ${benchmark.distribution.samples} controles · ${benchmark.familySize} variante(s) · ${benchmark.observationRounds} concursos elegíveis</span>
       <strong>${escapeHtml(bestStrategy.label)} · ${status.label}</strong>
-      <p>${status.copy} Percentil mid-rank ${formatPercent(benchmark.strategyPercentile)}; diferença para a mediana: ${formatPercentagePoints(benchmark.medianDelta)} em ${metricLabel}. p ajustado: ${formatPercent(benchmark.adjustedPValue)}.</p>
+      <p>${escapeHtml(status.copy)} Percentil mid-rank ${formatPercent(benchmark.strategyPercentile)}; diferença para a mediana da distribuição: ${formatPercentagePoints(benchmark.medianDelta)} em ${metricLabel}. p ajustado: ${formatPercent(benchmark.adjustedPValue)}.</p>
     </div>
     <div class="lab-distribution">
       <div><span>P05</span><strong>${formatPercent(benchmark.distribution.p05)}</strong></div>
@@ -360,7 +384,7 @@ function renderTable(result) {
       ? "—"
       : variant.summary.averageFixedHitsPerContest.toFixed(2).replace(".", ",");
     return `<tr class="${isControl ? "lab-control-row" : ""}">
-      <td class="${winnerClass}"><span class="lab-table-rank">${isControl ? "C" : index + 1}</span><strong>${escapeHtml(variant.label)}</strong>${isControl ? ' <span class="badge">mediana random</span>' : ""}</td>
+      <td class="${winnerClass}"><span class="lab-table-rank">${isControl ? "C" : index + 1}</span><strong>${escapeHtml(variant.label)}</strong>${isControl ? ' <span class="badge">amostra próxima da mediana</span>' : ""}</td>
       <td>${variant.summary.averageHitsPerGame.toFixed(2).replace(".", ",")}</td>
       <td>${fixedAverage}</td>
       <td><strong>${variant.summary.maxHits}</strong></td>
@@ -453,7 +477,7 @@ function renderChart() {
   ).join("");
 
   chartRoot.innerHTML = `
-    <div class="lab-chart-top-note">Linha tracejada: amostra aleatória próxima da mediana da distribuição.</div>
+    <div class="lab-chart-top-note">Linha tracejada: amostra aleatória próxima da mediana da distribuição. O P50 real é calculado sobre a distribuição inteira.</div>
     <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(metricConfig.label)} por bloco de concursos">${grid}${zeroLine}${lines}${xLabels}</svg>
     <div class="lab-chart-legend">${legend}</div>`;
 }
@@ -506,11 +530,13 @@ async function runComparison(event) {
     message.hidden = false;
     const heading = error.code === "INSUFFICIENT_HISTORY"
       ? "Histórico insuficiente"
-      : error.code === "ANALYSIS_TOO_LARGE"
-        ? "Análise grande demais"
-        : error.code === "ANALYSIS_TIMEOUT"
-          ? "Limite de execução atingido"
-          : "Comparação não concluída";
+      : error.code === "EMPTY_PERIOD"
+        ? "Período sem concursos elegíveis"
+        : error.code === "ANALYSIS_TOO_LARGE"
+          ? "Análise grande demais"
+          : error.code === "ANALYSIS_TIMEOUT"
+            ? "Limite de execução atingido"
+            : "Comparação não concluída";
     setMessage("error", heading, error.message);
   } finally {
     runButton.disabled = false;
