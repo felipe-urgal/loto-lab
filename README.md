@@ -108,7 +108,7 @@ Detalhes em [`docs/STRATEGY_LAB.md`](docs/STRATEGY_LAB.md).
 
 ## Requisitos
 
-- Node.js 22+
+- Node.js 24.19.0 LTS (linha 24.x; use `.nvmrc` para alinhar o ambiente local)
 - npm
 - Docker para PostgreSQL local
 
