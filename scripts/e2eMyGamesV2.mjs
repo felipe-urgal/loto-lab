@@ -28,28 +28,49 @@ async function json(path, options = {}) {
   return body;
 }
 
-async function seedComparisonHistory() {
+function contestFixture(contestNumber) {
+  const index = contestNumber - 9001;
+  const numbers = Array.from({ length: 6 }, (_, offset) => ((index * 5 + offset * 7) % 60) + 1)
+    .sort((a, b) => a - b);
+  const month = String((index % 12) + 1).padStart(2, "0");
+  const day = String((index % 27) + 1).padStart(2, "0");
+  return { contestNumber, date: `2026-${month}-${day}`, numbers };
+}
+
+async function insertContest(pool, contestNumber) {
+  const fixture = contestFixture(contestNumber);
+  await pool.query(
+    `
+      INSERT INTO contests (lottery, contest_number, draw_date, numbers)
+      VALUES ('mega-sena', $1, $2, $3)
+      ON CONFLICT (lottery, contest_number) DO UPDATE SET
+        draw_date = EXCLUDED.draw_date,
+        numbers = EXCLUDED.numbers,
+        updated_at = NOW()
+    `,
+    [fixture.contestNumber, fixture.date, fixture.numbers],
+  );
+}
+
+async function seedComparisonHistory(excludeContest) {
   if (!process.env.DATABASE_URL) throw new Error("My Games E2E requires DATABASE_URL");
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   try {
     for (let index = 0; index < 60; index += 1) {
       const contestNumber = 9001 + index;
-      const numbers = Array.from({ length: 6 }, (_, offset) => ((index * 5 + offset * 7) % 60) + 1)
-        .sort((a, b) => a - b);
-      const month = String((index % 12) + 1).padStart(2, "0");
-      const day = String((index % 27) + 1).padStart(2, "0");
-      await pool.query(
-        `
-          INSERT INTO contests (lottery, contest_number, draw_date, numbers)
-          VALUES ('mega-sena', $1, $2, $3)
-          ON CONFLICT (lottery, contest_number) DO UPDATE SET
-            draw_date = EXCLUDED.draw_date,
-            numbers = EXCLUDED.numbers,
-            updated_at = NOW()
-        `,
-        [contestNumber, `2026-${month}-${day}`, numbers],
-      );
+      if (contestNumber === excludeContest) continue;
+      await insertContest(pool, contestNumber);
     }
+  } finally {
+    await pool.end();
+  }
+}
+
+async function seedOfficialResult(contestNumber) {
+  if (!process.env.DATABASE_URL) throw new Error("My Games E2E requires DATABASE_URL");
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  try {
+    await insertContest(pool, contestNumber);
   } finally {
     await pool.end();
   }
@@ -69,7 +90,10 @@ async function generateBatch(contestNumber) {
 }
 
 async function prepareFixtures() {
-  await seedComparisonHistory();
+  // Keep the target result unknown until after the live bet is registered. This
+  // mirrors the auditable production flow and protects the real-performance KPI
+  // from hindsight.
+  await seedComparisonHistory(targetContest);
   const managed = await json("/api/v1/game-batches/manage/mega-sena?scope=active&limit=200");
   let betBatch = (managed.items || []).find((item) => item.targetContestNumber === targetContest && !item.hasRealBet);
   if (!betBatch) {
@@ -77,11 +101,7 @@ async function prepareFixtures() {
     betBatch = { id: created.batchId, targetContestNumber: targetContest };
   }
 
-  const createdGenerated = await generateBatch(targetContest + 1);
-  const generatedBatchId = createdGenerated.batchId;
-  if (!generatedBatchId) throw new Error("My Games E2E could not create a generated comparison batch");
-
-  const bet = await json("/api/v1/real-bets", {
+  const placedBet = await json("/api/v1/real-bets", {
     method: "POST",
     body: JSON.stringify({
       batchId: betBatch.id,
@@ -90,7 +110,15 @@ async function prepareFixtures() {
       gamePositions: [1],
     }),
   });
-  if (bet.status !== "checked") throw new Error(`Expected seeded real bet to be checked, got ${bet.status}`);
+  if (placedBet.status === "checked") throw new Error("Live bet was checked before its official result existed");
+
+  await seedOfficialResult(targetContest);
+  const bet = await json(`/api/v1/real-bets/${placedBet.id}/check`, { method: "POST" });
+  if (bet.status !== "checked") throw new Error(`Expected seeded real bet to be checked after result sync, got ${bet.status}`);
+
+  const createdGenerated = await generateBatch(targetContest + 1);
+  const generatedBatchId = createdGenerated.batchId;
+  if (!generatedBatchId) throw new Error("My Games E2E could not create a generated comparison batch");
 
   const comparison = await json(`/api/v1/game-batches/${generatedBatchId}/comparison?count=5`);
   if (comparison.items?.length !== 5) throw new Error(`Expected five comparison contests, got ${comparison.items?.length}`);
@@ -336,7 +364,7 @@ try {
 
   assert(runtimeErrors.length === 0, `My Games runtime exceptions: ${runtimeErrors.join(" | ")}`);
   assert(serverErrors.length === 0, `My Games server failures: ${serverErrors.join(" | ")}`);
-  console.log("My Games 2.1 E2E passed: generated-vs-real separation, 3/5 contest comparison, hide/restore and mobile layout");
+  console.log("My Games 2.1 E2E passed: audited live bet, generated-vs-real separation, 3/5 contest comparison, hide/restore and mobile layout");
 } finally {
   client?.close();
   await stopBrowser(browser);
