@@ -1,4 +1,5 @@
 import type { LotteryId } from "../domain/types.js";
+import type { StrategyEvidenceStatus } from "../lab/strategyLab.js";
 
 export type AiInsightFocus = "overview" | "analysis" | "strategy" | "real-performance";
 
@@ -33,6 +34,20 @@ export interface AiStrategyVariantEvidence {
   netResult: number;
 }
 
+export interface AiStrategyBenchmarkEvidence {
+  status: StrategyEvidenceStatus;
+  basis: "roi" | "prizeRate";
+  adjustedPValue: number;
+  lowerAdjustedPValue: number;
+  strategyPercentile: number;
+  resolutionSufficient: boolean;
+  sampleSizeSufficient: boolean;
+  observationRounds: number;
+  minimumObservationRounds: number;
+  randomSamples: number;
+  familySize: number;
+}
+
 export interface AiRealBetEvidence {
   contestNumber: number;
   status: string;
@@ -60,11 +75,13 @@ export interface AiEvidenceContext {
   };
   latestBacktest?: AiBacktestEvidence;
   strategyLab?: {
+    sourceJobId: number;
     startContest?: number;
     endContest?: number;
     gameCount: number;
     rankingBasis: "roi" | "prizeRate";
-    winner?: string;
+    bestInPeriod?: string;
+    benchmark: AiStrategyBenchmarkEvidence;
     variants: AiStrategyVariantEvidence[];
   };
   realPerformance: {
