@@ -40,7 +40,7 @@ export class AnalysisJobManager {
   private readonly activeControllers = new Map<number, AbortController>();
   private readonly explicitCancels = new Set<number>();
 
-  constructor(private readonly pool: Pool) {
+  constructor(pool: Pool) {
     this.repository = new PostgresAnalysisJobRepository(pool);
     this.services = new LotoLabApiServices(pool);
   }
