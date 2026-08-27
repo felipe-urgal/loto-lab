@@ -33,6 +33,16 @@ async function waitForTerminalJob(manager: AnalysisJobManager, id: number, timeo
   throw new Error(`Analysis job ${id} did not reach a terminal state within ${timeoutMs}ms`);
 }
 
+async function reserveAnalysisGate(timeoutMs = 1_000): Promise<() => void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const release = expensiveAnalysisGate.acquire();
+    if (release) return release;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`Analysis gate did not become available within ${timeoutMs}ms`);
+}
+
 test(
   "analysis job manager recovers, executes and cancels queued work",
   { skip: !databaseUrl, timeout: 20_000 },
@@ -84,8 +94,7 @@ test(
       assert.equal(listed[0]?.id, interrupted.id);
       assert.equal((await manager.findById(interrupted.id))?.status, "completed");
 
-      const release = expensiveAnalysisGate.acquire();
-      assert.ok(release, "test must be able to reserve the expensive-work gate");
+      const release = await reserveAnalysisGate();
       try {
         const queued = await manager.enqueue("backtest", "mega-sena", input);
         const cancelled = await manager.cancel(queued.id);
