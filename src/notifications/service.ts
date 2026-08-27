@@ -36,7 +36,7 @@ export class NotificationService {
   private readonly operations: PostgresOperationRepository;
   private readonly realBets: PostgresRealBetRepository;
 
-  constructor(private readonly pool: Pool) {
+  constructor(pool: Pool) {
     this.agenda = new PostgresAgendaRepository(pool);
     this.contests = new PostgresContestRepository(pool);
     this.notifications = new PostgresNotificationRepository(pool);
