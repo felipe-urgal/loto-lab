@@ -48,6 +48,11 @@ const typescriptRange = packageJson.devDependencies?.typescript;
 const typescriptMajor = majorOf(typescriptRange, "devDependencies.typescript");
 const nodeTypesRange = packageJson.devDependencies?.["@types/node"];
 const nodeTypesMajor = majorOf(nodeTypesRange, "devDependencies.@types/node");
+const lockRoot = packageLock.packages?.[""];
+
+if (!/^\d+\.\d+\.\d+$/.test(nodeVersion)) {
+  fail(`.nvmrc deve conter uma versão exata x.y.z, encontrado "${nodeVersion}"`);
+}
 
 if (nodeVersionFile.trim() !== nodeVersion) {
   fail(`.node-version (${nodeVersionFile.trim()}) diverge de .nvmrc (${nodeVersion})`);
@@ -58,13 +63,16 @@ if (nodeMajor !== null) {
   if (packageJson.engines?.node !== expectedEngine) {
     fail(`engines.node deve ser "${expectedEngine}", encontrado "${packageJson.engines?.node ?? "ausente"}"`);
   }
+
+  if (lockRoot?.engines?.node !== expectedEngine) {
+    fail(`package-lock.json deve refletir engines.node "${expectedEngine}"`);
+  }
 }
 
 if (nodeMajor !== null && nodeTypesMajor !== null && nodeTypesMajor !== nodeMajor) {
   fail(`@types/node deve permanecer na major ${nodeMajor}.x, encontrado ${nodeTypesRange}`);
 }
 
-const lockRoot = packageLock.packages?.[""];
 if (lockRoot?.devDependencies?.typescript !== typescriptRange) {
   fail("package-lock.json não reflete o range de TypeScript do package.json");
 }
@@ -83,6 +91,12 @@ if (
   fail(
     `TypeScript resolvido no lockfile (${lockedTypescriptVersion}) diverge da major declarada (${typescriptRange})`,
   );
+}
+
+const lockedNodeTypesVersion = packageLock.packages?.["node_modules/@types/node"]?.version;
+const lockedNodeTypesMajor = majorOf(lockedNodeTypesVersion, "package-lock @types/node");
+if (nodeMajor !== null && lockedNodeTypesMajor !== null && lockedNodeTypesMajor !== nodeMajor) {
+  fail(`@types/node resolvido no lockfile (${lockedNodeTypesVersion}) diverge da major do Node (${nodeMajor}.x)`);
 }
 
 const ciNodeVersions = [...workflow.matchAll(/node-version:\s*["']?([^\s"']+)/g)].map((match) => match[1]);
