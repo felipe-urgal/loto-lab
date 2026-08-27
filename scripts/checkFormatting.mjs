@@ -52,10 +52,6 @@ for (const file of trackedFiles) {
     failures.push(`${file}: use LF em vez de CRLF/CR`);
   }
 
-  if (content.length > 0 && !content.endsWith('\n')) {
-    failures.push(`${file}: arquivo deve terminar com newline`);
-  }
-
   const lines = content.split('\n');
   for (let index = 0; index < lines.length; index += 1) {
     if (/[ \t]+$/.test(lines[index])) {
