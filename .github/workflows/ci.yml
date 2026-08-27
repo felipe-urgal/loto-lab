@@ -49,11 +49,8 @@ jobs:
       - name: Run static quality gates
         run: npm run quality:static
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: npm test
-
-      - name: Measure test coverage
-        run: npm run coverage
 
       - name: Audit production dependencies
         run: npm run audit:prod
