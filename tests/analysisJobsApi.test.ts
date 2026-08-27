@@ -120,7 +120,7 @@ test(
       lottery: "not-a-lottery",
     });
     assert.equal(invalidLottery.status, 400);
-    assert.equal(((await responseJson(invalidLottery)).error as { code: string }).code, "INVALID_ARGUMENT");
+    assert.equal(((await responseJson(invalidLottery)).error as { code: string }).code, "INVALID_LOTTERY");
 
     const invalidRange = await postJson(baseUrl, "/api/v1/analysis-jobs", {
       kind: "backtest",
