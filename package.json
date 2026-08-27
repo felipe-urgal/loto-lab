@@ -11,7 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit --noUnusedLocals --noUnusedParameters --noFallthroughCasesInSwitch",
     "format:check": "node scripts/checkFormatting.mjs",
-    "quality:static": "npm run platform:verify && npm run format:check && npm run lint",
+    "quality:static": "npm run platform:verify && npm run typecheck && npm run format:check && npm run lint",
     "build:server": "tsc -p tsconfig.json",
     "web:build": "node scripts/buildWeb.mjs",
     "build": "npm run build:server && npm run web:build",
