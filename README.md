@@ -106,6 +106,12 @@ Detalhes em [`docs/DATA_OPERATIONS.md`](docs/DATA_OPERATIONS.md).
 
 Detalhes em [`docs/STRATEGY_LAB.md`](docs/STRATEGY_LAB.md).
 
+## Roadmap
+
+O roadmap técnico e de produto vigente está em [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+Ele é a fonte de verdade para prioridades `Now / Next / Later`, dependências e critérios de pronto. Listas históricas de “próximos milestones” não devem ser mantidas no README.
+
 ## Requisitos
 
 - Node.js 24.19.0 LTS (linha 24.x; use `.nvmrc` para alinhar o ambiente local)
@@ -267,16 +273,21 @@ Essa regra vale para backtests tradicionais e para todas as variantes do Laborat
 db/
 └── migrations/
 
+docs/
+├── ROADMAP.md
+├── MENTAL_MODEL.md
+├── RELIABILITY.md
+└── ...
+
 web/
 ├── index.html
+├── shell.js
+├── feature-loader.js
 ├── app.js
-├── styles.css
-├── lab.html
-├── lab.js
-├── lab.css
-└── favicon.svg
+└── features/assets por área
 
 src/
+├── ai/
 ├── analysis/
 ├── api/
 ├── backtest/
@@ -289,17 +300,13 @@ src/
 ├── generator/
 ├── lab/
 ├── lotteries/
+├── notifications/
+├── observability/
+├── operations/
 ├── persistence/
+├── realBets/
 └── index.ts
 ```
-
-## Próximos milestones
-
-1. tracking de apostas efetivamente realizadas;
-2. atualização/conferência automática pós-sorteio;
-3. estratégias configuráveis pela interface;
-4. execução assíncrona de experimentos longos;
-5. camada de interpretação por IA.
 
 ## Aviso
 
