@@ -7,11 +7,12 @@
     "node": ">=24.19.0 <25"
   },
   "scripts": {
+    "platform:verify": "node scripts/verifyPlatform.mjs",
     "build:server": "tsc -p tsconfig.json",
     "web:build": "node scripts/buildWeb.mjs",
     "build": "npm run build:server && npm run web:build",
     "build:prod": "tsc -p tsconfig.build.json && npm run web:build",
-    "test": "npm run build && node --test dist/tests/*.test.js",
+    "test": "npm run platform:verify && npm run build && node --test dist/tests/*.test.js",
     "check": "npm test",
     "e2e:browser": "node scripts/e2eBrowser.mjs && node scripts/e2eAnalysisLotteries.mjs && node scripts/e2eGeneratorV2.mjs && node scripts/e2eMyGamesV2.mjs && node scripts/e2eReadability.mjs && node scripts/e2eCriticalRoutes.mjs && node scripts/e2eOperationalFlows.mjs",
     "api:start": "npm run build && node --env-file-if-exists=.env dist/src/cli/apiStart.js",
