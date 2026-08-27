@@ -32,6 +32,7 @@ const textNames = new Set([
 ]);
 
 const failures = [];
+let inspectedFiles = 0;
 
 for (const file of trackedFiles) {
   if (!textNames.has(file) && !textExtensions.has(extname(file))) {
@@ -42,6 +43,7 @@ for (const file of trackedFiles) {
     continue;
   }
 
+  inspectedFiles += 1;
   const content = readFileSync(file, 'utf8');
 
   if (content.startsWith('\uFEFF')) {
@@ -68,4 +70,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Repository text format OK: ${trackedFiles.length} tracked files inspected`);
+console.log(`Repository text format OK: ${inspectedFiles} text files inspected`);
