@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: loto_lab
       POSTGRES_PASSWORD: loto_lab
     ports:
-      - "5434:5432"
+      - "5433:5432"
     volumes:
       - loto_lab_postgres:/var/lib/postgresql/data
     healthcheck:
