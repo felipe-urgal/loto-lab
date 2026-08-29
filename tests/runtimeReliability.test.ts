@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import type { PoolClient } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { releaseAdvisoryLockClient } from "../src/db/advisoryLock.js";
+import { runOperationalSync } from "../src/operations/sync.js";
 
 function fakeClient(options: {
   unlocked?: boolean;
@@ -46,6 +47,23 @@ test("advisory lock client is discarded when unlock fails or cannot be confirmed
     assert.equal(fake.releaseCalls(), 1);
     assert.ok(fake.releasedWith() instanceof Error);
   }
+});
+
+test("operational sync discards the client when advisory lock acquisition fails", async () => {
+  const queryError = new Error("connection lost during lock acquisition");
+  const fake = fakeClient({ queryError });
+  const pool = {
+    async connect() {
+      return fake.client;
+    },
+  } as unknown as Pool;
+
+  await assert.rejects(
+    () => runOperationalSync(pool),
+    /connection lost during lock acquisition/,
+  );
+  assert.equal(fake.releaseCalls(), 1);
+  assert.equal(fake.releasedWith(), queryError);
 });
 
 test("analysis jobs recover before the HTTP server starts accepting requests", async () => {
