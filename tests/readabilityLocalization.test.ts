@@ -28,6 +28,8 @@ test("web build keeps static readability without runtime localization or font au
 
 test("static readability layer establishes a hard 16px minimum for functional text", async () => {
   const css = await source("web/readability.css");
+  const styles = await source("web/styles.css");
+  const uiFoundation = await source("web/ui-foundation.css");
   const refinements = await source("web/refinements.css");
   const lab = await source("web/lab.css");
   const labV2 = await source("web/lab-v2.css");
@@ -50,6 +52,8 @@ test("static readability layer establishes a hard 16px minimum for functional te
   assert.match(e2e, /size < minimum - 0\.01/);
 
   assertMinimumExplicitFontSize(css, "readability.css");
+  assertMinimumExplicitFontSize(styles, "styles.css");
+  assertMinimumExplicitFontSize(uiFoundation, "ui-foundation.css");
   assertMinimumExplicitFontSize(refinements, "refinements.css");
   assertMinimumExplicitFontSize(lab, "lab.css");
   assertMinimumExplicitFontSize(labV2, "lab-v2.css");
