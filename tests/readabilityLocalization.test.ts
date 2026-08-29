@@ -30,6 +30,7 @@ test("static readability layer establishes a hard 16px minimum for functional te
   const css = await source("web/readability.css");
   const styles = await source("web/styles.css");
   const uiFoundation = await source("web/ui-foundation.css");
+  const analysisV2Css = await source("web/analysis-v2.css");
   const refinements = await source("web/refinements.css");
   const lab = await source("web/lab.css");
   const labV2 = await source("web/lab-v2.css");
@@ -43,7 +44,7 @@ test("static readability layer establishes a hard 16px minimum for functional te
   assert.match(css, /body \{ font-size: 16px;/);
   assert.match(css, /th,[\s\S]*td,[\s\S]*font-size: 16px !important;/);
   assert.match(css, /\.field input,[\s\S]*\.field select[\s\S]*font-size: 16px !important;/);
-  assert.match(css, /\.a2-panel-head strong,[\s\S]*font-size: 16px !important;/);
+  assert.doesNotMatch(css, /\.a2-/, "Analyses 2.0 must not depend on readability.css overrides");
   assert.doesNotMatch(css, /readability-min-text/);
   assert.doesNotMatch(build, /readability\.js/);
   assert.doesNotMatch(build, /localization\.js/);
@@ -54,6 +55,7 @@ test("static readability layer establishes a hard 16px minimum for functional te
   assertMinimumExplicitFontSize(css, "readability.css");
   assertMinimumExplicitFontSize(styles, "styles.css");
   assertMinimumExplicitFontSize(uiFoundation, "ui-foundation.css");
+  assertMinimumExplicitFontSize(analysisV2Css, "analysis-v2.css");
   assertMinimumExplicitFontSize(refinements, "refinements.css");
   assertMinimumExplicitFontSize(lab, "lab.css");
   assertMinimumExplicitFontSize(labV2, "lab-v2.css");
