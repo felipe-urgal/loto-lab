@@ -162,3 +162,28 @@ test("strategy lab owns its visible vocabulary in Portuguese while preserving in
   assert.doesNotMatch(lab, /"Ranking por ROI"/);
   assert.doesNotMatch(lab, /"Ranking por taxa de premiação"/);
 });
+
+test("refinement layers own their Portuguese analysis vocabulary while preserving score contracts", async () => {
+  const refinements = await source("web/refinements.js");
+  const labRefinements = await source("web/lab-refinements.js");
+
+  for (const copy of [
+    "Explorar classificação",
+    '<option value="score">Pontuação</option>',
+    "Como a pontuação é calculada?",
+    "posições relativas na classificação",
+  ]) {
+    assert.ok(refinements.includes(copy), `missing canonical refinement copy: ${copy}`);
+  }
+  assert.match(refinements, /b\.score - a\.score/);
+  assert.match(refinements, /row\.score\.toFixed/);
+  assert.match(refinements, /class="score-cell"/);
+  assert.doesNotMatch(refinements, /Explorar ranking/);
+  assert.doesNotMatch(refinements, />Score<\/option>/);
+  assert.doesNotMatch(refinements, /Como o score é calculado/);
+  assert.doesNotMatch(refinements, /posições relativas no ranking/);
+
+  assert.match(labRefinements, /const ranking = document\.querySelector\("#lab-ranking"\)/);
+  assert.match(labRefinements, /métrica de classificação não variou/);
+  assert.doesNotMatch(labRefinements, /métrica de ranking não variou/);
+});
