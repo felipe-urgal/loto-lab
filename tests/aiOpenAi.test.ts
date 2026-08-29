@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { OpenAiInterpretationProvider } from "../src/ai/openai.js";
+import { OpenAiInterpretationProvider, OpenAiProviderError } from "../src/ai/openai.js";
 import type { AiEvidenceContext } from "../src/ai/types.js";
 
 const evidence: AiEvidenceContext = {
@@ -24,6 +24,17 @@ const evidence: AiEvidenceContext = {
   },
   recentRealBets: [],
 };
+
+function assertProviderError(
+  error: unknown,
+  expectedCode: string,
+  expectedStatus?: number,
+): boolean {
+  assert.ok(error instanceof OpenAiProviderError);
+  assert.equal(error.code, expectedCode);
+  assert.equal(error.status, expectedStatus);
+  return true;
+}
 
 test("OpenAI provider sends bounded structured evidence and parses the insight contract", async () => {
   let requestUrl = "";
@@ -101,6 +112,52 @@ test("OpenAI provider rejects unstructured output defensively", async () => {
   const provider = new OpenAiInterpretationProvider({ apiKey: "sk-test", fetchImpl });
   await assert.rejects(
     () => provider.interpret({ focus: "analysis", evidence }),
-    /invalid JSON/i,
+    (error) => assertProviderError(error, "AI_INVALID_RESPONSE"),
+  );
+});
+
+test("OpenAI provider rejects requests when credentials are not configured", async () => {
+  const provider = new OpenAiInterpretationProvider({ apiKey: "   " });
+  await assert.rejects(
+    () => provider.interpret({ focus: "overview", evidence }),
+    (error) => assertProviderError(error, "AI_NOT_CONFIGURED"),
+  );
+});
+
+test("OpenAI provider maps transport failures to provider unavailable", async () => {
+  const fetchImpl = (async () => {
+    throw new Error("socket closed");
+  }) as typeof fetch;
+  const provider = new OpenAiInterpretationProvider({ apiKey: "sk-test", fetchImpl });
+
+  await assert.rejects(
+    () => provider.interpret({ focus: "overview", evidence }),
+    (error) => assertProviderError(error, "AI_PROVIDER_UNAVAILABLE", 502),
+  );
+});
+
+test("OpenAI provider maps abort and timeout failures to gateway timeout", async () => {
+  const fetchImpl = (async () => {
+    const error = new Error("timed out");
+    error.name = "TimeoutError";
+    throw error;
+  }) as typeof fetch;
+  const provider = new OpenAiInterpretationProvider({ apiKey: "sk-test", fetchImpl });
+
+  await assert.rejects(
+    () => provider.interpret({ focus: "overview", evidence }),
+    (error) => assertProviderError(error, "AI_PROVIDER_TIMEOUT", 504),
+  );
+});
+
+test("OpenAI provider preserves upstream error code and HTTP status", async () => {
+  const fetchImpl = (async () => new Response(JSON.stringify({
+    error: { code: "rate_limit_exceeded", message: "Too many requests" },
+  }), { status: 429, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+  const provider = new OpenAiInterpretationProvider({ apiKey: "sk-test", fetchImpl });
+
+  await assert.rejects(
+    () => provider.interpret({ focus: "overview", evidence }),
+    (error) => assertProviderError(error, "rate_limit_exceeded", 429),
   );
 });
