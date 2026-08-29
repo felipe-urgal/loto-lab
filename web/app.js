@@ -7,11 +7,11 @@ const LOTTERIES = {
 };
 
 const VIEWS = {
-  dashboard: ["Dashboard", "Visão geral dos concursos, jogos e desempenho."],
-  analysis: ["Análises", "Frequências, score e classificação por horizonte."],
+  dashboard: ["Painel", "Visão geral dos concursos, jogos e desempenho."],
+  analysis: ["Análises", "Frequências, pontuação e classificação por horizonte."],
   generate: ["Gerar jogos", "Monte lotes seguindo as regras da metodologia."],
   games: ["Meus jogos", "Lotes gerados, núcleo compartilhado e conferência."],
-  backtests: ["Backtests", "Teste a estratégia em dados passados sem vazamento futuro."],
+  backtests: ["Testes históricos", "Teste a estratégia em dados passados sem vazamento futuro."],
 };
 
 const ICONS = {
@@ -219,9 +219,9 @@ async function renderDashboard(render) {
 
   content.innerHTML = `<div class="stack">
     <section><div class="section-head"><div><h2>Últimos concursos</h2><p>Base atual armazenada no PostgreSQL.</p></div></div><div class="grid cols-3">${lotteryCards}</div></section>
-    <section><div class="section-head"><div><h2>Desempenho recente · ${lotteryLabel(render.lottery)}</h2><p>Resumo do último backtest persistido.</p></div><button class="link-button" data-go="backtests">Ver backtests</button></div>
+    <section><div class="section-head"><div><h2>Desempenho recente · ${lotteryLabel(render.lottery)}</h2><p>Resumo do último teste histórico salvo.</p></div><button class="link-button" data-go="backtests">Ver testes históricos</button></div>
       <div class="grid cols-4">
-        ${metric("ROI", formatPercent(summary.roi), lastBacktest ? `Backtest #${lastBacktest.id}` : "Sem backtest", typeof summary.roi === "number" ? (summary.roi >= 0 ? "positive" : "negative") : "")}
+        ${metric("ROI", formatPercent(summary.roi), lastBacktest ? `Teste histórico #${lastBacktest.id}` : "Sem teste histórico", typeof summary.roi === "number" ? (summary.roi >= 0 ? "positive" : "negative") : "")}
         ${metric("Cobertura financeira", formatPercent(summary.financialCoverage), "Concursos com rateio conhecido")}
         ${metric("Melhor resultado", summary.bestHits ?? "—", "Maior número de acertos")}
         ${metric("Prêmios", formatCurrency(summary.totalPrizeValue), "Retorno bruto conhecido")}
@@ -256,12 +256,12 @@ async function renderAnalysis(render) {
   content.innerHTML = `<div class="stack">
     <div class="grid cols-4">
       ${metric("Concurso de referência", latest ? `#${latest.number}` : "—", latest ? formatDate(latest.date) : "Sem histórico")}
-      ${metric("Fortes", data.tiers.strong.length, "Terço superior do ranking", "positive")}
+      ${metric("Fortes", data.tiers.strong.length, "Terço superior da classificação", "positive")}
       ${metric("Intermediárias", data.tiers.balanced.length, "Centro da distribuição", "warning")}
-      ${metric("Frias", data.tiers.cold.length, "Terço inferior do ranking")}
+      ${metric("Frias", data.tiers.cold.length, "Terço inferior da classificação")}
     </div>
-    <section><div class="section-head"><div><h2>Classificação das dezenas</h2><p>Ranking relativo dentro da loteria selecionada.</p></div></div><div class="analysis-groups">${group("strong", "Fortes", "maior score combinado")}${group("balanced", "Intermediárias", "faixa central")}${group("cold", "Frias", "menor score combinado")}</div></section>
-    <section><div class="section-head"><div><h2>Top dezenas por score</h2><p>Componentes normalizados de 0 a 100.</p></div></div><div class="panel table-wrap"><table><thead><tr><th>Dezena</th><th>Grupo</th><th>Score</th><th>Ano</th><th>Mês</th><th>10 últimos</th><th>20 últimos</th><th>Histórico</th></tr></thead><tbody>${rows}</tbody></table></div></section>
+    <section><div class="section-head"><div><h2>Classificação das dezenas</h2><p>Classificação relativa dentro da loteria selecionada.</p></div></div><div class="analysis-groups">${group("strong", "Fortes", "maior pontuação combinada")}${group("balanced", "Intermediárias", "faixa central")}${group("cold", "Frias", "menor pontuação combinada")}</div></section>
+    <section><div class="section-head"><div><h2>Dezenas com maior pontuação</h2><p>Componentes normalizados de 0 a 100.</p></div></div><div class="panel table-wrap"><table><thead><tr><th>Dezena</th><th>Grupo</th><th>Pontuação</th><th>Ano</th><th>Mês</th><th>10 últimos</th><th>20 últimos</th><th>Histórico</th></tr></thead><tbody>${rows}</tbody></table></div></section>
   </div>`;
 }
 
@@ -374,15 +374,15 @@ async function renderBacktests(render) {
   if (!isCurrentRender(render)) return;
 
   content.innerHTML = `<div class="stack">
-    <section><div class="section-head"><div><h2>Executar backtest</h2><p>Cada concurso é simulado usando somente o histórico disponível antes dele.</p></div></div><form class="panel form-panel" id="backtest-form"><div class="form-grid">
+    <section><div class="section-head"><div><h2>Executar teste histórico</h2><p>Cada concurso é simulado usando somente o histórico disponível antes dele.</p></div></div><form class="panel form-panel" id="backtest-form"><div class="form-grid">
       <div class="field"><label for="bt-games">Jogos por concurso</label><input id="bt-games" name="gameCount" type="number" min="1" max="10" value="${LOTTERIES[render.lottery].defaultGames}" /></div>
       <div class="field"><label for="bt-warmup">Aquecimento</label><input id="bt-warmup" name="warmupContests" type="number" min="1" max="500" value="20" /></div>
       <div class="field" ${render.lottery !== "lotofacil" ? 'style="display:none"' : ""}><label for="bt-fixed">Núcleo fixo</label><select id="bt-fixed" name="fixedCount"><option value="8">8 dezenas</option><option value="9">9 dezenas</option><option value="10">10 dezenas</option></select></div>
       <div class="field"><label for="bt-start">Concurso inicial</label><input id="bt-start" name="startContest" type="number" min="1" placeholder="Opcional" /></div>
       <div class="field"><label for="bt-end">Concurso final</label><input id="bt-end" name="endContest" type="number" min="1" value="${latest?.number || ""}" placeholder="Opcional" /></div>
-    </div><div class="form-actions"><div><label class="checkbox"><input type="checkbox" name="persist" checked /> Salvar execução</label><div class="form-note">Cada execução HTTP é limitada a 500 concursos para proteger a aplicação.</div></div><button class="button primary" type="submit"><span class="button-icon" data-icon="play"></span>Executar backtest</button></div></form></section>
+    </div><div class="form-actions"><div><label class="checkbox"><input type="checkbox" name="persist" checked /> Salvar execução</label><div class="form-note">Cada execução HTTP é limitada a 500 concursos para proteger a aplicação.</div></div><button class="button primary" type="submit"><span class="button-icon" data-icon="play"></span>Executar teste histórico</button></div></form></section>
     <section id="backtest-result"></section>
-    <section><div class="section-head"><div><h2>Execuções recentes</h2><p>Histórico persistido para ${lotteryLabel(render.lottery)}.</p></div></div><div class="panel list">${runs.length ? runs.map(backtestRow).join("") : emptyState("Nenhum backtest salvo", "Execute a primeira simulação para criar seu histórico.")}</div></section>
+    <section><div class="section-head"><div><h2>Execuções recentes</h2><p>Histórico persistido para ${lotteryLabel(render.lottery)}.</p></div></div><div class="panel list">${runs.length ? runs.map(backtestRow).join("") : emptyState("Nenhum teste histórico salvo", "Execute a primeira simulação para criar seu histórico.")}</div></section>
   </div>`;
   installIcons(content);
   content.querySelector("#backtest-form").addEventListener("submit", handleBacktest);
@@ -391,7 +391,7 @@ async function renderBacktests(render) {
 function backtestRow(run) {
   const summary = run.summary || {};
   const roi = summary.roi;
-  return `<div class="list-row"><div class="list-row-main"><strong>Backtest #${run.id}</strong><p>${run.roundCount} concurso(s) · ${summary.totalGames ?? "—"} jogo(s) · ${formatDateTime(run.createdAt)}</p></div><div class="list-row-value"><strong class="${typeof roi === "number" && roi >= 0 ? "positive" : ""}">${formatPercent(roi)}</strong><small>ROI · cobertura ${formatPercent(summary.financialCoverage)}</small></div></div>`;
+  return `<div class="list-row"><div class="list-row-main"><strong>Teste histórico #${run.id}</strong><p>${run.roundCount} concurso(s) · ${summary.totalGames ?? "—"} jogo(s) · ${formatDateTime(run.createdAt)}</p></div><div class="list-row-value"><strong class="${typeof roi === "number" && roi >= 0 ? "positive" : ""}">${formatPercent(roi)}</strong><small>ROI · cobertura ${formatPercent(summary.financialCoverage)}</small></div></div>`;
 }
 
 async function handleBacktest(event) {
@@ -417,13 +417,13 @@ async function handleBacktest(event) {
     const result = await api("/backtests/run", { method: "POST", body: JSON.stringify(body) });
     const summary = result.summary || {};
     output.innerHTML = `<div class="section-head"><div><h2>Resultado ${result.id ? `· #${result.id}` : ""}</h2><p>${result.roundCount} concurso(s) simulados.</p></div></div><div class="grid cols-4">${metric("ROI", formatPercent(summary.roi), "resultado sobre o custo coberto", typeof summary.roi === "number" ? (summary.roi >= 0 ? "positive" : "negative") : "")}${metric("Custo", formatCurrency(summary.financialCost), "custo com rateio disponível")}${metric("Prêmios", formatCurrency(summary.totalPrizeValue), "retorno bruto conhecido")}${metric("Cobertura", formatPercent(summary.financialCoverage), `${summary.totalGames ?? "—"} jogos simulados`)}</div>`;
-    toast("Backtest concluído.");
+    toast("Teste histórico concluído.");
   } catch (error) {
-    output.innerHTML = `<div class="error-state" style="min-height:140px"><span class="error-code">${escapeHtml(error.code)}</span><strong>Falha no backtest</strong><p>${escapeHtml(error.message)}</p></div>`;
+    output.innerHTML = `<div class="error-state" style="min-height:140px"><span class="error-code">${escapeHtml(error.code)}</span><strong>Falha no teste histórico</strong><p>${escapeHtml(error.message)}</p></div>`;
     toast(error.message, "error");
   } finally {
     button.disabled = false;
-    button.innerHTML = '<span class="button-icon" data-icon="play"></span>Executar backtest';
+    button.innerHTML = '<span class="button-icon" data-icon="play"></span>Executar teste histórico';
     installIcons(button);
   }
 }
