@@ -106,6 +106,19 @@ if (ciNodeVersions.length === 0) {
   fail(`CI deve usar Node ${nodeVersion}; encontrado ${ciNodeVersions.join(", ")}`);
 }
 
+const requiredWorkflowSnippets = [
+  ["permissions mínimos", "permissions:\n  contents: read"],
+  ["grupo de concorrência", "group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"],
+  ["cancelamento apenas de PR superseded", "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"],
+  ["timeout global do job", "    timeout-minutes: 15"],
+  ["timeout dos testes", "      - name: Run tests with coverage\n        timeout-minutes: 5"],
+  ["timeout do build da imagem", "      - name: Build production image\n        timeout-minutes: 5"],
+  ["timeout do E2E", "      - name: Run real-browser E2E\n        timeout-minutes: 5"],
+];
+for (const [label, snippet] of requiredWorkflowSnippets) {
+  if (!workflow.includes(snippet)) fail(`CI perdeu ${label}`);
+}
+
 const dockerNodeVersions = [...dockerfile.matchAll(/^FROM\s+node:([0-9]+\.[0-9]+\.[0-9]+)-/gm)].map(
   (match) => match[1],
 );

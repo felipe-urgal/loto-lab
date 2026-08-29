@@ -96,6 +96,25 @@ npm audit --omit=dev --audit-level=high
 
 O gate cobre dependências de produção e falha para vulnerabilidades `high` ou `critical`. Dependências de desenvolvimento continuam visíveis no `npm ci`/Dependabot, mas não bloqueiam produção por esse gate específico.
 
+## Governança do workflow
+
+O workflow funcional usa permissões mínimas explícitas para o `GITHUB_TOKEN`:
+
+```yaml
+permissions:
+  contents: read
+```
+
+Novas permissões só devem ser concedidas no workflow ou job que realmente precisar delas. Scanners que necessitem publicar resultados de segurança devem permanecer separados do CI funcional, para que o job principal continue read-only.
+
+Runs de um mesmo PR compartilham um grupo de concorrência e uma atualização mais nova cancela a anterior. Pushes para `main` **não** são cancelados: cada merge continua recebendo sua validação completa mesmo quando outro commit chega em seguida.
+
+O job funcional possui timeout global de 15 minutos. Os passos mais caros e sujeitos a espera externa — testes com cobertura, build da imagem e E2E real — possuem timeout próprio de 5 minutos. Os smoke tests também mantêm loops de readiness explicitamente limitados.
+
+`actions/checkout` e `actions/setup-node` permanecem pinadas por SHA, e as imagens usadas pelo Dockerfile/serviço PostgreSQL permanecem pinadas por digest. O label do runner hospedado pelo GitHub (`ubuntu-latest`) não oferece pinning por digest; por isso a reprodutibilidade do projeto é garantida nos componentes controláveis (toolchain, Actions, dependências e containers) e validada pelos gates de plataforma.
+
+`scripts/verifyPlatform.mjs` protege esse baseline e falha se permissões mínimas, política de concorrência ou timeouts críticos forem removidos do workflow principal.
+
 ## CI
 
 Em PRs e pushes para `main`, a ordem principal é:
