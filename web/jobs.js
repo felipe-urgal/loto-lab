@@ -188,20 +188,21 @@ function schedulePoll() {
 }
 
 async function loadJobs(showLoading = true) {
+  const requestedLottery = lottery.value;
   const token = ++loadToken;
   if (showLoading) listRoot.innerHTML = '<div class="loading-state"><span class="spinner"></span><span>Carregando execuções...</span></div>';
   refreshButton.disabled = true;
   try {
-    const data = await api(`/analysis-jobs?lottery=${encodeURIComponent(lottery.value)}&limit=100`);
-    if (token !== loadToken) return;
+    const data = await api(`/analysis-jobs?lottery=${encodeURIComponent(requestedLottery)}&limit=100`);
+    if (token !== loadToken || lottery.value !== requestedLottery) return;
     jobs = data.items || [];
     renderJobs();
     schedulePoll();
   } catch (error) {
-    if (token !== loadToken) return;
+    if (token !== loadToken || lottery.value !== requestedLottery) return;
     listRoot.innerHTML = `<div class="panel experiment-empty job-error">${escapeHtml(error.message)}</div>`;
   } finally {
-    if (token === loadToken) refreshButton.disabled = false;
+    if (token === loadToken && lottery.value === requestedLottery) refreshButton.disabled = false;
   }
 }
 
@@ -249,9 +250,8 @@ lottery.addEventListener("change", async () => {
   const requestedLottery = lottery.value;
   localStorage.setItem("loto-lab:lottery", requestedLottery);
   syncFields();
-  await loadStrategies();
+  await Promise.all([loadStrategies(), loadJobs()]);
   if (lottery.value !== requestedLottery) return;
-  await loadJobs();
 });
 refreshButton.addEventListener("click", () => { void loadJobs(); });
 document.addEventListener("visibilitychange", () => {
