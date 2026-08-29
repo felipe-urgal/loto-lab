@@ -1,5 +1,5 @@
 import type { Contest, ContestPrizeTier, LotteryId } from "../domain/types.js";
-import { getLotteryConfig } from "../lotteries/config.js";
+import { assertValidContestNumbers } from "../domain/validation.js";
 import type { ContestSource, LotteryAgendaSnapshot, LotteryAgendaSource } from "./source.js";
 
 const BASE_URL = "https://servicebus2.caixa.gov.br/portaldeloterias/api";
@@ -36,7 +36,12 @@ function toIsoDate(value: string): string {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
   if (!match) throw new Error(`Invalid Caixa date: ${value}`);
   const [, day, month, year] = match;
-  return `${year}-${month}-${day}`;
+  const iso = `${year}-${month}-${day}`;
+  const parsed = new Date(`${iso}T00:00:00.000Z`);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== iso) {
+    throw new Error(`Invalid Caixa date: ${value}`);
+  }
+  return iso;
 }
 
 function sanitizeLuckyMonth(value?: string | null): string | undefined {
@@ -61,14 +66,9 @@ function normalizePrizeTiers(value?: CaixaPrizeTierResponse[] | null): ContestPr
 }
 
 export function normalizeCaixaContest(lottery: LotteryId, payload: CaixaContestResponse): Contest {
-  const config = getLotteryConfig(lottery);
   const numbers = payload.listaDezenas.map(Number).sort((a, b) => a - b);
   if (!Number.isInteger(payload.numero) || payload.numero < 1) throw new Error("Invalid contest number returned by Caixa");
-  if (numbers.length !== config.drawSize) throw new Error(`Expected ${config.drawSize} numbers for ${lottery}, received ${numbers.length}`);
-  if (numbers.some((number) => !Number.isInteger(number) || number < config.minNumber || number > config.maxNumber)) {
-    throw new Error(`Invalid drawn number returned by Caixa for ${lottery}`);
-  }
-  if (new Set(numbers).size !== numbers.length) throw new Error(`Duplicated drawn number returned by Caixa for ${lottery}`);
+  assertValidContestNumbers(lottery, numbers);
 
   const luckyMonth = lottery === "dia-de-sorte" ? sanitizeLuckyMonth(payload.nomeTimeCoracaoMesSorte) : undefined;
   const prizeTiers = normalizePrizeTiers(payload.listaRateioPremio);
