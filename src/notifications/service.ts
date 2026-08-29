@@ -112,7 +112,7 @@ export class NotificationService {
     }
 
     const latest = currentOperation
-      ?? await this.operations.latest("sync-all") as OperationRunRecord<Record<string, unknown>> | undefined;
+      ?? (await this.operations.latest("sync-all") as OperationRunRecord<Record<string, unknown>> | undefined);
     if (latest && (latest.status === "failed" || latest.status === "partial" || latest.status === "abandoned")) {
       const abandoned = latest.status === "abandoned";
       const failed = latest.status === "failed";
