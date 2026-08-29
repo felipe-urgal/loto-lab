@@ -88,7 +88,8 @@ td,
 .button, .link-button { min-height: 42px; padding-inline: 14px; }
 .button.compact { min-height: 38px; }
 .list-row { min-height: 70px; }
-.list-row-main p, .list-row-value small { line-height: 1.55; }
+.list-row-main p { line-height: 1.55; }
+.list-row-value small { line-height: 1.4; }
 th, td { padding-top: 14px; padding-bottom: 14px; line-height: 1.45; }
 .field input, .field select { min-height: 46px; }
 .form-note, .form-inline-note, .content p { line-height: 1.55; }
