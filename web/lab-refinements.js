@@ -54,7 +54,7 @@ function refineMetric() {
     if (head && !head.querySelector(".lab-chart-auto-note")) {
       const note = document.createElement("div");
       note.className = "lab-chart-auto-note";
-      note.textContent = "A métrica de ranking não variou neste período; o gráfico abriu em média de acertos para facilitar a comparação.";
+      note.textContent = "A métrica de classificação não variou neste período; o gráfico abriu em média de acertos para facilitar a comparação.";
       head.append(note);
     }
   }
