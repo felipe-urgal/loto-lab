@@ -94,10 +94,25 @@ export class AnalysisJobManager {
     }
 
     this.rerunRequested = false;
-    this.running = this.drain().finally(() => {
-      this.running = undefined;
-      if (this.rerunRequested && !this.stopped) this.kick();
-    });
+    let drainFailed = false;
+    this.running = this.drain()
+      .catch((error: unknown) => {
+        drainFailed = true;
+        const serialized = serializedError(error);
+        logEvent("error", "analysis_job_drain_failed", {
+          code: serialized.code,
+          message: serialized.message,
+        });
+      })
+      .finally(() => {
+        this.running = undefined;
+        if (this.stopped) return;
+        if (this.rerunRequested) {
+          this.kick();
+        } else if (drainFailed) {
+          this.scheduleRetry();
+        }
+      });
   }
 
   private async execute(job: AnalysisJobRecord, signal: AbortSignal): Promise<Record<string, unknown>> {
