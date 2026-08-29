@@ -47,6 +47,13 @@ test("AI workspace and provider status are served without exposing credentials",
   assert.equal(script.status, 200);
   const source = await script.text();
   assert.match(source, /\/ai\/insights/);
+  assert.match(source, /let historyLoadToken = 0/);
+  assert.match(source, /let insightRequestToken = 0/);
+  assert.match(source, /const token = \+\+historyLoadToken/);
+  assert.match(source, /token !== historyLoadToken \|\| lotterySelect\.value !== requestedLottery/);
+  assert.match(source, /const token = \+\+insightRequestToken/);
+  assert.match(source, /token !== insightRequestToken \|\| lotterySelect\.value !== requestedLottery/);
+  assert.match(source, /insightRequestToken \+= 1/);
   // The UI may name OPENAI_API_KEY to explain local setup, but authentication
   // material and provider headers must remain exclusively on the backend.
   assert.doesNotMatch(source, /Authorization\s*:/i);
