@@ -76,6 +76,10 @@ test("localization keeps product vocabulary in Portuguese and scopes dynamic rep
   assert.match(js, /\.job-result/);
   assert.match(js, /\.status-pill/);
   assert.match(js, /function replaceAnalysisTerms/);
+  assert.match(js, /loto-lab:view-rendered/);
+  assert.match(js, /translateTree\(document\)/);
+  assert.doesNotMatch(js, /MutationObserver/, "localization must not monitor the entire DOM");
+  assert.doesNotMatch(js, /observer\.observe/, "localization must use explicit render lifecycle events");
 
   const knownStart = js.indexOf("function replaceKnownPhrases");
   const knownEnd = js.indexOf("function replaceOperationalTerms");
