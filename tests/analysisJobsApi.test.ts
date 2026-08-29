@@ -5,10 +5,9 @@ import type { Contest } from "../src/domain/types.js";
 import { getAnalysisJobManager } from "../src/analysis/jobManager.js";
 import { createLotoLabServer } from "../src/api/server.js";
 import { expensiveAnalysisGate } from "../src/api/workGate.js";
-import { createPostgresPool } from "../src/db/client.js";
-import { runMigrations } from "../src/db/migrations.js";
 import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
 import { PostgresStrategyRepository } from "../src/persistence/strategyRepository.js";
+import { createIsolatedPostgresDatabase } from "./helpers/postgres.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -88,21 +87,9 @@ test(
   "analysis jobs API validates, enqueues, lists, fetches and cancels work",
   { skip: !databaseUrl, timeout: 30_000 },
   async (t) => {
-    const pool = createPostgresPool({ connectionString: databaseUrl!, max: 4 });
+    const database = await createIsolatedPostgresDatabase({ label: "analysis-jobs-api", max: 4 });
+    const { pool } = database;
     const manager = getAnalysisJobManager(pool);
-
-    await runMigrations(pool);
-    await pool.query(`
-      TRUNCATE TABLE
-        analysis_jobs,
-        backtest_rounds,
-        backtest_runs,
-        strategy_versions,
-        strategies,
-        contest_prize_tiers,
-        contests
-      RESTART IDENTITY CASCADE
-    `);
 
     await new PostgresContestRepository(pool).upsertMany(
       Array.from({ length: 26 }, (_, index) => makeMegaContest(index + 1)),
@@ -144,7 +131,7 @@ test(
     t.after(async () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await manager.stopAndDrain();
-      await pool.end();
+      await database.close();
     });
 
     const address = server.address();
