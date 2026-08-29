@@ -1,10 +1,10 @@
 # Operação da base histórica
 
-Este documento descreve como preparar e manter os concursos usados por análise, geração e backtests do Loto Lab.
+Este documento descreve como preparar e manter os concursos usados por análise, geração e testes históricos do Loto Lab.
 
 ## Princípio
 
-O Dashboard pode funcionar com apenas o concurso mais recente, mas análises e backtests precisam de histórico suficiente. O comando `db:bootstrap` existe para transformar uma instalação vazia ou parcial em uma base histórica contínua.
+O Painel pode funcionar com apenas o concurso mais recente, mas análises e testes históricos precisam de histórico suficiente. O comando `db:bootstrap` existe para transformar uma instalação vazia ou parcial em uma base histórica contínua.
 
 ## Configuração local
 
@@ -14,11 +14,13 @@ Crie o arquivo local `.env` uma vez:
 cp .env.example .env
 ```
 
-O arquivo já usa o PostgreSQL do Docker Compose na porta 5433:
+O arquivo já usa o PostgreSQL do Docker Compose na porta `5434`:
 
 ```text
-DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5433/loto_lab
+DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5434/loto_lab
 ```
+
+A aplicação/API local usa `127.0.0.1:5200` por padrão.
 
 `.env` é ignorado pelo Git e não deve ser versionado.
 
@@ -100,7 +102,7 @@ A saída informa para cada loteria:
 - cobertura financeira percentual;
 - data/hora da última atualização de algum concurso.
 
-O Dashboard consulta os mesmos dados em:
+O Painel consulta os mesmos dados em:
 
 ```http
 GET /api/v1/data/status
@@ -120,6 +122,18 @@ npm run db:sync -- dia-de-sorte
 
 Se houver suspeita de lacunas ou uma execução tiver sido interrompida, prefira `db:bootstrap`.
 
+## Sincronização operacional
+
+A aplicação também possui uma rotina operacional que sincroniza as três loterias e reconcilia apostas reais pendentes:
+
+```bash
+npm run ops:sync
+```
+
+Quando `OPS_AUTO_SYNC=true`, `npm run api:start` inicia o scheduler e executa a mesma rotina periodicamente. O padrão atual é intervalo de 30 minutos, com alerta de desatualização após 180 minutos.
+
+Detalhes em [`OPERATIONS.md`](OPERATIONS.md).
+
 ## Dados financeiros
 
 O adapter da CAIXA persiste, quando disponíveis:
@@ -138,4 +152,4 @@ A cobertura financeira mostrada no status representa a proporção dos concursos
 - o bootstrap nunca remove concursos existentes;
 - upserts incompletos não apagam rateios financeiros já conhecidos;
 - reexecutar bootstrap é seguro;
-- o histórico é usado pelo backtest com a regra anti-leakage já existente: o concurso alvo nunca entra nos dados usados para gerar seus próprios jogos.
+- o histórico é usado por testes históricos com a regra anti-leakage: o concurso alvo nunca entra nos dados usados para gerar seus próprios jogos.
