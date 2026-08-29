@@ -59,7 +59,7 @@ tr.is-top-five td:first-child strong::after {
 
 /* Backtests */
 .backtest-default-note {
-  margin-top: 6px; color: var(--muted-2); font-size: 9px; line-height: 1.4;
+  margin-top: 6px; color: var(--muted-2); font-size: 16px; line-height: 1.4;
 }
 
 /* Strategy Lab */
