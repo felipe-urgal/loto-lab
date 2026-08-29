@@ -50,7 +50,7 @@ experimentField.innerHTML = `
   <label for="lab-experiment">Experimento</label>
   <select id="lab-experiment">
     <option value="fixed-core">Núcleo fixo</option>
-    <option value="score-model">Score v1 × v2 × sem score</option>
+    <option value="score-model">Pontuação v1 × v2 × sem pontuação</option>
     <option value="external-rules">Regras externas (Mega-Sena)</option>
   </select>`;
 formGrid.prepend(experimentField);
@@ -167,8 +167,8 @@ function updateLotteryCopy(resetGames = false) {
   const experiment = selectedExperiment();
   ensureInferenceResolution(experiment);
   if (experiment === "score-model") {
-    title.textContent = `${config.label}: Score v1 × Score v2 × sem score`;
-    description.textContent = "Isola o valor do ranking, mede AUC fora da amostra e faz walk-forward sem olhar concursos futuros.";
+    title.textContent = `${config.label}: Pontuação v1 × Pontuação v2 × sem pontuação`;
+    description.textContent = "Isola o valor da classificação, mede AUC fora da amostra e faz validação progressiva sem olhar concursos futuros.";
   } else if (experiment === "external-rules") {
     title.textContent = "Mega-Sena: validação de regras externas";
     description.textContent = "Testa regras como hipóteses separadas e corrige a evidência pela quantidade de variantes comparadas. O modo usa pelo menos 250 controles para ter resolução inferencial suficiente.";
@@ -249,7 +249,7 @@ function variantBadge(result, variant, index) {
 function statusCopy(benchmark) {
   if (benchmark.status === "beats-random") {
     return {
-      label: "Evidência acima do random",
+      label: "Evidência acima do acaso",
       tone: "positive",
       copy: "A cauda superior permanece significativa após corrigir o número de variantes testadas.",
     };
@@ -277,7 +277,7 @@ function statusCopy(benchmark) {
   }
   if (benchmark.status === "underperforms-random") {
     return {
-      label: "Evidência abaixo do random",
+      label: "Evidência abaixo do acaso",
       tone: "negative",
       copy: "A cauda inferior permanece significativa após a correção por múltiplas comparações.",
     };
@@ -305,21 +305,21 @@ function renderPredictiveEvidence(result) {
   const walk = result.walkForward;
   const walkMarkup = walk ? `<div class="lab-walk-forward">
     <div>
-      <span class="lab-eyebrow">Otimização walk-forward</span>
+      <span class="lab-eyebrow">Otimização por validação progressiva</span>
       <strong>${formatAuc(walk.tunedAuc)} AUC otimizado vs ${formatAuc(walk.defaultAuc)} padrão</strong>
-      <p>${walk.folds.length} folds · ${walk.totalTestRounds} concursos fora da amostra. Os pesos são escolhidos no passado e congelados no bloco seguinte.</p>
+      <p>${walk.folds.length} blocos · ${walk.totalTestRounds} concursos fora da amostra. Os pesos são escolhidos no passado e congelados no bloco seguinte.</p>
     </div>
     <div class="lab-null-box">
       <span>Ganho observado</span>
       <strong>${formatPercentagePoints(walk.deltaVsDefault)}</strong>
-      <small>Null P05 ${formatPercentagePoints(walk.nullBenchmark.p05)} · P95 ${formatPercentagePoints(walk.nullBenchmark.p95)} · p bilateral ${formatPercent(walk.nullBenchmark.twoSidedPValue)}</small>
+      <small>Referência nula P05 ${formatPercentagePoints(walk.nullBenchmark.p05)} · P95 ${formatPercentagePoints(walk.nullBenchmark.p95)} · p bilateral ${formatPercent(walk.nullBenchmark.twoSidedPValue)}</small>
     </div>
   </div>` : "";
 
   return `<section class="panel lab-predictive-evidence">
     <div class="lab-evidence-head"><div>
       <span class="lab-eyebrow">Qualidade preditiva</span>
-      <strong>O ranking colocou os números sorteados acima dos não sorteados?</strong>
+      <strong>A classificação colocou os números sorteados acima dos não sorteados?</strong>
       <p>AUC 0,500 equivale a ordenação sem informação. Concursos com lacuna no predecessor são excluídos da validação.</p>
     </div></div>
     <div class="lab-evidence-grid">${qualityCards}</div>
@@ -336,9 +336,9 @@ function renderBenchmark(result) {
   const metricLabel = benchmark.basis === "roi" ? "ROI" : "taxa de premiação";
   return `<article class="panel lab-benchmark-card is-${status.tone}">
     <div class="lab-benchmark-main">
-      <span class="lab-eyebrow">Benchmark · ${benchmark.distribution.samples} controles · ${benchmark.familySize} variante(s) · ${benchmark.observationRounds} concursos elegíveis</span>
+      <span class="lab-eyebrow">Referência · ${benchmark.distribution.samples} controles · ${benchmark.familySize} variante(s) · ${benchmark.observationRounds} concursos elegíveis</span>
       <strong>${escapeHtml(bestStrategy.label)} · ${status.label}</strong>
-      <p>${escapeHtml(status.copy)} Percentil mid-rank ${formatPercent(benchmark.strategyPercentile)}; diferença para a mediana da distribuição: ${formatPercentagePoints(benchmark.medianDelta)} em ${metricLabel}. p ajustado: ${formatPercent(benchmark.adjustedPValue)}.</p>
+      <p>${escapeHtml(status.copy)} Percentil de posição média ${formatPercent(benchmark.strategyPercentile)}; diferença para a mediana da distribuição: ${formatPercentagePoints(benchmark.medianDelta)} em ${metricLabel}. p ajustado: ${formatPercent(benchmark.adjustedPValue)}.</p>
     </div>
     <div class="lab-distribution">
       <div><span>P05</span><strong>${formatPercent(benchmark.distribution.p05)}</strong></div>
@@ -473,7 +473,7 @@ function renderChart() {
       : "";
   }).join("");
   const legend = variants.map((variant, index) =>
-    `<span class="lab-legend-item"><span class="lab-legend-dot series-${index}"></span>${escapeHtml(variant.label)}${variant.key === control.key ? " · benchmark" : ""}</span>`,
+    `<span class="lab-legend-item"><span class="lab-legend-dot series-${index}"></span>${escapeHtml(variant.label)}${variant.key === control.key ? " · referência" : ""}</span>`,
   ).join("");
 
   chartRoot.innerHTML = `
@@ -486,11 +486,11 @@ function renderResult(result) {
   currentResult = result;
   resultsRoot.hidden = false;
   message.hidden = true;
-  basis.textContent = result.rankingBasis === "roi" ? "Ranking por ROI" : "Ranking por taxa de premiação";
+  basis.textContent = result.rankingBasis === "roi" ? "Classificação por ROI" : "Classificação por taxa de premiação";
   const experimentCopy = result.experiment === "external-rules"
     ? "regras externas"
     : result.experiment === "score-model"
-      ? "modelos de score"
+      ? "modelos de pontuação"
       : "núcleo fixo";
   periodCopy.textContent = `Concursos #${result.startContest ?? "—"} a #${result.endContest ?? "—"} · ${result.gameCount} jogo(s) por concurso · ${experimentCopy} · ${result.randomSamples} controles aleatórios · blocos de ${result.bucketSize}`;
   metricSelect.value = result.rankingBasis === "roi" ? "roi" : "prizeRate";
@@ -507,7 +507,7 @@ async function runComparison(event) {
   resultsRoot.hidden = true;
   setMessage(
     "running",
-    "Executando backtests",
+    "Executando testes históricos",
     "Estratégias, AUC e controles aleatórios usam somente a informação disponível antes de cada concurso elegível.",
   );
 
