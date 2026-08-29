@@ -31,6 +31,9 @@ test("static readability layer establishes a hard 16px minimum for functional te
   const styles = await source("web/styles.css");
   const uiFoundation = await source("web/ui-foundation.css");
   const analysisV2Css = await source("web/analysis-v2.css");
+  const generationV2Css = await source("web/generation-v2.css");
+  const generationExplainabilityCss = await source("web/generation-explainability.css");
+  const generationDiversityCss = await source("web/generation-diversity.css");
   const refinements = await source("web/refinements.css");
   const lab = await source("web/lab.css");
   const labV2 = await source("web/lab-v2.css");
@@ -56,6 +59,9 @@ test("static readability layer establishes a hard 16px minimum for functional te
   assertMinimumExplicitFontSize(styles, "styles.css");
   assertMinimumExplicitFontSize(uiFoundation, "ui-foundation.css");
   assertMinimumExplicitFontSize(analysisV2Css, "analysis-v2.css");
+  assertMinimumExplicitFontSize(generationV2Css, "generation-v2.css");
+  assertMinimumExplicitFontSize(generationExplainabilityCss, "generation-explainability.css");
+  assertMinimumExplicitFontSize(generationDiversityCss, "generation-diversity.css");
   assertMinimumExplicitFontSize(refinements, "refinements.css");
   assertMinimumExplicitFontSize(lab, "lab.css");
   assertMinimumExplicitFontSize(labV2, "lab-v2.css");
