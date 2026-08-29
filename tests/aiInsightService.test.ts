@@ -6,8 +6,10 @@ import type {
   AiInterpretationRequest,
   AiProviderResult,
 } from "../src/ai/types.js";
+import type { Contest } from "../src/domain/types.js";
 import { createPostgresPool } from "../src/db/client.js";
 import { runMigrations } from "../src/db/migrations.js";
+import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -23,6 +25,20 @@ function insightResult(model: string, suffix: string): AiProviderResult {
       nextTests: [`Next ${suffix}`],
     },
     usage: { inputTokens: 10, outputTokens: 5 },
+  };
+}
+
+function megaContest(number: number): Contest {
+  return {
+    lottery: "mega-sena",
+    number,
+    date: "2026-08-29",
+    numbers: [1, 7, 13, 29, 42, 60],
+    prizeTiers: [
+      { description: "6 acertos", winners: 0, prizeValue: 0 },
+      { description: "5 acertos", winners: 10, prizeValue: 50_000 },
+      { description: "4 acertos", winners: 1_000, prizeValue: 1_000 },
+    ],
   };
 }
 
@@ -77,13 +93,79 @@ test(
     `);
     t.after(async () => pool.end());
 
+    await new PostgresContestRepository(pool).upsertMany([megaContest(3000)]);
+    await pool.query(
+      `
+        INSERT INTO backtest_runs (lottery, options, summary, tested_contests, total_games)
+        VALUES ('mega-sena', $1::jsonb, $2::jsonb, 1, 1)
+      `,
+      [JSON.stringify({ gameCount: 1, warmupContests: 20 }), JSON.stringify({ averageHitsPerGame: 1.5 })],
+    );
+    const labResult = {
+      schemaVersion: 2,
+      lottery: "mega-sena",
+      experiment: "fixed-core",
+      startContest: 2990,
+      endContest: 3000,
+      gameCount: 1,
+      warmupContests: 20,
+      bucketSize: 5,
+      randomSamples: 100,
+      rankingBasis: "roi",
+      winner: "core-3",
+      benchmark: {
+        status: "inconclusive",
+        basis: "roi",
+        adjustedPValue: 0.4,
+        lowerAdjustedPValue: 0.7,
+        strategyPercentile: 0.65,
+        resolutionSufficient: true,
+        sampleSizeSufficient: false,
+        observationRounds: 11,
+        minimumObservationRounds: 30,
+        familySize: 3,
+      },
+      variants: [{
+        key: "core-3",
+        label: "3 fixas",
+        fixedCount: 3,
+        summary: {
+          averageHitsPerGame: 1.5,
+          averageFixedHitsPerContest: 0.8,
+          maxHits: 4,
+          prizeRate: 0.1,
+          roi: -0.5,
+          financialCoverage: 1,
+          netResult: -30,
+        },
+        series: [],
+      }],
+    };
+    await pool.query(
+      `
+        INSERT INTO analysis_jobs (kind, lottery, status, input, result, finished_at)
+        VALUES ('strategy-lab', 'mega-sena', 'completed', '{}'::jsonb, $1::jsonb, NOW())
+      `,
+      [JSON.stringify(labResult)],
+    );
+
     const provider = new TestProvider();
     const service = new AiInsightService(pool, provider);
+    assert.deepEqual(service.status(), {
+      provider: "test-provider",
+      configured: true,
+      model: "test-model",
+    });
 
     const first = await service.generate("mega-sena", "overview");
     assert.equal(provider.calls, 1);
     assert.ok(first.evidenceHash);
     assert.equal(first.reused, undefined);
+    assert.equal(first.evidence.latestContest?.number, 3000);
+    assert.ok(first.evidence.latestBacktest?.id);
+    assert.equal(first.evidence.strategyLab?.bestInPeriod, "core-3");
+    assert.equal(first.evidence.strategyLab?.benchmark.status, "inconclusive");
+    assert.equal(first.evidence.strategyLab?.variants[0]?.fixedCount, 3);
 
     await delay(5);
     const cached = await service.generate("mega-sena", "overview");
@@ -110,9 +192,12 @@ test(
     const concurrentFirst = service.generate("mega-sena", "analysis");
     await interpretationStarted;
     const concurrentSecond = service.generate("mega-sena", "analysis");
-    await delay(25);
-    assert.equal(provider.calls, beforeConcurrentCalls + 1);
-    releaseInterpretation();
+    try {
+      await delay(25);
+      assert.equal(provider.calls, beforeConcurrentCalls + 1);
+    } finally {
+      releaseInterpretation();
+    }
 
     const [sharedFirst, sharedSecond] = await Promise.all([concurrentFirst, concurrentSecond]);
     assert.equal(sharedSecond.id, sharedFirst.id);
