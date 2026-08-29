@@ -38,8 +38,8 @@ function installEducation(shell) {
   education.className = "g2-education-grid";
   education.dataset.g2Education = "true";
   education.innerHTML = `
-    ${explanationCard("Isto não é previsão", "O Loto Lab organiza escolhas e mede hipóteses. Frequência, atraso e score não mudam a probabilidade matemática individual de uma combinação válida.", "danger")}
-    ${explanationCard("Quando o score influencia", "O Score v2 ordena preferências usando desvios em relação ao esperado, levando o tamanho da amostra em conta. Ele continua sendo um sinal exploratório e pode ser testado contra Score v1 e sem score no Laboratório.", "info")}
+    ${explanationCard("Isto não é previsão", "O Loto Lab organiza escolhas e mede hipóteses. Frequência, atraso e pontuação não mudam a probabilidade matemática individual de uma combinação válida.", "danger")}
+    ${explanationCard("Quando a pontuação influencia", "A Pontuação v2 ordena preferências usando desvios em relação ao esperado, levando o tamanho da amostra em conta. Ela continua sendo um sinal exploratório e pode ser testada contra Pontuação v1 e sem pontuação no Laboratório.", "info")}
     ${explanationCard("Quando a cobertura domina", "O motor penaliza reutilização e mistura perfis para reduzir concentração entre jogos. O objetivo é ampliar a cobertura do lote, não criar dezenas mais prováveis.", "accent")}`;
   shell.append(education);
 }
@@ -53,9 +53,9 @@ function installWhyPanel(shell) {
   panel.innerHTML = `
     <div class="g2-card-head"><div><strong>Por que este lote será gerado assim?</strong><span>As decisões do motor ficam explícitas antes da prévia.</span></div></div>
     <ol class="g2-why-list">
-      <li><strong>Score v2</strong><span>Compara cada janela com o que seria esperado e reduz a força de diferenças sustentadas por amostras pequenas.</span></li>
+      <li><strong>Pontuação v2</strong><span>Compara cada janela com o que seria esperado e reduz a força de diferenças sustentadas por amostras pequenas.</span></li>
       <li><strong>Núcleo compartilhado</strong><span>As fixas combinam perfis complementares; escolhas manuais continuam visíveis e auditáveis.</span></li>
-      <li><strong>Variáveis estratificadas</strong><span>O pool reserva espaço para fortes, intermediárias e frias, evitando depender apenas do topo do ranking.</span></li>
+      <li><strong>Variáveis estratificadas</strong><span>O conjunto reserva espaço para fortes, intermediárias e frias, evitando depender apenas do topo da classificação.</span></li>
       <li><strong>Diversidade do lote</strong><span>Reutilização de variáveis é penalizada para aumentar cobertura entre os cartões.</span></li>
       <li><strong>Filtros são estrutura</strong><span>Paridade, repetição e soma servem para compor cenários; não aumentam a chance individual de um jogo.</span></li>
     </ol>
@@ -88,10 +88,10 @@ function installLotofacilReadiness(preview) {
   panel.innerHTML = `
     <div class="g2-card-head"><div><strong>${allAcceptable ? "✓" : "⚠"} Perfil da Lotofácil</strong><span>Conferência da repetição em relação ao concurso imediatamente anterior.</span></div></div>
     <div class="g2-rationale-grid">
-      <div><strong>${acceptable}/${repeated.length} na faixa aceitável</strong><span>A metodologia padrão usa 7–11 repetidas como guardrail amplo.</span></div>
+      <div><strong>${acceptable}/${repeated.length} na faixa aceitável</strong><span>A metodologia padrão usa 7–11 repetidas como regra de proteção ampla.</span></div>
       <div><strong>${preferred}/${repeated.length} na faixa preferida</strong><span>8–10 continua sendo uma preferência de composição, não uma promessa de desempenho.</span></div>
       <div><strong>Repetidas por jogo</strong><span>${repeated.join(" · ")}</span></div>
-      <div><strong>${allAcceptable ? "Perfil padrão respeitado" : "Perfil padrão alterado"}</strong><span>${allAcceptable ? "O lote permanece dentro do perfil documentado." : "Um filtro explícito pode ter sobrescrito o guardrail padrão; revise antes de salvar."}</span></div>
+      <div><strong>${allAcceptable ? "Perfil padrão respeitado" : "Perfil padrão alterado"}</strong><span>${allAcceptable ? "O lote permanece dentro do perfil documentado." : "Um filtro explícito pode ter sobrescrito a regra de proteção padrão; revise antes de salvar."}</span></div>
     </div>`;
   const actions = preview.querySelector(".g2-result-actions");
   if (actions) actions.before(panel);
@@ -130,9 +130,9 @@ function decoratePreview(shell) {
     <div class="g2-card-head"><div><strong>Por que este lote foi aceito?</strong><span>A prévia passou pelo mesmo funil que será persistido.</span></div></div>
     <div class="g2-rationale-grid">
       <div><strong>✓ Núcleo</strong><span>Compartilhado conforme a configuração escolhida.</span></div>
-      <div><strong>✓ Variáveis</strong><span>Selecionadas por score + diversidade, com penalização de reutilização.</span></div>
+      <div><strong>✓ Variáveis</strong><span>Selecionadas por pontuação + diversidade, com penalização de reutilização.</span></div>
       <div><strong>✓ Restrições</strong><span>Todos os jogos respeitam os filtros habilitados e o perfil padrão aplicável.</span></div>
-      <div><strong>✓ Auditoria</strong><span>Seed, histórico e fingerprint permitem reproduzir exatamente a prévia.</span></div>
+      <div><strong>✓ Auditoria</strong><span>Semente, histórico e assinatura permitem reproduzir exatamente a prévia.</span></div>
     </div>`;
   preview.append(rationale);
 }

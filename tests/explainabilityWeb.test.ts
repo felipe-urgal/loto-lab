@@ -9,6 +9,7 @@ async function source(path: string): Promise<string> {
 
 test("Generator explainability layer exposes the five-step flow and methodology guardrails", async () => {
   const javascript = await source("web/generation-explainability.js");
+  const diversity = await source("web/generation-diversity.js");
   const css = await source("web/generation-explainability.css");
   const loader = await source("web/feature-loader.js");
 
@@ -19,9 +20,25 @@ test("Generator explainability layer exposes the five-step flow and methodology 
   assert.match(javascript, /Restrições/);
   assert.match(javascript, /Auditoria/);
   assert.match(javascript, /Isto não é previsão/);
-  assert.match(javascript, /Score v2/);
+  assert.match(javascript, /Pontuação v2/);
+  assert.match(javascript, /topo da classificação/);
+  assert.match(javascript, /Selecionadas por pontuação \+ diversidade/);
+  assert.match(javascript, /Semente, histórico e assinatura/);
+  assert.match(javascript, /regra de proteção ampla/);
   assert.match(javascript, /Por que este lote foi aceito/);
   assert.match(javascript, /Validar hipótese no Laboratório/);
+  assert.doesNotMatch(javascript, /\bScore v2\b/);
+  assert.doesNotMatch(javascript, /\bscore\b/);
+  assert.doesNotMatch(javascript, /topo do ranking/);
+  assert.doesNotMatch(javascript, /\bguardrail\b/);
+  assert.doesNotMatch(javascript, /Seed, histórico e fingerprint/);
+
+  assert.match(diversity, /generatorOptions\?\.seed/);
+  assert.match(diversity, /A semente registrada permite reconstruir exatamente este lote/);
+  assert.match(diversity, /Testes históricos e Laboratório continuam determinísticos/);
+  assert.doesNotMatch(diversity, /A seed registrada/);
+  assert.doesNotMatch(diversity, /Backtests e Laboratório continuam determinísticos/);
+
   assert.match(css, /g2-explain-stepper/);
   assert.match(css, /g2-education-grid/);
 });

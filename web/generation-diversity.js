@@ -31,7 +31,7 @@ async function decorateAudit(result) {
       const title = document.createElement("strong");
       title.textContent = "Lote diversificado e reproduzível";
       const description = document.createElement("span");
-      description.textContent = "A seed registrada permite reconstruir exatamente este lote.";
+      description.textContent = "A semente registrada permite reconstruir exatamente este lote.";
       copy.append(title, description);
 
       const code = document.createElement("code");
@@ -59,7 +59,7 @@ function decorateForm() {
       <div class="generation-mode-badge">Modo real · diversificado</div>
       <div>
         <strong>Cada nova geração explora outros núcleos e combinações de alta pontuação.</strong>
-        <p>O núcleo compartilhado também varia de forma ponderada entre as melhores candidatas da análise. Todos os jogos do mesmo lote continuam compartilhando o mesmo núcleo. Backtests e Laboratório continuam determinísticos.</p>
+        <p>O núcleo compartilhado também varia de forma ponderada entre as melhores candidatas da análise. Todos os jogos do mesmo lote continuam compartilhando o mesmo núcleo. Testes históricos e Laboratório continuam determinísticos.</p>
       </div>`;
     actions?.insertAdjacentElement("beforebegin", card);
   }
