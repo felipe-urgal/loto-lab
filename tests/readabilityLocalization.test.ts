@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 
 async function source(path: string) {
   return readFile(path, "utf8");
@@ -21,6 +21,9 @@ test("web build keeps static readability without runtime localization or font au
     assert.doesNotMatch(html, /\/assets\/readability\.js(?:\?|["'])/, `${page} must not load readability.js`);
     assert.doesNotMatch(html, /\/assets\/localization\.js(?:\?|["'])/, `${page} must not load localization.js`);
   }
+
+  const assets = await readdir("web-dist/assets");
+  assert.equal(assets.includes("localization.js"), false, "built assets must not contain localization.js");
 });
 
 test("static readability layer establishes a hard 16px minimum for functional text", async () => {
