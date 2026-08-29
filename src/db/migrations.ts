@@ -101,14 +101,13 @@ export async function runMigrations(
   } finally {
     if (!lockAcquired) {
       client.release();
-      return;
+    } else {
+      await releaseAdvisoryLockClient(
+        client,
+        "SELECT pg_advisory_unlock(hashtext('loto_lab_migrations')) AS unlocked",
+      ).catch((error: unknown) => {
+        console.error("Failed to release migration advisory lock; PostgreSQL session was discarded", error);
+      });
     }
-
-    await releaseAdvisoryLockClient(
-      client,
-      "SELECT pg_advisory_unlock(hashtext('loto_lab_migrations')) AS unlocked",
-    ).catch((error: unknown) => {
-      console.error("Failed to release migration advisory lock; PostgreSQL session was discarded", error);
-    });
   }
 }
