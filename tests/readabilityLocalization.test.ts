@@ -156,7 +156,7 @@ test("strategy lab owns its visible vocabulary in Portuguese while preserving in
   assert.match(lab, /experiment === "score-model"/);
   assert.match(lab, /result\.rankingBasis/);
   assert.match(lab, /result\.rankingQuality/);
-  assert.match(lab, /class="lab-ranking"/);
+  assert.match(html, /class="lab-ranking"/);
   assert.doesNotMatch(lab, />Score v1 × v2 × sem score</);
   assert.doesNotMatch(lab, /Executando backtests/);
   assert.doesNotMatch(lab, /"Ranking por ROI"/);
