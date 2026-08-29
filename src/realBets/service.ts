@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import type { LotteryId } from "../domain/types.js";
+import { normalizeIsoDateTime } from "../domain/dateTime.js";
 import { evaluateGames } from "../checker/evaluate.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import { PostgresGameRepository } from "../persistence/gameRepository.js";
@@ -61,8 +62,9 @@ export class RealBetService {
     const games = positions
       .sort((a, b) => a - b)
       .map((position) => ({ batchPosition: position, game: batch.games[position - 1]! }));
-    const playedAt = input.playedAt ?? new Date().toISOString();
-    if (!Number.isFinite(new Date(playedAt).getTime())) throw new Error("INVALID_PLAYED_AT");
+    const requestedPlayedAt = input.playedAt ?? new Date().toISOString();
+    const playedAt = normalizeIsoDateTime(requestedPlayedAt);
+    if (!playedAt) throw new Error("INVALID_PLAYED_AT");
 
     let created: RealBetRecord;
     try {
