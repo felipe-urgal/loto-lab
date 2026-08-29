@@ -65,7 +65,8 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
     return response.text();
   };
 
-  const [shell, refinements, realBets, management, agenda, foundation] = await Promise.all([
+  const [app, shell, refinements, realBets, management, agenda, foundation] = await Promise.all([
+    fetchSource("app.js"),
     fetchSource("shell.js"),
     fetchSource("refinements.js"),
     fetchSource("real-bets.js"),
@@ -73,6 +74,14 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
     fetchSource("agenda.js"),
     fetchSource("ui-foundation.css"),
   ]);
+
+  assert.match(app, /function sumKnownMoney\(items, field\)/);
+  assert.match(app, /const prize = sumKnownMoney\(result\.checks, "totalPrizeValue"\)/);
+  assert.match(app, /const cost = sumKnownMoney\(result\.checks, "ticketCost"\)/);
+  assert.match(app, /const net = prize !== undefined && cost !== undefined \? prize - cost : undefined/);
+  assert.match(app, /formatCurrency\(check\.totalPrizeValue\)/);
+  assert.doesNotMatch(app, /check\.totalPrizeValue \|\| 0/);
+  assert.doesNotMatch(app, /check\.ticketCost \|\| 0/);
 
   assert.match(shell, /normalizeMainHash/);
   assert.match(shell, /localStorage\.removeItem\("loto-lab:lottery"\)/);

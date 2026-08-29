@@ -94,6 +94,13 @@ function formatCurrency(value) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
+function sumKnownMoney(items, field) {
+  if (!items.every((item) => typeof item[field] === "number" && Number.isFinite(item[field]))) {
+    return undefined;
+  }
+  return items.reduce((sum, item) => sum + item[field], 0);
+}
+
 function formatPercent(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "—";
   return `${(value * 100).toFixed(1).replace(".", ",")}%`;
@@ -348,10 +355,11 @@ async function handleCheckBatch(event) {
   resultTarget.innerHTML = '<div class="loading-state" style="min-height:120px"><span class="spinner"></span><span>Conferindo lote...</span></div>';
   try {
     const result = await api("/games/check", { method: "POST", body: JSON.stringify({ batchId, contestNumber }) });
-    const prize = result.checks.reduce((sum, check) => sum + (check.totalPrizeValue || 0), 0);
-    const cost = result.checks.reduce((sum, check) => sum + (check.ticketCost || 0), 0);
+    const prize = sumKnownMoney(result.checks, "totalPrizeValue");
+    const cost = sumKnownMoney(result.checks, "ticketCost");
+    const net = prize !== undefined && cost !== undefined ? prize - cost : undefined;
     const best = Math.max(...result.checks.map((check) => check.hits));
-    resultTarget.innerHTML = `<div class="result-banner"><h3>Conferência do lote #${batchId} · concurso #${contestNumber}</h3><p>${lotteryLabel(result.batch.lottery)} · ${result.checks.length} jogo(s) conferidos</p><div class="check-grid"><div class="check-card"><strong>${best}</strong><span>melhor pontuação</span></div><div class="check-card"><strong>${formatCurrency(cost)}</strong><span>custo do lote</span></div><div class="check-card"><strong>${formatCurrency(prize)}</strong><span>prêmio conhecido</span></div><div class="check-card"><strong>${formatCurrency(prize - cost)}</strong><span>resultado líquido</span></div></div></div><div class="panel list" style="margin-top:12px">${result.checks.map((check, index) => `<div class="list-row"><div class="list-row-main"><strong>Jogo ${index + 1} · ${check.hits} acerto(s)</strong><p>Fixas ${check.fixedHits} · variáveis ${check.variableHits}${check.prizeTier ? ` · ${escapeHtml(check.prizeTier)}` : ""}</p></div><div class="list-row-value"><strong>${formatCurrency(check.totalPrizeValue || 0)}</strong><small>${check.luckyMonthHit ? "Mês da Sorte ✓" : "prêmio"}</small></div></div>`).join("")}</div>`;
+    resultTarget.innerHTML = `<div class="result-banner"><h3>Conferência do lote #${batchId} · concurso #${contestNumber}</h3><p>${lotteryLabel(result.batch.lottery)} · ${result.checks.length} jogo(s) conferidos</p><div class="check-grid"><div class="check-card"><strong>${best}</strong><span>melhor pontuação</span></div><div class="check-card"><strong>${formatCurrency(cost)}</strong><span>custo do lote</span></div><div class="check-card"><strong>${formatCurrency(prize)}</strong><span>prêmio conhecido</span></div><div class="check-card"><strong>${formatCurrency(net)}</strong><span>resultado líquido</span></div></div></div><div class="panel list" style="margin-top:12px">${result.checks.map((check, index) => `<div class="list-row"><div class="list-row-main"><strong>Jogo ${index + 1} · ${check.hits} acerto(s)</strong><p>Fixas ${check.fixedHits} · variáveis ${check.variableHits}${check.prizeTier ? ` · ${escapeHtml(check.prizeTier)}` : ""}</p></div><div class="list-row-value"><strong>${formatCurrency(check.totalPrizeValue)}</strong><small>${check.luckyMonthHit ? "Mês da Sorte ✓" : "prêmio"}</small></div></div>`).join("")}</div>`;
     resultTarget.scrollIntoView({ behavior: "smooth", block: "nearest" });
   } catch (error) {
     resultTarget.innerHTML = `<div class="error-state" style="min-height:140px"><span class="error-code">${escapeHtml(error.code)}</span><strong>Falha na conferência</strong><p>${escapeHtml(error.message)}</p></div>`;
