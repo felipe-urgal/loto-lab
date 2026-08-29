@@ -6,34 +6,48 @@ async function source(path: string) {
   return readFile(path, "utf8");
 }
 
-test("web build injects readability and Portuguese localization into every HTML entrypoint", async () => {
+function assertMinimumExplicitFontSize(css: string, label: string, minimum = 16) {
+  const sizes = [...css.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]));
+  assert.ok(sizes.length > 0, `${label} should expose functional typography in source`);
+  assert.ok(sizes.every((size) => size >= minimum), `${label} contains font-size below ${minimum}px: ${sizes.filter((size) => size < minimum).join(", ")}`);
+}
+
+test("web build keeps static readability and Portuguese localization without runtime font auditor", async () => {
   const pages = ["index.html", "agenda.html", "ai.html", "jobs.html", "lab.html", "strategies.html"];
 
   for (const page of pages) {
     const html = await source(`web-dist/${page}`);
     assert.match(html, /\/assets\/readability\.css\?v=[a-f0-9]{12}/, `${page} must load readability.css`);
-    assert.match(html, /\/assets\/readability\.js\?v=[a-f0-9]{12}/, `${page} must load readability.js`);
+    assert.doesNotMatch(html, /\/assets\/readability\.js(?:\?|["'])/, `${page} must not load readability.js`);
     assert.match(html, /\/assets\/localization\.js\?v=[a-f0-9]{12}/, `${page} must load localization.js`);
   }
 });
 
-test("readability layer establishes a hard 16px minimum for functional text", async () => {
+test("static readability layer establishes a hard 16px minimum for functional text", async () => {
   const css = await source("web/readability.css");
-  const js = await source("web/readability.js");
+  const refinements = await source("web/refinements.css");
+  const lab = await source("web/lab.css");
+  const labV2 = await source("web/lab-v2.css");
+  const agenda = await source("web/agenda.css");
+  const build = await source("scripts/buildWeb.mjs");
+  const e2e = await source("scripts/e2eReadability.mjs");
 
   assert.match(css, /--loto-font-min: 16px/);
   assert.match(css, /body \{ font-size: 16px;/);
-  assert.match(css, /\.readability-min-text \{ font-size: 16px !important;/);
   assert.match(css, /th,[\s\S]*td,[\s\S]*font-size: 16px !important;/);
   assert.match(css, /\.field input,[\s\S]*\.field select[\s\S]*font-size: 16px !important;/);
   assert.match(css, /\.a2-panel-head strong,[\s\S]*font-size: 16px !important;/);
-  assert.match(js, /const MIN_FONT_PX = 16;/);
-  assert.match(js, /size < MIN_FONT_PX/);
-  assert.match(js, /MutationObserver/);
+  assert.doesNotMatch(css, /readability-min-text/);
+  assert.doesNotMatch(build, /readability\.js/);
+  assert.doesNotMatch(e2e, /readability-min-text/);
+  assert.match(e2e, /getComputedStyle\(el\)\.fontSize/);
+  assert.match(e2e, /size < minimum - 0\.01/);
 
-  const fontSizes = [...css.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]));
-  assert.ok(fontSizes.length > 20, "readability.css should explicitly cover the UI typography");
-  assert.ok(fontSizes.every((size) => size >= 16), `readability.css contains font-size below 16px: ${fontSizes.filter((size) => size < 16).join(", ")}`);
+  assertMinimumExplicitFontSize(css, "readability.css");
+  assertMinimumExplicitFontSize(refinements, "refinements.css");
+  assertMinimumExplicitFontSize(lab, "lab.css");
+  assertMinimumExplicitFontSize(labV2, "lab-v2.css");
+  assertMinimumExplicitFontSize(agenda, "agenda.css");
 });
 
 test("localization keeps product vocabulary in Portuguese and scopes dynamic replacements to system UI", async () => {
