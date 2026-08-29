@@ -165,12 +165,11 @@ function translateTree(root) {
   }
 }
 
-translateTree(document);
+function localizeRenderedView() {
+  const content = document.querySelector("#content");
+  if (content) translateTree(content);
+  translateTree(document.querySelector(".topbar") || document);
+}
 
-const observer = new MutationObserver((mutations) => {
-  for (const mutation of mutations) {
-    if (mutation.type === "characterData") translateTextNode(mutation.target);
-    for (const node of mutation.addedNodes) translateTree(node);
-  }
-});
-observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+translateTree(document);
+window.addEventListener("loto-lab:view-rendered", localizeRenderedView);

@@ -207,7 +207,7 @@ function baselineMarkup(state) {
   const lottery = plan.lotteryBaseline;
   const reference = plan.dataQuality.previousContestAvailable ? `#${plan.referenceContestNumber}` : "indisponível";
   const gaps = plan.dataQuality.historyGapCount;
-  return `<div class="g2-card-head"><div><strong>Baseline condicionado</strong><span>Referências após fixadas/excluídas; a referência original da loteria aparece abaixo.</span></div></div>
+  return `<div class="g2-card-head"><div><strong>Referência condicionada</strong><span>Referências após fixadas/excluídas; a referência original da loteria aparece abaixo.</span></div></div>
     <div class="g2-plan-grid">
       <div class="g2-plan-stat"><span>Ímpares esperados</span><strong>${formatDecimal(conditional.expectedOdd)}</strong><small>loteria sem seleção: ${formatDecimal(lottery.expectedOdd)}</small></div>
       <div class="g2-plan-stat"><span>Repetidas esperadas</span><strong>${conditional.expectedRepeated === null ? "—" : formatDecimal(conditional.expectedRepeated)}</strong><small>loteria: ${lottery.expectedRepeated === null ? "—" : formatDecimal(lottery.expectedRepeated)} · referência ${reference}</small></div>
@@ -254,7 +254,7 @@ function workspaceMarkup(state) {
         </section>
 
         <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>3. Filtros estruturais</strong><span>Desligados por padrão. Os baselines abaixo são condicionados às dezenas manuais atuais.</span></div></div>
+          <div class="g2-card-head"><div><strong>3. Filtros estruturais</strong><span>Desligados por padrão. As referências abaixo são condicionadas às dezenas manuais atuais.</span></div></div>
           <div class="g2-filter-list" data-g2-filters>${filtersMarkup(state)}</div>
           <div style="margin-top:14px">${methodologyMarkup(state)}</div>
         </section>

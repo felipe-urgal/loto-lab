@@ -76,10 +76,35 @@ test("localization keeps product vocabulary in Portuguese and scopes dynamic rep
   assert.match(js, /\.job-result/);
   assert.match(js, /\.status-pill/);
   assert.match(js, /function replaceAnalysisTerms/);
+  assert.match(js, /loto-lab:view-rendered/);
+  assert.match(js, /translateTree\(document\)/);
+  assert.doesNotMatch(js, /MutationObserver/, "localization must not monitor the entire DOM");
+  assert.doesNotMatch(js, /observer\.observe/, "localization must use explicit render lifecycle events");
 
   const knownStart = js.indexOf("function replaceKnownPhrases");
   const knownEnd = js.indexOf("function replaceOperationalTerms");
   assert.ok(knownStart >= 0 && knownEnd > knownStart);
   const knownFunction = js.slice(knownStart, knownEnd);
   assert.doesNotMatch(knownFunction, /\\bBacktests/, "broad Backtests replacement must not run on arbitrary user text");
+});
+
+test("Analyses 2.0 owns its Portuguese product vocabulary in source", async () => {
+  const analysis = await source("web/analysis-v2.js");
+
+  assert.match(analysis, /ranking: "Classificação"/);
+  assert.match(analysis, /Decomposição da pontuação/);
+  assert.match(analysis, /Classificação por escore-z; valor-p exato/);
+  assert.doesNotMatch(analysis, /ranking: "Ranking"/);
+  assert.doesNotMatch(analysis, />Ranking auditável</);
+  assert.doesNotMatch(analysis, />Score</);
+  assert.doesNotMatch(analysis, /Decomposição do score/);
+});
+
+test("Generator 2.0 owns its conditioned reference copy in Portuguese", async () => {
+  const generator = await source("web/generation-v2.js");
+
+  assert.match(generator, />Referência condicionada</);
+  assert.match(generator, /As referências abaixo são condicionadas/);
+  assert.doesNotMatch(generator, />Baseline condicionado</);
+  assert.doesNotMatch(generator, /Os baselines abaixo são condicionados/);
 });

@@ -33,7 +33,7 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
   assert.match(loader, /loadStyle\("analysis-v2"\)/);
   assert.match(loader, /loadStyle\("analysis-v2-hardening"\)/);
   assert.match(loader, /loadModule\("analysis-v2"\)/);
-  assert.match(source, /Ranking/);
+  assert.match(source, /Classificação/);
   assert.match(source, /Estrutura/);
   assert.match(source, /Dinâmica/);
   assert.match(source, /Combinações/);
