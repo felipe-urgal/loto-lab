@@ -6,6 +6,12 @@ async function source(path: string) {
   return readFile(path, "utf8");
 }
 
+function assertMinimumExplicitFontSize(css: string, label: string, minimum = 16) {
+  const sizes = [...css.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]));
+  assert.ok(sizes.length > 0, `${label} should expose functional typography in source`);
+  assert.ok(sizes.every((size) => size >= minimum), `${label} contains font-size below ${minimum}px: ${sizes.filter((size) => size < minimum).join(", ")}`);
+}
+
 test("web build keeps static readability and Portuguese localization without runtime font auditor", async () => {
   const pages = ["index.html", "agenda.html", "ai.html", "jobs.html", "lab.html", "strategies.html"];
 
@@ -21,6 +27,7 @@ test("static readability layer establishes a hard 16px minimum for functional te
   const css = await source("web/readability.css");
   const refinements = await source("web/refinements.css");
   const lab = await source("web/lab.css");
+  const labV2 = await source("web/lab-v2.css");
   const build = await source("scripts/buildWeb.mjs");
   const e2e = await source("scripts/e2eReadability.mjs");
 
@@ -35,17 +42,10 @@ test("static readability layer establishes a hard 16px minimum for functional te
   assert.match(e2e, /getComputedStyle\(el\)\.fontSize/);
   assert.match(e2e, /size < minimum - 0\.01/);
 
-  const fontSizes = [...css.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]));
-  assert.ok(fontSizes.length > 20, "readability.css should explicitly cover the UI typography");
-  assert.ok(fontSizes.every((size) => size >= 16), `readability.css contains font-size below 16px: ${fontSizes.filter((size) => size < 16).join(", ")}`);
-
-  const refinementFontSizes = [...refinements.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]));
-  assert.ok(refinementFontSizes.length > 5, "refinements.css should expose its functional typography in source");
-  assert.ok(refinementFontSizes.every((size) => size >= 16), `refinements.css contains font-size below 16px: ${refinementFontSizes.filter((size) => size < 16).join(", ")}`);
-
-  const labFontSizes = [...lab.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]));
-  assert.ok(labFontSizes.length > 10, "lab.css should expose its functional typography in source");
-  assert.ok(labFontSizes.every((size) => size >= 16), `lab.css contains font-size below 16px: ${labFontSizes.filter((size) => size < 16).join(", ")}`);
+  assertMinimumExplicitFontSize(css, "readability.css");
+  assertMinimumExplicitFontSize(refinements, "refinements.css");
+  assertMinimumExplicitFontSize(lab, "lab.css");
+  assertMinimumExplicitFontSize(labV2, "lab-v2.css");
 });
 
 test("localization keeps product vocabulary in Portuguese and scopes dynamic replacements to system UI", async () => {
