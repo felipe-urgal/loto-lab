@@ -28,7 +28,6 @@ test("static readability layer establishes a hard 16px minimum for functional te
   assert.match(css, /th,[\s\S]*td,[\s\S]*font-size: 16px !important;/);
   assert.match(css, /\.field input,[\s\S]*\.field select[\s\S]*font-size: 16px !important;/);
   assert.match(css, /\.a2-panel-head strong,[\s\S]*font-size: 16px !important;/);
-  assert.match(refinements, /\.backtest-default-note\s*\{[^}]*font-size:\s*16px/);
   assert.doesNotMatch(css, /readability-min-text/);
   assert.doesNotMatch(build, /readability\.js/);
   assert.doesNotMatch(e2e, /readability-min-text/);
@@ -38,6 +37,10 @@ test("static readability layer establishes a hard 16px minimum for functional te
   const fontSizes = [...css.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]));
   assert.ok(fontSizes.length > 20, "readability.css should explicitly cover the UI typography");
   assert.ok(fontSizes.every((size) => size >= 16), `readability.css contains font-size below 16px: ${fontSizes.filter((size) => size < 16).join(", ")}`);
+
+  const refinementFontSizes = [...refinements.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]));
+  assert.ok(refinementFontSizes.length > 5, "refinements.css should expose its functional typography in source");
+  assert.ok(refinementFontSizes.every((size) => size >= 16), `refinements.css contains font-size below 16px: ${refinementFontSizes.filter((size) => size < 16).join(", ")}`);
 });
 
 test("localization keeps product vocabulary in Portuguese and scopes dynamic replacements to system UI", async () => {
