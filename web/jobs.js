@@ -55,6 +55,7 @@ let selectedHistoricalVersion;
 let jobs = [];
 let pollTimer;
 let loadToken = 0;
+let strategyLoadToken = 0;
 
 function syncFields() {
   const isLab = kind.value === "strategy-lab";
@@ -79,9 +80,12 @@ function applyConfig(config = {}) {
 }
 
 async function loadStrategies(preferredVersionId) {
+  const requestedLottery = lottery.value;
+  const token = ++strategyLoadToken;
   selectedHistoricalVersion = undefined;
   try {
-    const data = await api(`/strategies?lottery=${encodeURIComponent(lottery.value)}`);
+    const data = await api(`/strategies?lottery=${encodeURIComponent(requestedLottery)}`);
+    if (token !== strategyLoadToken || lottery.value !== requestedLottery) return;
     strategies = data.items || [];
     strategySelect.innerHTML = '<option value="">Configuração manual</option>' + strategies.map((strategy) =>
       `<option value="${strategy.latestVersionId}">${escapeHtml(strategy.name)} · v${strategy.version} (#${strategy.latestVersionId})</option>`,
@@ -93,7 +97,8 @@ async function loadStrategies(preferredVersionId) {
         strategySelect.value = preferred;
       } else {
         const historical = await api(`/strategy-versions/${encodeURIComponent(preferred)}`);
-        if (historical.strategy?.lottery === lottery.value) {
+        if (token !== strategyLoadToken || lottery.value !== requestedLottery) return;
+        if (historical.strategy?.lottery === requestedLottery) {
           selectedHistoricalVersion = historical;
           const option = document.createElement("option");
           option.value = String(historical.id);
@@ -108,6 +113,7 @@ async function loadStrategies(preferredVersionId) {
     if (latest) applyConfig(latest.config);
     else if (selectedHistoricalVersion?.id === Number(strategySelect.value)) applyConfig(selectedHistoricalVersion.config);
   } catch (error) {
+    if (token !== strategyLoadToken || lottery.value !== requestedLottery) return;
     strategies = [];
     selectedHistoricalVersion = undefined;
     strategySelect.innerHTML = '<option value="">Estratégias indisponíveis</option>';
@@ -240,9 +246,11 @@ strategySelect.addEventListener("change", () => {
 kind.addEventListener("change", syncFields);
 experiment.addEventListener("change", syncFields);
 lottery.addEventListener("change", async () => {
-  localStorage.setItem("loto-lab:lottery", lottery.value);
+  const requestedLottery = lottery.value;
+  localStorage.setItem("loto-lab:lottery", requestedLottery);
   syncFields();
   await loadStrategies();
+  if (lottery.value !== requestedLottery) return;
   await loadJobs();
 });
 refreshButton.addEventListener("click", () => { void loadJobs(); });
