@@ -37,6 +37,7 @@ test("static readability layer establishes a hard 16px minimum for functional te
   const myGamesV2Css = await source("web/my-games-v2.css");
   const myGamesManagementCss = await source("web/my-games-management.css");
   const realBetsCss = await source("web/real-bets.css");
+  const experiments = await source("web/experiments.css");
   const refinements = await source("web/refinements.css");
   const lab = await source("web/lab.css");
   const labV2 = await source("web/lab-v2.css");
@@ -51,6 +52,7 @@ test("static readability layer establishes a hard 16px minimum for functional te
   assert.match(css, /th,[\s\S]*td,[\s\S]*font-size: 16px !important;/);
   assert.match(css, /\.field input,[\s\S]*\.field select[\s\S]*font-size: 16px !important;/);
   assert.doesNotMatch(css, /\.a2-/, "Analyses 2.0 must not depend on readability.css overrides");
+  assert.doesNotMatch(css, /\.(?:experiment|job-result|status-pill|ai-provider-status|ai-history|agenda-card|agenda-notification|lab-basis|lab-history-status)/, "auxiliary pages must not depend on readability.css overrides");
   assert.doesNotMatch(css, /readability-min-text/);
   assert.doesNotMatch(build, /readability\.js/);
   assert.doesNotMatch(build, /localization\.js/);
@@ -68,12 +70,15 @@ test("static readability layer establishes a hard 16px minimum for functional te
   assertMinimumExplicitFontSize(myGamesV2Css, "my-games-v2.css");
   assertMinimumExplicitFontSize(myGamesManagementCss, "my-games-management.css");
   assertMinimumExplicitFontSize(realBetsCss, "real-bets.css");
+  assertMinimumExplicitFontSize(experiments, "experiments.css");
   assertMinimumExplicitFontSize(refinements, "refinements.css");
   assertMinimumExplicitFontSize(lab, "lab.css");
   assertMinimumExplicitFontSize(labV2, "lab-v2.css");
   assertMinimumExplicitFontSize(agenda, "agenda.css");
   assertMinimumExplicitFontSize(ai, "ai.css");
   assertMinimumExplicitFontSize(dashboardScope, "dashboard-scope.css");
+  assert.match(experiments, /\.experiment-card-head h3 \{[^}]*font-size: 19px;/);
+  assert.match(agenda, /\.agenda-card h3 \{ font-size: 19px; \}/);
 });
 
 test("Analyses 2.0 owns its Portuguese product vocabulary in source", async () => {
@@ -166,6 +171,7 @@ test("refinement layers own their Portuguese analysis vocabulary while preservin
   assert.match(refinements, /b\.score - a\.score/);
   assert.match(refinements, /row\.score\.toFixed/);
   assert.match(refinements, /class="score-cell"/);
+  assert.doesNotMatch(refinements, /style="font-size:\s*\d+px"/, "refinement copy must not use inline font-size corrections");
   assert.doesNotMatch(refinements, /Explorar ranking/);
   assert.doesNotMatch(refinements, />Score<\/option>/);
   assert.doesNotMatch(refinements, /Como o score é calculado/);
