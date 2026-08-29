@@ -4,7 +4,7 @@ import type { ContestSource } from "../data/source.js";
 import { isLotteryAgendaSource } from "../data/source.js";
 import { CaixaContestSource } from "../data/caixa.js";
 import { bootstrapLotteryHistory } from "../data/bootstrap.js";
-import { releaseAdvisoryLockClient } from "../db/advisoryLock.js";
+import { discardPoolClient, releaseAdvisoryLockClient } from "../db/advisoryLock.js";
 import { hasCompletePrizeSchedule } from "../finance/prizes.js";
 import { PostgresAgendaRepository } from "../persistence/agendaRepository.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
@@ -122,10 +122,15 @@ export async function runOperationalSync(
   options: RunOperationalSyncOptions = {},
 ): Promise<OperationRunRecord<SyncAllDetails>> {
   const lockClient = await pool.connect();
-  const lock = await lockClient.query<{ locked: boolean }>(
-    "SELECT pg_try_advisory_lock($1) AS locked",
-    [SYNC_ADVISORY_LOCK],
-  );
+  let lock: { rows: Array<{ locked: boolean }> };
+  try {
+    lock = await lockClient.query<{ locked: boolean }>(
+      "SELECT pg_try_advisory_lock($1) AS locked",
+      [SYNC_ADVISORY_LOCK],
+    );
+  } catch (error) {
+    throw discardPoolClient(lockClient, error);
+  }
 
   if (!lock.rows[0]?.locked) {
     lockClient.release();
