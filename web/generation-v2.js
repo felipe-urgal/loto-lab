@@ -227,6 +227,7 @@ function selectionModesMarkup(state) {
     ${modes.map(([mode, label]) => `<button class="button compact ${state.selectionMode === mode ? "primary" : ""}" type="button" data-g2-selection-mode="${mode}" aria-pressed="${state.selectionMode === mode ? "true" : "false"}">${label}</button>`).join("")}
   </div>`;
 }
+
 function workspaceMarkup(state) {
   return `<div class="g2-shell" data-g2-shell>
     <div class="g2-principle"><strong>Algoritmo calcula; você audita.</strong><span>Configure o lote, veja o universo matemático e o espaço realmente explorado, gere uma prévia congelada e só então salve.</span></div>
