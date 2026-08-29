@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 import type { GeneratedGame, LotteryId } from "../domain/types.js";
+import { assertValidGeneratedGame } from "../domain/validation.js";
 import type {
   GeneratedGameBatchRecord,
   GenerationPreviewRecord,
@@ -110,6 +111,7 @@ function validateBatchInput(input: SaveGeneratedGameBatchInput): void {
   if (input.games.some((game) => game.lottery !== input.lottery)) {
     throw new Error("Every game in a batch must match the batch lottery");
   }
+  for (const game of input.games) assertValidGeneratedGame(game);
 }
 
 export class PostgresGameRepository {

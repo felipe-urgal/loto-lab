@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import type { LotteryId } from "../domain/types.js";
 import type { GeneratedGame } from "../domain/types.js";
+import { assertValidGeneratedGame } from "../domain/validation.js";
 import type { GameCheckResult } from "../checker/evaluate.js";
 
 export type RealBetStatus = "planned" | "placed" | "awaiting_result" | "checked";
@@ -138,12 +139,13 @@ export class PostgresRealBetRepository {
 
   async create(input: CreateRealBetInput): Promise<RealBetRecord> {
     if (input.games.length === 0) throw new Error("A real bet must contain at least one game");
-    if (!Number.isFinite(input.actualCost) || input.actualCost < 0) {
-      throw new Error("actualCost must be a non-negative number");
+    if (!Number.isFinite(input.actualCost) || input.actualCost <= 0) {
+      throw new Error("actualCost must be a positive number");
     }
     if (input.games.some(({ game }) => game.lottery !== input.lottery)) {
       throw new Error("Every real-bet game must match the bet lottery");
     }
+    for (const { game } of input.games) assertValidGeneratedGame(game);
 
     const client = await this.pool.connect();
     let id = 0;
