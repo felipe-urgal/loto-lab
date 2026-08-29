@@ -34,6 +34,9 @@ test("static readability layer establishes a hard 16px minimum for functional te
   const generationV2Css = await source("web/generation-v2.css");
   const generationExplainabilityCss = await source("web/generation-explainability.css");
   const generationDiversityCss = await source("web/generation-diversity.css");
+  const myGamesV2Css = await source("web/my-games-v2.css");
+  const myGamesManagementCss = await source("web/my-games-management.css");
+  const realBetsCss = await source("web/real-bets.css");
   const refinements = await source("web/refinements.css");
   const lab = await source("web/lab.css");
   const labV2 = await source("web/lab-v2.css");
@@ -62,6 +65,9 @@ test("static readability layer establishes a hard 16px minimum for functional te
   assertMinimumExplicitFontSize(generationV2Css, "generation-v2.css");
   assertMinimumExplicitFontSize(generationExplainabilityCss, "generation-explainability.css");
   assertMinimumExplicitFontSize(generationDiversityCss, "generation-diversity.css");
+  assertMinimumExplicitFontSize(myGamesV2Css, "my-games-v2.css");
+  assertMinimumExplicitFontSize(myGamesManagementCss, "my-games-management.css");
+  assertMinimumExplicitFontSize(realBetsCss, "real-bets.css");
   assertMinimumExplicitFontSize(refinements, "refinements.css");
   assertMinimumExplicitFontSize(lab, "lab.css");
   assertMinimumExplicitFontSize(labV2, "lab-v2.css");
