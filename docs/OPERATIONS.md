@@ -1,6 +1,6 @@
 # Operação automática do Loto Lab
 
-O Milestone 15 transforma a manutenção diária da base em uma operação única e auditável.
+A manutenção diária da base é tratada como uma operação única e auditável.
 
 ## O que acontece em uma sincronização operacional
 
@@ -25,7 +25,7 @@ O comando processa as três loterias e retorna um JSON com o resultado por loter
 
 ## Execução automática junto da API
 
-`npm run api:start` agora aplica migrations pendentes automaticamente e inicia o scheduler operacional por padrão.
+`npm run api:start` aplica migrations pendentes automaticamente e inicia o scheduler operacional por padrão.
 
 Configuração no `.env`:
 
@@ -37,7 +37,7 @@ OPS_STALE_AFTER_MINUTES=180
 
 - `OPS_AUTO_SYNC`: use `false` para desativar o scheduler;
 - `OPS_INTERVAL_MINUTES`: intervalo entre 5 e 1440 minutos;
-- `OPS_STALE_AFTER_MINUTES`: tempo sem uma execução recente antes do Dashboard sinalizar atenção.
+- `OPS_STALE_AFTER_MINUTES`: tempo sem uma execução recente antes do Painel sinalizar atenção.
 
 O scheduler roda uma sincronização logo após o processo iniciar e depois respeita o intervalo configurado.
 
@@ -49,7 +49,7 @@ Isso protege contra sobreposição entre:
 
 - scheduler automático;
 - `npm run ops:sync`;
-- botão **Sincronizar agora** do Dashboard;
+- botão **Sincronizar agora** do Painel;
 - chamada HTTP manual.
 
 ## API
@@ -79,9 +79,9 @@ Executa a mesma rotina das três loterias usada pelo scheduler e pelo CLI.
 
 Se já existir uma sincronização em andamento, retorna HTTP `409` com `OPERATION_ALREADY_RUNNING`.
 
-## Dashboard
+## Painel
 
-A barra superior do Dashboard passa a mostrar:
+A barra superior do Painel mostra:
 
 - estado operacional atualizado/atrasado;
 - idade da última sincronização;

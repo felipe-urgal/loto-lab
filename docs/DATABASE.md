@@ -4,16 +4,16 @@ Este documento descreve a camada de persistência do Loto Lab.
 
 ## Objetivo
 
-O PostgreSQL passa a ser a base persistente do aplicativo. O JSON local continua existindo como formato de importação, exportação e desenvolvimento legado, mas a API HTTP e o futuro frontend consomem os repositórios PostgreSQL.
+O PostgreSQL é a base persistente do aplicativo. O JSON local continua existindo como formato de importação, exportação e desenvolvimento legado, mas a API HTTP e o frontend consomem os repositórios PostgreSQL.
 
 ## Configuração
 
-A conexão usa a variável de ambiente `DATABASE_URL`.
+A conexão local usa a variável de ambiente `DATABASE_URL`.
 
-Exemplo local:
+Exemplo atual:
 
 ```text
-postgresql://loto_lab:loto_lab@localhost:5433/loto_lab
+postgresql://loto_lab:loto_lab@localhost:5434/loto_lab
 ```
 
 Nunca versionar credenciais reais. O repositório contém somente `.env.example`.
@@ -26,13 +26,15 @@ Subir o PostgreSQL:
 docker compose up -d postgres
 ```
 
-O container continua ouvindo em `5432` internamente, mas o Docker Compose publica `5433` na máquina para evitar conflito com PostgreSQL local.
+O container continua ouvindo em `5432` internamente, mas o Docker Compose publica `5434` na máquina para evitar conflito com PostgreSQL local.
 
-Definir a URL no shell:
+Definir a URL no shell, quando não estiver usando `.env`:
 
 ```bash
-export DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5433/loto_lab
+export DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5434/loto_lab
 ```
+
+O caminho recomendado para desenvolvimento é copiar `.env.example` para `.env`; os comandos operacionais carregam esse arquivo automaticamente.
 
 Aplicar migrations:
 
@@ -49,6 +51,8 @@ O runner:
 - executa cada arquivo em transação;
 - registra somente migrations concluídas;
 - pode ser executado várias vezes com segurança.
+
+`npm run api:start` também aplica migrations pendentes antes de iniciar o servidor.
 
 ## Migrar o JSON atual
 
@@ -134,7 +138,7 @@ A ordem dentro do lote é preservada por `position`.
 
 ### `backtest_runs`
 
-Uma execução de backtest:
+Uma execução de teste histórico:
 
 - estratégia;
 - loteria;
@@ -142,7 +146,7 @@ Uma execução de backtest:
 - resumo completo em `JSONB`;
 - métricas principais em colunas próprias: concursos, jogos, custos, prêmios, ROI e cobertura financeira.
 
-As colunas próprias evitam leituras caras de JSON para dashboards e rankings.
+As colunas próprias evitam leituras caras de JSON para painéis e classificações.
 
 ### `backtest_rounds`
 
@@ -172,6 +176,12 @@ Operações com múltiplas escritas usam uma única conexão e transação.
 
 O pool é criado uma vez pelo processo da API, não uma vez por request.
 
+## Produção
+
+No `docker-compose.prod.yml`, o PostgreSQL permanece somente na rede Docker e **não publica porta no host**. A aplicação acessa o banco internamente em `postgres:5432`.
+
+Consulte [`DEPLOYMENT.md`](DEPLOYMENT.md) para configuração de produção e backup/restore.
+
 ## Testes
 
 O CI sobe um PostgreSQL real e testa:
@@ -181,7 +191,7 @@ O CI sobe um PostgreSQL real e testa:
 3. preservação de enriquecimento financeiro;
 4. estratégia versionada;
 5. persistência de lote de jogos;
-6. persistência de backtest e rodadas;
+6. persistência de teste histórico e rodadas;
 7. endpoints HTTP consumindo os mesmos repositórios.
 
 Localmente, os testes de integração PostgreSQL/API são ignorados quando `DATABASE_URL` não está definida.
