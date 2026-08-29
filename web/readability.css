@@ -72,20 +72,6 @@ th, td { padding-top: 14px; padding-bottom: 14px; line-height: 1.45; }
 .form-note,
 .form-inline-note { line-height: 1.55; }
 
-/* Páginas auxiliares: Execuções, Estratégias, IA, Agenda e Laboratório. */
-.experiment-card p,
-.experiment-meta,
-.job-result,
-.status-pill,
-.ai-provider-status,
-.ai-history,
-.agenda-card p,
-.agenda-notification p,
-.lab-basis,
-.lab-history-status { font-size: 16px !important; line-height: 1.55; }
-.experiment-card h3,
-.agenda-card h3 { font-size: 19px !important; }
-
 /* Pseudo-elementos textuais herdam o piso do elemento pai. */
 body *::before,
 body *::after { font-size: inherit; }
