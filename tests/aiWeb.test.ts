@@ -54,6 +54,12 @@ test("AI workspace and provider status are served without exposing credentials",
   assert.match(source, /const token = \+\+insightRequestToken/);
   assert.match(source, /token !== insightRequestToken \|\| lotterySelect\.value !== requestedLottery/);
   assert.match(source, /insightRequestToken \+= 1/);
+  assert.match(source, /<span>Teste histórico<\/span>/);
+  assert.match(source, /o registro #\$\{record\.id\} foi reutilizado sem nova chamada ao provedor/);
+  assert.match(source, /Registro #\$\{record\.id\} criado sem alterar qualquer cálculo ou jogo/);
+  assert.doesNotMatch(source, /<span>Backtest<\/span>/);
+  assert.doesNotMatch(source, /o snapshot #\$\{record\.id\}/);
+  assert.doesNotMatch(source, /nova chamada ao provider/);
   // The UI may name OPENAI_API_KEY to explain local setup, but authentication
   // material and provider headers must remain exclusively on the backend.
   assert.doesNotMatch(source, /Authorization\s*:/i);
