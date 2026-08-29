@@ -207,7 +207,7 @@ function baselineMarkup(state) {
   const lottery = plan.lotteryBaseline;
   const reference = plan.dataQuality.previousContestAvailable ? `#${plan.referenceContestNumber}` : "indisponível";
   const gaps = plan.dataQuality.historyGapCount;
-  return `<div class="g2-card-head"><div><strong>Baseline condicionado</strong><span>Referências após fixadas/excluídas; a referência original da loteria aparece abaixo.</span></div></div>
+  return `<div class="g2-card-head"><div><strong>Referência condicionada</strong><span>Referências após fixadas/excluídas; a referência original da loteria aparece abaixo.</span></div></div>
     <div class="g2-plan-grid">
       <div class="g2-plan-stat"><span>Ímpares esperados</span><strong>${formatDecimal(conditional.expectedOdd)}</strong><small>loteria sem seleção: ${formatDecimal(lottery.expectedOdd)}</small></div>
       <div class="g2-plan-stat"><span>Repetidas esperadas</span><strong>${conditional.expectedRepeated === null ? "—" : formatDecimal(conditional.expectedRepeated)}</strong><small>loteria: ${lottery.expectedRepeated === null ? "—" : formatDecimal(lottery.expectedRepeated)} · referência ${reference}</small></div>
@@ -227,7 +227,6 @@ function selectionModesMarkup(state) {
     ${modes.map(([mode, label]) => `<button class="button compact ${state.selectionMode === mode ? "primary" : ""}" type="button" data-g2-selection-mode="${mode}" aria-pressed="${state.selectionMode === mode ? "true" : "false"}">${label}</button>`).join("")}
   </div>`;
 }
-
 function workspaceMarkup(state) {
   return `<div class="g2-shell" data-g2-shell>
     <div class="g2-principle"><strong>Algoritmo calcula; você audita.</strong><span>Configure o lote, veja o universo matemático e o espaço realmente explorado, gere uma prévia congelada e só então salve.</span></div>
@@ -254,7 +253,7 @@ function workspaceMarkup(state) {
         </section>
 
         <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>3. Filtros estruturais</strong><span>Desligados por padrão. Os baselines abaixo são condicionados às dezenas manuais atuais.</span></div></div>
+          <div class="g2-card-head"><div><strong>3. Filtros estruturais</strong><span>Desligados por padrão. As referências abaixo são condicionadas às dezenas manuais atuais.</span></div></div>
           <div class="g2-filter-list" data-g2-filters>${filtersMarkup(state)}</div>
           <div style="margin-top:14px">${methodologyMarkup(state)}</div>
         </section>
