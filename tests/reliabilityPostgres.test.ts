@@ -1,11 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { GeneratedGame } from "../src/domain/types.js";
-import { createPostgresPool } from "../src/db/client.js";
-import { runMigrations } from "../src/db/migrations.js";
 import { PostgresAnalysisJobRepository } from "../src/persistence/analysisJobRepository.js";
 import { PostgresGameRepository } from "../src/persistence/gameRepository.js";
 import { RealBetService } from "../src/realBets/service.js";
+import { createIsolatedPostgresDatabase } from "./helpers/postgres.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -13,10 +12,9 @@ test(
   "analysis job recovery finalizes cancelled jobs and requeues only active work",
   { skip: !databaseUrl },
   async () => {
-    const pool = createPostgresPool({ connectionString: databaseUrl! });
+    const database = await createIsolatedPostgresDatabase({ label: "reliability-job-recovery" });
+    const { pool } = database;
     try {
-      await runMigrations(pool);
-      await pool.query("TRUNCATE TABLE analysis_jobs RESTART IDENTITY CASCADE");
       const repository = new PostgresAnalysisJobRepository(pool);
 
       const cancelled = await repository.create("backtest", "mega-sena", { lottery: "mega-sena" });
@@ -43,7 +41,7 @@ test(
       const claimed = await repository.claimNext();
       assert.equal(claimed?.id, active.id);
     } finally {
-      await pool.end();
+      await database.close();
     }
   },
 );
@@ -52,18 +50,9 @@ test(
   "real bet cannot be reconciled against a contest different from its generated batch target",
   { skip: !databaseUrl },
   async () => {
-    const pool = createPostgresPool({ connectionString: databaseUrl! });
+    const database = await createIsolatedPostgresDatabase({ label: "reliability-real-bet" });
+    const { pool } = database;
     try {
-      await runMigrations(pool);
-      await pool.query(`
-        TRUNCATE TABLE
-          real_bet_games,
-          real_bets,
-          generated_games,
-          generated_game_batches
-        RESTART IDENTITY CASCADE
-      `);
-
       const game: GeneratedGame = {
         lottery: "mega-sena",
         numbers: [1, 2, 3, 4, 5, 6],
@@ -94,7 +83,7 @@ test(
       );
       assert.equal(await service.realBets.findByBatchId(batch.id), undefined);
     } finally {
-      await pool.end();
+      await database.close();
     }
   },
 );

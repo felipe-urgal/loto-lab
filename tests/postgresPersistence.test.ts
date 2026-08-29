@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { Contest, GeneratedGame } from "../src/domain/types.js";
-import { createPostgresPool } from "../src/db/client.js";
 import { runMigrations } from "../src/db/migrations.js";
 import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
 import { PostgresStrategyRepository } from "../src/persistence/strategyRepository.js";
 import { PostgresGameRepository } from "../src/persistence/gameRepository.js";
 import { PostgresBacktestRepository } from "../src/persistence/backtestRepository.js";
+import { createIsolatedPostgresDatabase } from "./helpers/postgres.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -14,26 +14,18 @@ test(
   "PostgreSQL persists contests, strategies, game batches and backtests",
   { skip: !databaseUrl },
   async () => {
-    const pool = createPostgresPool({ connectionString: databaseUrl! });
+    const database = await createIsolatedPostgresDatabase({
+      label: "postgres-persistence",
+      migrate: false,
+    });
+    const { pool } = database;
 
     try {
       const firstMigration = await runMigrations(pool);
-      assert.ok(firstMigration.applied.includes("001_initial.sql") || firstMigration.skipped.includes("001_initial.sql"));
+      assert.ok(firstMigration.applied.includes("001_initial.sql"));
 
       const secondMigration = await runMigrations(pool);
       assert.ok(secondMigration.skipped.includes("001_initial.sql"));
-
-      await pool.query(`
-        TRUNCATE TABLE
-          backtest_rounds,
-          backtest_runs,
-          generated_games,
-          generated_game_batches,
-          strategies,
-          contest_prize_tiers,
-          contests
-        RESTART IDENTITY CASCADE
-      `);
 
       const contests = new PostgresContestRepository(pool);
       const target: Contest = {
@@ -115,7 +107,7 @@ test(
       assert.equal(run.summary.roi, -0.3);
       assert.equal((await backtests.findById(run.id))?.rounds[0]?.contest, 3766);
     } finally {
-      await pool.end();
+      await database.close();
     }
   },
 );

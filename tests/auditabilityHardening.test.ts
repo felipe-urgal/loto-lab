@@ -1,8 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { Contest, GeneratedGame } from "../src/domain/types.js";
-import { createPostgresPool } from "../src/db/client.js";
-import { runMigrations } from "../src/db/migrations.js";
 import { hasCompletePrizeSchedule } from "../src/finance/prizes.js";
 import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
 import { PostgresGameRepository } from "../src/persistence/gameRepository.js";
@@ -12,6 +10,7 @@ import {
   RuntimeInstanceAlreadyActiveError,
 } from "../src/operations/runtimeLock.js";
 import { validatePublicExposure } from "../src/api/publicExposure.js";
+import { createIsolatedPostgresDatabase } from "./helpers/postgres.js";
 
 const TARGET = 990001;
 
@@ -58,69 +57,65 @@ const correctedCompleteTiers = [
 test(
   "real-bet finance remains reconcilable, complete schedules never downgrade and official corrections are audited",
   { skip: !process.env.DATABASE_URL },
-  async (t) => {
-    const pool = createPostgresPool({ max: 3 });
-    await runMigrations(pool);
+  async () => {
+    const database = await createIsolatedPostgresDatabase({ label: "auditability-finance" });
+    const { pool } = database;
     const contests = new PostgresContestRepository(pool);
     const games = new PostgresGameRepository(pool);
     const service = new RealBetService(pool);
 
-    await pool.query("DELETE FROM contests WHERE lottery = 'mega-sena' AND contest_number = $1", [TARGET]);
-    const batch = await games.saveBatch({
-      lottery: "mega-sena",
-      targetContestNumber: TARGET,
-      generatorOptions: { test: "auditability-hardening" },
-      games: [testGame()],
-    });
+    try {
+      const batch = await games.saveBatch({
+        lottery: "mega-sena",
+        targetContestNumber: TARGET,
+        generatorOptions: { test: "auditability-hardening" },
+        games: [testGame()],
+      });
 
-    t.after(async () => {
-      await pool.query("DELETE FROM real_bets WHERE batch_id = $1", [batch.id]).catch(() => undefined);
-      await pool.query("DELETE FROM generated_game_batches WHERE id = $1", [batch.id]).catch(() => undefined);
-      await pool.query("DELETE FROM contests WHERE lottery = 'mega-sena' AND contest_number = $1", [TARGET]).catch(() => undefined);
-      await pool.end();
-    });
+      const bet = await service.create({ batchId: batch.id, actualCost: 6 });
+      assert.equal(bet.status, "awaiting_result");
+      assert.equal(bet.totalPrizeValue, undefined);
 
-    const bet = await service.create({ batchId: batch.id, actualCost: 6 });
-    assert.equal(bet.status, "awaiting_result");
-    assert.equal(bet.totalPrizeValue, undefined);
+      await contests.upsertMany([contest(partialTiers)]);
+      const statisticallyChecked = await service.reconcile(bet.id);
+      assert.equal(statisticallyChecked?.status, "checked");
+      assert.equal(statisticallyChecked?.totalPrizeValue, undefined);
+      assert.equal(statisticallyChecked?.netResult, undefined);
 
-    await contests.upsertMany([contest(partialTiers)]);
-    const statisticallyChecked = await service.reconcile(bet.id);
-    assert.equal(statisticallyChecked?.status, "checked");
-    assert.equal(statisticallyChecked?.totalPrizeValue, undefined);
-    assert.equal(statisticallyChecked?.netResult, undefined);
+      await contests.upsertMany([contest(completeTiers)]);
+      const financiallyResolved = await service.reconcilePending("mega-sena");
+      assert.equal(financiallyResolved, 1);
+      const checked = await service.realBets.findById(bet.id);
+      assert.equal(checked?.totalPrizeValue, 777);
+      assert.equal(checked?.netResult, 771);
+      assert.ok(checked?.checkedAt);
+      const firstCheckedAt = checked!.checkedAt;
 
-    await contests.upsertMany([contest(completeTiers)]);
-    const financiallyResolved = await service.reconcilePending("mega-sena");
-    assert.equal(financiallyResolved, 1);
-    const checked = await service.realBets.findById(bet.id);
-    assert.equal(checked?.totalPrizeValue, 777);
-    assert.equal(checked?.netResult, 771);
-    assert.ok(checked?.checkedAt);
-    const firstCheckedAt = checked!.checkedAt;
+      await contests.upsertMany([contest(partialTiers)]);
+      const preserved = await contests.findByNumber("mega-sena", TARGET);
+      assert.ok(preserved);
+      assert.equal(hasCompletePrizeSchedule(preserved), true);
+      assert.equal(preserved.prizeTiers?.find((tier) => tier.description === "4 acertos")?.prizeValue, 777);
 
-    await contests.upsertMany([contest(partialTiers)]);
-    const preserved = await contests.findByNumber("mega-sena", TARGET);
-    assert.ok(preserved);
-    assert.equal(hasCompletePrizeSchedule(preserved), true);
-    assert.equal(preserved.prizeTiers?.find((tier) => tier.description === "4 acertos")?.prizeValue, 777);
+      await contests.upsertMany([contest(correctedCompleteTiers)]);
+      const correction = await service.reconcileContestNumbers("mega-sena", [TARGET]);
+      assert.deepEqual(correction, { financiallyResolved: 0, financiallyRevised: 1 });
 
-    await contests.upsertMany([contest(correctedCompleteTiers)]);
-    const correction = await service.reconcileContestNumbers("mega-sena", [TARGET]);
-    assert.deepEqual(correction, { financiallyResolved: 0, financiallyRevised: 1 });
+      const revised = await service.realBets.findById(bet.id);
+      assert.equal(revised?.totalPrizeValue, 888);
+      assert.equal(revised?.netResult, 882);
+      assert.equal(revised?.checkedAt, firstCheckedAt);
 
-    const revised = await service.realBets.findById(bet.id);
-    assert.equal(revised?.totalPrizeValue, 888);
-    assert.equal(revised?.netResult, 882);
-    assert.equal(revised?.checkedAt, firstCheckedAt);
-
-    const revisions = await service.realBets.listFinancialRevisions(bet.id);
-    assert.equal(revisions.length, 1);
-    assert.equal(revisions[0]?.previousTotalPrizeValue, 777);
-    assert.equal(revisions[0]?.newTotalPrizeValue, 888);
-    assert.equal(revisions[0]?.previousNetResult, 771);
-    assert.equal(revisions[0]?.newNetResult, 882);
-    assert.equal(revisions[0]?.reason, "official-prize-refresh");
+      const revisions = await service.realBets.listFinancialRevisions(bet.id);
+      assert.equal(revisions.length, 1);
+      assert.equal(revisions[0]?.previousTotalPrizeValue, 777);
+      assert.equal(revisions[0]?.newTotalPrizeValue, 888);
+      assert.equal(revisions[0]?.previousNetResult, 771);
+      assert.equal(revisions[0]?.newNetResult, 882);
+      assert.equal(revisions[0]?.reason, "official-prize-refresh");
+    } finally {
+      await database.close();
+    }
   },
 );
 
@@ -128,20 +123,24 @@ test(
   "runtime instance advisory lock rejects a second active process",
   { skip: !process.env.DATABASE_URL },
   async () => {
-    const pool = createPostgresPool({ max: 3 });
-    const first = await acquireRuntimeInstanceLock(pool);
+    const database = await createIsolatedPostgresDatabase({ label: "auditability-runtime-lock" });
+    const { pool } = database;
     try {
-      await assert.rejects(
-        () => acquireRuntimeInstanceLock(pool),
-        RuntimeInstanceAlreadyActiveError,
-      );
-    } finally {
-      await first.release();
-    }
+      const first = await acquireRuntimeInstanceLock(pool);
+      try {
+        await assert.rejects(
+          () => acquireRuntimeInstanceLock(pool),
+          RuntimeInstanceAlreadyActiveError,
+        );
+      } finally {
+        await first.release();
+      }
 
-    const second = await acquireRuntimeInstanceLock(pool);
-    await second.release();
-    await pool.end();
+      const second = await acquireRuntimeInstanceLock(pool);
+      await second.release();
+    } finally {
+      await database.close();
+    }
   },
 );
 
