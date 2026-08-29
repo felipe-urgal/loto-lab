@@ -65,7 +65,7 @@ async function refineDashboard() {
   const roiTone = typeof summary.roi === "number" ? (summary.roi >= 0 ? "positive" : "negative") : "";
   section.innerHTML = `
     <div class="section-head">
-      <div><h2>Desempenho real</h2><p>Apenas apostas marcadas como realmente realizadas · não inclui backtests.</p></div>
+      <div><h2>Desempenho real</h2><p>Apenas apostas marcadas como realmente realizadas · não inclui testes históricos.</p></div>
     </div>
     <div class="grid cols-4">
       ${metric("ROI real", formatPercent(summary.roi), `${summary.checkedBets || 0} aposta(s) conferida(s)`, roiTone)}
@@ -92,7 +92,7 @@ function betSummaryMarkup(bet) {
 function realBetHistory(data) {
   if (!data.items?.length) return "";
   return `<section class="real-bet-history">
-    <div class="section-head"><div><h2>Apostas reais</h2><p>Histórico separado dos lotes apenas gerados e dos backtests.</p></div></div>
+    <div class="section-head"><div><h2>Apostas reais</h2><p>Histórico separado dos lotes apenas gerados e dos testes históricos.</p></div></div>
     <div class="panel list">${data.items.map((bet) => {
       const info = statusInfo(bet.status);
       const value = bet.status === "checked" ? (bet.netResult || 0) : undefined;
