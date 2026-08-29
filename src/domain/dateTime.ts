@@ -24,8 +24,8 @@ export function normalizeIsoDateTime(value: string): string | undefined {
   const hour = Number(match[4]);
   const minute = Number(match[5]);
   const second = Number(match[6]);
-  const offsetHour = match[9] === undefined ? 0 : Number(match[9]);
-  const offsetMinute = match[10] === undefined ? 0 : Number(match[10]);
+  const offsetHour = match[10] === undefined ? 0 : Number(match[10]);
+  const offsetMinute = match[11] === undefined ? 0 : Number(match[11]);
 
   if (year < 1 || year > 9999) return undefined;
   if (month < 1 || month > 12) return undefined;
