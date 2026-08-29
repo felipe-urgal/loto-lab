@@ -2,10 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import type { Contest } from "../src/domain/types.js";
-import { createPostgresPool } from "../src/db/client.js";
-import { runMigrations } from "../src/db/migrations.js";
 import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
 import { createLotoLabServer } from "../src/api/server.js";
+import { createIsolatedPostgresDatabase } from "./helpers/postgres.js";
 
 function makeMegaContest(offset: number): Contest {
   const number = 2600 + offset;
@@ -33,21 +32,8 @@ test(
   "HTTP API exposes contests, analysis, diversified generation, real bets, checking, strategies, backtests and lab",
   { skip: !process.env.DATABASE_URL },
   async (t) => {
-    const pool = createPostgresPool({ max: 4 });
-    await runMigrations(pool);
-    await pool.query(`
-      TRUNCATE TABLE
-        real_bet_games,
-        real_bets,
-        backtest_rounds,
-        backtest_runs,
-        generated_games,
-        generated_game_batches,
-        strategies,
-        contest_prize_tiers,
-        contests
-      RESTART IDENTITY CASCADE
-    `);
+    const database = await createIsolatedPostgresDatabase({ label: "api", max: 4 });
+    const { pool } = database;
 
     const contests = Array.from({ length: 25 }, (_, index) => makeMegaContest(index));
     const contestRepository = new PostgresContestRepository(pool);
@@ -61,7 +47,7 @@ test(
 
     t.after(async () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
-      await pool.end();
+      await database.close();
     });
 
     const address = server.address();
