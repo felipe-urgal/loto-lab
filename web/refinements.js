@@ -72,7 +72,7 @@ async function refineAnalysis() {
   refinement.innerHTML = `
     <div class="analysis-toolbar">
       <div>
-        <strong style="font-size:11px">Explorar classificação</strong>
+        <strong>Explorar classificação</strong>
         <div class="form-note">A classificação é relativa ao período e à distribuição atual.</div>
       </div>
       <div class="analysis-toolbar-controls">
