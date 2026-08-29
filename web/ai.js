@@ -24,6 +24,8 @@ const FOCUS_LABELS = {
 };
 let status = null;
 let historyItems = [];
+let historyLoadToken = 0;
+let insightRequestToken = 0;
 
 function list(items) {
   if (!items?.length) return "<li>Sem observações adicionais.</li>";
@@ -101,12 +103,16 @@ function renderHistory() {
 }
 
 async function loadHistory() {
+  const requestedLottery = lotterySelect.value;
+  const token = ++historyLoadToken;
   historyRoot.innerHTML = '<div class="loading-state"><span class="spinner"></span><span>Carregando histórico...</span></div>';
   try {
-    const data = await api(`/ai/insights/${lotterySelect.value}?limit=10`);
+    const data = await api(`/ai/insights/${requestedLottery}?limit=10`);
+    if (token !== historyLoadToken || lotterySelect.value !== requestedLottery) return;
     historyItems = data.items || [];
     renderHistory();
   } catch (error) {
+    if (token !== historyLoadToken || lotterySelect.value !== requestedLottery) return;
     historyItems = [];
     historyRoot.innerHTML = `<div class="ai-empty">${escapeHtml(error.message)}</div>`;
   }
@@ -115,6 +121,8 @@ async function loadHistory() {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!status?.configured) return;
+  const requestedLottery = lotterySelect.value;
+  const token = ++insightRequestToken;
   runButton.disabled = true;
   runButton.textContent = "Interpretando...";
   message.className = "panel ai-message is-loading";
@@ -123,11 +131,12 @@ form.addEventListener("submit", async (event) => {
     const record = await api("/ai/insights", {
       method: "POST",
       body: JSON.stringify({
-        lottery: lotterySelect.value,
+        lottery: requestedLottery,
         focus: focusSelect.value,
         force: Boolean(forceInput?.checked),
       }),
     });
+    if (token !== insightRequestToken || lotterySelect.value !== requestedLottery) return;
     renderInsight(record, record.disclaimer);
     message.className = "panel ai-message";
     message.innerHTML = record.reused
@@ -136,16 +145,24 @@ form.addEventListener("submit", async (event) => {
     if (forceInput) forceInput.checked = false;
     await loadHistory();
   } catch (error) {
+    if (token !== insightRequestToken || lotterySelect.value !== requestedLottery) return;
     message.className = "panel ai-message";
     message.innerHTML = `<strong>Falha na interpretação</strong><p>${escapeHtml(error.message)}</p>`;
   } finally {
-    runButton.disabled = !status?.configured;
-    runButton.textContent = "Gerar interpretação";
+    if (token === insightRequestToken) {
+      runButton.disabled = !status?.configured;
+      runButton.textContent = "Gerar interpretação";
+    }
   }
 });
 
 lotterySelect.addEventListener("change", async () => {
   localStorage.setItem("loto-lab:lottery", lotterySelect.value);
+  insightRequestToken += 1;
+  runButton.disabled = !status?.configured;
+  runButton.textContent = "Gerar interpretação";
+  message.className = "panel ai-message";
+  message.innerHTML = "<strong>Pronto para interpretar</strong><p>Escolha o foco. Nenhuma interpretação altera a metodologia ou os jogos gerados.</p>";
   resultRoot.hidden = true;
   await loadHistory();
 });
