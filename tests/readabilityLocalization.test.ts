@@ -126,3 +126,35 @@ test("core app owns dashboard, analyses and historical-test copy in Portuguese",
   assert.doesNotMatch(app, />Executar backtest</);
   assert.doesNotMatch(app, />Score</);
 });
+
+test("strategy lab owns its visible vocabulary in Portuguese while preserving internal contracts", async () => {
+  const html = await source("web/lab.html");
+  const lab = await source("web/lab.js");
+
+  assert.match(html, /Hipótese → regra → teste histórico → benchmark → evidência → decisão/);
+  assert.doesNotMatch(html, /→ backtest →/);
+
+  for (const copy of [
+    "Pontuação v1 × v2 × sem pontuação",
+    "Pontuação v1 × Pontuação v2 × sem pontuação",
+    "Isola o valor da classificação",
+    "validação progressiva sem olhar concursos futuros",
+    "Otimização por validação progressiva",
+    "A classificação colocou os números sorteados",
+    "Classificação por ROI",
+    "Classificação por taxa de premiação",
+    "modelos de pontuação",
+    "Executando testes históricos",
+  ]) {
+    assert.ok(lab.includes(copy), `missing canonical laboratory copy: ${copy}`);
+  }
+
+  assert.match(lab, /experiment === "score-model"/);
+  assert.match(lab, /result\.rankingBasis/);
+  assert.match(lab, /result\.rankingQuality/);
+  assert.match(lab, /class="lab-ranking"/);
+  assert.doesNotMatch(lab, />Score v1 × v2 × sem score</);
+  assert.doesNotMatch(lab, /Executando backtests/);
+  assert.doesNotMatch(lab, /"Ranking por ROI"/);
+  assert.doesNotMatch(lab, /"Ranking por taxa de premiação"/);
+});
