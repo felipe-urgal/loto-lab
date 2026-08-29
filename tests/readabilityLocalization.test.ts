@@ -29,6 +29,7 @@ test("static readability layer establishes a hard 16px minimum for functional te
   const lab = await source("web/lab.css");
   const labV2 = await source("web/lab-v2.css");
   const agenda = await source("web/agenda.css");
+  const ai = await source("web/ai.css");
   const build = await source("scripts/buildWeb.mjs");
   const e2e = await source("scripts/e2eReadability.mjs");
 
@@ -48,6 +49,7 @@ test("static readability layer establishes a hard 16px minimum for functional te
   assertMinimumExplicitFontSize(lab, "lab.css");
   assertMinimumExplicitFontSize(labV2, "lab-v2.css");
   assertMinimumExplicitFontSize(agenda, "agenda.css");
+  assertMinimumExplicitFontSize(ai, "ai.css");
 });
 
 test("localization keeps product vocabulary in Portuguese and scopes dynamic replacements to system UI", async () => {
