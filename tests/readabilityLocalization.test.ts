@@ -108,3 +108,21 @@ test("Generator 2.0 owns its conditioned reference copy in Portuguese", async ()
   assert.doesNotMatch(generator, />Baseline condicionado</);
   assert.doesNotMatch(generator, /Os baselines abaixo são condicionados/);
 });
+
+test("core app owns dashboard, analyses and historical-test copy in Portuguese", async () => {
+  const app = await source("web/app.js");
+
+  assert.match(app, /dashboard: \["Painel"/);
+  assert.match(app, /backtests: \["Testes históricos"/);
+  assert.match(app, /Frequências, pontuação e classificação por horizonte/);
+  assert.match(app, /Resumo do último teste histórico salvo/);
+  assert.match(app, /Dezenas com maior pontuação/);
+  assert.match(app, /Executar teste histórico/);
+  assert.match(app, /Teste histórico concluído/);
+
+  assert.doesNotMatch(app, /dashboard: \["Dashboard"/);
+  assert.doesNotMatch(app, /backtests: \["Backtests"/);
+  assert.doesNotMatch(app, /Resumo do último backtest persistido/);
+  assert.doesNotMatch(app, />Executar backtest</);
+  assert.doesNotMatch(app, />Score</);
+});
