@@ -20,6 +20,7 @@ test("web build keeps static readability and Portuguese localization without run
 test("static readability layer establishes a hard 16px minimum for functional text", async () => {
   const css = await source("web/readability.css");
   const refinements = await source("web/refinements.css");
+  const lab = await source("web/lab.css");
   const build = await source("scripts/buildWeb.mjs");
   const e2e = await source("scripts/e2eReadability.mjs");
 
@@ -41,6 +42,10 @@ test("static readability layer establishes a hard 16px minimum for functional te
   const refinementFontSizes = [...refinements.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]));
   assert.ok(refinementFontSizes.length > 5, "refinements.css should expose its functional typography in source");
   assert.ok(refinementFontSizes.every((size) => size >= 16), `refinements.css contains font-size below 16px: ${refinementFontSizes.filter((size) => size < 16).join(", ")}`);
+
+  const labFontSizes = [...lab.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]));
+  assert.ok(labFontSizes.length > 10, "lab.css should expose its functional typography in source");
+  assert.ok(labFontSizes.every((size) => size >= 16), `lab.css contains font-size below 16px: ${labFontSizes.filter((size) => size < 16).join(", ")}`);
 });
 
 test("localization keeps product vocabulary in Portuguese and scopes dynamic replacements to system UI", async () => {
