@@ -119,6 +119,12 @@ async function main(): Promise<void> {
       logEvent("warn", "operations_recovered", { count: recoveredOperations });
     }
 
+    analysisJobs = getAnalysisJobManager(pool);
+    const recoveredJobs = await analysisJobs.start();
+    if (recoveredJobs > 0) {
+      logEvent("warn", "analysis_jobs_recovered", { count: recoveredJobs });
+    }
+
     const port = parsePort(process.env.API_PORT);
     const host = process.env.API_HOST ?? "127.0.0.1";
     server = createLotoLabServer({
@@ -127,12 +133,6 @@ async function main(): Promise<void> {
     });
 
     await listenServer(server, port, host);
-
-    analysisJobs = getAnalysisJobManager(pool);
-    const recoveredJobs = await analysisJobs.start();
-    if (recoveredJobs > 0) {
-      logEvent("warn", "analysis_jobs_recovered", { count: recoveredJobs });
-    }
 
     if (autoSyncEnabled(process.env.OPS_AUTO_SYNC)) {
       scheduler = startOperationsScheduler(pool, {
