@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import type { LotteryId } from "../domain/types.js";
 import { normalizeIsoDateTime } from "../domain/dateTime.js";
+import { discardPoolClient, releaseAdvisoryLockClient } from "../db/advisoryLock.js";
 import { evaluateGames } from "../checker/evaluate.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import { PostgresGameRepository } from "../persistence/gameRepository.js";
@@ -21,6 +22,10 @@ export interface CreateRealBetRequest {
 export interface RealBetReconciliationSummary {
   financiallyResolved: number;
   financiallyRevised: number;
+}
+
+function reconciliationLockKey(id: number): string {
+  return `loto_lab_real_bet_reconcile:${id}`;
 }
 
 export class RealBetService {
@@ -88,14 +93,37 @@ export class RealBetService {
   }
 
   async reconcile(id: number): Promise<RealBetRecord | undefined> {
-    const bet = await this.realBets.findById(id);
-    if (!bet) return undefined;
+    const lockClient = await this.pool.connect();
+    const lockKey = reconciliationLockKey(id);
+    let locked = false;
+    try {
+      try {
+        await lockClient.query(
+          "SELECT pg_advisory_lock(hashtextextended($1, 0))",
+          [lockKey],
+        );
+        locked = true;
+      } catch (error) {
+        throw discardPoolClient(lockClient, error);
+      }
 
-    const contest = await this.contests.findByNumber(bet.lottery, bet.contestNumber);
-    if (!contest) return bet;
+      const bet = await this.realBets.findById(id);
+      if (!bet) return undefined;
 
-    const checks = evaluateGames(bet.games.map((item) => item.game), contest);
-    return this.realBets.markChecked(id, checks);
+      const contest = await this.contests.findByNumber(bet.lottery, bet.contestNumber);
+      if (!contest) return bet;
+
+      const checks = evaluateGames(bet.games.map((item) => item.game), contest);
+      return this.realBets.markChecked(id, checks);
+    } finally {
+      if (locked) {
+        await releaseAdvisoryLockClient(
+          lockClient,
+          "SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
+          [lockKey],
+        );
+      }
+    }
   }
 
   async reconcileContestNumbers(
