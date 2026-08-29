@@ -7,6 +7,7 @@ import type { ContestSource, LotteryAgendaSnapshot } from "../src/data/source.js
 import { runMigrations } from "../src/db/migrations.js";
 import type { Contest, LotteryId } from "../src/domain/types.js";
 import { runOperationalSync, type SyncAllDetails } from "../src/operations/sync.js";
+import { PostgresNotificationRepository } from "../src/persistence/notificationRepository.js";
 import { PostgresOperationRepository } from "../src/persistence/operationRepository.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -149,6 +150,7 @@ test(
 
     await runMigrations(pool);
     const operations = new PostgresOperationRepository(pool);
+    const notifications = new PostgresNotificationRepository(pool);
 
     const partial = await runOperationalSync(pool, {
       source: new PartialSource(),
@@ -170,6 +172,12 @@ test(
     assert.equal(latest?.id, partial.id);
     assert.equal(latest?.status, "partial");
 
+    let operationWarnings = (await notifications.list()).filter((item) => item.type === "operation-warning");
+    assert.equal(operationWarnings.length, 1);
+    assert.equal(operationWarnings[0]?.eventKey, `operation:${partial.id}`);
+    assert.equal(operationWarnings[0]?.severity, "warning");
+    assert.equal(operationWarnings[0]?.metadata.status, "partial");
+
     const failed = await runOperationalSync(pool, {
       source: new FailingSource(),
       retries: 0,
@@ -180,6 +188,12 @@ test(
     assert.equal(failed.details.failedLotteries, 3);
     assert.ok(failed.details.lotteries.every((item) => item.status === "failed"));
     assert.ok(failed.details.lotteries.every((item) => item.error?.startsWith("source unavailable for ")));
+
+    operationWarnings = (await notifications.list()).filter((item) => item.type === "operation-warning");
+    assert.equal(operationWarnings.length, 2);
+    const failedWarning = operationWarnings.find((item) => item.eventKey === `operation:${failed.id}`);
+    assert.equal(failedWarning?.severity, "error");
+    assert.equal(failedWarning?.metadata.status, "failed");
 
     server = createLotoLabServer({ pool, operationSource: new SuccessfulSource() });
     await new Promise<void>((resolve, reject) => {
