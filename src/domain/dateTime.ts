@@ -1,4 +1,4 @@
-const ISO_DATE_TIME_WITH_ZONE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/;
+const ISO_DATE_TIME_WITH_ZONE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|([+-])(\d{2}):(\d{2}))$/;
 
 function isLeapYear(year: number): boolean {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
@@ -24,11 +24,14 @@ export function normalizeIsoDateTime(value: string): string | undefined {
   const hour = Number(match[4]);
   const minute = Number(match[5]);
   const second = Number(match[6]);
+  const offsetHour = match[9] === undefined ? 0 : Number(match[9]);
+  const offsetMinute = match[10] === undefined ? 0 : Number(match[10]);
 
   if (year < 1 || year > 9999) return undefined;
   if (month < 1 || month > 12) return undefined;
   if (day < 1 || day > daysInMonth(year, month)) return undefined;
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) return undefined;
+  if (offsetHour < 0 || offsetHour > 23 || offsetMinute < 0 || offsetMinute > 59) return undefined;
 
   const parsed = new Date(value);
   if (!Number.isFinite(parsed.getTime())) return undefined;
