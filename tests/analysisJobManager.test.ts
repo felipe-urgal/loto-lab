@@ -43,7 +43,7 @@ async function reserveAnalysisGate(timeoutMs = 1_000): Promise<() => void> {
 }
 
 test(
-  "analysis job manager recovers, executes and cancels queued work",
+  "analysis job manager recovers, retries transient claim failures, executes and cancels queued work",
   { skip: !databaseUrl, timeout: 20_000 },
   async () => {
     const database = await createIsolatedPostgresDatabase({ label: "analysis-job-manager" });
@@ -70,9 +70,23 @@ test(
         [interrupted.id],
       );
 
+      const internalRepository = (manager as unknown as {
+        repository: PostgresAnalysisJobRepository;
+      }).repository;
+      const claimNext = internalRepository.claimNext.bind(internalRepository);
+      let injectedClaimFailures = 0;
+      internalRepository.claimNext = async () => {
+        if (injectedClaimFailures === 0) {
+          injectedClaimFailures += 1;
+          throw new Error("transient claim failure for test");
+        }
+        return claimNext();
+      };
+
       assert.equal(await manager.start(), 1);
 
       const completed = await waitForTerminalJob(manager, interrupted.id);
+      assert.equal(injectedClaimFailures, 1);
       assert.equal(completed.status, "completed");
       assert.equal(completed.cancelRequested, false);
       assert.equal(completed.result?.lottery, "mega-sena");

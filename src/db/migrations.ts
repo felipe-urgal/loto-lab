@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Pool, PoolClient } from "pg";
+import { releaseAdvisoryLockClient } from "./advisoryLock.js";
 
 export interface MigrationResult {
   applied: string[];
@@ -98,9 +99,15 @@ export async function runMigrations(
 
     return { applied, skipped };
   } finally {
-    if (lockAcquired) {
-      await client.query("SELECT pg_advisory_unlock(hashtext('loto_lab_migrations'))").catch(() => undefined);
+    if (!lockAcquired) {
+      client.release();
+    } else {
+      await releaseAdvisoryLockClient(
+        client,
+        "SELECT pg_advisory_unlock(hashtext('loto_lab_migrations')) AS unlocked",
+      ).catch((error: unknown) => {
+        console.error("Failed to release migration advisory lock; PostgreSQL session was discarded", error);
+      });
     }
-    client.release();
   }
 }

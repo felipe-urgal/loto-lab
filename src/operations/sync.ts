@@ -4,6 +4,7 @@ import type { ContestSource } from "../data/source.js";
 import { isLotteryAgendaSource } from "../data/source.js";
 import { CaixaContestSource } from "../data/caixa.js";
 import { bootstrapLotteryHistory } from "../data/bootstrap.js";
+import { releaseAdvisoryLockClient } from "../db/advisoryLock.js";
 import { hasCompletePrizeSchedule } from "../finance/prizes.js";
 import { PostgresAgendaRepository } from "../persistence/agendaRepository.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
@@ -274,7 +275,12 @@ export async function runOperationalSync(
     }
     throw error;
   } finally {
-    await lockClient.query("SELECT pg_advisory_unlock($1)", [SYNC_ADVISORY_LOCK]).catch(() => undefined);
-    lockClient.release();
+    await releaseAdvisoryLockClient(
+      lockClient,
+      "SELECT pg_advisory_unlock($1) AS unlocked",
+      [SYNC_ADVISORY_LOCK],
+    ).catch((error: unknown) => {
+      logEvent("error", "operational_sync_lock_release_failed", { message: message(error) });
+    });
   }
 }
