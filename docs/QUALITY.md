@@ -52,17 +52,21 @@ O repositório possui alguns arquivos legados sem newline final. O gate não for
 
 ## Isolamento da suíte PostgreSQL
 
-A suíte inclui testes unitários, de integração, API e persistência. Vários desses testes compartilham o mesmo PostgreSQL de CI e usam fixtures globais ou `TRUNCATE`.
+A suíte inclui testes unitários, de integração, API e persistência. As suítes que dependem de PostgreSQL não compartilham mais tabelas, sequences ou fixtures globais entre arquivos.
 
-Por isso, os arquivos de teste rodam com:
+O helper `tests/helpers/postgres.ts` cria um database temporário exclusivo para cada suíte integrada, preservando a configuração base de conexão e executando migrations por padrão. O cleanup encerra o pool antes de remover o database; se uma conexão vazar, o helper força a remoção para não deixar resíduo, mas propaga a falha original para que o leak continue visível no CI.
+
+O isolamento por database foi escolhido em vez de apenas `search_path`/schema porque o Loto Lab também exerce advisory locks reais em migrations, runtime e operações. Isso fornece uma fronteira consistente para dados e locks durante testes concorrentes.
+
+Os arquivos de teste rodam com concorrência deliberadamente limitada:
 
 ```text
---test-concurrency=1
+--test-concurrency=2
 ```
 
-A execução serial é intencional: impede que um arquivo remova ou insira dados enquanto outro está validando o mesmo banco. O CI detectou essa condição ao observar um concurso sintético de outro teste dentro de uma consulta de API.
+O valor `2` é intencional. Ele remove a serialização global que existia por causa do banco compartilhado sem assumir que mais paralelismo sempre será melhor para PostgreSQL, worker threads ou o runner de CI. Qualquer aumento futuro deve ser medido no pipeline completo e manter estabilidade antes de ser adotado.
 
-Esse contrato deve permanecer até existir isolamento real por database/schema por worker. Paralelizar novamente sem esse isolamento reintroduz flakiness.
+Testes puramente unitários continuam sem depender de PostgreSQL. Suítes integradas devem usar o helper comum em vez de introduzir `TRUNCATE` global, fixtures compartilhadas ou schemas manuais.
 
 ## Cobertura
 
@@ -98,7 +102,7 @@ Em PRs e pushes para `main`, a ordem principal é:
 
 1. instalar dependências com `npm ci`;
 2. executar gates estáticos;
-3. build + testes serializados com thresholds de cobertura;
+3. build + testes com concorrência limitada e thresholds de cobertura;
 4. auditar dependências de produção;
 5. validar Compose;
 6. construir a imagem de produção;
