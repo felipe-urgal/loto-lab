@@ -7,7 +7,7 @@ Arquivos principais:
 - `Dockerfile` — imagem multi-stage da aplicação;
 - `docker-compose.prod.yml` — aplicação + PostgreSQL persistente;
 - `.env.production.example` — template de configuração;
-- `docker-compose.yml` — continua sendo o compose local de desenvolvimento.
+- `docker-compose.yml` — compose local de desenvolvimento.
 
 ## Princípios
 
@@ -71,16 +71,25 @@ OPENAI_MODEL=gpt-5.6-luna
 
 Sem chave ou sem billing da API, somente a geração de interpretações de IA fica indisponível. Chamadas de interpretação possuem timeout e rate limiting no servidor para limitar consumo acidental ou abusivo.
 
-## Exposição de rede
+## Portas e exposição de rede
 
-Por segurança o template usa:
+A aplicação escuta internamente em `3000` no container. A porta publicada no host é configurada por `APP_PORT` e o template atual usa:
 
 ```env
 APP_BIND=127.0.0.1
-APP_PORT=3000
+APP_PORT=5200
+PUBLIC_ORIGIN=http://localhost:5200
+```
+
+Com esses valores, o mapeamento é:
+
+```text
+127.0.0.1:5200 -> app:3000
 ```
 
 Isso deixa a aplicação acessível apenas no próprio servidor e é o modo recomendado quando Caddy, Nginx, Traefik ou outro reverse proxy termina HTTPS no mesmo host.
+
+O PostgreSQL permanece somente na rede Docker em `postgres:5432` e não publica porta no host em produção.
 
 Para exposição direta, altere deliberadamente para:
 
@@ -88,7 +97,9 @@ Para exposição direta, altere deliberadamente para:
 APP_BIND=0.0.0.0
 ```
 
-Nesse caso configure firewall e TLS adequadamente. Não exponha PostgreSQL na internet.
+Nesse caso configure firewall e TLS adequadamente. Se `APP_BIND` não for loopback, `PUBLIC_ORIGIN` deve usar `https://`, salvo a exceção local/emergencial explicitamente habilitada por `ALLOW_INSECURE_PUBLIC_HTTP=true`.
+
+Não exponha PostgreSQL na internet.
 
 ## Validar configuração
 
@@ -135,10 +146,10 @@ Em uma base vazia, a primeira sincronização pode levar mais tempo porque preci
 docker compose --env-file .env.production -f docker-compose.prod.yml ps
 ```
 
-Com o bind padrão:
+Com o bind/porta padrão:
 
 ```bash
-curl -f http://127.0.0.1:3000/health/ready
+curl -f http://127.0.0.1:5200/health/ready
 ```
 
 Resposta esperada:
@@ -152,7 +163,7 @@ Os endpoints `/health`, `/health/live` e `/health/ready` não exigem autenticaç
 Para validar uma rota protegida via terminal:
 
 ```bash
-curl -u "$APP_AUTH_USER:$APP_AUTH_PASSWORD" http://127.0.0.1:3000/api/v1/lotteries
+curl -u "$APP_AUTH_USER:$APP_AUTH_PASSWORD" http://127.0.0.1:5200/api/v1/lotteries
 ```
 
 ## Limites operacionais HTTP
@@ -160,12 +171,12 @@ curl -u "$APP_AUTH_USER:$APP_AUTH_PASSWORD" http://127.0.0.1:3000/api/v1/lotteri
 Para evitar que uma chamada web monopolize CPU/memória:
 
 - geração de jogos aceita no máximo 10 jogos por chamada;
-- backtests via HTTP aceitam no máximo 10 jogos por concurso e 500 concursos por execução;
-- Laboratório aceita no máximo 10 jogos, 500 concursos de aquecimento/lookback e bucket máximo de 100;
-- geração, backtests, Laboratório, IA e sincronização manual possuem rate limiting em memória;
-- backtests persistidos guardam apenas o artefato compacto de cada rodada; o resumo completo continua preservado.
+- testes históricos via HTTP aceitam no máximo 10 jogos por concurso e 500 concursos por execução;
+- Laboratório aceita no máximo 10 jogos, 500 concursos de aquecimento/janela histórica e bloco máximo de 100;
+- geração, testes históricos, Laboratório, IA e sincronização manual possuem rate limiting em memória;
+- testes históricos persistidos guardam apenas o artefato compacto de cada rodada; o resumo completo continua preservado.
 
-Backtests maiores devem ser segmentados por intervalo de concursos. O limite web não altera os cálculos determinísticos do core.
+Testes históricos maiores devem ser segmentados por intervalo de concursos. O limite web não altera os cálculos determinísticos do core.
 
 ## Logs
 
@@ -233,7 +244,7 @@ Suba a aplicação novamente:
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d app
 ```
 
-Confirme `/health/ready` e o Dashboard antes de considerar o restore concluído.
+Confirme `/health/ready` e o Painel antes de considerar o restore concluído.
 
 ## Parar a stack
 
@@ -255,13 +266,13 @@ OPS_INTERVAL_MINUTES=30
 OPS_STALE_AFTER_MINUTES=180
 ```
 
-A aplicação usa advisory lock no PostgreSQL para impedir duas sincronizações simultâneas. O botão do Dashboard, scheduler e comandos manuais compartilham a mesma trava.
+A aplicação usa advisory lock no PostgreSQL para impedir duas sincronizações simultâneas. O botão do Painel, scheduler e comandos manuais compartilham a mesma trava.
 
 No encerramento por `SIGINT`/`SIGTERM`, a aplicação para de aceitar novas conexões, aguarda uma sincronização operacional já iniciada terminar e só então encerra o pool do PostgreSQL.
 
 ## Reverse proxy e HTTPS
 
-O compose não escolhe um provedor de TLS. Em produção pública, coloque um reverse proxy na frente de `127.0.0.1:3000` e use HTTPS.
+O compose não escolhe um provedor de TLS. Em produção pública, coloque um reverse proxy na frente de `127.0.0.1:5200` e use HTTPS.
 
 Depois ajuste:
 
@@ -275,12 +286,15 @@ Não coloque `OPENAI_API_KEY`, senha do PostgreSQL ou qualquer outro segredo no 
 
 ## CI
 
-O CI valida produção em três níveis:
+O CI valida produção em múltiplos níveis:
 
-1. suíte TypeScript/PostgreSQL existente;
+1. quality gates estáticos e suíte TypeScript/PostgreSQL;
 2. `docker compose config` da stack de produção;
-3. build da imagem e smoke test real do container contra PostgreSQL, aguardando `/health/ready`.
+3. build da imagem e smoke test real do container contra PostgreSQL;
+4. autenticação da imagem de produção;
+5. E2E em navegador real;
+6. checks de Security, incluindo dependency review, CodeQL, SBOM e vulnerabilidades da imagem.
 
-A imagem de runtime é construída com `tsconfig.build.json`, contendo somente o código de `src/`; testes não são copiados para o artefato final.
+A imagem de runtime é construída com `tsconfig.build.json`, contendo somente o código necessário para execução.
 
-Assim uma alteração só fica verde quando o artefato que será executado em produção também consegue iniciar.
+Assim uma alteração só fica verde quando o artefato que será executado em produção também consegue iniciar e responder pelos fluxos protegidos esperados.
