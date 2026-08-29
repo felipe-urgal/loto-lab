@@ -7,9 +7,8 @@ import type {
   AiProviderResult,
 } from "../src/ai/types.js";
 import type { Contest } from "../src/domain/types.js";
-import { createPostgresPool } from "../src/db/client.js";
-import { runMigrations } from "../src/db/migrations.js";
 import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
+import { createIsolatedPostgresDatabase } from "./helpers/postgres.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -74,24 +73,9 @@ test(
   "AI insight service deduplicates semantic evidence, shares in-flight work, honors force and recovers from provider failures",
   { skip: !databaseUrl, timeout: 20_000 },
   async (t) => {
-    const pool = createPostgresPool({ connectionString: databaseUrl!, max: 4 });
-    await runMigrations(pool);
-    await pool.query(`
-      TRUNCATE TABLE
-        ai_insights,
-        analysis_jobs,
-        backtest_rounds,
-        backtest_runs,
-        real_bet_financial_revisions,
-        real_bet_games,
-        real_bets,
-        generated_games,
-        generated_game_batches,
-        contest_prize_tiers,
-        contests
-      RESTART IDENTITY CASCADE
-    `);
-    t.after(async () => pool.end());
+    const database = await createIsolatedPostgresDatabase({ label: "ai-insight-service", max: 4 });
+    const { pool } = database;
+    t.after(async () => database.close());
 
     await new PostgresContestRepository(pool).upsertMany([megaContest(3000)]);
     await pool.query(
