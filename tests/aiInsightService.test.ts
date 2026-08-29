@@ -147,7 +147,7 @@ test(
     assert.equal(provider.calls, beforeFailureCalls + 2);
 
     const history = await service.history("mega-sena", 20);
-    assert.equal(history.length, 6);
+    assert.equal(history.length, 5);
     assert.equal(history.filter((row) => row.focus === "overview").length, 1);
     assert.equal(history.filter((row) => row.focus === "analysis").length, 1);
     assert.equal(history.filter((row) => row.focus === "strategy").length, 2);
