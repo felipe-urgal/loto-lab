@@ -4,6 +4,12 @@ function normalizedError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
+export function discardPoolClient(client: PoolClient, error: unknown): Error {
+  const normalized = normalizedError(error);
+  client.release(normalized);
+  return normalized;
+}
+
 /**
  * Releases a session-level PostgreSQL advisory lock and then returns the client
  * to the pool. If the unlock cannot be confirmed, the client is discarded
@@ -21,9 +27,7 @@ export async function releaseAdvisoryLockClient(
       throw new Error("PostgreSQL advisory lock release was not confirmed");
     }
   } catch (error) {
-    const normalized = normalizedError(error);
-    client.release(normalized);
-    throw normalized;
+    throw discardPoolClient(client, error);
   }
 
   client.release();
