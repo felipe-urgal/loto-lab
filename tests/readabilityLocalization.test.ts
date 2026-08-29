@@ -131,8 +131,12 @@ test("strategy lab owns its visible vocabulary in Portuguese while preserving in
   const html = await source("web/lab.html");
   const lab = await source("web/lab.js");
 
-  assert.match(html, /Hipótese → regra → teste histórico → benchmark → evidência → decisão/);
+  assert.match(html, /Hipótese → regra → teste histórico → referência → evidência → decisão/);
+  assert.match(html, /Evidência acima do acaso/);
+  assert.match(html, /Evidência abaixo do acaso/);
   assert.doesNotMatch(html, /→ backtest →/);
+  assert.doesNotMatch(html, /→ benchmark →/);
+  assert.doesNotMatch(html, /Evidência (?:acima|abaixo) do random/);
 
   for (const copy of [
     "Pontuação v1 × v2 × sem pontuação",
