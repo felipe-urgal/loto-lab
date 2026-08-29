@@ -1,16 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
-import type {
-  AnalysisWeights,
-  Contest,
-  LotteryId,
-  NumberAnalysis,
-  NumberTier,
-} from "../domain/types.js";
+import type { Contest, LotteryId } from "../domain/types.js";
 import type { buildAdvancedAnalysis } from "../analysis/advanced.js";
 import { runAdvancedAnalysisInWorker } from "../analysis/advancedWorkerClient.js";
-import { buildNumberAnalysis, DEFAULT_WEIGHTS } from "../analysis/scoring.js";
-import { getLotteryConfig } from "../lotteries/config.js";
+import { AnalyzeLotteryUseCase } from "../application/analyzeLottery.js";
 import { generateMegaSenaGames } from "../generator/megaSena.js";
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { generateDiaDeSorteGames } from "../generator/diaDeSorte.js";
@@ -31,18 +24,12 @@ import type {
   UpsertStrategyInput,
 } from "../persistence/types.js";
 
+export type { AnalysisResponse } from "../application/analyzeLottery.js";
+
 export const MIN_GENERATION_HISTORY = 20;
 export const MAX_HTTP_BACKTEST_ROUNDS = 500;
 
 export type AdvancedAnalysis = ReturnType<typeof buildAdvancedAnalysis>;
-
-export interface AnalysisResponse {
-  lottery: LotteryId;
-  latestContest: Contest | null;
-  weights: AnalysisWeights;
-  tiers: Record<NumberTier, number[]>;
-  numbers: NumberAnalysis[];
-}
 
 export interface AdvancedAnalysisResponse {
   lottery: LotteryId;
@@ -145,6 +132,7 @@ export class LotoLabApiServices {
   readonly games: PostgresGameRepository;
   readonly strategies: PostgresStrategyRepository;
   readonly backtests: PostgresBacktestRepository;
+  private readonly analyzeLottery: AnalyzeLotteryUseCase;
   private readonly advancedAnalysisCache = new Map<LotteryId, AdvancedAnalysisCacheEntry>();
   private readonly advancedAnalysisInFlight = new Map<LotteryId, AdvancedAnalysisInFlightEntry>();
 
@@ -153,25 +141,11 @@ export class LotoLabApiServices {
     this.games = new PostgresGameRepository(pool);
     this.strategies = new PostgresStrategyRepository(pool);
     this.backtests = new PostgresBacktestRepository(pool);
+    this.analyzeLottery = new AnalyzeLotteryUseCase(this.contests);
   }
 
-  async analyze(lottery: LotteryId): Promise<AnalysisResponse> {
-    const contests = await this.contests.listAnalysisHistory(lottery);
-    const config = getLotteryConfig(lottery);
-    const rows = buildNumberAnalysis(contests, config);
-    const latestContest = contests.at(-1) ?? null;
-
-    return {
-      lottery,
-      latestContest,
-      weights: DEFAULT_WEIGHTS,
-      tiers: {
-        strong: rows.filter((row) => row.tier === "strong").map((row) => row.number),
-        balanced: rows.filter((row) => row.tier === "balanced").map((row) => row.number),
-        cold: rows.filter((row) => row.tier === "cold").map((row) => row.number),
-      },
-      numbers: rows,
-    };
+  async analyze(lottery: LotteryId) {
+    return this.analyzeLottery.execute(lottery);
   }
 
   async analyzeAdvanced(lottery: LotteryId): Promise<AdvancedAnalysisResponse> {
