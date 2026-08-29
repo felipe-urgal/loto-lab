@@ -187,3 +187,14 @@ test("refinement layers own their Portuguese analysis vocabulary while preservin
   assert.match(labRefinements, /métrica de classificação não variou/);
   assert.doesNotMatch(labRefinements, /métrica de ranking não variou/);
 });
+
+test("real-bet UI owns its historical-test vocabulary in source", async () => {
+  const realBets = await source("web/real-bets.js");
+
+  assert.match(realBets, /não inclui testes históricos/);
+  assert.match(realBets, /separado dos lotes apenas gerados e dos testes históricos/);
+  assert.doesNotMatch(realBets, /não inclui backtests/);
+  assert.doesNotMatch(realBets, /lotes apenas gerados e dos backtests/);
+  assert.match(realBets, /\/real-bets\/\$\{lottery\}/);
+  assert.match(realBets, /api\("\/real-bets"/);
+});
