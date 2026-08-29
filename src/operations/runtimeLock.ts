@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from "pg";
-import { releaseAdvisoryLockClient } from "../db/advisoryLock.js";
+import { discardPoolClient, releaseAdvisoryLockClient } from "../db/advisoryLock.js";
 
 const RUNTIME_INSTANCE_ADVISORY_LOCK = 1515016;
 
@@ -25,8 +25,11 @@ export async function acquireRuntimeInstanceLock(pool: Pool): Promise<RuntimeIns
     locked = Boolean(result.rows[0]?.locked);
     if (!locked) throw new RuntimeInstanceAlreadyActiveError();
   } catch (error) {
-    client.release();
-    throw error;
+    if (error instanceof RuntimeInstanceAlreadyActiveError) {
+      client.release();
+      throw error;
+    }
+    throw discardPoolClient(client, error);
   }
 
   let released = false;
