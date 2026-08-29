@@ -16,7 +16,7 @@
     "web:build": "node scripts/buildWeb.mjs",
     "build": "npm run build:server && npm run web:build",
     "build:prod": "tsc -p tsconfig.build.json && npm run web:build",
-    "coverage:run": "node --experimental-test-coverage --test-coverage-lines=78 --test-coverage-branches=75 --test-coverage-functions=85 --test --test-concurrency=1 dist/tests/*.test.js",
+    "coverage:run": "node --experimental-test-coverage --test-coverage-lines=78 --test-coverage-branches=75 --test-coverage-functions=85 --test --test-concurrency=2 dist/tests/*.test.js",
     "coverage": "npm run build && npm run coverage:run",
     "test": "npm run platform:verify && npm run build && npm run coverage:run",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
