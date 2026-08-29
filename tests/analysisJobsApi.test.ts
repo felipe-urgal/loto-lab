@@ -8,6 +8,7 @@ import { expensiveAnalysisGate } from "../src/api/workGate.js";
 import { createPostgresPool } from "../src/db/client.js";
 import { runMigrations } from "../src/db/migrations.js";
 import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
+import { PostgresStrategyRepository } from "../src/persistence/strategyRepository.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -39,6 +40,26 @@ async function postJson(baseUrl: string, path: string, body: Record<string, unkn
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+async function waitForJobStatus(
+  baseUrl: string,
+  id: number,
+  expectedStatus: string,
+  timeoutMs = 5_000,
+) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const response = await fetch(`${baseUrl}/api/v1/analysis-jobs/${id}`);
+    assert.equal(response.status, 200);
+    const job = await responseJson(response);
+    if (job.status === expectedStatus) return job;
+    if (["completed", "failed", "cancelled"].includes(String(job.status))) {
+      throw new Error(`Analysis job ${id} reached ${String(job.status)} before ${expectedStatus}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`Analysis job ${id} did not reach ${expectedStatus} within ${timeoutMs}ms`);
 }
 
 async function waitForTerminalJob(baseUrl: string, id: number, timeoutMs = 15_000) {
@@ -86,6 +107,32 @@ test(
     await new PostgresContestRepository(pool).upsertMany(
       Array.from({ length: 26 }, (_, index) => makeMegaContest(index + 1)),
     );
+
+    const strategies = new PostgresStrategyRepository(pool);
+    const megaStrategy = await strategies.upsert({
+      slug: "analysis-jobs-mega",
+      lottery: "mega-sena",
+      name: "Analysis jobs Mega-Sena",
+      methodologyVersion: "test-v1",
+      config: {
+        gameCount: 1,
+        warmupContests: 20,
+        startContest: 21,
+        endContest: 21,
+      },
+    });
+    const lotofacilStrategy = await strategies.upsert({
+      slug: "analysis-jobs-lotofacil",
+      lottery: "lotofacil",
+      name: "Analysis jobs Lotofácil",
+      methodologyVersion: "test-v1",
+      config: {
+        gameCount: 1,
+        warmupContests: 20,
+        fixedCount: 9,
+      },
+    });
+
     await manager.start();
 
     const server = createLotoLabServer({ pool, corsOrigin: "http://localhost:5173" });
@@ -132,6 +179,39 @@ test(
     assert.equal(invalidRange.status, 400);
     assert.equal(((await responseJson(invalidRange)).error as { code: string }).code, "INVALID_ARGUMENT");
 
+    const missingVersion = await postJson(baseUrl, "/api/v1/analysis-jobs", {
+      kind: "backtest",
+      lottery: "mega-sena",
+      strategyVersionId: 999_999,
+    });
+    assert.equal(missingVersion.status, 404);
+    assert.equal(
+      ((await responseJson(missingVersion)).error as { code: string }).code,
+      "STRATEGY_VERSION_NOT_FOUND",
+    );
+
+    const strategyMismatch = await postJson(baseUrl, "/api/v1/analysis-jobs", {
+      kind: "backtest",
+      lottery: "mega-sena",
+      strategyVersionId: lotofacilStrategy.latestVersionId,
+    });
+    assert.equal(strategyMismatch.status, 409);
+    assert.equal(
+      ((await responseJson(strategyMismatch)).error as { code: string }).code,
+      "STRATEGY_LOTTERY_MISMATCH",
+    );
+
+    const invalidFixedCount = await postJson(baseUrl, "/api/v1/analysis-jobs", {
+      kind: "backtest",
+      lottery: "lotofacil",
+      fixedCount: 7,
+    });
+    assert.equal(invalidFixedCount.status, 400);
+    assert.equal(
+      ((await responseJson(invalidFixedCount)).error as { code: string }).code,
+      "INVALID_ARGUMENT",
+    );
+
     const badLimit = await fetch(`${baseUrl}/api/v1/analysis-jobs?limit=0`);
     assert.equal(badLimit.status, 400);
     assert.equal(((await responseJson(badLimit)).error as { code: string }).code, "INVALID_ARGUMENT");
@@ -142,6 +222,34 @@ test(
 
     const release = await reserveAnalysisGate();
     try {
+      const strategyResponse = await postJson(baseUrl, "/api/v1/analysis-jobs", {
+        kind: "backtest",
+        lottery: "mega-sena",
+        strategyVersionId: megaStrategy.latestVersionId,
+        gameCount: 2,
+      });
+      assert.equal(strategyResponse.status, 202);
+      const strategyJob = await responseJson(strategyResponse);
+      assert.equal(strategyJob.status, "queued");
+      assert.equal((strategyJob.input as Record<string, unknown>).gameCount, 2);
+      assert.equal((strategyJob.input as Record<string, unknown>).warmupContests, 20);
+      assert.equal((strategyJob.input as Record<string, unknown>).startContest, 21);
+      assert.equal((strategyJob.input as Record<string, unknown>).endContest, 21);
+      assert.equal((strategyJob.input as Record<string, unknown>).eligibleRounds, 1);
+      assert.equal((strategyJob.input as Record<string, unknown>).strategyId, megaStrategy.id);
+      assert.equal(
+        (strategyJob.input as Record<string, unknown>).strategyVersionId,
+        megaStrategy.latestVersionId,
+      );
+
+      const cancelStrategy = await postJson(
+        baseUrl,
+        `/api/v1/analysis-jobs/${Number(strategyJob.id)}/cancel`,
+        {},
+      );
+      assert.equal(cancelStrategy.status, 200);
+      assert.equal((await responseJson(cancelStrategy)).status, "cancelled");
+
       const queuedResponse = await postJson(baseUrl, "/api/v1/analysis-jobs", {
         kind: "backtest",
         lottery: "mega-sena",
@@ -175,6 +283,12 @@ test(
       assert.equal(cancelled.status, "cancelled");
       assert.equal(cancelled.cancelRequested, true);
 
+      const cancelAgain = await postJson(baseUrl, `/api/v1/analysis-jobs/${queuedId}/cancel`, {});
+      assert.equal(cancelAgain.status, 200);
+      const cancelledAgain = await responseJson(cancelAgain);
+      assert.equal(cancelledAgain.status, "cancelled");
+      assert.equal(cancelledAgain.cancelRequested, true);
+
       const labResponse = await postJson(baseUrl, "/api/v1/analysis-jobs", {
         kind: "strategy-lab",
         lottery: "mega-sena",
@@ -196,6 +310,28 @@ test(
       const cancelLab = await postJson(baseUrl, `/api/v1/analysis-jobs/${labId}/cancel`, {});
       assert.equal(cancelLab.status, 200);
       assert.equal((await responseJson(cancelLab)).status, "cancelled");
+
+      const lotofacilResponse = await postJson(baseUrl, "/api/v1/analysis-jobs", {
+        kind: "backtest",
+        lottery: "lotofacil",
+        strategyVersionId: lotofacilStrategy.latestVersionId,
+      });
+      assert.equal(lotofacilResponse.status, 202);
+      const lotofacil = await responseJson(lotofacilResponse);
+      assert.equal(lotofacil.status, "queued");
+      assert.equal((lotofacil.input as Record<string, unknown>).fixedCount, 9);
+      assert.equal(
+        (lotofacil.input as Record<string, unknown>).strategyVersionId,
+        lotofacilStrategy.latestVersionId,
+      );
+
+      const cancelLotofacil = await postJson(
+        baseUrl,
+        `/api/v1/analysis-jobs/${Number(lotofacil.id)}/cancel`,
+        {},
+      );
+      assert.equal(cancelLotofacil.status, 200);
+      assert.equal((await responseJson(cancelLotofacil)).status, "cancelled");
     } finally {
       release();
     }
@@ -213,6 +349,39 @@ test(
     const terminal = await waitForTerminalJob(baseUrl, Number(running.id));
     assert.equal(terminal.status, "completed");
     assert.equal((terminal.result as Record<string, unknown>).roundCount, 1);
+
+    const cancelCompleted = await postJson(
+      baseUrl,
+      `/api/v1/analysis-jobs/${Number(running.id)}/cancel`,
+      {},
+    );
+    assert.equal(cancelCompleted.status, 200);
+    const completedAfterCancel = await responseJson(cancelCompleted);
+    assert.equal(completedAfterCancel.status, "completed");
+    assert.equal(completedAfterCancel.cancelRequested, false);
+
+    const cancellableResponse = await postJson(baseUrl, "/api/v1/analysis-jobs", {
+      kind: "backtest",
+      lottery: "mega-sena",
+      gameCount: 10,
+      warmupContests: 1,
+      startContest: 2,
+      endContest: 26,
+    });
+    assert.equal(cancellableResponse.status, 202);
+    const cancellable = await responseJson(cancellableResponse);
+    const cancellableId = Number(cancellable.id);
+    await waitForJobStatus(baseUrl, cancellableId, "running");
+
+    const cancelRunning = await postJson(baseUrl, `/api/v1/analysis-jobs/${cancellableId}/cancel`, {});
+    assert.equal(cancelRunning.status, 200);
+    const cancellationRequested = await responseJson(cancelRunning);
+    assert.equal(cancellationRequested.status, "running");
+    assert.equal(cancellationRequested.cancelRequested, true);
+
+    const cancelledTerminal = await waitForTerminalJob(baseUrl, cancellableId);
+    assert.equal(cancelledTerminal.status, "cancelled");
+    assert.equal(cancelledTerminal.cancelRequested, true);
 
     const missingCancel = await postJson(baseUrl, "/api/v1/analysis-jobs/999999/cancel", {});
     assert.equal(missingCancel.status, 404);
