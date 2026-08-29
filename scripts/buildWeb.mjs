@@ -19,13 +19,8 @@ async function walk(directory) {
   return files;
 }
 
-function withReadabilityLayer(html) {
-  if (html.includes("/assets/readability.css")) return html;
-  return html.replace(/<\/head>/i, '    <link rel="stylesheet" href="/assets/readability.css" />\n  </head>');
-}
-
 function withVersion(html, version) {
-  let output = withReadabilityLayer(html).replace(/<html([^>]*)>/i, (_, attributes) => {
+  let output = html.replace(/<html([^>]*)>/i, (_, attributes) => {
     const normalizedAttributes = attributes.replace(/\sdata-build=(['"])[^'"]*\1/i, "");
     return `<html${normalizedAttributes} data-build="${version}">`;
   });
