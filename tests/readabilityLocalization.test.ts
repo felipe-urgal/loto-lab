@@ -19,6 +19,7 @@ test("web build keeps static readability and Portuguese localization without run
 
 test("static readability layer establishes a hard 16px minimum for functional text", async () => {
   const css = await source("web/readability.css");
+  const refinements = await source("web/refinements.css");
   const build = await source("scripts/buildWeb.mjs");
   const e2e = await source("scripts/e2eReadability.mjs");
 
@@ -27,6 +28,7 @@ test("static readability layer establishes a hard 16px minimum for functional te
   assert.match(css, /th,[\s\S]*td,[\s\S]*font-size: 16px !important;/);
   assert.match(css, /\.field input,[\s\S]*\.field select[\s\S]*font-size: 16px !important;/);
   assert.match(css, /\.a2-panel-head strong,[\s\S]*font-size: 16px !important;/);
+  assert.match(refinements, /\.backtest-default-note\s*\{[^}]*font-size:\s*16px/);
   assert.doesNotMatch(css, /readability-min-text/);
   assert.doesNotMatch(build, /readability\.js/);
   assert.doesNotMatch(e2e, /readability-min-text/);
