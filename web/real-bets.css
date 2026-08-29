@@ -11,7 +11,7 @@
   border-radius: 999px;
   border: 1px solid var(--border-strong);
   color: var(--muted);
-  font-size: 9px;
+  font-size: 16px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: .05em;
@@ -39,7 +39,7 @@
   border-radius: 9px;
   background: rgba(255,255,255,.018);
   color: var(--muted);
-  font-size: 10px;
+  font-size: 16px;
 }
 
 .real-bet-summary strong { color: var(--text); }
@@ -62,8 +62,8 @@
   margin-bottom: 14px;
 }
 
-.real-bet-form-head strong { font-size: 12px; }
-.real-bet-form-head p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+.real-bet-form-head strong { font-size: 16px; }
+.real-bet-form-head p { margin: 4px 0 0; color: var(--muted); font-size: 16px; }
 
 .real-bet-games {
   display: grid;
@@ -80,7 +80,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 16px;
   cursor: pointer;
 }
 
