@@ -77,7 +77,7 @@ test("static readability layer establishes a hard 16px minimum for functional te
   assertMinimumExplicitFontSize(agenda, "agenda.css");
   assertMinimumExplicitFontSize(ai, "ai.css");
   assertMinimumExplicitFontSize(dashboardScope, "dashboard-scope.css");
-  assert.match(experiments, /\.experiment-card-head h3 \{[^}]*font-size: 19px;/);
+  assert.match(experiments, /\.experiment-card h3 \{ font-size: 19px; \}/);
   assert.match(agenda, /\.agenda-card h3 \{ font-size: 19px; \}/);
 });
 
