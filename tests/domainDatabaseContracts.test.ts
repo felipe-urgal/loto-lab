@@ -180,12 +180,10 @@ test(
     for (const fixture of invalidGames) {
       assert.throws(
         () => assertValidGeneratedGame(fixture.value),
-        undefined,
         fixture.label,
       );
       await assert.rejects(
         () => insertRawGame(pool, fixture.value),
-        undefined,
         fixture.label,
       );
     }
