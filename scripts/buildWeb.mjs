@@ -20,14 +20,8 @@ async function walk(directory) {
 }
 
 function withGlobalUiLayers(html) {
-  let output = html;
-  if (!output.includes("/assets/readability.css")) {
-    output = output.replace(/<\/head>/i, '    <link rel="stylesheet" href="/assets/readability.css" />\n  </head>');
-  }
-  if (!output.includes("/assets/localization.js")) {
-    output = output.replace(/<\/body>/i, '    <script type="module" src="/assets/localization.js"></script>\n  </body>');
-  }
-  return output;
+  if (html.includes("/assets/localization.js")) return html;
+  return html.replace(/<\/body>/i, '    <script type="module" src="/assets/localization.js"></script>\n  </body>');
 }
 
 function withVersion(html, version) {
