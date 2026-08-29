@@ -52,7 +52,7 @@ function renderInsight(record, disclaimer) {
       </div>
       <div class="ai-evidence">
         <div class="ai-evidence-item"><span>Referência</span><strong>${latest ? `#${latest.number} · ${escapeHtml(latest.date)}` : "Sem concurso"}</strong></div>
-        <div class="ai-evidence-item"><span>Backtest</span><strong>${backtest ? `#${backtest.id}` : "Não disponível"}</strong></div>
+        <div class="ai-evidence-item"><span>Teste histórico</span><strong>${backtest ? `#${backtest.id}` : "Não disponível"}</strong></div>
         <div class="ai-evidence-item"><span>Laboratório</span><strong>${lab ? `${lab.variants.length} variantes · ${lab.rankingBasis === "roi" ? "ROI" : "premiação"}` : "Não disponível"}</strong></div>
         <div class="ai-evidence-item"><span>Resultado real</span><strong>${real.checkedBets || 0} conferida(s) · ROI ${formatPercent(real.roi)}</strong></div>
       </div>
@@ -140,8 +140,8 @@ form.addEventListener("submit", async (event) => {
     renderInsight(record, record.disclaimer);
     message.className = "panel ai-message";
     message.innerHTML = record.reused
-      ? `<strong>Interpretação reutilizada</strong><p>A evidência não mudou; o snapshot #${record.id} foi reutilizado sem nova chamada ao provider.</p>`
-      : `<strong>Interpretação salva</strong><p>Snapshot #${record.id} criado sem alterar qualquer cálculo ou jogo.</p>`;
+      ? `<strong>Interpretação reutilizada</strong><p>A evidência não mudou; o registro #${record.id} foi reutilizado sem nova chamada ao provedor.</p>`
+      : `<strong>Interpretação salva</strong><p>Registro #${record.id} criado sem alterar qualquer cálculo ou jogo.</p>`;
     if (forceInput) forceInput.checked = false;
     await loadHistory();
   } catch (error) {
