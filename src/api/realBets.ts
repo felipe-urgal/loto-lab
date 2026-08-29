@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { normalizeIsoDateTime } from "../domain/dateTime.js";
 import { RealBetService } from "../realBets/service.js";
 import type { ApiServerOptions } from "./app.js";
 import {
@@ -28,10 +29,14 @@ function parseGamePositions(value: unknown): number[] | undefined {
 
 function parsePlayedAt(value: unknown): string | undefined {
   if (value === undefined || value === null || value === "") return undefined;
-  if (typeof value !== "string" || !Number.isFinite(new Date(value).getTime())) {
-    throw new ApiError(400, "INVALID_ARGUMENT", "playedAt must be a valid ISO date/time");
+  if (typeof value !== "string") {
+    throw new ApiError(400, "INVALID_ARGUMENT", "playedAt must be a valid ISO date/time with timezone");
   }
-  return new Date(value).toISOString();
+  const normalized = normalizeIsoDateTime(value);
+  if (!normalized) {
+    throw new ApiError(400, "INVALID_ARGUMENT", "playedAt must be a valid ISO date/time with timezone");
+  }
+  return normalized;
 }
 
 function serviceError(error: unknown): ApiError | undefined {
