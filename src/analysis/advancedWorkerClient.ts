@@ -5,6 +5,8 @@ import { ApiError } from "../api/http.js";
 import { expensiveAnalysisGate } from "../api/workGate.js";
 
 export const ADVANCED_ANALYSIS_TIMEOUT_MS = 15_000;
+const MIN_ADVANCED_ANALYSIS_TIMEOUT_MS = 1_000;
+const MAX_ADVANCED_ANALYSIS_TIMEOUT_MS = 10 * 60_000;
 
 interface WorkerErrorPayload {
   name: string;
@@ -34,6 +36,15 @@ export function runAdvancedAnalysisInWorker(
   timeoutMs = ADVANCED_ANALYSIS_TIMEOUT_MS,
 ): Promise<AdvancedAnalysis> {
   return new Promise<AdvancedAnalysis>((resolve, reject) => {
+    if (
+      !Number.isFinite(timeoutMs)
+      || timeoutMs < MIN_ADVANCED_ANALYSIS_TIMEOUT_MS
+      || timeoutMs > MAX_ADVANCED_ANALYSIS_TIMEOUT_MS
+    ) {
+      reject(new Error("Advanced analysis worker timeout must be between 1000 and 600000 ms"));
+      return;
+    }
+
     const release = expensiveAnalysisGate.acquire();
     if (!release) {
       reject(new ApiError(429, "ANALYSIS_BUSY", "Another expensive analysis is already running"));

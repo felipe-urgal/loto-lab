@@ -1,6 +1,7 @@
 import { parentPort, workerData } from "node:worker_threads";
 import type { Contest, LotteryId } from "../domain/types.js";
 import { buildAdvancedAnalysis } from "../analysis/advanced.js";
+import { alignRecentFrequencyWindows } from "../analysis/advancedConsistency.js";
 import { hardenAdvancedAnalysis } from "../analysis/advancedHardening.js";
 import { backtestMegaSena } from "../backtest/megaSena.js";
 import { backtestLotofacil } from "../backtest/lotofacil.js";
@@ -111,8 +112,12 @@ try {
     result = compareStrategyLab(job.contests, job.input);
   } else {
     const config = getLotteryConfig(job.lottery);
-    result = hardenAdvancedAnalysis(
-      buildAdvancedAnalysis(job.contests, config),
+    result = alignRecentFrequencyWindows(
+      hardenAdvancedAnalysis(
+        buildAdvancedAnalysis(job.contests, config),
+        job.contests,
+        config,
+      ),
       job.contests,
       config,
     );
