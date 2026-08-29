@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from "pg";
+import { releaseAdvisoryLockClient } from "../db/advisoryLock.js";
 
 const RUNTIME_INSTANCE_ADVISORY_LOCK = 1515016;
 
@@ -33,10 +34,15 @@ export async function acquireRuntimeInstanceLock(pool: Pool): Promise<RuntimeIns
     async release() {
       if (released) return;
       released = true;
-      if (locked) {
-        await client.query("SELECT pg_advisory_unlock($1)", [RUNTIME_INSTANCE_ADVISORY_LOCK]).catch(() => undefined);
+      if (!locked) {
+        client.release();
+        return;
       }
-      client.release();
+      await releaseAdvisoryLockClient(
+        client,
+        "SELECT pg_advisory_unlock($1) AS unlocked",
+        [RUNTIME_INSTANCE_ADVISORY_LOCK],
+      );
     },
   };
 }
