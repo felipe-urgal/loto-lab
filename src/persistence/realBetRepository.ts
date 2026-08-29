@@ -339,14 +339,42 @@ export class PostgresRealBetRepository {
     const totalPrizeValue = financialKnown
       ? checks.reduce((sum, check) => sum + check.totalPrizeValue!, 0)
       : undefined;
-    const netResult = totalPrizeValue !== undefined ? totalPrizeValue - current.actualCost : undefined;
-    const isOfficialFinancialRevision = current.totalPrizeValue !== undefined && (
-      !sameOptionalNumber(current.totalPrizeValue, totalPrizeValue)
-      || !sameOptionalNumber(current.netResult, netResult)
-    );
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      const locked = await client.query<{
+        actual_cost: number;
+        total_prize_value: number | null;
+        net_result: number | null;
+      }>(
+        `
+          SELECT
+            actual_cost::float8 AS actual_cost,
+            total_prize_value::float8 AS total_prize_value,
+            net_result::float8 AS net_result
+          FROM real_bets
+          WHERE id = $1
+          FOR UPDATE
+        `,
+        [id],
+      );
+      const financialState = locked.rows[0];
+      if (!financialState) throw new Error(`Real bet ${id} was not found`);
+
+      const previousTotalPrizeValue = financialState.total_prize_value === null
+        ? undefined
+        : Number(financialState.total_prize_value);
+      const previousNetResult = financialState.net_result === null
+        ? undefined
+        : Number(financialState.net_result);
+      const netResult = totalPrizeValue !== undefined
+        ? totalPrizeValue - Number(financialState.actual_cost)
+        : undefined;
+      const isOfficialFinancialRevision = previousTotalPrizeValue !== undefined && (
+        !sameOptionalNumber(previousTotalPrizeValue, totalPrizeValue)
+        || !sameOptionalNumber(previousNetResult, netResult)
+      );
+
       for (const [index, check] of checks.entries()) {
         const game = current.games[index]!;
         await client.query(
@@ -386,9 +414,9 @@ export class PostgresRealBetRepository {
           `,
           [
             id,
-            current.totalPrizeValue ?? null,
+            previousTotalPrizeValue ?? null,
             totalPrizeValue ?? null,
-            current.netResult ?? null,
+            previousNetResult ?? null,
             netResult ?? null,
           ],
         );
