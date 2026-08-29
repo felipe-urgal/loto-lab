@@ -34,7 +34,7 @@
 .job-running { display: inline-flex; align-items: center; gap: 7px; color: var(--info); font-size: 16px; }
 .job-running .spinner { width: 13px; height: 13px; }
 .experiment-empty { padding: 24px; text-align: center; color: var(--muted); }
-.form-inline-note { margin-top: 8px; color: var(--muted-2); font-size: 16px; line-height: 1.45; }
+.form-inline-note { margin-top: 8px; color: var(--muted-2); font-size: 16px; line-height: 1.55; }
 
 @media (max-width: 980px) {
   .experiment-grid { grid-template-columns: 1fr; }

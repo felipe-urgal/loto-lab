@@ -1,6 +1,17 @@
 [hidden] { display: none !important; }
 
-body { font-size: 16px; line-height: 1.5; }
+html { font-size: 16px; }
+body { font-size: 16px; line-height: 1.55; }
+body *::before, body *::after { font-size: inherit; }
+
+.brand-copy strong { font-size: 18px; }
+.brand-copy small,
+.nav-item,
+.nav-link,
+.nav-more,
+.nav-more-link,
+.sidebar-footer p,
+.status-row { font-size: 16px; line-height: 1.45; }
 
 .nav-link, .nav-more {
   appearance: none;
@@ -32,27 +43,59 @@ body { font-size: 16px; line-height: 1.5; }
   box-shadow: 0 0 0 4px rgba(101,214,164,.12);
 }
 
-.topbar-copy p, .section-head p { font-size: 16px; line-height: 1.45; }
-.section-head h2 { font-size: 16px; }
-.metric-label { font-size: 16px; }
-.metric-detail, .target-copy { font-size: 16px; line-height: 1.45; }
-.contest-number { font-size: 16px; }
-.button, .link-button { min-height: 40px; font-size: 16px; }
-.button.compact { min-height: 34px; font-size: 16px; }
-.list-row-main strong, .list-row-value strong { font-size: 16px; }
-.list-row-main p, .list-row-value small { font-size: 16px; line-height: 1.4; }
-.analysis-group-head strong { font-size: 16px; }
-.analysis-group-head span { font-size: 16px; }
-th { font-size: 16px; }
-td { font-size: 16px; }
-.field label, .field > span { font-size: 16px; }
-.field input, .field select { min-height: 44px; font-size: 16px; }
-.form-note, .checkbox { font-size: 16px; }
-.game-head strong { font-size: 16px; }
-.game-head span { font-size: 16px; }
+.topbar-copy h1 { font-size: 26px; }
+.topbar-copy p,
+.select-control span,
+.select-control select { font-size: 16px; line-height: 1.45; }
+.select-control { min-height: 52px; }
+
+.section-head h2 { font-size: 20px; }
+.section-head p { font-size: 16px; line-height: 1.5; }
+
+.metric-label,
+.metric-detail,
+.lottery-name,
+.contest-number,
+.target-copy,
+.ball,
+.button,
+.link-button,
+.button.compact,
+.list-row-main strong,
+.list-row-main p,
+.list-row-value strong,
+.list-row-value small,
+.analysis-group-head strong,
+.analysis-group-head span,
+th,
+td,
+.field label,
+.field > span,
+.field input,
+.field select,
+.form-note,
+.form-inline-note,
+.checkbox,
+.game-head strong,
+.game-head span,
+.empty-state strong,
+.error-state strong,
+.content small,
+.content p { font-size: 16px; }
+
+.metric-value { font-size: 28px; }
+.metric-detail, .target-copy { line-height: 1.45; }
+.button, .link-button { min-height: 42px; padding-inline: 14px; }
+.button.compact { min-height: 38px; }
+.list-row { min-height: 70px; }
+.list-row-main p { line-height: 1.55; }
+.list-row-value small { line-height: 1.4; }
+th, td { padding-top: 14px; padding-bottom: 14px; line-height: 1.45; }
+.field input, .field select { min-height: 46px; }
+.form-note, .form-inline-note, .content p { line-height: 1.55; }
+.ball { width: 38px; height: 38px; }
 .badge { font-size: 16px; min-height: 26px; }
 .toast { font-size: 16px; line-height: 1.4; }
-.empty-state strong, .error-state strong { font-size: 16px; }
 .empty-state p, .error-state p { font-size: 16px; }
 
 @media (max-width: 900px) {
@@ -92,8 +135,9 @@ td { font-size: 16px; }
   .nav-more-link:hover, .nav-more-link.is-active { background: var(--accent-soft); color: var(--accent-strong); }
   .nav-more-menu .nav-label { display: inline !important; }
   .nav-more-menu .nav-icon { width: 19px; height: 19px; }
-  .topbar-copy h1 { font-size: 21px; }
-  .topbar-copy p { display: none; }
+  .topbar-copy h1 { font-size: 24px; }
+  .topbar-copy p { display: none; font-size: 16px; }
+  .content { padding-left: 16px; padding-right: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

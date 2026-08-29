@@ -6,79 +6,82 @@ async function source(path: string) {
   return readFile(path, "utf8");
 }
 
+function explicitFontSizes(css: string) {
+  return [...css.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]));
+}
+
 function assertMinimumExplicitFontSize(css: string, label: string, minimum = 16) {
-  const sizes = [...css.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]));
+  const sizes = explicitFontSizes(css);
   assert.ok(sizes.length > 0, `${label} should expose functional typography in source`);
   assert.ok(sizes.every((size) => size >= minimum), `${label} contains font-size below ${minimum}px: ${sizes.filter((size) => size < minimum).join(", ")}`);
 }
 
-test("web build keeps static readability without runtime localization or font auditor", async () => {
+test("web build ships canonical styles without global readability or localization layers", async () => {
   const pages = ["index.html", "agenda.html", "ai.html", "jobs.html", "lab.html", "strategies.html"];
 
   for (const page of pages) {
     const html = await source(`web-dist/${page}`);
-    assert.match(html, /\/assets\/readability\.css\?v=[a-f0-9]{12}/, `${page} must load readability.css`);
-    assert.doesNotMatch(html, /\/assets\/readability\.js(?:\?|["'])/, `${page} must not load readability.js`);
+    assert.doesNotMatch(html, /\/assets\/readability\.(?:css|js)(?:\?|["'])/, `${page} must not load a readability layer`);
     assert.doesNotMatch(html, /\/assets\/localization\.js(?:\?|["'])/, `${page} must not load localization.js`);
   }
 
   const assets = await readdir("web-dist/assets");
+  assert.equal(assets.includes("readability.css"), false, "built assets must not contain readability.css");
+  assert.equal(assets.includes("readability.js"), false, "built assets must not contain readability.js");
   assert.equal(assets.includes("localization.js"), false, "built assets must not contain localization.js");
 });
 
-test("static readability layer establishes a hard 16px minimum for functional text", async () => {
-  const css = await source("web/readability.css");
+test("canonical web source owns the 16px functional typography floor", async () => {
   const styles = await source("web/styles.css");
   const uiFoundation = await source("web/ui-foundation.css");
-  const analysisV2Css = await source("web/analysis-v2.css");
-  const generationV2Css = await source("web/generation-v2.css");
-  const generationExplainabilityCss = await source("web/generation-explainability.css");
-  const generationDiversityCss = await source("web/generation-diversity.css");
-  const myGamesV2Css = await source("web/my-games-v2.css");
-  const myGamesManagementCss = await source("web/my-games-management.css");
-  const realBetsCss = await source("web/real-bets.css");
   const experiments = await source("web/experiments.css");
-  const refinements = await source("web/refinements.css");
-  const lab = await source("web/lab.css");
-  const labV2 = await source("web/lab-v2.css");
   const agenda = await source("web/agenda.css");
-  const ai = await source("web/ai.css");
-  const dashboardScope = await source("web/dashboard-scope.css");
   const build = await source("scripts/buildWeb.mjs");
   const e2e = await source("scripts/e2eReadability.mjs");
 
-  assert.match(css, /--loto-font-min: 16px/);
-  assert.match(css, /body \{ font-size: 16px;/);
-  assert.match(css, /th,[\s\S]*td,[\s\S]*font-size: 16px !important;/);
-  assert.match(css, /\.field input,[\s\S]*\.field select[\s\S]*font-size: 16px !important;/);
-  assert.doesNotMatch(css, /\.a2-/, "Analyses 2.0 must not depend on readability.css overrides");
-  assert.doesNotMatch(css, /\.(?:experiment|job-result|status-pill|ai-provider-status|ai-history|agenda-card|agenda-notification|lab-basis|lab-history-status)/, "auxiliary pages must not depend on readability.css overrides");
-  assert.doesNotMatch(css, /readability-min-text/);
-  assert.doesNotMatch(build, /readability\.js/);
+  assert.match(uiFoundation, /html \{ font-size: 16px; \}/);
+  assert.match(uiFoundation, /body \{ font-size: 16px; line-height: 1\.55; \}/);
+  assert.match(uiFoundation, /\.brand-copy strong \{ font-size: 18px; \}/);
+  assert.match(uiFoundation, /\.topbar-copy h1 \{ font-size: 26px; \}/);
+  assert.match(uiFoundation, /\.section-head h2 \{ font-size: 20px; \}/);
+  assert.match(uiFoundation, /\.metric-value \{ font-size: 28px; \}/);
+  assert.match(uiFoundation, /\.button, \.link-button \{ min-height: 42px; padding-inline: 14px; \}/);
+  assert.match(uiFoundation, /\.button\.compact \{ min-height: 38px; \}/);
+  assert.match(uiFoundation, /\.field input, \.field select \{ min-height: 46px; \}/);
+  assert.match(uiFoundation, /\.ball \{ width: 38px; height: 38px; \}/);
+  assert.match(uiFoundation, /\.list-row \{ min-height: 70px; \}/);
+  assert.match(uiFoundation, /\.topbar-copy h1 \{ font-size: 24px; \}/);
+  assert.match(experiments, /\.experiment-card h3 \{ font-size: 19px; \}/);
+  assert.match(experiments, /\.form-inline-note \{[^}]*line-height: 1\.55;/);
+  assert.match(agenda, /\.agenda-card h3 \{ font-size: 19px; \}/);
+
+  assert.doesNotMatch(build, /readability\.(?:css|js)/);
   assert.doesNotMatch(build, /localization\.js/);
   assert.doesNotMatch(e2e, /readability-min-text/);
   assert.match(e2e, /getComputedStyle\(el\)\.fontSize/);
   assert.match(e2e, /size < minimum - 0\.01/);
 
-  assertMinimumExplicitFontSize(css, "readability.css");
+  const webEntries = await readdir("web", { withFileTypes: true });
+  const cssFiles = webEntries.filter((entry) => entry.isFile() && entry.name.endsWith(".css"));
+  assert.ok(cssFiles.length > 0, "web should contain canonical CSS files");
+
+  for (const entry of cssFiles) {
+    const stylesheet = await source(`web/${entry.name}`);
+    const sizes = explicitFontSizes(stylesheet);
+    assert.ok(
+      sizes.every((size) => size >= 16),
+      `${entry.name} contains font-size below 16px: ${sizes.filter((size) => size < 16).join(", ")}`,
+    );
+  }
+
+  const inlineSources = webEntries.filter((entry) => entry.isFile() && (entry.name.endsWith(".js") || entry.name.endsWith(".html")));
+  for (const entry of inlineSources) {
+    const content = await source(`web/${entry.name}`);
+    assert.doesNotMatch(content, /style=["'][^"']*font-size\s*:/i, `${entry.name} must not use inline font-size corrections`);
+  }
+
   assertMinimumExplicitFontSize(styles, "styles.css");
   assertMinimumExplicitFontSize(uiFoundation, "ui-foundation.css");
-  assertMinimumExplicitFontSize(analysisV2Css, "analysis-v2.css");
-  assertMinimumExplicitFontSize(generationV2Css, "generation-v2.css");
-  assertMinimumExplicitFontSize(generationExplainabilityCss, "generation-explainability.css");
-  assertMinimumExplicitFontSize(generationDiversityCss, "generation-diversity.css");
-  assertMinimumExplicitFontSize(myGamesV2Css, "my-games-v2.css");
-  assertMinimumExplicitFontSize(myGamesManagementCss, "my-games-management.css");
-  assertMinimumExplicitFontSize(realBetsCss, "real-bets.css");
-  assertMinimumExplicitFontSize(experiments, "experiments.css");
-  assertMinimumExplicitFontSize(refinements, "refinements.css");
-  assertMinimumExplicitFontSize(lab, "lab.css");
-  assertMinimumExplicitFontSize(labV2, "lab-v2.css");
-  assertMinimumExplicitFontSize(agenda, "agenda.css");
-  assertMinimumExplicitFontSize(ai, "ai.css");
-  assertMinimumExplicitFontSize(dashboardScope, "dashboard-scope.css");
-  assert.match(experiments, /\.experiment-card h3 \{ font-size: 19px; \}/);
-  assert.match(agenda, /\.agenda-card h3 \{ font-size: 19px; \}/);
 });
 
 test("Analyses 2.0 owns its Portuguese product vocabulary in source", async () => {
