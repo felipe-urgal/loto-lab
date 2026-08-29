@@ -53,6 +53,8 @@ td,
 .checkbox,
 .game-head strong,
 .game-head span,
+.empty-state strong,
+.error-state strong,
 .content small,
 .content p { font-size: 16px !important; }
 
