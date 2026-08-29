@@ -87,3 +87,15 @@ test("localization keeps product vocabulary in Portuguese and scopes dynamic rep
   const knownFunction = js.slice(knownStart, knownEnd);
   assert.doesNotMatch(knownFunction, /\\bBacktests/, "broad Backtests replacement must not run on arbitrary user text");
 });
+
+test("Analyses 2.0 owns its Portuguese product vocabulary in source", async () => {
+  const analysis = await source("web/analysis-v2.js");
+
+  assert.match(analysis, /ranking: "Classificação"/);
+  assert.match(analysis, /Decomposição da pontuação/);
+  assert.match(analysis, /Classificação por escore-z; valor-p exato/);
+  assert.doesNotMatch(analysis, /ranking: "Ranking"/);
+  assert.doesNotMatch(analysis, />Ranking auditável</);
+  assert.doesNotMatch(analysis, />Score</);
+  assert.doesNotMatch(analysis, /Decomposição do score/);
+});
