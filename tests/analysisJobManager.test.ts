@@ -3,10 +3,9 @@ import assert from "node:assert/strict";
 import type { Contest } from "../src/domain/types.js";
 import { AnalysisJobManager, getAnalysisJobManager } from "../src/analysis/jobManager.js";
 import { expensiveAnalysisGate } from "../src/api/workGate.js";
-import { createPostgresPool } from "../src/db/client.js";
-import { runMigrations } from "../src/db/migrations.js";
 import { PostgresAnalysisJobRepository } from "../src/persistence/analysisJobRepository.js";
 import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
+import { createIsolatedPostgresDatabase } from "./helpers/postgres.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -47,19 +46,11 @@ test(
   "analysis job manager recovers, executes and cancels queued work",
   { skip: !databaseUrl, timeout: 20_000 },
   async () => {
-    const pool = createPostgresPool({ connectionString: databaseUrl! });
+    const database = await createIsolatedPostgresDatabase({ label: "analysis-job-manager" });
+    const { pool } = database;
     const manager = new AnalysisJobManager(pool);
 
     try {
-      await runMigrations(pool);
-      await pool.query(`
-        TRUNCATE TABLE
-          analysis_jobs,
-          backtest_runs,
-          contests
-        RESTART IDENTITY CASCADE
-      `);
-
       await new PostgresContestRepository(pool).upsertMany(
         Array.from({ length: 21 }, (_, index) => makeMegaContest(index + 1)),
       );
@@ -113,7 +104,7 @@ test(
       await singleton.stopAndDrain();
     } finally {
       await manager.stopAndDrain();
-      await pool.end();
+      await database.close();
     }
   },
 );
