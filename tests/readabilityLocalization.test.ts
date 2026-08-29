@@ -99,3 +99,12 @@ test("Analyses 2.0 owns its Portuguese product vocabulary in source", async () =
   assert.doesNotMatch(analysis, />Score</);
   assert.doesNotMatch(analysis, /Decomposição do score/);
 });
+
+test("Generator 2.0 owns its conditioned reference copy in Portuguese", async () => {
+  const generator = await source("web/generation-v2.js");
+
+  assert.match(generator, />Referência condicionada</);
+  assert.match(generator, /As referências abaixo são condicionadas/);
+  assert.doesNotMatch(generator, />Baseline condicionado</);
+  assert.doesNotMatch(generator, /Os baselines abaixo são condicionados/);
+});
