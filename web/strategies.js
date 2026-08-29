@@ -25,6 +25,7 @@ const bucket = document.querySelector("#strategy-bucket");
 const resetButton = document.querySelector("#strategy-reset");
 
 let strategies = [];
+let loadToken = 0;
 
 function syncLotteryFields() {
   const isLotofacil = lottery.value === "lotofacil";
@@ -136,13 +137,17 @@ async function loadVersions(strategyId) {
 }
 
 async function loadStrategies() {
+  const requestedFilter = filter.value;
+  const token = ++loadToken;
   listRoot.innerHTML = '<div class="loading-state"><span class="spinner"></span><span>Carregando estratégias...</span></div>';
   try {
-    const query = filter.value ? `?lottery=${encodeURIComponent(filter.value)}` : "";
+    const query = requestedFilter ? `?lottery=${encodeURIComponent(requestedFilter)}` : "";
     const data = await api(`/strategies${query}`);
+    if (token !== loadToken || filter.value !== requestedFilter) return;
     strategies = data.items || [];
     renderStrategies();
   } catch (error) {
+    if (token !== loadToken || filter.value !== requestedFilter) return;
     strategies = [];
     countRoot.textContent = "Falha ao carregar";
     listRoot.innerHTML = `<div class="panel experiment-empty job-error">${escapeHtml(error.message)}</div>`;

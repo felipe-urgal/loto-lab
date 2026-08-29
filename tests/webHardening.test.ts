@@ -65,13 +65,15 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
     return response.text();
   };
 
-  const [app, shell, refinements, realBets, management, agenda, foundation] = await Promise.all([
+  const [app, shell, refinements, realBets, management, agenda, strategies, jobs, foundation] = await Promise.all([
     fetchSource("app.js"),
     fetchSource("shell.js"),
     fetchSource("refinements.js"),
     fetchSource("real-bets.js"),
     fetchSource("my-games-management.js"),
     fetchSource("agenda.js"),
+    fetchSource("strategies.js"),
+    fetchSource("jobs.js"),
     fetchSource("ui-foundation.css"),
   ]);
 
@@ -105,6 +107,15 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
   assert.match(agenda, /safeActionHref/);
   assert.match(agenda, /new URL\(value, location\.origin\)/);
   assert.match(agenda, /aria-pressed/);
+
+  assert.match(strategies, /let loadToken = 0/);
+  assert.match(strategies, /const requestedFilter = filter\.value/);
+  assert.match(strategies, /token !== loadToken \|\| filter\.value !== requestedFilter/);
+
+  assert.match(jobs, /let strategyLoadToken = 0/);
+  assert.match(jobs, /token !== strategyLoadToken \|\| lottery\.value !== requestedLottery/);
+  assert.match(jobs, /token !== loadToken \|\| lottery\.value !== requestedLottery/);
+  assert.match(jobs, /Promise\.all\(\[loadStrategies\(\), loadJobs\(\)\]\)/);
 
   assert.match(foundation, /\.nav-item \.nav-label/);
   assert.match(foundation, /safe-area-inset-bottom/);
