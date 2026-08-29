@@ -10,9 +10,10 @@
 .experiment-form .field.is-wide { grid-column: 1 / -1; }
 .experiment-card { padding: 16px; display: grid; gap: 13px; }
 .experiment-card + .experiment-card { margin-top: 10px; }
+.experiment-card h3 { font-size: 19px; }
 .experiment-card p { font-size: 16px; line-height: 1.55; }
 .experiment-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
-.experiment-card-head h3 { margin: 0; font-size: 19px; }
+.experiment-card-head h3 { margin: 0; }
 .experiment-card-head p { margin: 4px 0 0; color: var(--muted); font-size: 16px; }
 .experiment-card-actions { display: flex; flex-wrap: wrap; gap: 7px; justify-content: flex-end; }
 .experiment-meta { display: flex; flex-wrap: wrap; gap: 7px; font-size: 16px; line-height: 1.55; }
