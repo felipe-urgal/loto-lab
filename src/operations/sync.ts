@@ -215,7 +215,7 @@ export async function runOperationalSync(
     let notificationRefresh: "success" | "failed" = "success";
     let notificationError: string | undefined;
     try {
-      await new NotificationService(pool).refresh();
+      await new NotificationService(pool).refresh({ id: run.id, status });
     } catch (error) {
       notificationRefresh = "failed";
       notificationError = message(error);

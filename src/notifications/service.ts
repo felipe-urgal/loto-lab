@@ -29,6 +29,8 @@ export interface NotificationRefreshResult {
   unread: number;
 }
 
+type CurrentOperation = Pick<OperationRunRecord<Record<string, unknown>>, "id" | "status">;
+
 export class NotificationService {
   private readonly agenda: PostgresAgendaRepository;
   private readonly contests: PostgresContestRepository;
@@ -44,7 +46,7 @@ export class NotificationService {
     this.realBets = new PostgresRealBetRepository(pool);
   }
 
-  async refresh(): Promise<NotificationRefreshResult> {
+  async refresh(currentOperation?: CurrentOperation): Promise<NotificationRefreshResult> {
     let agendaCount = 0;
     let betCount = 0;
     let operationCount = 0;
@@ -109,7 +111,8 @@ export class NotificationService {
       }
     }
 
-    const latest = await this.operations.latest("sync-all") as OperationRunRecord<Record<string, unknown>> | undefined;
+    const latest = currentOperation
+      ?? (await this.operations.latest("sync-all") as OperationRunRecord<Record<string, unknown>> | undefined);
     if (latest && (latest.status === "failed" || latest.status === "partial" || latest.status === "abandoned")) {
       const abandoned = latest.status === "abandoned";
       const failed = latest.status === "failed";
