@@ -2,23 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import { createLotoLabServer } from "../src/api/server.js";
-import { createPostgresPool } from "../src/db/client.js";
-import { runMigrations } from "../src/db/migrations.js";
+import { createIsolatedPostgresDatabase } from "./helpers/postgres.js";
 
 test(
   "a batch with a real bet can be hidden and shown without deleting history",
   { skip: !process.env.DATABASE_URL },
   async (t) => {
-    const pool = createPostgresPool({ max: 3 });
-    await runMigrations(pool);
-    await pool.query(`
-      TRUNCATE TABLE
-        real_bet_games,
-        real_bets,
-        generated_games,
-        generated_game_batches
-      RESTART IDENTITY CASCADE
-    `);
+    const database = await createIsolatedPostgresDatabase({ label: "game-batch-visibility", max: 3 });
+    const { pool } = database;
 
     const batchResult = await pool.query<{ id: string }>(`
       INSERT INTO generated_game_batches (lottery, target_contest_number, generator_options)
@@ -51,7 +42,7 @@ test(
     });
     t.after(async () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
-      await pool.end();
+      await database.close();
     });
 
     const address = server.address();

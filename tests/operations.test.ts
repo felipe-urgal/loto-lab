@@ -1,16 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
-import { Pool } from "pg";
 import type { Contest, LotteryId } from "../src/domain/types.js";
 import type { ContestSource, LotteryAgendaSnapshot } from "../src/data/source.js";
-import { runMigrations } from "../src/db/migrations.js";
 import { createLotoLabServer } from "../src/api/server.js";
 import { PostgresAgendaRepository } from "../src/persistence/agendaRepository.js";
 import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
 import { PostgresNotificationRepository } from "../src/persistence/notificationRepository.js";
 import { PostgresOperationRepository } from "../src/persistence/operationRepository.js";
 import { runOperationalSync, type SyncAllDetails } from "../src/operations/sync.js";
+import { createIsolatedPostgresDatabase } from "./helpers/postgres.js";
 
 function contest(lottery: LotteryId, number: number): Contest {
   if (lottery === "mega-sena") {
@@ -80,22 +79,15 @@ test(
   "operational sync fills gaps, refreshes agenda, notifications and audits the run",
   { skip: !process.env.DATABASE_URL },
   async (t) => {
-    const connectionString = process.env.DATABASE_URL!;
-    const admin = new Pool({ connectionString, max: 1 });
-    const schema = `ops_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    await admin.query(`CREATE SCHEMA "${schema}"`);
-
-    const pool = new Pool({ connectionString, max: 4, options: `-c search_path=${schema},public` });
+    const database = await createIsolatedPostgresDatabase({ label: "operations", max: 4 });
+    const { pool } = database;
     let server: ReturnType<typeof createLotoLabServer> | undefined;
 
     t.after(async () => {
       if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
-      await pool.end();
-      await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
-      await admin.end();
+      await database.close();
     });
 
-    await runMigrations(pool);
     const result = await runOperationalSync(pool, { source: new FakeContestSource(), retries: 0, retryDelayMs: 0 });
 
     assert.equal(result.status, "success");
