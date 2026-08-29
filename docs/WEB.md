@@ -98,7 +98,7 @@ A view `#analysis` mantém a resposta básica da API para compatibilidade e mont
 
 A interface nunca transforma atraso, ciclo, frequência ou uma associação histórica em aumento automático de probabilidade. Métricas para as quais não há referência matemática implementada são marcadas como descritivas, em vez de receber um “esperado” arbitrário.
 
-O cálculo avançado permanece no backend. O navegador recebe os resultados prontos em `advanced` dentro de `GET /api/v1/analysis/:lottery` e se limita a explorar/renderizar os dados.
+O cálculo avançado permanece no backend. `analysis-v2.js` consulta `GET /api/v1/analysis/:lottery/advanced` e se limita a explorar/renderizar os resultados calculados pelo servidor.
 
 Detalhes matemáticos e de interpretação em [`ANALYSES.md`](ANALYSES.md).
 
@@ -135,7 +135,7 @@ A home não baixa todas as extensões na primeira navegação. `feature-loader.j
 
 No Painel o módulo de escopo é carregado antes do status operacional. Isso garante que o primeiro paint dos cards de cobertura use o mesmo escopo exibido no seletor.
 
-Em Análises, o HTML básico do `app.js` continua funcionando como fallback. Depois do render principal, `analysis-v2.js` assume a área de conteúdo se o bloco avançado estiver disponível no contrato da API. A resposta avançada recebe cache curto no serviço para evitar recomputação quando o render básico e o módulo lazy consultam a mesma revisão dos dados em sequência.
+Em Análises, o HTML básico do `app.js` continua funcionando como fallback. Depois do render principal, `analysis-v2.js` assume a área de conteúdo se o endpoint avançado estiver disponível. A resposta avançada recebe cache curto no serviço para evitar recomputação em consultas repetidas próximas.
 
 O loader reutiliza Promises para evitar downloads duplicados e aguarda a tentativa de carregamento do CSS da feature antes de executar seu módulo, evitando renderização temporariamente sem estilo no caminho normal. Se o stylesheet falhar, o JavaScript ainda é carregado para preservar a funcionalidade.
 
