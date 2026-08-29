@@ -39,7 +39,7 @@ test("UI refinement assets are lazy-loaded for the main app and served for strat
   const mainRefinements = await fetch(`${baseUrl}/assets/refinements.js`);
   assert.equal(mainRefinements.status, 200);
   const mainSource = await mainRefinements.text();
-  assert.match(mainSource, /Como o score é calculado/);
+  assert.match(mainSource, /Como a pontuação é calculada/);
   assert.match(mainSource, /Aguardando resultado do concurso/);
   assert.match(mainSource, /últimos 100 concursos/i);
 
