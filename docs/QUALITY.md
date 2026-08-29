@@ -105,7 +105,7 @@ permissions:
   contents: read
 ```
 
-Novas permissões só devem ser concedidas no workflow ou job que realmente precisar delas. Scanners que necessitem publicar resultados de segurança devem permanecer separados do CI funcional, para que o job principal continue read-only.
+Novas permissões só devem ser concedidas no workflow ou job que realmente precisar delas. Scanners que necessitem publicar resultados de segurança permanecem separados do CI funcional, para que o job principal continue read-only.
 
 Runs de um mesmo PR compartilham um grupo de concorrência e uma atualização mais nova cancela a anterior. Pushes para `main` **não** são cancelados: cada merge continua recebendo sua validação completa mesmo quando outro commit chega em seguida.
 
@@ -114,6 +114,30 @@ O job funcional possui timeout global de 15 minutos. Os passos mais caros e suje
 `actions/checkout` e `actions/setup-node` permanecem pinadas por SHA, e as imagens usadas pelo Dockerfile/serviço PostgreSQL permanecem pinadas por digest. O label do runner hospedado pelo GitHub (`ubuntu-latest`) não oferece pinning por digest; por isso a reprodutibilidade do projeto é garantida nos componentes controláveis (toolchain, Actions, dependências e containers) e validada pelos gates de plataforma.
 
 `scripts/verifyPlatform.mjs` protege esse baseline e falha se permissões mínimas, política de concorrência ou timeouts críticos forem removidos do workflow principal.
+
+## Segurança e supply chain
+
+`.github/workflows/security.yml` roda em PRs para `main`, pushes em `main` e semanalmente. Ele é separado do CI funcional para isolar permissões e distinguir regressão funcional de sinal de segurança.
+
+O workflow possui três frentes:
+
+1. **CodeQL** para JavaScript/TypeScript com queries `security-and-quality`. Somente esse job recebe `security-events: write`; o restante permanece `contents: read`.
+2. **Dependency Review** somente em PRs. Novas dependências de runtime com vulnerabilidade `high` ou `critical` bloqueiam o PR; dependências de desenvolvimento continuam observáveis, mas não entram nesse bloqueio específico.
+3. **Container + SBOM**. A imagem de produção é construída, recebe SBOM SPDX JSON com retenção de 14 dias e é analisada por Trivy.
+
+A política de severidade do container é intencionalmente acionável:
+
+- todo achado `HIGH` ou `CRITICAL`, inclusive sem correção disponível, aparece no relatório do workflow;
+- achados `HIGH` ou `CRITICAL` com correção disponível bloqueiam o workflow;
+- achados sem correção não são silenciosamente ignorados, mas também não tornam o branch permanentemente impossível de liberar.
+
+`npm audit` continua bloqueando vulnerabilidades `high`/`critical` de dependências de produção. Dependency Review bloqueia novas vulnerabilidades equivalentes no momento em que entram no PR. O Trivy cobre o artefato containerizado, incluindo pacotes do sistema operacional que não aparecem no lockfile npm.
+
+CodeQL publica alertas no GitHub Code Scanning. Um alerta não deve ser suprimido apenas para deixar o check verde: falsos positivos precisam ser triados no próprio alerta ou em mudança explicitamente documentada. Da mesma forma, qualquer futura exceção de Trivy deve ser específica para o CVE/advisory, incluir justificativa e data de revisão; não existe allowlist genérica por pacote ou severidade.
+
+As Actions do workflow de segurança são pinadas por SHA completo. As versões das ferramentas baixadas internamente também são explícitas (`Trivy v0.70.0` e `Syft v1.42.3`). Atualizações dessas versões devem ser feitas em PR próprio ou claramente destacadas em um PR de manutenção, para que o diff de supply chain seja revisável.
+
+O gate estático de plataforma verifica que `security.yml` mantém Actions pinadas por SHA, permissões mínimas, política de severidade, versões explícitas dos scanners e geração de SBOM sem escrita no dependency snapshot.
 
 ## CI
 

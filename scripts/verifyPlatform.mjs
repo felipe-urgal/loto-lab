@@ -28,6 +28,7 @@ const [
   nvmrc,
   nodeVersionFile,
   workflow,
+  securityWorkflow,
   dockerfile,
   platformDoc,
   readme,
@@ -37,6 +38,7 @@ const [
   readText(".nvmrc"),
   readText(".node-version"),
   readText(".github/workflows/ci.yml"),
+  readText(".github/workflows/security.yml"),
   readText("Dockerfile"),
   readText("docs/PLATFORM.md"),
   readText("README.md"),
@@ -117,6 +119,30 @@ const requiredWorkflowSnippets = [
 ];
 for (const [label, snippet] of requiredWorkflowSnippets) {
   if (!workflow.includes(snippet)) fail(`CI perdeu ${label}`);
+}
+
+const requiredSecurityWorkflowSnippets = [
+  ["permissions mínimas", "permissions:\n  contents: read"],
+  ["CodeQL com security-events", "      security-events: write"],
+  ["dependency review high", "          fail-on-severity: high"],
+  ["dependency review runtime", "          fail-on-scopes: runtime"],
+  ["Trivy fixável como bloqueio", "          ignore-unfixed: true\n          exit-code: 1"],
+  ["Trivy v0.70.0 explícito", "          version: v0.70.0"],
+  ["Syft v1.42.3 explícito", "          syft-version: v1.42.3"],
+  ["SBOM sem dependency snapshot", "          dependency-snapshot: false"],
+];
+for (const [label, snippet] of requiredSecurityWorkflowSnippets) {
+  if (!securityWorkflow.includes(snippet)) fail(`Security workflow perdeu ${label}`);
+}
+
+const securityActions = [...securityWorkflow.matchAll(/uses:\s*([^\s@]+)@([^\s#]+)/g)];
+if (securityActions.length === 0) {
+  fail("Security workflow não possui Actions");
+}
+for (const [, action, reference] of securityActions) {
+  if (!/^[0-9a-f]{40}$/.test(reference)) {
+    fail(`Security workflow deve pinar ${action} por SHA completo, encontrado ${reference}`);
+  }
 }
 
 const dockerNodeVersions = [...dockerfile.matchAll(/^FROM\s+node:([0-9]+\.[0-9]+\.[0-9]+)-/gm)].map(
