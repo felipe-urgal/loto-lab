@@ -72,7 +72,7 @@ async function refineAnalysis() {
   refinement.innerHTML = `
     <div class="analysis-toolbar">
       <div>
-        <strong style="font-size:11px">Explorar ranking</strong>
+        <strong style="font-size:11px">Explorar classificação</strong>
         <div class="form-note">A classificação é relativa ao período e à distribuição atual.</div>
       </div>
       <div class="analysis-toolbar-controls">
@@ -83,7 +83,7 @@ async function refineAnalysis() {
           <option value="all">Todas</option>
         </select></label>
         <label class="field"><span>Ordenar por</span><select data-analysis-sort>
-          <option value="score">Score</option>
+          <option value="score">Pontuação</option>
           <option value="year">Ano</option>
           <option value="month">Mês</option>
           <option value="recent10">10 últimos</option>
@@ -93,10 +93,10 @@ async function refineAnalysis() {
       </div>
     </div>
     <details class="score-explainer">
-      <summary>Como o score é calculado?</summary>
+      <summary>Como a pontuação é calculada?</summary>
       <p>Pesos atuais: ano ${(data.weights.year * 100).toFixed(0)}%, últimos 20 ${(data.weights.recent20 * 100).toFixed(0)}%, mês ${(data.weights.month * 100).toFixed(0)}%, histórico ${(data.weights.historical * 100).toFixed(0)}% e últimos 10 ${(data.weights.recent10 * 100).toFixed(0)}%. Cada componente é normalizado antes da combinação.</p>
     </details>
-    <div class="methodology-note"><strong>Leitura correta:</strong> “forte”, “intermediária” e “fria” são posições relativas no ranking. Frequência histórica não aumenta a probabilidade individual de uma dezena no próximo sorteio.</div>`;
+    <div class="methodology-note"><strong>Leitura correta:</strong> “forte”, “intermediária” e “fria” são posições relativas na classificação. Frequência histórica não aumenta a probabilidade individual de uma dezena no próximo sorteio.</div>`;
   tableWrap.parentElement.insertBefore(refinement, tableWrap);
 
   const tbody = table.querySelector("tbody");
