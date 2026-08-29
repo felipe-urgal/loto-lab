@@ -19,19 +19,13 @@ async function walk(directory) {
   return files;
 }
 
-function withGlobalUiLayers(html) {
-  let output = html;
-  if (!output.includes("/assets/readability.css")) {
-    output = output.replace(/<\/head>/i, '    <link rel="stylesheet" href="/assets/readability.css" />\n  </head>');
-  }
-  if (!output.includes("/assets/localization.js")) {
-    output = output.replace(/<\/body>/i, '    <script type="module" src="/assets/localization.js"></script>\n  </body>');
-  }
-  return output;
+function withReadabilityLayer(html) {
+  if (html.includes("/assets/readability.css")) return html;
+  return html.replace(/<\/head>/i, '    <link rel="stylesheet" href="/assets/readability.css" />\n  </head>');
 }
 
 function withVersion(html, version) {
-  let output = withGlobalUiLayers(html).replace(/<html([^>]*)>/i, (_, attributes) => {
+  let output = withReadabilityLayer(html).replace(/<html([^>]*)>/i, (_, attributes) => {
     const normalizedAttributes = attributes.replace(/\sdata-build=(['"])[^'"]*\1/i, "");
     return `<html${normalizedAttributes} data-build="${version}">`;
   });
