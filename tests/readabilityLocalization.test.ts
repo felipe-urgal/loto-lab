@@ -27,6 +27,7 @@ test("static readability layer establishes a hard 16px minimum for functional te
   assert.match(css, /th,[\s\S]*td,[\s\S]*font-size: 16px !important;/);
   assert.match(css, /\.field input,[\s\S]*\.field select[\s\S]*font-size: 16px !important;/);
   assert.match(css, /\.a2-panel-head strong,[\s\S]*font-size: 16px !important;/);
+  assert.doesNotMatch(css, /readability-min-text/);
   assert.doesNotMatch(build, /readability\.js/);
   assert.doesNotMatch(e2e, /readability-min-text/);
   assert.match(e2e, /getComputedStyle\(el\)\.fontSize/);
