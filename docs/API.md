@@ -1,14 +1,15 @@
 # Loto Lab HTTP API
 
-A API HTTP expõe o core estatístico e a persistência PostgreSQL sem duplicar regras de negócio.
+A API HTTP expõe o core estatístico e a persistência PostgreSQL sem duplicar regras de negócio. O mesmo processo também serve a interface web.
 
 ## Princípios
 
-- o algoritmo continua sendo a fonte de verdade para análise, geração, conferência e backtest;
-- a API apenas valida entrada, chama os serviços e serializa a resposta;
-- concursos, lotes de jogos, estratégias e backtests persistidos usam PostgreSQL;
-- backtests continuam respeitando a regra anti-leakage existente no core;
-- a API não autentica usuários neste milestone.
+- o algoritmo é a fonte de verdade para análise, geração, conferência e testes históricos;
+- a API valida entrada, chama serviços e serializa respostas;
+- concursos, lotes, estratégias, apostas reais, execuções e testes históricos persistidos usam PostgreSQL;
+- testes históricos e validações respeitam a regra anti-leakage;
+- operações pesadas usam limites, rate limiting e workers quando aplicável;
+- em produção, toda UI/API exceto health checks exige HTTP Basic.
 
 ## Execução local
 
@@ -18,22 +19,27 @@ Suba o PostgreSQL:
 docker compose up -d postgres
 ```
 
-Configure o ambiente:
+Crie o ambiente local:
 
 ```bash
-export DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5433/loto_lab
-export API_HOST=127.0.0.1
-export API_PORT=3000
-export API_CORS_ORIGIN=http://localhost:5173
+cp .env.example .env
 ```
 
-Aplique migrations:
+Valores padrão atuais:
+
+```env
+DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5434/loto_lab
+API_HOST=127.0.0.1
+API_PORT=5200
+```
+
+Aplique migrations quando estiver preparando a base pela primeira vez:
 
 ```bash
 npm run db:migrate
 ```
 
-Inicie a API:
+Inicie a aplicação/API:
 
 ```bash
 npm run api:start
@@ -42,8 +48,36 @@ npm run api:start
 Base local:
 
 ```text
-http://127.0.0.1:3000
+http://127.0.0.1:5200
 ```
+
+API:
+
+```text
+http://127.0.0.1:5200/api/v1
+```
+
+`npm run api:start` carrega `.env`, aplica migrations pendentes e inicia o scheduler operacional quando habilitado.
+
+## CORS e origem pública
+
+Em desenvolvimento local, `API_CORS_ORIGIN` e `PUBLIC_ORIGIN` podem ficar sem definição. O servidor deriva a origem do próprio host e aceita o uso local por `localhost` ou `127.0.0.1`.
+
+Defina uma origem explícita apenas quando a API for consumida por outro origin ou quando houver uma origem pública conhecida.
+
+## Autenticação
+
+No ambiente local padrão não há credenciais configuradas.
+
+Na stack de produção, `APP_AUTH_USER` e `APP_AUTH_PASSWORD` são obrigatórios e protegem toda a UI/API com HTTP Basic. Estes endpoints permanecem públicos para health checks:
+
+```text
+/health
+/health/live
+/health/ready
+```
+
+Consulte [`DEPLOYMENT.md`](DEPLOYMENT.md) para exposição segura e HTTPS.
 
 ## Health checks
 
@@ -63,260 +97,141 @@ GET /health/ready
 
 Executa uma consulta simples no PostgreSQL.
 
-## Loterias
+## Loterias e concursos
 
 ```http
 GET /api/v1/lotteries
-```
-
-Retorna as configurações de Mega-Sena, Lotofácil e Dia de Sorte.
-
-## Concursos
-
-### Últimos concursos
-
-```http
 GET /api/v1/contests/mega-sena?limit=20&order=desc
+GET /api/v1/contests/mega-sena/latest
+GET /api/v1/contests/mega-sena/3047
 ```
 
-Query params:
+Parâmetros de listagem de concursos:
 
 - `limit`: 1 a 200;
 - `order`: `asc` ou `desc`;
 - `startContest`: concurso mínimo opcional;
 - `endContest`: concurso máximo opcional.
 
-### Concurso mais recente
+## Análises
 
-```http
-GET /api/v1/contests/mega-sena/latest
-```
-
-### Concurso específico
-
-```http
-GET /api/v1/contests/mega-sena/3047
-```
-
-## Análise
+Resposta principal:
 
 ```http
 GET /api/v1/analysis/lotofacil
 ```
 
-A resposta contém:
+Workspace avançado:
 
-- concurso de referência mais recente;
-- pesos atuais do score;
-- grupos `strong`, `balanced` e `cold`;
-- score e componentes por dezena.
+```http
+GET /api/v1/analysis/lotofacil/advanced
+```
 
-## Gerar jogos
+Os contratos internos ainda podem usar nomes como `score` e `ranking`; a interface visível usa **pontuação** e **classificação**.
+
+Detalhes em [`ANALYSES.md`](ANALYSES.md).
+
+## Gerador 2.0
+
+Planejamento sem gerar jogos:
+
+```http
+POST /api/v1/generation/plan
+Content-Type: application/json
+```
+
+Preview não persistido:
+
+```http
+POST /api/v1/generation/preview
+Content-Type: application/json
+```
+
+Persistência de uma geração validada:
+
+```http
+POST /api/v1/generation/save
+Content-Type: application/json
+```
+
+A geração pode ser determinística ou diversificada. Gerações diversificadas usam seed auditável; ao salvar uma prévia diversificada, a seed retornada pela geração anterior deve ser reutilizada.
+
+O endpoint legado/compatível continua disponível:
 
 ```http
 POST /api/v1/games/generate
-Content-Type: application/json
 ```
 
-Mega-Sena:
+Detalhes em [`GENERATION.md`](GENERATION.md).
 
-```json
-{
-  "lottery": "mega-sena",
-  "gameCount": 3
-}
-```
-
-Lotofácil:
-
-```json
-{
-  "lottery": "lotofacil",
-  "gameCount": 4,
-  "fixedCount": 8
-}
-```
-
-Dia de Sorte:
-
-```json
-{
-  "lottery": "dia-de-sorte",
-  "gameCount": 4
-}
-```
-
-Campos opcionais:
-
-- `targetContestNumber`: se informado, somente concursos anteriores a ele entram na geração;
-- `persist`: `true` por padrão. Quando `true`, cria um lote em PostgreSQL.
-
-A geração persiste o lote como uma unidade, preservando o núcleo compartilhado e as opções usadas.
-
-## Lotes de jogos
-
-### Lotes recentes
+## Lotes e conferência
 
 ```http
-GET /api/v1/game-batches/lotofacil?limit=20
-```
-
-### Lote específico
-
-```http
-GET /api/v1/game-batches/id/1
-```
-
-## Comparar jogos do lote
-
-```http
-GET /api/v1/game-batches/1/comparison?startContest=3760&count=5
-```
-
-Compara os jogos persistidos do lote com os concursos a partir de `startContest`. O concurso inicial pode ser anterior ao concurso-alvo do lote, permitindo **backtest histórico** dos jogos gerados.
-
-Query params:
-
-- `startContest`: concurso inicial da comparação; opcional, usando o concurso-alvo do lote quando disponível;
-- `count`: quantidade de concursos, de 1 a 20, com padrão 5.
-
-A resposta inclui:
-
-- `targetContestNumber`: concurso para o qual o lote foi originalmente gerado;
-- `startContestNumber`: concurso usado para iniciar a comparação;
-- `summary`: resumo dos acertos;
-- `items`: resultados por concurso;
-- `availability.status`: `available` quando há concursos sincronizados para o intervalo solicitado ou `pending` quando o concurso inicial ainda não está disponível;
-- `availability.lastAvailableContestNumber`: último concurso conhecido, quando aplicável;
-- `scope.kind`: `backtest` quando a comparação começa antes do alvo do lote ou `post-target` quando começa no alvo/depois dele.
-
-Quando `availability.status` é `pending`, a API continua respondendo `200` com `items: []` e resumo zerado. Isso representa ausência temporária do resultado sincronizado, não um erro de servidor.
-
-Exemplo de resposta pendente:
-
-```json
-{
-  "targetContestNumber": 3768,
-  "startContestNumber": 3768,
-  "requestedCount": 5,
-  "availability": {
-    "status": "pending",
-    "targetContestNumber": 3768,
-    "lastAvailableContestNumber": 3767
-  },
-  "items": []
-}
-```
-
-Exemplo de backtest:
-
-```http
-GET /api/v1/game-batches/1/comparison?startContest=3760&count=5
-```
-
-Nesse caso, um lote originalmente gerado para o concurso 3768 pode ser comparado com 3760, 3761, 3762, 3763 e 3764, desde que esses concursos estejam sincronizados.
-
-## Conferir lote
-
-```http
+GET  /api/v1/game-batches/lotofacil?limit=20
+GET  /api/v1/game-batches/id/1
+GET  /api/v1/game-batches/1/comparison?startContest=3760&count=5
 POST /api/v1/games/check
-Content-Type: application/json
 ```
 
-```json
-{
-  "batchId": 1,
-  "contestNumber": 3767
-}
-```
+Uma comparação sem resultados sincronizados retorna `200` com `availability.status = "pending"`; isso representa indisponibilidade temporária do concurso, não falha de servidor.
 
-A resposta inclui o lote, o concurso e a conferência de cada jogo:
-
-- acertos;
-- acertos das fixas;
-- acertos das variáveis;
-- faixa premiada;
-- custo;
-- prêmio conhecido;
-- resultado líquido;
-- Mês da Sorte quando aplicável.
+Detalhes em [`MY_GAMES.md`](MY_GAMES.md).
 
 ## Estratégias
 
-### Listar
-
 ```http
-GET /api/v1/strategies
-GET /api/v1/strategies?lottery=lotofacil
-```
-
-### Criar ou atualizar pelo slug
-
-```http
+GET  /api/v1/strategies
+GET  /api/v1/strategies?lottery=lotofacil
 POST /api/v1/strategies
-Content-Type: application/json
 ```
 
-```json
-{
-  "slug": "lotofacil-core-8",
-  "lottery": "lotofacil",
-  "name": "Lotofácil 8 fixas",
-  "methodologyVersion": "1",
-  "config": {
-    "fixedCount": 8
-  }
-}
-```
+Estratégias usam identificador estável e versões imutáveis para preservar auditabilidade.
 
-## Rodar backtest
+## Testes históricos
+
+Os paths mantêm `backtests` por compatibilidade técnica:
 
 ```http
 POST /api/v1/backtests/run
-Content-Type: application/json
+GET  /api/v1/backtests/lotofacil?limit=20
+GET  /api/v1/backtest-runs/1
 ```
 
-Exemplo Lotofácil:
+Chamadas web possuem limites de jogos e concursos para proteger CPU/memória. O cálculo pesado roda fora do event loop principal quando aplicável.
 
-```json
-{
-  "lottery": "lotofacil",
-  "gameCount": 4,
-  "fixedCount": 8,
-  "warmupContests": 20,
-  "startContest": 3500,
-  "endContest": 3767
-}
-```
-
-Campos:
-
-- `lottery`: obrigatório;
-- `gameCount`: opcional;
-- `fixedCount`: somente Lotofácil, aceita 8, 9 ou 10;
-- `warmupContests`: padrão 20;
-- `startContest` e `endContest`: opcionais;
-- `persist`: `true` por padrão.
-
-O endpoint é síncrono neste milestone. Ele é adequado para os backtests atuais; execução assíncrona/job queue pode ser adicionada se os experimentos crescerem em custo.
-
-## Backtests persistidos
-
-### Listagem leve
+## Laboratório
 
 ```http
-GET /api/v1/backtests/lotofacil?limit=20
+POST /api/v1/lab/compare
 ```
 
-A listagem retorna resumo e `roundCount`, sem carregar todos os payloads das rodadas.
+O Laboratório compara variantes no mesmo período e com a mesma quantidade de jogos, preservando anti-leakage e controles aleatórios quando aplicável.
 
-### Execução completa
+Detalhes em [`STRATEGY_LAB.md`](STRATEGY_LAB.md).
+
+## Operação
+
+Estado operacional:
 
 ```http
-GET /api/v1/backtest-runs/1
+GET /api/v1/operations/status
 ```
 
-Retorna também as rodadas persistidas.
+Sincronização manual das três loterias:
+
+```http
+POST /api/v1/operations/sync
+```
+
+A operação compartilha advisory lock com scheduler e CLI. Se já houver sincronização ativa, uma nova chamada não inicia trabalho duplicado.
+
+Status da base:
+
+```http
+GET /api/v1/data/status
+```
+
+Detalhes em [`OPERATIONS.md`](OPERATIONS.md).
 
 ## Erros
 
@@ -326,31 +241,31 @@ Erros de validação e recursos ausentes seguem a forma:
 {
   "error": {
     "code": "INVALID_ARGUMENT",
-    "message": "gameCount must be an integer between 1 and 20"
+    "message": "mensagem descritiva"
   }
 }
 ```
 
-Status usados neste milestone:
+Status comuns:
 
 - `200`: leitura ou execução não persistida;
 - `201`: criação/persistência;
 - `204`: preflight CORS;
 - `400`: entrada inválida;
+- `401`: autenticação ausente/incorreta quando habilitada;
 - `404`: rota/recurso inexistente;
-- `413`: body acima de 1 MB;
+- `409`: conflito operacional, como sincronização já em andamento;
+- `413`: body acima do limite;
+- `429`: rate limit;
 - `500`: erro inesperado de servidor/banco.
 
-Uma comparação sem resultados sincronizados continua sendo `200` com `availability.status = "pending"`; não é classificada como erro `500`.
+## Produção
 
-## CORS
-
-Por padrão a API permite a origem configurada em `API_CORS_ORIGIN`.
-
-O valor local recomendado é:
+A aplicação escuta `3000` dentro do container de produção e é publicada no host por `APP_PORT`, cujo padrão atual é `5200`:
 
 ```text
-http://localhost:5173
+Host:      127.0.0.1:5200
+Container: app:3000
 ```
 
-Isso já prepara a integração com o frontend Vite do próximo milestone.
+O PostgreSQL de produção não publica porta no host. Consulte [`DEPLOYMENT.md`](DEPLOYMENT.md).
