@@ -12,24 +12,36 @@ import {
   type GenerateGamesRequest,
   type GenerateGamesResponse,
 } from "../application/generateGames.js";
-import { backtestMegaSena } from "../backtest/megaSena.js";
-import { backtestLotofacil } from "../backtest/lotofacil.js";
-import { backtestDiaDeSorte } from "../backtest/diaDeSorte.js";
+import {
+  BacktestRoundLimitError,
+  MAX_HTTP_BACKTEST_ROUNDS,
+  RunBacktestUseCase,
+  type RunBacktestRequest,
+  type RunBacktestResponse,
+} from "../application/runBacktest.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import { PostgresGameRepository } from "../persistence/gameRepository.js";
 import { PostgresStrategyRepository } from "../persistence/strategyRepository.js";
 import { PostgresBacktestRepository } from "../persistence/backtestRepository.js";
 import type {
-  BacktestRoundArtifact,
   BacktestRunSummaryRecord,
   StrategyRecord,
   UpsertStrategyInput,
 } from "../persistence/types.js";
 
-export { InsufficientGenerationHistoryError, MIN_GENERATION_HISTORY };
-export type { AnalysisResponse, GenerateGamesRequest, GenerateGamesResponse };
-
-export const MAX_HTTP_BACKTEST_ROUNDS = 500;
+export {
+  BacktestRoundLimitError,
+  InsufficientGenerationHistoryError,
+  MAX_HTTP_BACKTEST_ROUNDS,
+  MIN_GENERATION_HISTORY,
+};
+export type {
+  AnalysisResponse,
+  GenerateGamesRequest,
+  GenerateGamesResponse,
+  RunBacktestRequest,
+  RunBacktestResponse,
+};
 
 export type AdvancedAnalysis = ReturnType<typeof buildAdvancedAnalysis>;
 
@@ -48,31 +60,6 @@ interface AdvancedAnalysisInFlightEntry {
   promise: Promise<AdvancedAnalysis>;
 }
 
-export class BacktestRoundLimitError extends Error {
-  constructor(readonly requested: number, readonly maximum = MAX_HTTP_BACKTEST_ROUNDS) {
-    super(`Backtest would process ${requested} contests; the HTTP limit is ${maximum}`);
-  }
-}
-
-export interface RunBacktestRequest {
-  lottery: LotteryId;
-  gameCount: number;
-  warmupContests: number;
-  fixedCount?: 8 | 9 | 10;
-  startContest?: number;
-  endContest?: number;
-  persist: boolean;
-}
-
-export interface RunBacktestResponse {
-  id?: number;
-  lottery: LotteryId;
-  options: Record<string, unknown>;
-  summary: Record<string, unknown>;
-  roundCount: number;
-  createdAt?: string;
-}
-
 function analysisSignature(contests: Contest[]): string {
   const hash = createHash("sha256");
   for (const contest of contests) {
@@ -86,14 +73,6 @@ function analysisSignature(contests: Contest[]): string {
   return hash.digest("hex");
 }
 
-function compactBacktestRound(round: BacktestRoundArtifact): BacktestRoundArtifact {
-  const compact: BacktestRoundArtifact = { contest: round.contest };
-  for (const key of ["date", "targetNumbers", "hitsByGame", "bestHits", "fixedHits"] as const) {
-    if (round[key] !== undefined) compact[key] = round[key];
-  }
-  return compact;
-}
-
 export class LotoLabApiServices {
   readonly contests: PostgresContestRepository;
   readonly games: PostgresGameRepository;
@@ -102,6 +81,7 @@ export class LotoLabApiServices {
   private readonly analyzeLottery: AnalyzeLotteryUseCase;
   private readonly checkGameBatch: CheckGameBatchUseCase;
   private readonly generateGames: GenerateGamesUseCase;
+  private readonly runBacktestUseCase: RunBacktestUseCase;
   private readonly advancedAnalysisCache = new Map<LotteryId, AdvancedAnalysisCacheEntry>();
   private readonly advancedAnalysisInFlight = new Map<LotteryId, AdvancedAnalysisInFlightEntry>();
 
@@ -113,6 +93,7 @@ export class LotoLabApiServices {
     this.analyzeLottery = new AnalyzeLotteryUseCase(this.contests);
     this.checkGameBatch = new CheckGameBatchUseCase(this.games, this.contests);
     this.generateGames = new GenerateGamesUseCase(this.contests, this.games);
+    this.runBacktestUseCase = new RunBacktestUseCase(this.contests, this.backtests);
   }
 
   async analyze(lottery: LotteryId): Promise<AnalysisResponse> {
@@ -156,81 +137,7 @@ export class LotoLabApiServices {
   }
 
   async runBacktest(input: RunBacktestRequest): Promise<RunBacktestResponse> {
-    const contests = await this.contests.list({ lottery: input.lottery, order: "asc" });
-    const eligibleRoundCount = contests
-      .slice(input.warmupContests)
-      .filter((contest) => input.startContest === undefined || contest.number >= input.startContest)
-      .filter((contest) => input.endContest === undefined || contest.number <= input.endContest)
-      .length;
-    if (eligibleRoundCount > MAX_HTTP_BACKTEST_ROUNDS) {
-      throw new BacktestRoundLimitError(eligibleRoundCount);
-    }
-
-    const options: Record<string, unknown> = {
-      gameCount: input.gameCount,
-      warmupContests: input.warmupContests,
-      ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),
-      ...(input.endContest !== undefined ? { endContest: input.endContest } : {}),
-    };
-
-    let result: {
-      rounds: Array<{ contest: number }>;
-      summary: unknown;
-    };
-
-    if (input.lottery === "mega-sena") {
-      result = backtestMegaSena(contests, {
-        gameCount: input.gameCount,
-        warmupContests: input.warmupContests,
-        ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),
-        ...(input.endContest !== undefined ? { endContest: input.endContest } : {}),
-      });
-    } else if (input.lottery === "lotofacil") {
-      const fixedCount = input.fixedCount ?? 8;
-      options.fixedCount = fixedCount;
-      result = backtestLotofacil(contests, {
-        gameCount: input.gameCount,
-        fixedCount,
-        warmupContests: input.warmupContests,
-        ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),
-        ...(input.endContest !== undefined ? { endContest: input.endContest } : {}),
-      });
-    } else {
-      result = backtestDiaDeSorte(contests, {
-        gameCount: input.gameCount,
-        warmupContests: input.warmupContests,
-        ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),
-        ...(input.endContest !== undefined ? { endContest: input.endContest } : {}),
-      });
-    }
-
-    const summary = result.summary as Record<string, unknown>;
-    const rounds = result.rounds as unknown as BacktestRoundArtifact[];
-
-    if (!input.persist) {
-      return {
-        lottery: input.lottery,
-        options,
-        summary,
-        roundCount: rounds.length,
-      };
-    }
-
-    const saved = await this.backtests.save({
-      lottery: input.lottery,
-      options,
-      summary,
-      rounds: rounds.map(compactBacktestRound),
-    });
-
-    return {
-      id: saved.id,
-      lottery: saved.lottery,
-      options: saved.options ?? {},
-      summary: saved.summary,
-      roundCount: saved.rounds.length,
-      createdAt: saved.createdAt,
-    };
+    return this.runBacktestUseCase.execute(input);
   }
 
   async listBacktests(lottery: LotteryId, limit: number): Promise<BacktestRunSummaryRecord[]> {
