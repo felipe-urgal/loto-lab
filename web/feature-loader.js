@@ -54,10 +54,10 @@ async function loadStyledModule(name) {
 async function ensureViewFeatures() {
   const view = location.hash.replace("#", "") || "dashboard";
   if (view === "dashboard") {
-    // Scope owns the selector value on the dashboard. Load it before status so
-    // the operational cards render against the same scope on the first paint.
+    // Dashboard scope owns the final presentation, including operational status.
+    // Load the scope first so the status module mounts against its canonical CSS.
     await loadStyledModule("dashboard-scope");
-    await loadStyledModule("data-status");
+    await loadModule("data-status");
     return;
   }
 
