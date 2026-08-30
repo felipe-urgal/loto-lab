@@ -1,0 +1,418 @@
+.experiment-content {
+  max-width: none;
+}
+
+.experiment-grid {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1.18fr);
+  gap: 18px;
+}
+
+.experiment-grid > * {
+  min-width: 0;
+}
+
+.experiment-form {
+  top: 92px;
+  padding: 16px;
+  border-color: var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  scroll-margin-top: 92px;
+}
+
+.experiment-form .section-head {
+  margin-bottom: 14px;
+}
+
+.experiment-form .section-head h2,
+.experiment-grid > section > .section-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 19px;
+}
+
+.experiment-form .section-head p,
+.experiment-grid > section > .section-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.experiment-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.experiment-form .field {
+  min-width: 0;
+  gap: 6px;
+}
+
+.experiment-form .field label {
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.experiment-form input,
+.experiment-form select,
+.experiment-form textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 16px;
+}
+
+.experiment-form textarea {
+  min-height: 96px;
+}
+
+.experiment-form input:hover,
+.experiment-form select:hover,
+.experiment-form textarea:hover {
+  border-color: var(--border-strong);
+}
+
+.experiment-form input:focus,
+.experiment-form select:focus,
+.experiment-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.experiment-form input[readonly],
+.experiment-form select:disabled {
+  border-color: var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.experiment-form .field.is-wide {
+  grid-column: 1 / -1;
+}
+
+.form-inline-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--muted-2);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.experiment-form .form-actions {
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.experiment-form .button {
+  min-height: 44px;
+  font-size: 16px;
+}
+
+.experiment-form .button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.experiment-form .button.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.experiment-grid > section {
+  min-width: 0;
+}
+
+.experiment-grid > section > .section-head {
+  align-items: flex-end;
+  min-height: 44px;
+  margin-bottom: 10px;
+}
+
+#strategy-count {
+  font-variant-numeric: tabular-nums;
+}
+
+#strategy-list {
+  display: grid;
+  gap: 10px;
+}
+
+.experiment-card {
+  padding: 14px;
+  gap: 12px;
+  border-color: var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.experiment-card + .experiment-card {
+  margin-top: 0;
+}
+
+.experiment-card-head {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.experiment-card-head > div {
+  min-width: 0;
+}
+
+.experiment-card-head h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 18px;
+}
+
+.experiment-card-head p {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.experiment-card .status-pill.completed {
+  min-height: 30px;
+  padding: 3px 9px;
+  border: 1px solid rgba(22, 137, 255, 0.3);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.experiment-meta {
+  gap: 6px;
+}
+
+.experiment-meta span {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.experiment-config {
+  max-height: 150px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.45;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.experiment-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  justify-content: flex-start;
+  padding-top: 2px;
+}
+
+.experiment-card-actions .button {
+  min-height: 40px;
+  border-color: var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 16px;
+}
+
+.experiment-card-actions .button:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+}
+
+.experiment-card-actions .button.primary {
+  margin-left: auto;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.version-list {
+  gap: 7px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.version-list[hidden] {
+  display: none;
+}
+
+.version-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 9px 10px;
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.version-row strong,
+.version-row span,
+.version-row .button {
+  font-size: 16px;
+}
+
+.version-row strong {
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.version-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+
+.version-row .button {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.experiment-empty,
+#strategy-list .loading-state {
+  min-height: 180px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.experiment-empty.job-error {
+  border-color: rgba(240, 113, 129, 0.36);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.job-error {
+  color: var(--danger);
+  font-size: 16px;
+}
+
+@media (max-width: 1100px) {
+  .experiment-grid {
+    grid-template-columns: minmax(330px, 0.9fr) minmax(0, 1.1fr);
+  }
+
+  .experiment-form .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .experiment-form .field.is-wide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .experiment-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .experiment-form {
+    position: static;
+    top: auto;
+  }
+
+  .experiment-form .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .experiment-content {
+    padding-inline: 14px;
+  }
+
+  .experiment-grid {
+    gap: 16px;
+  }
+
+  .experiment-form {
+    padding: 14px;
+  }
+
+  .experiment-form .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .experiment-form .form-actions {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .experiment-card {
+    padding: 13px;
+  }
+
+  .experiment-card-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .experiment-card-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .experiment-card-actions .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .experiment-card-actions .button.primary {
+    grid-column: 1 / -1;
+    margin-left: 0;
+  }
+
+  .version-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .version-row .button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .experiment-content *,
+  .experiment-content *::before,
+  .experiment-content *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
