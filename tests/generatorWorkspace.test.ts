@@ -20,7 +20,8 @@ test("generator workspace follows Prototype 1 while preserving audited generatio
   assert.match(workspace, /\.g2-shell \{[\s\S]*max-width: 1440px/);
   assert.match(workspace, /\.g2-number\.is-fixed \{[\s\S]*background: var\(--accent\)[\s\S]*color: #ffffff/);
   assert.match(workspace, /\.g2-methodology \{[\s\S]*border-color: rgba\(22, 137, 255/);
-  assert.match(workspace, /\.g2-game-month,[\s\S]*\.g2-saved \{[\s\S]*color: var\(--success-strong\)/);
+  assert.match(workspace, /\.g2-saved \{[\s\S]*color: var\(--success-strong\)/);
+  assert.match(workspace, /\.g2-game-month \{[\s\S]*color: var\(--accent-strong\)/);
   assert.match(workspace, /@media \(max-width: 760px\)[\s\S]*\.g2-explain-stepper \{[\s\S]*overflow-x: auto/);
   assert.match(workspace, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
@@ -31,5 +32,6 @@ test("generator workspace follows Prototype 1 while preserving audited generatio
   assert.match(generator, /includeSeed && state\.preview\?\.generatorOptions\?\.seed/);
   assert.match(generator, /Se o histórico mudar, o save é recusado/);
   assert.match(explainability, /Isto não é previsão/);
-  assert.match(explainability, /MutationObserver/);
+  assert.match(explainability, /loto-lab:view-rendered/);
+  assert.match(explainability, /data-g2-explain-stepper/);
 });
