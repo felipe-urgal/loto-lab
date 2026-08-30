@@ -3,15 +3,19 @@ import { createServer, type Server } from "node:http";
 import { createApiRequestHandler, type ApiServerOptions } from "./app.js";
 import type { AiInterpretationProvider } from "../ai/types.js";
 import { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
+import { RunStrategyLabUseCase } from "../application/runStrategyLab.js";
 import { StrategyCatalogUseCase } from "../application/strategyCatalog.js";
 import type { ContestSource } from "../data/source.js";
 import { logEvent } from "../observability/log.js";
 import { PostgresBacktestRepository } from "../persistence/backtestRepository.js";
+import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import { PostgresStrategyRepository } from "../persistence/strategyRepository.js";
 import { serveFeatureRoutes } from "./routes.js";
 import { serveWebAsset } from "./web.js";
 import { loadAppAuthConfig, requireAppAuthentication } from "./auth.js";
 import { requireSameOriginMutation, resolveMutationExpectedOrigin } from "./http.js";
+import { expensiveAnalysisGate } from "./workGate.js";
+import { runStrategyLabInWorker } from "./workerClient.js";
 
 export interface LotoLabServerOptions extends ApiServerOptions {
   aiProvider?: AiInterpretationProvider;
@@ -28,6 +32,11 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const featureRouteDependencies = {
     backtestCatalog: new BacktestCatalogUseCase(new PostgresBacktestRepository(options.pool)),
     strategyCatalog: new StrategyCatalogUseCase(new PostgresStrategyRepository(options.pool)),
+    runStrategyLab: new RunStrategyLabUseCase(
+      new PostgresContestRepository(options.pool),
+      expensiveAnalysisGate,
+      runStrategyLabInWorker,
+    ),
   };
   const auth = loadAppAuthConfig();
   const configuredOrigin = options.corsOrigin
