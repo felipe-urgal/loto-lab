@@ -1,6 +1,6 @@
 # Senior Review · Integridade financeira — registro histórico
 
-> **Status: concluído.** Este arquivo preserva o escopo de um review sênior já incorporado ao produto. O contrato atual está em [`../FINANCIALS.md`](../FINANCIALS.md), [`../REAL_BETS.md`](../REAL_BETS.md) e [`../RELIABILITY.md`](../RELIABILITY.md).
+> **Status do review original: concluído.** Este arquivo preserva o escopo do review sênior incorporado ao produto. O contrato atual está em [`../FINANCIALS.md`](../FINANCIALS.md), [`../REAL_BETS.md`](../REAL_BETS.md) e [`../RELIABILITY.md`](../RELIABILITY.md).
 
 ## Invariantes revisados
 
@@ -15,16 +15,20 @@
 - ROI de apostas reais usa `checkedCost`, não o custo total que inclui pendências;
 - correções oficiais posteriores preservam o `checked_at` original e entram em `real_bet_financial_revisions`.
 
-## Follow-up que existia no review
+## Follow-up residual ainda aberto
 
-Na época deste registro, ainda havia semântica financeira duplicada no fallback antigo do frontend. Esse débito foi absorvido pelo trabalho posterior de frontend source-of-truth/redesign:
+O fluxo canônico foi consolidado em Meus Jogos 2.0 e no Painel, mas **o fallback legado `web/real-bets.js` ainda possui semântica financeira antiga**: para uma aposta `checked` com `totalPrizeValue`/`netResult` desconhecidos, ele pode renderizar `R$ 0,00` por usar fallback numérico para zero.
 
-- o Painel passou a possuir sua composição financeira canônica;
+Portanto este ponto **não deve ser considerado absorvido**. Ele permanece como dívida do frontend legado a ser corrigida ou eliminada durante a modularização/consolidação da #60.
+
+O que já foi absorvido corretamente:
+
+- o Painel possui sua composição financeira canônica;
 - o refinamento legado de “Desempenho real” deixou de ser injetado tardiamente no dashboard;
-- Meus Jogos 2.0 passou a possuir o fluxo de lote/aposta/conferência;
+- Meus Jogos 2.0 possui o fluxo principal de lote/aposta/conferência;
 - `RealBetUseCase` e `RealBetService` permanecem donos das regras de criação/reconciliação no backend.
 
-Não reintroduzir uma terceira implementação financeira no frontend.
+Até o fallback ser removido/corrigido, não usar sua representação de prêmio/resultado desconhecido como contrato de produto.
 
 ## Guardrail permanente
 
@@ -38,4 +42,4 @@ Mudanças futuras em custo, prêmio, ROI ou reconciliação devem conferir pelo 
 6. concorrência transacional;
 7. agregação de ROI por totais, nunca média simples de percentuais.
 
-Este arquivo não representa backlog aberto. Novos achados devem gerar issue/PR próprios e atualizar os documentos canônicos quando alterarem comportamento.
+Este arquivo é um registro histórico, não uma lista geral de backlog. O follow-up residual acima permanece explicitamente vinculado à #60 até a remoção/correção do fallback legado.
