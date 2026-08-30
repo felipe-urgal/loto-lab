@@ -107,7 +107,7 @@ O runtime single-instance usa advisory lock para tornar o recovery atual seguro.
 
 `ai_insights` persiste:
 
-- modelo/provedor;
+- modelo usado e ID da resposta do provedor quando disponível;
 - snapshot de evidências;
 - interpretação estruturada;
 - uso retornado pelo provedor quando disponível.
