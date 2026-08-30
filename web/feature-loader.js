@@ -90,6 +90,9 @@ async function ensureViewFeatures() {
     const moduleReady = styleReady ? await loadModule("my-games-v2") : false;
     if (moduleReady) {
       await loadModule("real-bet-auditability");
+      // Prototype 1 owns final presentation only after the functional and
+      // auditability layers are mounted.
+      await loadStyle("my-games-workspace");
     } else {
       await Promise.all([
         loadStyle("real-bets"),
