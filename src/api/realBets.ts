@@ -1,7 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import {
+  RealBetUseCaseError,
+  type RealBetUseCase,
+  type RealBetUseCaseErrorCode,
+} from "../application/realBets.js";
 import { normalizeIsoDateTime } from "../domain/dateTime.js";
-import { RealBetService } from "../realBets/service.js";
-import type { ApiServerOptions } from "./app.js";
 import {
   ApiError,
   parseLottery,
@@ -10,6 +13,10 @@ import {
   sendJson,
   sendNoContent,
 } from "./http.js";
+
+export interface RealBetsApiOptions {
+  corsOrigin?: string;
+}
 
 function parseActualCost(value: unknown): number {
   const parsed = typeof value === "number" ? value : Number(value);
@@ -39,46 +46,28 @@ function parsePlayedAt(value: unknown): string | undefined {
   return normalized;
 }
 
-function serviceError(error: unknown): ApiError | undefined {
-  if (!(error instanceof Error)) return undefined;
-  if (error.message.startsWith("BATCH_NOT_FOUND:")) {
-    return new ApiError(404, "BATCH_NOT_FOUND", `Game batch ${error.message.split(":")[1]} was not found`);
+function statusForRealBetError(code: RealBetUseCaseErrorCode): number {
+  switch (code) {
+    case "BATCH_NOT_FOUND":
+    case "REAL_BET_NOT_FOUND":
+      return 404;
+    case "REAL_BET_ALREADY_EXISTS":
+    case "CONTEST_TARGET_MISMATCH":
+    case "RESULT_ALREADY_KNOWN":
+    case "RESULT_NOT_AVAILABLE":
+      return 409;
+    case "CONTEST_NUMBER_REQUIRED":
+    case "INVALID_GAME_POSITIONS":
+    case "INVALID_PLAYED_AT":
+      return 400;
   }
-  if (error.message.startsWith("REAL_BET_ALREADY_EXISTS:")) {
-    return new ApiError(409, "REAL_BET_ALREADY_EXISTS", "This generated batch is already marked as a real bet");
-  }
-  if (error.message.startsWith("CONTEST_TARGET_MISMATCH:")) {
-    const [, expected, received] = error.message.split(":");
-    return new ApiError(
-      409,
-      "CONTEST_TARGET_MISMATCH",
-      `This batch targets contest ${expected}; it cannot be registered as a real bet for contest ${received}`,
-    );
-  }
-  if (error.message.startsWith("RESULT_ALREADY_KNOWN:")) {
-    const contest = error.message.split(":")[1];
-    return new ApiError(
-      409,
-      "RESULT_ALREADY_KNOWN",
-      `Contest ${contest} is already stored. Historical results cannot be registered as live real bets.`,
-    );
-  }
-  if (error.message === "CONTEST_NUMBER_REQUIRED") {
-    return new ApiError(400, "CONTEST_NUMBER_REQUIRED", "A contest number is required for a real bet");
-  }
-  if (error.message === "INVALID_GAME_POSITIONS") {
-    return new ApiError(400, "INVALID_GAME_POSITIONS", "gamePositions contains a game that does not exist in the batch");
-  }
-  if (error.message === "INVALID_PLAYED_AT") {
-    return new ApiError(400, "INVALID_PLAYED_AT", "playedAt is invalid");
-  }
-  return undefined;
 }
 
 export async function serveRealBets(
   request: IncomingMessage,
   response: ServerResponse,
-  options: ApiServerOptions,
+  options: RealBetsApiOptions,
+  realBets: RealBetUseCase,
 ): Promise<boolean> {
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://localhost");
@@ -87,7 +76,6 @@ export async function serveRealBets(
   if (!isRoute) return false;
 
   const corsOrigin = options.corsOrigin ?? process.env.API_CORS_ORIGIN ?? "http://localhost:3000";
-  const service = new RealBetService(options.pool);
 
   try {
     if (method === "OPTIONS") {
@@ -104,7 +92,7 @@ export async function serveRealBets(
       const actualCost = parseActualCost(body.actualCost);
       const gamePositions = parseGamePositions(body.gamePositions);
       const playedAt = parsePlayedAt(body.playedAt);
-      const created = await service.create({
+      const created = await realBets.create({
         batchId,
         actualCost,
         ...(contestNumber !== undefined ? { contestNumber } : {}),
@@ -118,30 +106,21 @@ export async function serveRealBets(
     if (method === "POST" && pathname === "/api/v1/real-bets/reconcile") {
       const body = await readJsonBody(request);
       const lottery = body.lottery === undefined ? undefined : parseLottery(body.lottery);
-      const checked = await service.reconcilePending(lottery);
-      sendJson(response, 200, { checked }, corsOrigin);
+      sendJson(response, 200, await realBets.reconcilePending(lottery), corsOrigin);
       return true;
     }
 
     const checkMatch = /^\/api\/v1\/real-bets\/(\d+)\/check$/.exec(pathname);
     if (method === "POST" && checkMatch) {
       const id = parsePositiveInt(checkMatch[1], "realBetId");
-      const item = await service.reconcile(id);
-      if (!item) throw new ApiError(404, "REAL_BET_NOT_FOUND", `Real bet ${id} was not found`);
-      if (item.status !== "checked") {
-        throw new ApiError(409, "RESULT_NOT_AVAILABLE", `Contest ${item.contestNumber} is not stored yet for ${item.lottery}`);
-      }
-      sendJson(response, 200, item, corsOrigin);
+      sendJson(response, 200, await realBets.check(id), corsOrigin);
       return true;
     }
 
     const revisionsMatch = /^\/api\/v1\/real-bets\/(\d+)\/revisions$/.exec(pathname);
     if (method === "GET" && revisionsMatch) {
       const id = parsePositiveInt(revisionsMatch[1], "realBetId");
-      const item = await service.realBets.findById(id);
-      if (!item) throw new ApiError(404, "REAL_BET_NOT_FOUND", `Real bet ${id} was not found`);
-      const revisions = await service.realBets.listFinancialRevisions(id);
-      sendJson(response, 200, { realBetId: id, revisions }, corsOrigin);
+      sendJson(response, 200, await realBets.financialRevisions(id), corsOrigin);
       return true;
     }
 
@@ -153,13 +132,17 @@ export async function serveRealBets(
         max: 200,
         defaultValue: 50,
       });
-      sendJson(response, 200, await service.list(lottery, limit), corsOrigin);
+      sendJson(response, 200, await realBets.list(lottery, limit), corsOrigin);
       return true;
     }
 
     throw new ApiError(404, "ROUTE_NOT_FOUND", `${method} ${pathname} was not found`);
   } catch (error) {
-    const mapped = error instanceof ApiError ? error : serviceError(error);
+    const mapped = error instanceof ApiError
+      ? error
+      : error instanceof RealBetUseCaseError
+        ? new ApiError(statusForRealBetError(error.code), error.code, error.message)
+        : undefined;
     if (mapped) {
       sendJson(response, mapped.statusCode, { error: { code: mapped.code, message: mapped.message } }, corsOrigin);
       return true;
