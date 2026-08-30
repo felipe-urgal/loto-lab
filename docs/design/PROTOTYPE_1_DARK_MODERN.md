@@ -1,24 +1,20 @@
 # Protótipo 1 — Dark Moderno
 
-> Direção visual oficial do Loto Lab. Decisão registrada em #120; rollout e consolidação acompanhados por #121.
+> Direção visual oficial do Loto Lab. Decisão registrada em #120; rollout e consolidação concluídos pela #121.
 
 ![Referência visual](./prototype-1-dark-workspace.svg)
 
 ## Estado atual
 
-A direção deixou de ser apenas protótipo: o rollout principal já foi aplicado ao produto.
+A direção deixou de ser apenas protótipo: o rollout e a consolidação visual foram concluídos.
 
-Entre #123 e #133 foram migrados o shell e as superfícies do workspace; #134–#137 iniciaram a consolidação das camadas CSS que ficaram redundantes depois do rollout.
+Entre #123 e #133 foram migrados o shell e todas as superfícies principais. Os PRs #134–#142 consolidaram ownership e removeram camadas CSS comprovadamente redundantes; #143 fechou a auditoria transversal de legibilidade, foco por teclado, reduced-motion e comportamento mobile, inclusive corrigindo um overflow horizontal real em Análises sem enfraquecer o E2E.
 
-O trabalho restante em #121 é de **consolidação final**, não de redefinição da linguagem:
+A #121 está concluída. Trabalho futuro deve respeitar esta linguagem e seguir para a issue que realmente possui o novo escopo:
 
-- remover apenas CSS comprovadamente sem consumidor/redundante;
-- absorver overrides corretivos quando a fonte canônica já possui ownership claro;
-- revisar contraste, foco, teclado e reduced-motion transversalmente;
-- revisar layout shift/performance visual;
-- fechar revisão desktop/mobile/UX final.
-
-Mudanças maiores de arquitetura frontend pertencem à #60. Mudanças de jornada/arquitetura de informação pertencem à #64.
+- arquitetura frontend, TypeScript e primitives compartilhadas: #60;
+- arquitetura de informação/jornada: #64;
+- Web Vitals e otimizações de performance baseadas em medição: #65.
 
 ## Intenção
 
@@ -60,6 +56,8 @@ CSS funcional da feature
 
 Nem toda página precisa possuir exatamente a mesma quantidade de folhas. O objetivo é que a **fonte canônica final** seja clara e que nenhuma camada global de correção esconda dívida da feature.
 
+Folhas funcionais adicionais podem permanecer quando possuem responsabilidade real. Em especial, bases funcionais e fallbacks deliberados não são “legado” apenas por coexistirem com um `*-workspace.css`.
+
 `readability.css`, `readability.js` e `localization.js` já foram removidos. PT-BR e legibilidade nascem na fonte.
 
 ## Shell
@@ -94,7 +92,7 @@ Nem toda página precisa possuir exatamente a mesma quantidade de folhas. O obje
 - LotteryBall;
 - superfícies de gráfico, legenda e tooltip.
 
-Não existe obrigação de criar um componente abstrato apenas para cumprir a lista. Reuso deve surgir quando houver contrato comum real.
+Não existe obrigação de criar um componente abstrato apenas para cumprir a lista. Reuso deve surgir quando houver contrato comum real. A evolução dessas primitives pertence à #60.
 
 ## Hierarquia
 
@@ -136,9 +134,22 @@ A ordem adotada foi:
 6. Meus Jogos / Apostas Reais;
 7. Pesquisa — Testes históricos, Laboratório e Estratégias;
 8. Operação — Execuções, Agenda e IA;
-9. consolidação do legado visual.
+9. consolidação do legado visual e ownership;
+10. auditoria transversal desktop/mobile e acessibilidade.
 
 A implementação foi fatiada por superfície para manter PRs pequenos e E2E revisável.
+
+### Consolidação final
+
+- #134 — IA assume `ai-workspace.css` como owner canônico;
+- #135 — Agenda assume `agenda-workspace.css`;
+- #136 — Laboratório absorve `lab.css`/`lab-v2.css`;
+- #137 — Estratégias e Execuções deixam o antigo `experiments.css`;
+- #139 — hardening visual de Análises é absorvido no workspace canônico;
+- #140 — assets legados de diversidade do Gerador são removidos;
+- #141 — status visual do Painel é absorvido no scope canônico;
+- #142 — explainability visual do Gerador é absorvida no workspace, preservando o módulo funcional;
+- #143 — auditoria transversal final em navegador real, com desktop/mobile, foco visível, reduced-motion, piso tipográfico e ausência de overflow estrutural.
 
 ## Guardrails de implementação
 
@@ -154,16 +165,19 @@ A implementação foi fatiada por superfície para manter PRs pequenos e E2E rev
 - `hardening` funcional não é removido apenas por nome;
 - PRs visuais continuam exigindo CI/E2E + auto code review final no SHA exato antes do merge.
 
-## Critério de conclusão da #121
+## Evidência de conclusão da #121
 
-A consolidação visual está pronta quando:
+A consolidação visual foi encerrada porque:
 
-- não houver override/camada corretiva sem owner claro;
-- CSS redundante estiver removido com evidência de ausência de consumidor;
-- todas as superfícies mantiverem a linguagem do Protótipo 1;
-- browser E2E desktop/mobile continuar verde;
-- foco, teclado, contraste e reduced-motion forem revisados transversalmente;
-- o produto não depender de uma camada global para corrigir legibilidade/copy;
-- mudanças futuras puderem ser feitas na fonte canônica da própria feature.
+- overrides/camadas corretivas sem owner claro foram absorvidos ou removidos quando havia evidência;
+- folhas que permanecem possuem responsabilidade funcional, estrutural ou fallback explícita;
+- todas as superfícies mantêm a linguagem do Protótipo 1;
+- browser E2E desktop/mobile ficou verde no SHA final do #143;
+- foco por teclado, texto funcional >=16px, reduced-motion e overflow horizontal passaram a ter auditoria transversal em navegador real;
+- contraste e semântica de estados continuam protegidos pelos tokens/contratos dos workspaces;
+- o produto não depende de camada global para corrigir legibilidade ou copy;
+- mudanças futuras podem ser feitas na fonte canônica da própria feature.
 
-Relacionadas: #60, #64, #120 e #121.
+Performance percebida continua protegida pelo lifecycle e E2E. Medições quantitativas de LCP/INP/CLS e otimizações baseadas em evidência pertencem à #65, não reabrem a #121.
+
+Relacionadas: #60, #64, #65, #120 e #121.
