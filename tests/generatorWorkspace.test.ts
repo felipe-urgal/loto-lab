@@ -16,6 +16,9 @@ test("generator workspace follows Prototype 1 while preserving audited generatio
   assert.ok(generatorLayer >= 0, "Generator 2.0 must remain the functional owner");
   assert.ok(explainabilityLayer > generatorLayer, "explainability must remain additive");
   assert.ok(workspaceLayer > explainabilityLayer, "Prototype 1 must be the final generator style layer");
+  assert.doesNotMatch(loader, /generation-diversity/);
+  await assert.rejects(readFile("web/generation-diversity.js", "utf8"), /ENOENT/);
+  await assert.rejects(readFile("web/generation-diversity.css", "utf8"), /ENOENT/);
 
   assert.match(workspace, /\.g2-shell \{[\s\S]*max-width: 1440px/);
   assert.match(workspace, /\.g2-number\.is-fixed \{[\s\S]*background: var\(--accent\)[\s\S]*color: #ffffff/);
@@ -29,6 +32,7 @@ test("generator workspace follows Prototype 1 while preserving audited generatio
   assert.match(generator, /postJson\("\/generation\/plan"/);
   assert.match(generator, /postJson\("\/generation\/preview"/);
   assert.match(generator, /postJson\("\/generation\/save"/);
+  assert.match(generator, /generationMode: "diversified"/);
   assert.match(generator, /includeSeed && state\.preview\?\.generatorOptions\?\.seed/);
   assert.match(generator, /Se o histórico mudar, o save é recusado/);
   assert.match(explainability, /Isto não é previsão/);
