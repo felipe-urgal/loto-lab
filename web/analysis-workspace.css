@@ -1,0 +1,489 @@
+.a2-shell {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  gap: 16px;
+}
+
+.a2-stack {
+  gap: 20px;
+}
+
+.a2-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.a2-metric {
+  min-width: 0;
+  min-height: 108px;
+  padding: 15px 16px;
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+
+.a2-metric > span,
+.a2-metric > small {
+  font-size: 16px;
+}
+
+.a2-metric > span {
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.a2-metric > strong {
+  margin-top: 8px;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 28px;
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.a2-metric > strong.positive,
+.a2-shell .a2-move.positive,
+.a2-shell .positive {
+  color: var(--success-strong) !important;
+}
+
+.a2-shell .negative {
+  color: var(--danger) !important;
+}
+
+.a2-principle,
+.a2-warning,
+.a2-validation-principle {
+  min-height: 46px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.a2-principle strong,
+.a2-validation-principle strong {
+  color: var(--accent-strong);
+}
+
+.a2-warning {
+  border-color: rgba(239, 185, 88, 0.28);
+  background: var(--warning-soft);
+}
+
+.a2-tabs {
+  position: sticky;
+  top: calc(var(--shell-header-height) + 8px);
+  z-index: 12;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(15, 27, 41, 0.96);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(12px);
+}
+
+.a2-tabs button {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.a2-tabs button:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.a2-tabs button.is-active {
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.a2-tier-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.a2-tier-panel {
+  min-width: 0;
+  min-height: 164px;
+  padding: 15px;
+  align-content: start;
+}
+
+.a2-tier-panel .a2-panel-head {
+  align-items: center;
+}
+
+.a2-ball-cloud {
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.a2-ball {
+  width: 38px;
+  height: 38px;
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  font-size: 16px;
+}
+
+.a2-ball.is-strong {
+  border-color: rgba(22, 137, 255, 0.34);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.a2-ball.is-balanced {
+  border-color: rgba(239, 185, 88, 0.3);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.a2-ball.is-cold {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.a2-tier-chip.is-strong {
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.a2-tier-chip.is-balanced {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.a2-tier-chip.is-cold {
+  color: var(--muted);
+  background: var(--surface-2);
+}
+
+.a2-compare-panel,
+.a2-pair-explorer,
+.a2-filter-validation,
+.a2-movers,
+.a2-heat-panel,
+.a2-associations,
+.a2-method-card {
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+.a2-compare-controls,
+.a2-pair-controls {
+  align-items: center;
+  gap: 8px;
+}
+
+.a2-compare-controls select,
+.a2-pair-controls select,
+.a2-window-control select {
+  min-height: 44px;
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 16px;
+}
+
+.a2-structure-grid {
+  gap: 10px;
+}
+
+.a2-structure-card {
+  padding: 15px;
+  border-radius: var(--radius);
+}
+
+.a2-structure-current {
+  color: var(--text);
+  font-size: 28px;
+}
+
+.a2-observed-expected span,
+.a2-filter-numbers span,
+.a2-grid-profile > span,
+.a2-pair-stat > span,
+.a2-mover-list button,
+.a2-delay-list button,
+.a2-association-row,
+.a2-similarity > div {
+  background: var(--surface-2);
+}
+
+.a2-distribution {
+  padding: 6px 2px 0;
+}
+
+.a2-dist-bar {
+  border-bottom-color: var(--border-strong);
+}
+
+.a2-dist-bar i {
+  background: var(--accent);
+  opacity: 0.82;
+}
+
+.a2-mover-list button:hover,
+.a2-delay-list button:hover {
+  background: var(--surface-3);
+}
+
+.a2-delay-list {
+  gap: 8px;
+  background: var(--surface);
+}
+
+.a2-delay-list button {
+  min-height: 68px;
+  border: 1px solid transparent;
+}
+
+.a2-delay-list button:hover {
+  border-color: var(--border-strong);
+}
+
+.a2-delay-list em {
+  color: var(--accent-strong);
+}
+
+.a2-heat-panel {
+  background: var(--surface);
+}
+
+.a2-heat-cell {
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+
+.a2-heat-cell.is-hit {
+  border-color: rgba(22, 137, 255, 0.42);
+  background: var(--accent);
+}
+
+.a2-table {
+  min-width: 820px;
+}
+
+.a2-table th {
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.a2-table td {
+  font-size: 16px;
+}
+
+.a2-table tr[data-a2-number]:hover td {
+  background: var(--surface-2);
+}
+
+.a2-validation-grid {
+  gap: 10px;
+}
+
+.a2-validation-card {
+  border-radius: var(--radius);
+}
+
+.a2-detail {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.a2-detail::backdrop {
+  background: rgba(2, 8, 15, 0.68);
+}
+
+.a2-detail-grid {
+  gap: 10px;
+}
+
+.a2-detail-section {
+  border-color: var(--border);
+}
+
+@media (max-width: 1120px) {
+  .a2-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .a2-tier-list {
+    grid-template-columns: 1fr;
+  }
+
+  .a2-tier-panel {
+    min-height: auto;
+  }
+
+  .a2-structure-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .a2-delay-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .a2-tabs {
+    top: calc(var(--shell-header-height) + 4px);
+  }
+
+  .a2-structure-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .a2-cycle {
+    grid-template-columns: 1fr;
+  }
+
+  .a2-filter-numbers,
+  .a2-delay-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .a2-pair-stat,
+  .a2-association-row,
+  .a2-similarity > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .a2-association-row em,
+  .a2-pair-stat em {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}
+
+@media (max-width: 680px) {
+  .a2-shell {
+    gap: 14px;
+  }
+
+  .a2-stack {
+    gap: 18px;
+  }
+
+  .a2-summary {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .a2-metric {
+    min-height: 100px;
+    padding: 13px;
+  }
+
+  .a2-metric > strong {
+    font-size: 24px;
+  }
+
+  .a2-principle,
+  .a2-warning,
+  .a2-validation-principle {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .a2-principle strong,
+  .a2-warning strong,
+  .a2-validation-principle strong {
+    white-space: normal;
+  }
+
+  .a2-tabs {
+    position: static;
+    width: calc(100vw - 32px);
+    margin-inline: auto;
+    overflow-x: auto;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .a2-tabs button {
+    flex: 0 0 auto;
+  }
+
+  .a2-compare-controls,
+  .a2-pair-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .a2-compare-controls select,
+  .a2-pair-controls select,
+  .a2-compare-controls .button,
+  .a2-pair-controls .button,
+  .a2-window-control select {
+    width: 100%;
+  }
+
+  .a2-observed-expected,
+  .a2-filter-numbers,
+  .a2-delay-list,
+  .a2-pair-stat,
+  .a2-association-row,
+  .a2-similarity > div {
+    grid-template-columns: 1fr;
+  }
+
+  .a2-association-row em,
+  .a2-pair-stat em {
+    grid-column: auto;
+  }
+
+  .a2-grid-profile {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .a2-grid-profile > strong {
+    grid-column: 1 / -1;
+  }
+
+  .a2-detail {
+    width: calc(100vw - 20px);
+    max-width: none;
+    max-height: calc(100dvh - 20px);
+    margin: auto;
+  }
+}
+
+@media (max-width: 460px) {
+  .a2-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .a2-metric {
+    min-height: 92px;
+  }
+
+  .a2-grid-profile {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a2-shell *,
+  .a2-shell *::before,
+  .a2-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
