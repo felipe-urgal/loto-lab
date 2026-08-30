@@ -46,7 +46,7 @@ function betSummaryMarkup(bet) {
       <span><strong>${bet.games.length}</strong> jogo(s) realmente apostado(s)</span>
       <span>Concurso <strong>#${bet.contestNumber}</strong></span>
       <span>Gasto <strong>${formatCurrency(bet.actualCost)}</strong></span>
-      ${bet.status === "checked" ? `<span>Prêmio <strong>${formatCurrency(bet.totalPrizeValue || 0)}</strong></span><span>Resultado <strong class="${netTone}">${formatCurrency(bet.netResult || 0)}</strong></span>` : ""}
+      ${bet.status === "checked" ? `<span>Prêmio <strong>${formatCurrency(bet.totalPrizeValue)}</strong></span><span>Resultado <strong class="${netTone}">${formatCurrency(bet.netResult)}</strong></span>` : ""}
     </div>`;
 }
 
@@ -56,7 +56,7 @@ function realBetHistory(data) {
     <div class="section-head"><div><h2>Apostas reais</h2><p>Histórico separado dos lotes apenas gerados e dos testes históricos.</p></div></div>
     <div class="panel list">${data.items.map((bet) => {
       const info = statusInfo(bet.status);
-      const value = bet.status === "checked" ? (bet.netResult || 0) : undefined;
+      const value = bet.status === "checked" ? bet.netResult : undefined;
       const tone = typeof value === "number" ? (value >= 0 ? "positive" : "negative") : "";
       return `<div class="list-row"><div class="list-row-main"><strong>Aposta #${bet.id} · concurso #${bet.contestNumber}</strong><p>${bet.games.length} jogo(s) · ${formatDateTime(bet.playedAt)} · ${info.label}</p></div><div class="list-row-value"><strong class="${tone}">${bet.status === "checked" ? formatCurrency(value) : formatCurrency(bet.actualCost)}</strong><small>${bet.status === "checked" ? "resultado líquido" : "gasto registrado"}</small></div></div>`;
     }).join("")}</div>
