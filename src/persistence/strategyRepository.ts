@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from "pg";
+import { StrategyLotteryImmutableError } from "../application/strategyCatalog.js";
 import type { LotteryId } from "../domain/types.js";
 import type {
   StrategyRecord,
@@ -103,7 +104,7 @@ export class PostgresStrategyRepository {
       } else {
         strategyId = Number(current.id);
         if (current.lottery !== input.lottery) {
-          throw new Error(`STRATEGY_LOTTERY_IMMUTABLE:${input.slug}`);
+          throw new StrategyLotteryImmutableError(input.slug);
         }
 
         const sameVersion = await client.query(
