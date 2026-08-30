@@ -52,7 +52,9 @@ test("Strategy Lab UI exposes score-model, inference resolution and predictive v
   assert.match(html, /mínimo prático \(9 variantes\)/);
   assert.match(html, /Resolução insuficiente/);
   assert.match(html, /Amostra histórica pequena/);
-  assert.match(html, /lab-v2\.css/);
+  assert.match(html, /lab-workspace\.css/);
+  assert.doesNotMatch(html, /lab-v2\.css/);
+  assert.doesNotMatch(html, /\/assets\/lab\.css/);
   assert.match(javascript, /score-model/);
   assert.match(javascript, /Pontuação v1 × Pontuação v2 × sem pontuação/);
   assert.match(javascript, /minimumPracticalRandomSamples/);
