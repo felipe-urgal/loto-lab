@@ -41,7 +41,11 @@ test("AI workspace and provider status are served without exposing credentials",
   const html = await page.text();
   assert.match(html, /Algoritmo calcula\. IA interpreta\./);
   assert.match(html, /\/assets\/ai\.js/);
-  assert.match(html, /\/assets\/ai\.css/);
+  assert.match(html, /\/assets\/ai-workspace\.css/);
+  assert.doesNotMatch(html, /\/assets\/ai\.css/);
+
+  const legacyStyle = await fetch(`${baseUrl}/assets/ai.css`);
+  assert.equal(legacyStyle.status, 404);
 
   const script = await fetch(`${baseUrl}/assets/ai.js`);
   assert.equal(script.status, 200);
