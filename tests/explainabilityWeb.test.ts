@@ -9,11 +9,12 @@ async function source(path: string): Promise<string> {
 
 test("Generator explainability layer exposes the five-step flow and methodology guardrails", async () => {
   const javascript = await source("web/generation-explainability.js");
-  const diversity = await source("web/generation-diversity.js");
+  const generator = await source("web/generation-v2.js");
   const css = await source("web/generation-explainability.css");
   const loader = await source("web/feature-loader.js");
 
   assert.match(loader, /generation-explainability/);
+  assert.doesNotMatch(loader, /generation-diversity/);
   assert.match(javascript, /Análise/);
   assert.match(javascript, /Núcleo fixo/);
   assert.match(javascript, /Variáveis/);
@@ -33,11 +34,9 @@ test("Generator explainability layer exposes the five-step flow and methodology 
   assert.doesNotMatch(javascript, /\bguardrail\b/);
   assert.doesNotMatch(javascript, /Seed, histórico e fingerprint/);
 
-  assert.match(diversity, /generatorOptions\?\.seed/);
-  assert.match(diversity, /A semente registrada permite reconstruir exatamente este lote/);
-  assert.match(diversity, /Testes históricos e Laboratório continuam determinísticos/);
-  assert.doesNotMatch(diversity, /A seed registrada/);
-  assert.doesNotMatch(diversity, /Backtests e Laboratório continuam determinísticos/);
+  assert.match(generator, /generationMode: "diversified"/);
+  assert.match(generator, /generatorOptions\?\.seed/);
+  await assert.rejects(source("web/generation-diversity.js"), /ENOENT/);
 
   assert.match(css, /g2-explain-stepper/);
   assert.match(css, /g2-education-grid/);
