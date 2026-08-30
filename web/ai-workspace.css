@@ -11,6 +11,9 @@
 
 .ai-principle {
   min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 16px;
   gap: 18px;
   border-color: var(--border);
@@ -30,6 +33,7 @@
 
 .ai-principle p {
   max-width: 860px;
+  margin: 0;
   color: var(--muted);
   font-size: 16px;
   line-height: 1.45;
@@ -38,7 +42,7 @@
 .ai-provider-status {
   min-width: 260px;
   padding: 10px 12px;
-  border-color: var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--muted);
@@ -162,6 +166,8 @@
 
 .ai-message.is-loading {
   min-height: 104px;
+  display: grid;
+  place-items: center;
   border-color: rgba(22, 137, 255, 0.34);
   background: var(--accent-soft);
 }
@@ -174,9 +180,12 @@
 }
 
 .ai-result-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 16px;
   padding-bottom: 14px;
-  border-bottom-color: var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .ai-result-head > div:first-child {
@@ -191,6 +200,7 @@
 
 .ai-result-head p {
   max-width: 900px;
+  margin: 0;
   color: var(--muted);
   font-size: 16px;
   line-height: 1.45;
@@ -208,6 +218,7 @@
 }
 
 .ai-columns {
+  display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-top: 14px;
@@ -215,7 +226,7 @@
 
 .ai-section {
   padding: 13px;
-  border-color: var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
 }
@@ -227,7 +238,9 @@
 }
 
 .ai-section ul {
+  display: grid;
   gap: 7px;
+  margin: 0;
   padding-left: 20px;
   color: var(--muted);
   font-size: 16px;
@@ -235,6 +248,7 @@
 }
 
 .ai-evidence {
+  display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin-top: 12px;
@@ -249,12 +263,15 @@
 }
 
 .ai-evidence-item span {
+  display: block;
   color: var(--muted-2);
   font-size: 16px;
+  text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .ai-evidence-item strong {
+  display: block;
   margin-top: 4px;
   color: var(--text);
   font-size: 16px;
@@ -265,7 +282,7 @@
 .ai-disclaimer {
   margin-top: 14px;
   padding-top: 12px;
-  border-top-color: var(--border);
+  border-top: 1px solid var(--border);
   color: var(--muted-2);
   font-size: 16px;
   line-height: 1.45;
@@ -293,11 +310,13 @@
   border-color: var(--border);
   background: var(--surface);
   font-size: 16px;
+  line-height: 1.55;
 }
 
 .ai-history-row {
   width: 100%;
   min-height: 72px;
+  display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 14px;
   padding: 12px 14px;
@@ -323,6 +342,7 @@
 }
 
 .ai-history-row strong {
+  display: block;
   color: var(--text);
   font-size: 16px;
 }
