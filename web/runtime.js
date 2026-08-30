@@ -1,3 +1,9 @@
+export {
+  formatCurrency,
+  formatDateTime,
+  formatPercent,
+} from "./src/shared/formatters.js";
+
 export const API = "/api/v1";
 
 export function escapeHtml(value) {
@@ -23,23 +29,6 @@ export async function api(path, options = {}) {
     throw error;
   }
   return payload;
-}
-
-export function formatDateTime(value) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(date);
-}
-
-export function formatCurrency(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
-
-export function formatPercent(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
-  return `${(value * 100).toFixed(1).replace(".", ",")}%`;
 }
 
 export function toast(message, type = "info") {
