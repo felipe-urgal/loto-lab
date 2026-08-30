@@ -310,12 +310,15 @@ Leia [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md), [`docs/FINANCIALS.md`](docs/F
 - squash merge;
 - não enfraquecer teste/E2E para fazer um PR ficar verde.
 
+**Agentes de IA e automações de desenvolvimento devem ler e seguir [`AGENTS.md`](AGENTS.md) antes de alterar o repositório.** O arquivo formaliza postura Fullstack Sênior, fila de PRs, investigação de gates, padrões frontend/backend/banco e o auto code review final obrigatório no SHA verde.
+
 A proteção obrigatória da `main` ainda precisa ser configurada administrativamente (#52).
 
 ## Mapa da documentação
 
 | Documento | Assunto |
 | --- | --- |
+| [`AGENTS.md`](AGENTS.md) | contrato operacional para agentes de IA e fluxo de PR/review |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | prioridades e issues ativas |
 | [`docs/MENTAL_MODEL.md`](docs/MENTAL_MODEL.md) | mapa conceitual e arquitetural |
 | [`docs/WEB.md`](docs/WEB.md) | frontend, navegação e lifecycle |
