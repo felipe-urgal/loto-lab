@@ -185,13 +185,20 @@ test("refinement layers own their Portuguese analysis vocabulary while preservin
   assert.doesNotMatch(labRefinements, /métrica de ranking não variou/);
 });
 
-test("real-bet UI owns its historical-test vocabulary in source", async () => {
+test("real-bet flow remains owned by My Games while dashboard summary belongs to dashboard scope", async () => {
   const realBets = await source("web/real-bets.js");
+  const dashboard = await source("web/dashboard-scope.js");
 
-  assert.match(realBets, /não inclui testes históricos/);
   assert.match(realBets, /separado dos lotes apenas gerados e dos testes históricos/);
   assert.doesNotMatch(realBets, /não inclui backtests/);
   assert.doesNotMatch(realBets, /lotes apenas gerados e dos backtests/);
   assert.match(realBets, /\/real-bets\/\$\{lottery\}/);
   assert.match(realBets, /api\("\/real-bets"/);
+  assert.match(realBets, /currentView\(\) === "games"/);
+  assert.doesNotMatch(realBets, /real-performance-section/);
+  assert.doesNotMatch(realBets, /refineDashboard/);
+
+  assert.match(dashboard, /function realStatusCard/);
+  assert.match(dashboard, /Apostas reais/);
+  assert.match(dashboard, /Resultado real/);
 });
