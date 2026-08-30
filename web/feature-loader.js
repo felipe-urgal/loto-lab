@@ -73,6 +73,13 @@ async function ensureViewFeatures() {
 
   await loadStyledModule("refinements");
 
+  if (view === "backtests") {
+    // Backtests keep app.js + refinements as functional owners; Prototype 1
+    // only supplies the final, view-scoped presentation layer.
+    await loadStyle("backtests-workspace");
+    return;
+  }
+
   if (view === "generate") {
     // Generator 2.0 owns the advanced workspace. The basic generator rendered
     // by app.js remains the fallback when this optional module cannot mount.
