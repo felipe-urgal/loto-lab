@@ -14,7 +14,7 @@ import {
 } from "../application/generateGames.js";
 import {
   BacktestRoundLimitError,
-  MAX_HTTP_BACKTEST_ROUNDS,
+  MAX_BACKTEST_ROUNDS,
   RunBacktestUseCase,
   type RunBacktestRequest,
   type RunBacktestResponse,
@@ -32,9 +32,9 @@ import type {
 export {
   BacktestRoundLimitError,
   InsufficientGenerationHistoryError,
-  MAX_HTTP_BACKTEST_ROUNDS,
   MIN_GENERATION_HISTORY,
 };
+export const MAX_HTTP_BACKTEST_ROUNDS = MAX_BACKTEST_ROUNDS;
 export type {
   AnalysisResponse,
   GenerateGamesRequest,
