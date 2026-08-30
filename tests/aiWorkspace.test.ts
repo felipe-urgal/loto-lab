@@ -9,12 +9,14 @@ test("AI workspace follows Prototype 1 while preserving interpretation contracts
     readFile("web/ai.js", "utf8"),
   ]);
 
-  const baseAi = html.indexOf('/assets/ai.css');
-  const workspaceLayer = html.indexOf('/assets/ai-workspace.css');
-  assert.ok(baseAi >= 0, "base AI styles must remain available");
-  assert.ok(workspaceLayer > baseAi, "Prototype 1 must be the final AI presentation layer");
+  assert.doesNotMatch(html, /\/assets\/ai\.css/);
+  assert.match(html, /\/assets\/ai-workspace\.css/);
+  await assert.rejects(readFile("web/ai.css", "utf8"), /ENOENT/);
 
   assert.match(workspace, /\.ai-content > \.stack \{[\s\S]*max-width: 1440px/);
+  assert.match(workspace, /\.ai-principle \{[\s\S]*display: flex[\s\S]*justify-content: space-between/);
+  assert.match(workspace, /\.ai-columns \{[\s\S]*display: grid[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(workspace, /\.ai-evidence \{[\s\S]*display: grid[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(workspace, /\.ai-provider-status\.is-ready \{[\s\S]*background: var\(--success-soft\)[\s\S]*color: var\(--success-strong\)/);
   assert.match(workspace, /\.ai-provider-status\.is-offline \{[\s\S]*background: var\(--warning-soft\)[\s\S]*color: var\(--warning\)/);
   assert.match(workspace, /#ai-run \{[\s\S]*background: var\(--accent\)/);
