@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = join(root, "web");
@@ -31,6 +32,29 @@ function withVersion(html, version) {
   return output;
 }
 
+function transpileTypeScript(source, fileName) {
+  const result = ts.transpileModule(source, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.ES2022,
+    },
+    fileName,
+    reportDiagnostics: true,
+  });
+  const errors = (result.diagnostics || []).filter(
+    (diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error,
+  );
+  if (errors.length > 0) {
+    const message = ts.formatDiagnosticsWithColorAndContext(errors, {
+      getCanonicalFileName: (name) => name,
+      getCurrentDirectory: () => root,
+      getNewLine: () => "\n",
+    });
+    throw new Error(`Falha ao transpilar ${relative(root, fileName)}:\n${message}`);
+  }
+  return Buffer.from(result.outputText);
+}
+
 const sourceFiles = (await walk(sourceRoot)).sort();
 const hash = createHash("sha256");
 for (const file of sourceFiles) {
@@ -54,6 +78,9 @@ for (const sourceFile of sourceFiles) {
     output = Buffer.from(withVersion(body.toString("utf8"), version));
   } else if (rel === "favicon.svg") {
     destination = join(outputRoot, rel);
+  } else if (extension === ".ts") {
+    destination = join(assetRoot, rel.replace(/\.ts$/, ".js"));
+    output = transpileTypeScript(body.toString("utf8"), sourceFile);
   } else {
     destination = join(assetRoot, rel);
   }
