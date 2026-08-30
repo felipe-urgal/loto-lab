@@ -1,47 +1,33 @@
 # Loto Lab HTTP API
 
-A API HTTP expõe o core estatístico e a persistência PostgreSQL sem duplicar regras de negócio. O mesmo processo também serve a interface web.
+A API HTTP expõe as capacidades do Loto Lab sem duplicar regras estatísticas, financeiras ou de metodologia na camada de transporte.
 
-## Princípios
+O mesmo processo Node também serve a interface web.
 
-- o algoritmo é a fonte de verdade para análise, geração, conferência e testes históricos;
-- a API valida entrada, chama serviços e serializa respostas;
-- concursos, lotes, estratégias, apostas reais, execuções e testes históricos persistidos usam PostgreSQL;
-- testes históricos e validações respeitam a regra anti-leakage;
-- operações pesadas usam limites, rate limiting e workers quando aplicável;
-- em produção, toda UI/API exceto health checks exige HTTP Basic.
+## Arquitetura da borda HTTP
+
+A direção atual é:
+
+```text
+HTTP controller
+  ↓
+Application use case
+  ↓
+Domain / engines / ports
+  ↓
+PostgreSQL / CAIXA / OpenAI / workers
+```
+
+Várias features já seguem essa fronteira diretamente: Estratégias, Testes históricos, Strategy Lab, Operações, Apostas Reais e Status de Dados. `src/api/app.ts` ainda mantém algumas rotas legadas de concursos, análises, Generator 2.0 e game batches; a redução restante é rastreada pela #61.
+
+Controllers devem cuidar de parse, CORS/auth/rate-limit quando aplicável, serialização e error mapping. Regras de negócio pertencem ao application/core.
 
 ## Execução local
 
-Suba o PostgreSQL:
-
-```bash
-docker compose up -d postgres
-```
-
-Crie o ambiente local:
-
 ```bash
 cp .env.example .env
-```
-
-Valores padrão atuais:
-
-```env
-DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5434/loto_lab
-API_HOST=127.0.0.1
-API_PORT=5200
-```
-
-Aplique migrations quando estiver preparando a base pela primeira vez:
-
-```bash
+docker compose up -d postgres
 npm run db:migrate
-```
-
-Inicie a aplicação/API:
-
-```bash
 npm run api:start
 ```
 
@@ -57,125 +43,117 @@ API:
 http://127.0.0.1:5200/api/v1
 ```
 
-`npm run api:start` carrega `.env`, aplica migrations pendentes e inicia o scheduler operacional quando habilitado.
+`npm run api:start` aplica migrations pendentes e inicia o scheduler quando `OPS_AUTO_SYNC=true`.
 
-## CORS e origem pública
+## Autenticação, origem e JSON
 
-Em desenvolvimento local, `API_CORS_ORIGIN` e `PUBLIC_ORIGIN` podem ficar sem definição. O servidor deriva a origem do próprio host e aceita o uso local por `localhost` ou `127.0.0.1`.
+No ambiente local padrão não há credenciais.
 
-Defina uma origem explícita apenas quando a API for consumida por outro origin ou quando houver uma origem pública conhecida.
+Em produção, `APP_AUTH_USER` e `APP_AUTH_PASSWORD` protegem toda UI/API, exceto healthchecks.
 
-## Autenticação
+Mutações passam por proteção same-origin. Requests com corpo usam `Content-Type: application/json`.
 
-No ambiente local padrão não há credenciais configuradas.
+Cada resposta recebe `X-Request-Id` para correlação com logs.
 
-Na stack de produção, `APP_AUTH_USER` e `APP_AUTH_PASSWORD` são obrigatórios e protegem toda a UI/API com HTTP Basic. Estes endpoints permanecem públicos para health checks:
-
-```text
-/health
-/health/live
-/health/ready
-```
-
-Consulte [`DEPLOYMENT.md`](DEPLOYMENT.md) para exposição segura e HTTPS.
-
-## Health checks
-
-### Liveness
+## Health
 
 ```http
+GET /health
 GET /health/live
-```
-
-Não consulta o banco.
-
-### Readiness
-
-```http
 GET /health/ready
 ```
 
-Executa uma consulta simples no PostgreSQL.
+`/health/live` não consulta o banco. `/health` e `/health/ready` validam PostgreSQL.
 
 ## Loterias e concursos
 
 ```http
 GET /api/v1/lotteries
-GET /api/v1/contests/mega-sena?limit=20&order=desc
-GET /api/v1/contests/mega-sena/latest
-GET /api/v1/contests/mega-sena/3047
+GET /api/v1/contests/:lottery
+GET /api/v1/contests/:lottery/latest
+GET /api/v1/contests/:lottery/:contestNumber
 ```
 
-Parâmetros de listagem de concursos:
+Listagem de concursos aceita:
 
-- `limit`: 1 a 200;
+- `limit`: 1–200;
 - `order`: `asc` ou `desc`;
-- `startContest`: concurso mínimo opcional;
-- `endContest`: concurso máximo opcional.
+- `startContest`;
+- `endContest`.
 
 ## Análises
 
-Resposta principal:
-
 ```http
-GET /api/v1/analysis/lotofacil
+GET /api/v1/analysis/:lottery
+GET /api/v1/analysis/:lottery/advanced
 ```
 
-Workspace avançado:
+A resposta básica permanece utilizável mesmo quando a análise avançada estiver ocupada ou falhar.
 
-```http
-GET /api/v1/analysis/lotofacil/advanced
-```
+O contrato técnico pode manter nomes como `score` e `ranking`; a UI usa **pontuação** e **classificação**.
 
-Os contratos internos ainda podem usar nomes como `score` e `ranking`; a interface visível usa **pontuação** e **classificação**.
+Detalhes: [`ANALYSES.md`](ANALYSES.md).
 
-Detalhes em [`ANALYSES.md`](ANALYSES.md).
+## Generator 2.0
 
-## Gerador 2.0
-
-Planejamento sem gerar jogos:
+Planejamento:
 
 ```http
 POST /api/v1/generation/plan
-Content-Type: application/json
 ```
 
-Preview não persistido:
+Preview:
 
 ```http
 POST /api/v1/generation/preview
-Content-Type: application/json
 ```
 
-Persistência de uma geração validada:
+Persistência:
 
 ```http
 POST /api/v1/generation/save
-Content-Type: application/json
 ```
 
-A geração pode ser determinística ou diversificada. Gerações diversificadas usam seed auditável; ao salvar uma prévia diversificada, a seed retornada pela geração anterior deve ser reutilizada.
+Gerações diversificadas retornam seed auditável. Ao salvar uma prévia diversificada, a seed retornada pela prévia deve ser reutilizada.
 
-O endpoint legado/compatível continua disponível:
+Endpoint de compatibilidade:
 
 ```http
 POST /api/v1/games/generate
 ```
 
-Detalhes em [`GENERATION.md`](GENERATION.md).
+Detalhes: [`GENERATION.md`](GENERATION.md).
 
 ## Lotes e conferência
 
 ```http
-GET  /api/v1/game-batches/lotofacil?limit=20
-GET  /api/v1/game-batches/id/1
-GET  /api/v1/game-batches/1/comparison?startContest=3760&count=5
+GET  /api/v1/game-batches/:lottery?limit=20
+GET  /api/v1/game-batches/id/:id
+GET  /api/v1/game-batches/:id/comparison?startContest=3760&count=5
 POST /api/v1/games/check
 ```
 
-Uma comparação sem resultados sincronizados retorna `200` com `availability.status = "pending"`; isso representa indisponibilidade temporária do concurso, não falha de servidor.
+A gestão de lifecycle de lotes expõe também consulta/arquivamento/restauração usados por **Meus Jogos**.
 
-Detalhes em [`MY_GAMES.md`](MY_GAMES.md).
+Uma comparação sem concursos ainda sincronizados pode retornar disponibilidade pendente sem transformar isso em erro 5xx.
+
+Detalhes: [`MY_GAMES.md`](MY_GAMES.md).
+
+## Apostas reais
+
+Família principal:
+
+```http
+POST /api/v1/real-bets
+GET  /api/v1/real-bets/:lottery?limit=50
+POST /api/v1/real-bets/:id/check
+POST /api/v1/real-bets/reconcile
+GET  /api/v1/real-bets/:id/revisions
+```
+
+Apostas reais são separadas de lotes apenas gerados e de testes históricos. O backend impede registro retrospectivo quando o resultado oficial já era conhecido.
+
+Detalhes: [`REAL_BETS.md`](REAL_BETS.md).
 
 ## Estratégias
 
@@ -185,19 +163,17 @@ GET  /api/v1/strategies?lottery=lotofacil
 POST /api/v1/strategies
 ```
 
-Estratégias usam identificador estável e versões imutáveis para preservar auditabilidade.
+Estratégias possuem identificador estável e versões imutáveis para preservar auditabilidade.
 
 ## Testes históricos
 
-Os paths mantêm `backtests` por compatibilidade técnica:
-
 ```http
 POST /api/v1/backtests/run
-GET  /api/v1/backtests/lotofacil?limit=20
-GET  /api/v1/backtest-runs/1
+GET  /api/v1/backtests/:lottery?limit=20
+GET  /api/v1/backtest-runs/:id
 ```
 
-Chamadas web possuem limites de jogos e concursos para proteger CPU/memória. O cálculo pesado roda fora do event loop principal quando aplicável.
+Execução síncrona usa worker + gate compartilhado e limite seguro de rounds. A persistência guarda artefatos compactos por rodada, sem estruturas pesadas usadas apenas durante cálculo.
 
 ## Laboratório
 
@@ -205,11 +181,27 @@ Chamadas web possuem limites de jogos e concursos para proteger CPU/memória. O 
 POST /api/v1/lab/compare
 ```
 
-O Laboratório compara variantes no mesmo período e com a mesma quantidade de jogos, preservando anti-leakage e controles aleatórios quando aplicável.
+O Laboratório compara variantes no mesmo recorte, respeitando anti-leakage, orçamento, controles aleatórios e limites de worker.
 
-Detalhes em [`STRATEGY_LAB.md`](STRATEGY_LAB.md).
+Detalhes: [`STRATEGY_LAB.md`](STRATEGY_LAB.md).
 
-## Operação
+## Execuções / Analysis Jobs
+
+```http
+GET  /api/v1/analysis-jobs
+POST /api/v1/analysis-jobs
+GET  /api/v1/analysis-jobs/:id
+POST /api/v1/analysis-jobs/:id/cancel
+```
+
+`kind` aceita:
+
+- `backtest`;
+- `strategy-lab`.
+
+A criação valida loteria, estratégia/versionamento opcional, período e orçamento antes de enfileirar. A fila persistida diferencia `queued`, `running`, estados terminais e cancelamento.
+
+## Operação e dados
 
 Estado operacional:
 
@@ -217,13 +209,11 @@ Estado operacional:
 GET /api/v1/operations/status
 ```
 
-Sincronização manual das três loterias:
+Sincronização manual:
 
 ```http
 POST /api/v1/operations/sync
 ```
-
-A operação compartilha advisory lock com scheduler e CLI. Se já houver sincronização ativa, uma nova chamada não inicia trabalho duplicado.
 
 Status da base:
 
@@ -231,11 +221,48 @@ Status da base:
 GET /api/v1/data/status
 ```
 
-Detalhes em [`OPERATIONS.md`](OPERATIONS.md).
+Scheduler, CLI e HTTP compartilham o mesmo contrato operacional e advisory lock.
+
+Detalhes: [`OPERATIONS.md`](OPERATIONS.md).
+
+## Agenda e notificações
+
+```http
+GET  /api/v1/agenda
+GET  /api/v1/agenda?unread=true
+POST /api/v1/notifications/:id/read
+POST /api/v1/notifications/read-all
+```
+
+Detalhes: [`AGENDA.md`](AGENDA.md).
+
+## IA
+
+Status:
+
+```http
+GET /api/v1/ai/status
+```
+
+Gerar interpretação:
+
+```http
+POST /api/v1/ai/insights
+```
+
+Histórico:
+
+```http
+GET /api/v1/ai/insights/:lottery?limit=10
+```
+
+A IA recebe evidências calculadas e nunca substitui o core.
+
+Detalhes: [`AI.md`](AI.md).
 
 ## Erros
 
-Erros de validação e recursos ausentes seguem a forma:
+Forma padrão:
 
 ```json
 {
@@ -248,24 +275,28 @@ Erros de validação e recursos ausentes seguem a forma:
 
 Status comuns:
 
-- `200`: leitura ou execução não persistida;
+- `200`: leitura/execução não persistida;
 - `201`: criação/persistência;
-- `204`: preflight CORS;
-- `400`: entrada inválida;
-- `401`: autenticação ausente/incorreta quando habilitada;
+- `202`: trabalho assíncrono enfileirado;
+- `204`: preflight/sem conteúdo;
+- `400`: entrada inválida ou orçamento seguro excedido;
+- `401`: autenticação ausente/incorreta;
 - `404`: rota/recurso inexistente;
-- `409`: conflito operacional, como sincronização já em andamento;
+- `409`: conflito de estado/operação;
 - `413`: body acima do limite;
-- `429`: rate limit;
-- `500`: erro inesperado de servidor/banco.
+- `429`: rate limit ou gate de trabalho caro ocupado;
+- `500`: erro inesperado.
+
+Erros específicos de timeout/cancelamento podem ser mapeados para códigos próprios sem expor detalhes internos.
 
 ## Produção
 
-A aplicação escuta `3000` dentro do container de produção e é publicada no host por `APP_PORT`, cujo padrão atual é `5200`:
+Por padrão:
 
 ```text
-Host:      127.0.0.1:5200
-Container: app:3000
+127.0.0.1:5200 -> app:3000
 ```
 
-O PostgreSQL de produção não publica porta no host. Consulte [`DEPLOYMENT.md`](DEPLOYMENT.md).
+PostgreSQL não publica porta no host de produção.
+
+Veja [`DEPLOYMENT.md`](DEPLOYMENT.md), [`RELIABILITY.md`](RELIABILITY.md) e [`QUALITY.md`](QUALITY.md).
