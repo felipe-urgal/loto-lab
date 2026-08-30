@@ -28,7 +28,6 @@ import { serveFeatureRoutes } from "./routes.js";
 import { serveWebAsset } from "./web.js";
 import { loadAppAuthConfig, requireAppAuthentication } from "./auth.js";
 import { requireSameOriginMutation, resolveMutationExpectedOrigin } from "./http.js";
-import { LotoLabApiServices } from "./services.js";
 import { expensiveAnalysisGate } from "./workGate.js";
 import { runBacktestInWorker, runStrategyLabInWorker } from "./workerClient.js";
 
@@ -44,13 +43,18 @@ function isHealthPath(pathname: string): boolean {
 
 export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const apiHandler = createApiRequestHandler(options);
-  const backtestWorkerServices = new LotoLabApiServices(options.pool);
+  const contests = new PostgresContestRepository(options.pool);
+  const backtests = new PostgresBacktestRepository(options.pool);
   const featureRouteDependencies = {
-    backtestCatalog: new BacktestCatalogUseCase(new PostgresBacktestRepository(options.pool)),
-    dataStatus: new GetDataStatusUseCase(new PostgresContestRepository(options.pool)),
+    backtestCatalog: new BacktestCatalogUseCase(backtests),
+    dataStatus: new GetDataStatusUseCase(contests),
     executeBacktest: new ExecuteBacktestUseCase(
       expensiveAnalysisGate,
-      (input, signal) => runBacktestInWorker(backtestWorkerServices, input, { signal }),
+      (input, signal) => runBacktestInWorker(
+        { contests, backtests },
+        input,
+        signal ? { signal } : {},
+      ),
     ),
     operations: new OperationsUseCase(
       new PostgresOperationRepository(options.pool),
@@ -73,7 +77,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
     ),
     strategyCatalog: new StrategyCatalogUseCase(new PostgresStrategyRepository(options.pool)),
     runStrategyLab: new RunStrategyLabUseCase(
-      new PostgresContestRepository(options.pool),
+      contests,
       expensiveAnalysisGate,
       runStrategyLabInWorker,
     ),
