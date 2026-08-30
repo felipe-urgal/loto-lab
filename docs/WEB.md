@@ -66,7 +66,7 @@ Regras principais:
 
 ## Estado do rollout
 
-O rollout principal está concluído:
+O rollout e a consolidação visual estão concluídos pela #121:
 
 - #123 — Design System + shell;
 - #124 — Painel;
@@ -78,9 +78,15 @@ O rollout principal está concluído:
 - #130 — Estratégias;
 - #131 — Execuções;
 - #132 — Agenda;
-- #133 — IA.
+- #133 — IA;
+- #134–#137 — consolidação inicial de ownership/CSS legado;
+- #139 — hardening visual de Análises absorvido no workspace;
+- #140 — assets legados de diversidade do Gerador removidos;
+- #141 — status visual do Painel absorvido no scope canônico;
+- #142 — explainability visual do Gerador absorvida no workspace;
+- #143 — auditoria final desktop/mobile de legibilidade, foco, reduced-motion e overflow estrutural.
 
-A consolidação final permanece em #121. Já foram removidas camadas legadas de IA, Agenda, Laboratório e o antigo `experiments.css` compartilhado (#134–#137).
+As folhas adicionais que permanecem têm responsabilidade funcional, estrutural ou de fallback explícita; coexistir com um `*-workspace.css` não torna uma camada automaticamente redundante.
 
 ## Cascata visual
 
@@ -92,6 +98,8 @@ styles.css
 ui-foundation.css
   ↓
 design-system.css
+  ↓
+CSS funcional da feature, quando necessário
   ↓
 stylesheet canônico da superfície
 ```
@@ -129,7 +137,7 @@ Workspace técnico com:
 - Combinações;
 - Validação.
 
-A rota básica continua como fallback e a análise avançada monta quando disponível.
+A rota básica continua como fallback e a análise avançada monta quando disponível. Tabelas largas preservam scroll local no mobile sem expandir o documento.
 
 ### Gerador — `/#generate`
 
@@ -145,6 +153,8 @@ Consolida:
 - apostas reais;
 - financeiro;
 - ocultar/mostrar sem apagar histórico.
+
+`my-games-v2.css` permanece como base funcional do módulo principal e `my-games-workspace.css` como apresentação final. `real-bets`/`my-games-management` permanecem apenas no fallback deliberado quando o módulo principal não monta.
 
 ### Testes históricos — `/#backtests`
 
@@ -197,7 +207,8 @@ Guardrails:
 - falha de stylesheet não deve impedir o JS funcional;
 - cada feature precisa ser idempotente e tolerar navegação repetida;
 - listeners/observers/timers precisam de cleanup quando a feature deixa de ser dona da view;
-- não usar montagem eager redundante quando o lifecycle já fornece evento de montagem — essa regra evita races como a corrigida em Meus Jogos no #128.
+- não usar montagem eager redundante quando o lifecycle já fornece evento de montagem;
+- `loto-lab:view-rendered` só é emitido depois que o render principal deixa o loading, reduzindo FOUC/layout shift e races de montagem.
 
 ## Acessibilidade
 
@@ -208,9 +219,11 @@ Baseline:
 - controles com nome acessível;
 - teclado em tabs/dialogs/drawers;
 - `prefers-reduced-motion`;
-- sem overflow horizontal no mobile;
+- sem overflow horizontal estrutural no mobile;
 - contraste coerente com tokens do Design System;
 - loading/empty/error/success distinguíveis semanticamente e visualmente.
+
+O browser E2E transversal do #143 repete a auditoria de legibilidade em desktop/mobile, usa `Tab` real para confirmar foco visível, emula `prefers-reduced-motion: reduce` e falha quando o documento mobile cria overflow horizontal.
 
 ## Segurança no frontend
 
@@ -219,11 +232,17 @@ Baseline:
 - `innerHTML` com conteúdo dinâmico precisa ser tratado como superfície de risco;
 - o frontend não deve replicar validação crítica como única defesa — invariantes continuam no backend/PostgreSQL.
 
-A evolução para TypeScript/primitives compartilhadas é rastreada pela #60.
+A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. Mudanças de jornada pertencem à #64.
 
 ## Trabalho pesado
 
 Backtests, Strategy Lab e análise avançada usam workers/gates no backend. O frontend trata busy/timeout/erro como estados de produto, sem bloquear a navegação inteira.
+
+## Performance percebida
+
+O lifecycle, lazy loading e E2E atual protegem qualitativamente contra loading infinito, montagem duplicada, FOUC/layout inutilizável, navegação quebrada e overflow estrutural.
+
+Medições quantitativas de LCP, INP e CLS e otimizações guiadas por baseline pertencem à #65. Fechar #121 não converte metas de Web Vitals em promessa sem medição representativa.
 
 ## Testes
 
