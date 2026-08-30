@@ -1,0 +1,408 @@
+.experiment-content {
+  max-width: none;
+}
+
+.experiment-grid:has(#job-form) {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  grid-template-columns: minmax(380px, 0.88fr) minmax(0, 1.12fr);
+  gap: 18px;
+}
+
+.experiment-grid:has(#job-form) > * {
+  min-width: 0;
+}
+
+#job-form {
+  position: static;
+  padding: 16px;
+  border-color: var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+#job-form .section-head {
+  margin-bottom: 14px;
+}
+
+#job-form .section-head h2,
+.experiment-grid:has(#job-form) > section > .section-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 19px;
+}
+
+#job-form .section-head p,
+.experiment-grid:has(#job-form) > section > .section-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+#job-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#job-form .field {
+  min-width: 0;
+  gap: 6px;
+}
+
+#job-form .field[hidden] {
+  display: none;
+}
+
+#job-form .field label {
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+#job-form input,
+#job-form select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 16px;
+}
+
+#job-form input:hover,
+#job-form select:hover {
+  border-color: var(--border-strong);
+}
+
+#job-form input:focus,
+#job-form select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+#job-form .field.is-wide {
+  grid-column: 1 / -1;
+}
+
+#job-form .form-inline-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--muted-2);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+#job-form .form-actions {
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+#job-form .button {
+  min-height: 44px;
+  font-size: 16px;
+}
+
+#job-form .button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+#job-form .button.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+#jobs-refresh {
+  min-height: 44px;
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+}
+
+#jobs-refresh:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.experiment-grid:has(#job-form) > section > .section-head {
+  align-items: flex-end;
+  min-height: 44px;
+  margin-bottom: 10px;
+}
+
+#jobs-count {
+  font-variant-numeric: tabular-nums;
+}
+
+#jobs-list {
+  display: grid;
+  gap: 10px;
+}
+
+#jobs-list .experiment-card {
+  padding: 14px;
+  gap: 11px;
+  border-color: var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+#jobs-list .experiment-card + .experiment-card {
+  margin-top: 0;
+}
+
+#jobs-list .experiment-card-head {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+#jobs-list .experiment-card-head > div {
+  min-width: 0;
+}
+
+#jobs-list .experiment-card-head h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+#jobs-list .experiment-card-head p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+#jobs-list .status-pill {
+  min-height: 30px;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 16px;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+#jobs-list .status-pill.queued {
+  border-color: rgba(239, 185, 88, 0.34);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+#jobs-list .status-pill.running {
+  border-color: rgba(22, 137, 255, 0.34);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+#jobs-list .status-pill.succeeded,
+#jobs-list .status-pill.completed {
+  border-color: rgba(36, 199, 125, 0.34);
+  background: var(--success-soft);
+  color: var(--success-strong);
+}
+
+#jobs-list .status-pill.failed,
+#jobs-list .status-pill.cancelled {
+  border-color: rgba(240, 113, 129, 0.36);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+#jobs-list .status-pill.abandoned {
+  border-color: var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+#jobs-list .experiment-meta {
+  gap: 6px;
+}
+
+#jobs-list .experiment-meta span {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+#jobs-list .job-result {
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+#jobs-list .job-result strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+#jobs-list .job-result.job-error {
+  border-color: rgba(240, 113, 129, 0.34);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+#jobs-list .job-running {
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid rgba(22, 137, 255, 0.3);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 16px;
+}
+
+#jobs-list .job-running .spinner {
+  width: 16px;
+  height: 16px;
+}
+
+#jobs-list .experiment-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+#jobs-list .button.danger {
+  min-height: 40px;
+  border-color: rgba(240, 113, 129, 0.34);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 16px;
+}
+
+#jobs-list .button.danger:hover:not(:disabled) {
+  border-color: var(--danger);
+}
+
+#jobs-list .experiment-empty,
+#jobs-list > .loading-state {
+  min-height: 180px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 16px;
+}
+
+#jobs-list .experiment-empty.job-error {
+  border-color: rgba(240, 113, 129, 0.36);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+@media (max-width: 1080px) {
+  .experiment-grid:has(#job-form) {
+    grid-template-columns: 1fr;
+  }
+
+  #job-form .form-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  #job-form .field.is-wide {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 800px) {
+  #job-form .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #job-form .field.is-wide {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .experiment-content {
+    padding-inline: 14px;
+  }
+
+  .experiment-grid:has(#job-form) {
+    gap: 16px;
+  }
+
+  #job-form {
+    padding: 14px;
+  }
+
+  #job-form .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #job-form .field.is-wide {
+    grid-column: auto;
+  }
+
+  #job-form .form-actions {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  #job-form .form-actions .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  #jobs-list .experiment-card {
+    padding: 13px;
+  }
+
+  #jobs-list .experiment-card-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  #jobs-list .status-pill {
+    align-self: flex-start;
+  }
+
+  #jobs-list .experiment-card-actions,
+  #jobs-list .button.danger {
+    width: 100%;
+  }
+
+  #jobs-list .button.danger {
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .experiment-content *,
+  .experiment-content *::before,
+  .experiment-content *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
