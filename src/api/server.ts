@@ -7,6 +7,7 @@ import {
   OperationAlreadyRunningError,
   OperationsUseCase,
 } from "../application/operations.js";
+import { RealBetUseCase } from "../application/realBets.js";
 import { RunStrategyLabUseCase } from "../application/runStrategyLab.js";
 import { StrategyCatalogUseCase } from "../application/strategyCatalog.js";
 import type { ContestSource } from "../data/source.js";
@@ -18,7 +19,9 @@ import {
 import { PostgresBacktestRepository } from "../persistence/backtestRepository.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import { PostgresOperationRepository } from "../persistence/operationRepository.js";
+import { PostgresRealBetRepository } from "../persistence/realBetRepository.js";
 import { PostgresStrategyRepository } from "../persistence/strategyRepository.js";
+import { RealBetService } from "../realBets/service.js";
 import { serveFeatureRoutes } from "./routes.js";
 import { serveWebAsset } from "./web.js";
 import { loadAppAuthConfig, requireAppAuthentication } from "./auth.js";
@@ -54,6 +57,10 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
           throw error;
         }
       },
+    ),
+    realBets: new RealBetUseCase(
+      new RealBetService(options.pool),
+      new PostgresRealBetRepository(options.pool),
     ),
     strategyCatalog: new StrategyCatalogUseCase(new PostgresStrategyRepository(options.pool)),
     runStrategyLab: new RunStrategyLabUseCase(
