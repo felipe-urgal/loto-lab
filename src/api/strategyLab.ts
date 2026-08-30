@@ -1,5 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { PostgresContestRepository } from "../persistence/contestRepository.js";
+import {
+  EmptyStrategyLabPeriodError,
+  InsufficientStrategyLabHistoryError,
+  StrategyLabBusyError,
+  StrategyLabTooLargeError,
+  type RunStrategyLabUseCase,
+} from "../application/runStrategyLab.js";
 import type { ApiServerOptions } from "./app.js";
 import {
   ApiError,
@@ -8,24 +14,40 @@ import {
   sendJson,
 } from "./http.js";
 import { enforceRateLimit, FixedWindowRateLimiter } from "./rateLimit.js";
-import {
-  parseStrategyLabOptions,
-  validateStrategyLabExecution,
-} from "./strategyLabInput.js";
-export { estimateStrategyLabWorkUnits } from "./strategyLabInput.js";
-import { expensiveAnalysisGate } from "./workGate.js";
+import { parseStrategyLabOptions } from "./strategyLabInput.js";
+export { estimateStrategyLabWorkUnits } from "../application/runStrategyLab.js";
 import {
   AnalysisCancelledError,
   AnalysisTimeoutError,
-  runStrategyLabInWorker,
 } from "./workerClient.js";
 
 const labLimiter = new FixedWindowRateLimiter({ limit: 4, windowMs: 10 * 60_000 });
+
+function mapStrategyLabError(error: unknown): ApiError | undefined {
+  if (error instanceof ApiError) return error;
+  if (error instanceof InsufficientStrategyLabHistoryError) {
+    return new ApiError(409, error.code, error.message);
+  }
+  if (error instanceof EmptyStrategyLabPeriodError) {
+    return new ApiError(409, error.code, error.message);
+  }
+  if (error instanceof StrategyLabTooLargeError) {
+    return new ApiError(400, error.code, error.message);
+  }
+  if (error instanceof StrategyLabBusyError) {
+    return new ApiError(429, error.code, error.message);
+  }
+  if (error instanceof AnalysisTimeoutError) {
+    return new ApiError(504, "ANALYSIS_TIMEOUT", "Strategy Lab exceeded the safe execution limit");
+  }
+  return undefined;
+}
 
 export async function serveStrategyLab(
   request: IncomingMessage,
   response: ServerResponse,
   options: ApiServerOptions,
+  runStrategyLab: RunStrategyLabUseCase,
 ): Promise<boolean> {
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://localhost");
@@ -38,43 +60,29 @@ export async function serveStrategyLab(
     const body = await readJsonBody(request);
     const lottery = parseLottery(body.lottery);
     const workerInput = parseStrategyLabOptions(body, lottery);
-    const contests = await new PostgresContestRepository(options.pool).list({ lottery, order: "asc" });
-    validateStrategyLabExecution(contests, workerInput);
-
-    const release = expensiveAnalysisGate.acquire();
-    if (!release) {
-      throw new ApiError(429, "ANALYSIS_BUSY", "Another backtest or Strategy Lab analysis is already running");
-    }
+    const controller = new AbortController();
+    const abortWorker = () => controller.abort();
+    request.once("aborted", abortWorker);
+    response.once("close", abortWorker);
 
     try {
-      const controller = new AbortController();
-      const abortWorker = () => controller.abort();
-      request.once("aborted", abortWorker);
-      response.once("close", abortWorker);
-
-      try {
-        const result = await runStrategyLabInWorker(contests, workerInput, controller.signal);
-        if (response.destroyed || response.writableEnded) return true;
-        sendJson(response, 200, result, corsOrigin);
-        return true;
-      } catch (error) {
-        if (error instanceof AnalysisTimeoutError) {
-          throw new ApiError(504, "ANALYSIS_TIMEOUT", "Strategy Lab exceeded the safe execution limit");
-        }
-        if (error instanceof AnalysisCancelledError && (request.destroyed || response.destroyed)) return true;
-        throw error;
-      } finally {
-        request.off("aborted", abortWorker);
-        response.off("close", abortWorker);
-      }
+      const result = await runStrategyLab.execute(workerInput, controller.signal);
+      if (response.destroyed || response.writableEnded) return true;
+      sendJson(response, 200, result, corsOrigin);
+      return true;
+    } catch (error) {
+      if (error instanceof AnalysisCancelledError && (request.destroyed || response.destroyed)) return true;
+      throw error;
     } finally {
-      release();
+      request.off("aborted", abortWorker);
+      response.off("close", abortWorker);
     }
   } catch (error) {
-    if (error instanceof ApiError) {
+    const mapped = mapStrategyLabError(error);
+    if (mapped) {
       if (!response.destroyed && !response.writableEnded) {
-        sendJson(response, error.statusCode, {
-          error: { code: error.code, message: error.message },
+        sendJson(response, mapped.statusCode, {
+          error: { code: mapped.code, message: mapped.message },
         }, corsOrigin);
       }
       return true;
