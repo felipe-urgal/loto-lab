@@ -1,17 +1,20 @@
 import { Worker } from "node:worker_threads";
-import type { Contest } from "../domain/types.js";
-import type { BacktestRoundArtifact } from "../persistence/types.js";
+import type { Contest, LotteryId } from "../domain/types.js";
+import {
+  BacktestRoundLimitError,
+  MAX_BACKTEST_ROUNDS,
+  type RunBacktestRequest,
+  type RunBacktestResponse,
+} from "../application/runBacktest.js";
+import type {
+  BacktestRoundArtifact,
+  BacktestRunRecord,
+  SaveBacktestRunInput,
+} from "../persistence/types.js";
 import type {
   StrategyLabOptions,
   StrategyLabResult,
 } from "../lab/strategyLab.js";
-import {
-  BacktestRoundLimitError,
-  MAX_HTTP_BACKTEST_ROUNDS,
-  type LotoLabApiServices,
-  type RunBacktestRequest,
-  type RunBacktestResponse,
-} from "./services.js";
 import { STRATEGY_LAB_TIMEOUT_MS } from "./strategyLabInput.js";
 
 export const ANALYSIS_WORKER_TIMEOUT_MS = 60_000;
@@ -41,6 +44,15 @@ type StrategyBacktestRequest = RunBacktestRequest & {
   strategyId?: number;
   strategyVersionId?: number;
 };
+
+export interface BacktestWorkerServices {
+  contests: {
+    list(options: { lottery: LotteryId; order: "asc" }): Promise<Contest[]>;
+  };
+  backtests: {
+    save(input: SaveBacktestRunInput): Promise<BacktestRunRecord>;
+  };
+}
 
 export class AnalysisCancelledError extends Error {
   constructor() {
@@ -163,13 +175,13 @@ export interface RunBacktestWorkerOptions {
 }
 
 export async function runBacktestInWorker(
-  services: LotoLabApiServices,
+  services: BacktestWorkerServices,
   input: StrategyBacktestRequest,
   options: RunBacktestWorkerOptions = {},
 ): Promise<RunBacktestResponse> {
   const contests = await services.contests.list({ lottery: input.lottery, order: "asc" });
   const roundCount = eligibleRoundCount(contests, input);
-  if ((options.enforceHttpRoundLimit ?? true) && roundCount > MAX_HTTP_BACKTEST_ROUNDS) {
+  if ((options.enforceHttpRoundLimit ?? true) && roundCount > MAX_BACKTEST_ROUNDS) {
     throw new BacktestRoundLimitError(roundCount);
   }
 
