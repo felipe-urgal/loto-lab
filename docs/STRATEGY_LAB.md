@@ -203,15 +203,15 @@ Exige amostra e resolução suficientes, resultado abaixo da mediana e p-value i
 
 ## Compatibilidade da API v1
 
-O PR introduz `schemaVersion: 2` na resposta do Strategy Lab.
+A resposta atual do Strategy Lab usa `schemaVersion: 2`.
 
-Para evitar uma quebra silenciosa de consumidores existentes, estes campos mantêm a semântica antiga:
+Para evitar quebra silenciosa de consumidores existentes, estes campos mantêm a semântica legada:
 
 - `benchmark.control` — controle aleatório de seed fixa legado;
 - `benchmark.delta` — diferença para esse controle legado;
 - `benchmark.beatsRandom` — `delta > 0` no contrato legado.
 
-A interface nova **não** usa esses campos para concluir evidência.
+A interface atual **não** usa esses campos para concluir evidência.
 
 Os campos autoritativos v2 incluem:
 
