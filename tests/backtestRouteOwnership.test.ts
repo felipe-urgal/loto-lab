@@ -18,7 +18,9 @@ test("backtest catalog routes live exclusively in the feature controller", async
   assert.doesNotMatch(app, /services\.listBacktests/);
   assert.doesNotMatch(services, /listBacktests\s*\(/);
 
-  assert.match(controller, /\/api\/v1\/backtest-runs/);
-  assert.match(controller, /\/api\/v1\/backtests/);
+  assert.match(controller, /const runMatch =/);
+  assert.match(controller, /const listMatch =/);
+  assert.match(controller, /catalog\.get\(id\)/);
+  assert.match(controller, /catalog\.list\(lottery,/);
   assert.match(controller, /listMatch\[1\] !== "run"/);
 });
