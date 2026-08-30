@@ -39,8 +39,24 @@ test("dashboard scope keeps comparison mode separate from the active lottery", a
   assert.match(statusSource, /Sincronização em andamento/);
   assert.doesNotMatch(statusSource, /cobertura média/);
   assert.doesNotMatch(statusSource, /Sincronizar agora/);
-  assert.match(scopeCss, /dashboard-shell\.is-focused/);
-  assert.match(scopeCss, /dashboard-lottery-grid/);
-  assert.match(scopeCss, /dashboard-performance-panel/);
+
+  assert.match(scopeSource, /function focusedMetrics/);
+  assert.match(scopeSource, /function allMetrics/);
+  assert.match(scopeSource, /function realStatusCard/);
+  assert.match(scopeSource, /actualCost > 0 \? netResult \/ actualCost : undefined/);
+  assert.match(scopeSource, /dashboard-metrics-grid/);
+  assert.match(scopeSource, /dashboard-overview-grid/);
+  assert.match(scopeSource, /dashboard-status-card/);
+  assert.match(scopeSource, /dashboard-donut/);
+  assert.match(scopeSource, /Desempenho por loteria/);
+  assert.match(scopeSource, /Atividade recente/);
+
+  assert.match(scopeCss, /\.dashboard-metrics-grid/);
+  assert.match(scopeCss, /\.dashboard-overview-grid/);
+  assert.match(scopeCss, /\.dashboard-status-card/);
+  assert.match(scopeCss, /conic-gradient\(var\(--success\)/);
+  assert.match(scopeCss, /\.dashboard-performance-panel/);
+  assert.match(scopeCss, /\.dashboard-lottery-grid/);
+  assert.match(scopeCss, /color: var\(--success-strong\)/);
   assert.match(statusCss, /data-status-compact/);
 });
