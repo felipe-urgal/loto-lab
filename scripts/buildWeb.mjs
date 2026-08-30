@@ -54,6 +54,8 @@ for (const sourceFile of sourceFiles) {
     output = Buffer.from(withVersion(body.toString("utf8"), version));
   } else if (rel === "favicon.svg") {
     destination = join(outputRoot, rel);
+  } else if (extension === ".ts") {
+    continue;
   } else {
     destination = join(assetRoot, rel);
   }
