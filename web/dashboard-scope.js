@@ -185,9 +185,9 @@ function allMetrics(data, backtests, realBets) {
   const batches = data.batches.flatMap(([, value]) => value?.items || []);
   const gameCount = batches.reduce((total, batch) => total + (batch.games?.length || 0), 0);
   const realSummaries = LOTTERY_IDS.map((lottery) => realBets.get(lottery)?.summary || {});
-  const actualCost = realSummaries.reduce((total, summary) => total + Number(summary.actualCost || 0), 0);
+  const checkedCost = realSummaries.reduce((total, summary) => total + Number(summary.checkedCost || 0), 0);
   const netResult = realSummaries.reduce((total, summary) => total + Number(summary.netResult || 0), 0);
-  const aggregateRoi = actualCost > 0 ? netResult / actualCost : undefined;
+  const aggregateRoi = checkedCost > 0 ? netResult / checkedCost : undefined;
   const historicalEntries = LOTTERY_IDS
     .map((lottery) => ({ lottery, run: latestBacktest(backtests.get(lottery)) }))
     .filter((entry) => Number.isFinite(Number(entry.run?.summary?.roi)));
@@ -197,7 +197,7 @@ function allMetrics(data, backtests, realBets) {
   return `<section class="dashboard-metrics-grid" aria-label="Resumo do painel">
     ${metricCard("Cobertura atual", `${updatedLotteries}/${LOTTERY_IDS.length}`, "loterias com concurso sincronizado")}
     ${metricCard("Jogos recentes", String(gameCount), `${batches.length} lote(s) carregado(s)`)}
-    ${metricCard("ROI real agregado", formatPercent(aggregateRoi), actualCost > 0 ? `${formatCurrency(actualCost)} em custo real` : "Sem apostas conferidas", toneFor(aggregateRoi))}
+    ${metricCard("ROI real agregado", formatPercent(aggregateRoi), checkedCost > 0 ? `${formatCurrency(checkedCost)} em custo conferido` : "Sem apostas conferidas", toneFor(aggregateRoi))}
     ${metricCard("Melhor ROI histórico", bestHistorical ? formatPercent(bestHistorical.run.summary.roi) : "—", bestHistorical ? `${LOTTERIES[bestHistorical.lottery]} · teste #${bestHistorical.run.id}` : "Sem testes históricos", bestHistorical ? toneFor(bestHistorical.run.summary.roi) : "")}
   </section>`;
 }
