@@ -245,16 +245,17 @@ Frontend:
 - reduced-motion quando houver animação;
 - browser E2E crítico.
 
-Todos os PRs continuam exigindo **auto code review final no SHA verde** antes do squash merge.
+Todos os PRs continuam exigindo **auto code review final no SHA verde** antes do squash merge. Agentes de IA devem seguir também o contrato operacional de [`AGENTS.md`](../AGENTS.md).
 
 ---
 
 # Auditoria da documentação · 2026-08-30
 
-Todos os **26 arquivos Markdown** versionados foram revisados contra a `main` após #137. Arquivos corretos não receberam alteração cosmética apenas para trocar data; a tabela registra explicitamente a revisão completa.
+Todos os **27 arquivos Markdown** versionados foram revisados contra a `main` após #137. Arquivos corretos não receberam alteração cosmética apenas para trocar data; a tabela registra explicitamente a revisão completa.
 
 | Documento | Resultado da auditoria |
 | --- | --- |
+| `AGENTS.md` | novo — contrato de engenharia, PR, CI e auto-review para agentes de IA |
 | `README.md` | atualizado — estado, rollout, arquitetura e backlog |
 | `docs/AGENDA.md` | atualizado — URL local e retirada de linguagem de milestone |
 | `docs/AI.md` | atualizado — contexto/persistência atuais e URL local |
@@ -284,6 +285,7 @@ Todos os **26 arquivos Markdown** versionados foram revisados contra a `main` ap
 
 ## Gestão futura
 
+- `AGENTS.md` define como agentes de IA devem trabalhar e revisar;
 - README explica como usar/operar e aponta para documentos específicos;
 - ROADMAP contém apenas prioridade/estado/dependência atuais;
 - docs técnicos descrevem contratos presentes, não “milestones” antigos;
