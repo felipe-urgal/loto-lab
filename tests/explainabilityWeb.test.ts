@@ -10,10 +10,11 @@ async function source(path: string): Promise<string> {
 test("Generator explainability layer exposes the five-step flow and methodology guardrails", async () => {
   const javascript = await source("web/generation-explainability.js");
   const generator = await source("web/generation-v2.js");
-  const css = await source("web/generation-explainability.css");
+  const workspace = await source("web/generation-workspace.css");
   const loader = await source("web/feature-loader.js");
 
-  assert.match(loader, /generation-explainability/);
+  assert.match(loader, /loadModule\("generation-explainability"\)/);
+  assert.doesNotMatch(loader, /loadStyledModule\("generation-explainability"\)/);
   assert.doesNotMatch(loader, /generation-diversity/);
   assert.match(javascript, /Análise/);
   assert.match(javascript, /Núcleo fixo/);
@@ -37,9 +38,12 @@ test("Generator explainability layer exposes the five-step flow and methodology 
   assert.match(generator, /generationMode: "diversified"/);
   assert.match(generator, /generatorOptions\?\.seed/);
   await assert.rejects(source("web/generation-diversity.js"), /ENOENT/);
+  await assert.rejects(source("web/generation-explainability.css"), /ENOENT/);
 
-  assert.match(css, /g2-explain-stepper/);
-  assert.match(css, /g2-education-grid/);
+  assert.match(workspace, /g2-explain-stepper/);
+  assert.match(workspace, /g2-education-grid/);
+  assert.match(workspace, /g2-preview-explain-title/);
+  assert.match(workspace, /g2-game-reason/);
 });
 
 test("Strategy Lab UI exposes score-model, inference resolution and predictive validation", async () => {
