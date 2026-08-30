@@ -35,6 +35,8 @@ test("my games workspace follows Prototype 1 while preserving real-bet auditabil
   assert.match(myGames, /\/game-batches\/\$\{batchId\}\/show/);
   assert.match(myGames, /Aguardando resultado/);
   assert.match(myGames, /Conferência oficial/);
+  assert.match(myGames, /onViewRendered\(scheduleMount\)/);
+  assert.doesNotMatch(myGames, /\nscheduleMount\(\);\s*$/);
 
   assert.match(auditability, /input\.readOnly = true/);
   assert.match(auditability, /input\.max = String\(target\)/);

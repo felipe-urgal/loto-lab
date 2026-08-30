@@ -526,4 +526,3 @@ lotterySelect?.addEventListener("change", () => {
 });
 document.querySelector("#refresh-view")?.addEventListener("click", () => { ui.expandedBatchId = null; });
 window.addEventListener("loto-lab:data-synced", scheduleMount);
-scheduleMount();

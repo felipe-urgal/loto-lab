@@ -1,0 +1,302 @@
+.stack:has(#backtest-form) {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  gap: 18px;
+}
+
+.stack:has(#backtest-form) > section {
+  min-width: 0;
+}
+
+.stack:has(#backtest-form) .section-head {
+  margin-bottom: 10px;
+}
+
+.stack:has(#backtest-form) .section-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 19px;
+  letter-spacing: -0.02em;
+}
+
+.stack:has(#backtest-form) .section-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+#backtest-form {
+  padding: 16px;
+  border-color: var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+#backtest-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#backtest-form .field {
+  min-width: 0;
+  gap: 6px;
+}
+
+#backtest-form .field label,
+#backtest-form .checkbox {
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+#backtest-form .field input,
+#backtest-form .field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 16px;
+}
+
+#backtest-form .field input:hover,
+#backtest-form .field select:hover {
+  border-color: var(--border-strong);
+}
+
+#backtest-form .field input:focus,
+#backtest-form .field select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+#backtest-form .backtest-default-note,
+#backtest-form .form-note {
+  color: var(--muted-2);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+#backtest-form .form-actions {
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+#backtest-form .checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#backtest-form .checkbox input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+#backtest-form .button.primary {
+  min-height: 44px;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 16px;
+}
+
+#backtest-form .button.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+#backtest-result {
+  min-width: 0;
+}
+
+#backtest-result:empty {
+  display: none;
+}
+
+#backtest-result:not(:empty) {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+#backtest-result .section-head {
+  margin-bottom: 12px;
+}
+
+#backtest-result .grid.cols-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+#backtest-result .metric-card {
+  min-width: 0;
+  min-height: 106px;
+  padding: 13px;
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  box-shadow: none;
+}
+
+#backtest-result .metric-label,
+#backtest-result .metric-detail {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+#backtest-result .metric-value {
+  color: var(--text);
+  font-size: 26px;
+  line-height: 1.05;
+}
+
+#backtest-result .metric-value.positive {
+  color: var(--success-strong) !important;
+}
+
+#backtest-result .metric-value.negative {
+  color: var(--danger) !important;
+}
+
+#backtest-result .loading-state,
+#backtest-result .error-state {
+  min-height: 120px !important;
+  border: 0;
+  background: transparent;
+}
+
+.stack:has(#backtest-form) > section:last-child > .panel.list {
+  overflow: hidden;
+  border-color: var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.stack:has(#backtest-form) > section:last-child .list-row {
+  min-height: 66px;
+  padding: 11px 14px;
+  border-bottom-color: var(--border);
+  background: transparent;
+}
+
+.stack:has(#backtest-form) > section:last-child .list-row:hover {
+  background: var(--surface-2);
+}
+
+.stack:has(#backtest-form) > section:last-child .list-row-main strong,
+.stack:has(#backtest-form) > section:last-child .list-row-value strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.stack:has(#backtest-form) > section:last-child .list-row-main p,
+.stack:has(#backtest-form) > section:last-child .list-row-value small {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.stack:has(#backtest-form) > section:last-child .list-row-value strong.positive {
+  color: var(--success-strong) !important;
+}
+
+.stack:has(#backtest-form) .empty-state {
+  min-height: 180px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.stack:has(#backtest-form) .empty-state strong {
+  color: var(--text);
+  font-size: 18px;
+}
+
+.stack:has(#backtest-form) .empty-state p {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+@media (max-width: 1180px) {
+  #backtest-form .form-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  #backtest-form .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #backtest-result .grid.cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .stack:has(#backtest-form) {
+    gap: 16px;
+  }
+
+  #backtest-form {
+    padding: 14px;
+  }
+
+  #backtest-form .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #backtest-form .form-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  #backtest-form .form-actions > div,
+  #backtest-form .button.primary {
+    width: 100%;
+  }
+
+  #backtest-result:not(:empty) {
+    padding: 13px;
+  }
+
+  #backtest-result .grid.cols-4 {
+    grid-template-columns: 1fr;
+  }
+
+  .stack:has(#backtest-form) > section:last-child .list-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .stack:has(#backtest-form) > section:last-child .list-row-value {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stack:has(#backtest-form) *,
+  .stack:has(#backtest-form) *::before,
+  .stack:has(#backtest-form) *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
