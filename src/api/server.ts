@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import { createApiRequestHandler, type ApiServerOptions } from "./app.js";
 import type { AiInterpretationProvider } from "../ai/types.js";
 import { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
+import { GetDataStatusUseCase } from "../application/dataStatus.js";
 import {
   OperationAlreadyRunningError,
   OperationsUseCase,
@@ -43,6 +44,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const apiHandler = createApiRequestHandler(options);
   const featureRouteDependencies = {
     backtestCatalog: new BacktestCatalogUseCase(new PostgresBacktestRepository(options.pool)),
+    dataStatus: new GetDataStatusUseCase(new PostgresContestRepository(options.pool)),
     operations: new OperationsUseCase(
       new PostgresOperationRepository(options.pool),
       async () => {
