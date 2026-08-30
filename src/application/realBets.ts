@@ -15,13 +15,16 @@ export interface RealBetSnapshot {
   status: string;
 }
 
-export interface RealBetGateway {
+export interface RealBetOperations {
   create(input: CreateRealBetRequest): Promise<unknown>;
   reconcilePending(lottery?: LotteryId): Promise<number>;
   reconcile(id: number): Promise<RealBetSnapshot | undefined>;
+  list(lottery: LotteryId, limit: number): Promise<unknown>;
+}
+
+export interface RealBetRevisionReader {
   findById(id: number): Promise<RealBetSnapshot | undefined>;
   listFinancialRevisions(id: number): Promise<unknown[]>;
-  list(lottery: LotteryId, limit: number): Promise<unknown>;
 }
 
 export type RealBetUseCaseErrorCode =
@@ -90,11 +93,14 @@ function translateCreateError(error: unknown): RealBetUseCaseError | undefined {
 }
 
 export class RealBetUseCase {
-  constructor(private readonly gateway: RealBetGateway) {}
+  constructor(
+    private readonly operations: RealBetOperations,
+    private readonly revisions: RealBetRevisionReader,
+  ) {}
 
   async create(input: CreateRealBetRequest): Promise<unknown> {
     try {
-      return await this.gateway.create(input);
+      return await this.operations.create(input);
     } catch (error) {
       const translated = translateCreateError(error);
       if (translated) throw translated;
@@ -103,11 +109,11 @@ export class RealBetUseCase {
   }
 
   async reconcilePending(lottery?: LotteryId): Promise<{ checked: number }> {
-    return { checked: await this.gateway.reconcilePending(lottery) };
+    return { checked: await this.operations.reconcilePending(lottery) };
   }
 
   async check(id: number): Promise<RealBetSnapshot> {
-    const item = await this.gateway.reconcile(id);
+    const item = await this.operations.reconcile(id);
     if (!item) {
       throw new RealBetUseCaseError("REAL_BET_NOT_FOUND", `Real bet ${id} was not found`);
     }
@@ -120,18 +126,18 @@ export class RealBetUseCase {
     return item;
   }
 
-  async revisions(id: number): Promise<{ realBetId: number; revisions: unknown[] }> {
-    const item = await this.gateway.findById(id);
+  async financialRevisions(id: number): Promise<{ realBetId: number; revisions: unknown[] }> {
+    const item = await this.revisions.findById(id);
     if (!item) {
       throw new RealBetUseCaseError("REAL_BET_NOT_FOUND", `Real bet ${id} was not found`);
     }
     return {
       realBetId: id,
-      revisions: await this.gateway.listFinancialRevisions(id),
+      revisions: await this.revisions.listFinancialRevisions(id),
     };
   }
 
   list(lottery: LotteryId, limit: number): Promise<unknown> {
-    return this.gateway.list(lottery, limit);
+    return this.operations.list(lottery, limit);
   }
 }
