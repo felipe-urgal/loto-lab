@@ -31,7 +31,7 @@ O adapter usa a OpenAI Responses API por HTTP com `fetch` nativo do Node e `stor
 - resumo financeiro das apostas reais;
 - até 5 apostas reais recentes.
 
-O histórico completo de concursos, prompts internos e todos os jogos gerados não são enviados ao modelo.
+O histórico completo de concursos e todos os jogos gerados não são enviados ao modelo. O adapter envia as instruções de sistema fixas e o snapshot compacto de evidências necessário para a interpretação.
 
 ## Focos
 
@@ -59,8 +59,8 @@ Respostas fora do contrato são rejeitadas. `nextTests` pode sugerir experimento
 Cada interpretação bem-sucedida é persistida em `ai_insights` com:
 
 - loteria e foco;
-- modelo/provedor;
-- ID da resposta quando disponível;
+- modelo usado;
+- ID da resposta do provedor quando disponível;
 - snapshot das evidências enviadas;
 - conteúdo interpretativo;
 - uso retornado pelo provedor quando disponível;
