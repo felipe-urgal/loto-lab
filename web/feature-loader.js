@@ -85,8 +85,8 @@ async function ensureViewFeatures() {
     await loadStyledModule("generation-v2");
     // Readiness keeps derived local defaults aligned with the latest conditioned plan.
     await loadModule("generation-readiness");
-    // Explainability is additive: if it fails, the audited generator remains usable.
-    await loadStyledModule("generation-explainability");
+    // Explainability remains additive JS; its presentation is owned by the final workspace.
+    await loadModule("generation-explainability");
     // Prototype 1 owns the final presentation after both functional layers exist.
     await loadStyle("generation-workspace");
   } else if (view === "games") {
