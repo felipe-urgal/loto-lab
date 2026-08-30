@@ -21,7 +21,7 @@ A API fica no mesmo processo em `/api/v1`.
 
 ## Arquitetura atual
 
-O frontend continua **vanilla** — HTML, CSS e ES Modules — sem framework.
+O frontend continua **vanilla** — HTML, CSS e ES Modules — sem framework. Desde #148, a fonte pode avançar incrementalmente em TypeScript sob `web/src`, com emissão para JavaScript nativo antes de chegar ao navegador.
 
 Estrutura principal:
 
@@ -35,14 +35,22 @@ web/
 ├── jobs.html
 ├── shell.js
 ├── feature-loader.js
+├── runtime.js
 ├── app.js
+├── src/
+│   └── shared/
+│       └── formatters.ts
 ├── design-system.css
 ├── ui-foundation.css
 ├── *-workspace.css
 └── módulos/folhas específicos por feature
 ```
 
-`feature-loader.js` carrega módulos específicos sob demanda. O build `npm run web:build` gera `web-dist/`, calcula fingerprint SHA-256 do conjunto web e reescreve referências de assets com `?v=<hash>`.
+`feature-loader.js` carrega módulos específicos sob demanda. `runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; helpers migrados podem viver em `web/src` e ser reexportados sem forçar uma migração big-bang.
+
+O build `npm run web:build` primeiro prepara `web-dist/`, ignora fontes `.ts` como assets brutos e depois usa o `tsc` com `tsconfig.web.json` para emitir JavaScript em `web-dist/assets/src`. O conjunto web continua alimentando o fingerprint SHA-256 usado para reescrever referências de assets com `?v=<hash>`.
+
+`typecheck` e `lint` também cobrem `web/src/**/*.ts` com ambiente browser/DOM isolado do tsconfig do servidor.
 
 HTML usa política sem cache permanente; assets fingerprintados podem usar cache imutável quando o hash corresponde ao build atual.
 
@@ -85,6 +93,8 @@ O rollout e a consolidação visual estão concluídos pela #121:
 - #141 — status visual do Painel absorvido no scope canônico;
 - #142 — explainability visual do Gerador absorvida no workspace;
 - #143 — auditoria final desktop/mobile de legibilidade, foco, reduced-motion e overflow estrutural.
+
+A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
 
 As folhas adicionais que permanecem têm responsabilidade funcional, estrutural ou de fallback explícita; coexistir com um `*-workspace.css` não torna uma camada automaticamente redundante.
 
@@ -210,6 +220,8 @@ Guardrails:
 - não usar montagem eager redundante quando o lifecycle já fornece evento de montagem;
 - `loto-lab:view-rendered` só é emitido depois que o render principal deixa o loading, reduzindo FOUC/layout shift e races de montagem.
 
+A #60 deve migrar lifecycle/state em fatias pequenas preservando esse contrato; mover código de pasta sem reduzir ownership ou duplicação não é objetivo.
+
 ## Acessibilidade
 
 Baseline:
@@ -232,7 +244,7 @@ O browser E2E transversal do #143 repete a auditoria de legibilidade em desktop/
 - `innerHTML` com conteúdo dinâmico precisa ser tratado como superfície de risco;
 - o frontend não deve replicar validação crítica como única defesa — invariantes continuam no backend/PostgreSQL.
 
-A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. Mudanças de jornada pertencem à #64.
+A evolução para TypeScript/primitives compartilhadas é rastreada pela #60 e começou em #148 pelos formatters. API client, errors, escaping, lifecycle/state, primitives e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
 
 ## Trabalho pesado
 
@@ -246,7 +258,7 @@ Medições quantitativas de LCP, INP e CLS e otimizações guiadas por baseline 
 
 ## Testes
 
-`npm test` cobre build e contracts. O CI também executa:
+`npm test` cobre build e contracts. O typecheck/lint inclui a área TypeScript do frontend. O CI também executa:
 
 - Compose;
 - imagem/smoke;
