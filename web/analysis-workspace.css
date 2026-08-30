@@ -1,12 +1,18 @@
 .a2-shell {
   width: 100%;
   max-width: 1440px;
+  min-width: 0;
   margin: 0 auto;
   gap: 16px;
 }
 
 .a2-stack {
+  min-width: 0;
   gap: 20px;
+}
+
+.a2-stack > section {
+  min-width: 0;
 }
 
 .a2-summary {
