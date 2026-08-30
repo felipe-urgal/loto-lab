@@ -11,12 +11,15 @@ test("generator workspace follows Prototype 1 while preserving audited generatio
   ]);
 
   const generatorLayer = loader.indexOf('loadStyledModule("generation-v2")');
-  const explainabilityLayer = loader.indexOf('loadStyledModule("generation-explainability")');
+  const explainabilityLayer = loader.indexOf('loadModule("generation-explainability")');
   const workspaceLayer = loader.indexOf('loadStyle("generation-workspace")');
   assert.ok(generatorLayer >= 0, "Generator 2.0 must remain the functional owner");
   assert.ok(explainabilityLayer > generatorLayer, "explainability must remain additive");
   assert.ok(workspaceLayer > explainabilityLayer, "Prototype 1 must be the final generator style layer");
+  assert.doesNotMatch(loader, /loadStyledModule\("generation-explainability"\)/);
+  assert.doesNotMatch(loader, /loadStyle\("generation-explainability"\)/);
   assert.doesNotMatch(loader, /generation-diversity/);
+  await assert.rejects(readFile("web/generation-explainability.css", "utf8"), /ENOENT/);
   await assert.rejects(readFile("web/generation-diversity.js", "utf8"), /ENOENT/);
   await assert.rejects(readFile("web/generation-diversity.css", "utf8"), /ENOENT/);
 
@@ -25,6 +28,9 @@ test("generator workspace follows Prototype 1 while preserving audited generatio
   assert.match(workspace, /\.g2-methodology \{[\s\S]*border-color: rgba\(22, 137, 255/);
   assert.match(workspace, /\.g2-saved \{[\s\S]*color: var\(--success-strong\)/);
   assert.match(workspace, /\.g2-game-month \{[\s\S]*color: var\(--accent-strong\)/);
+  assert.match(workspace, /\.g2-explain-stepper \{[\s\S]*grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr auto 1fr/);
+  assert.match(workspace, /\.g2-why-list \{[\s\S]*counter-reset: why/);
+  assert.match(workspace, /\.g2-rationale-grid \{[\s\S]*repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(workspace, /@media \(max-width: 760px\)[\s\S]*\.g2-explain-stepper \{[\s\S]*overflow-x: auto/);
   assert.match(workspace, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
