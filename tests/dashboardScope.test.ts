@@ -43,7 +43,10 @@ test("dashboard scope keeps comparison mode separate from the active lottery", a
   assert.match(scopeSource, /function focusedMetrics/);
   assert.match(scopeSource, /function allMetrics/);
   assert.match(scopeSource, /function realStatusCard/);
-  assert.match(scopeSource, /actualCost > 0 \? netResult \/ actualCost : undefined/);
+  assert.match(scopeSource, /summary\.checkedCost/);
+  assert.match(scopeSource, /checkedCost > 0 \? netResult \/ checkedCost : undefined/);
+  assert.doesNotMatch(scopeSource, /actualCost > 0 \? netResult \/ actualCost/);
+  assert.match(scopeSource, /custo conferido/);
   assert.match(scopeSource, /dashboard-metrics-grid/);
   assert.match(scopeSource, /dashboard-overview-grid/);
   assert.match(scopeSource, /dashboard-status-card/);
