@@ -8,13 +8,19 @@ async function source(path: string): Promise<string> {
 }
 
 test("active backtest execution is owned by the feature controller and application use case", async () => {
-  const [controller, application, routes, server, workerClient] = await Promise.all([
+  const [app, controller, application, routes, server, workerClient] = await Promise.all([
+    source("src/api/app.ts"),
     source("src/api/backtests.ts"),
     source("src/application/executeBacktest.ts"),
     source("src/api/routes.ts"),
     source("src/api/server.ts"),
     source("src/api/workerClient.ts"),
   ]);
+
+  assert.doesNotMatch(app, /\/api\/v1\/backtests\/run/);
+  assert.doesNotMatch(app, /runBacktestInWorker/);
+  assert.doesNotMatch(app, /expensiveAnalysisGate/);
+  assert.doesNotMatch(app, /BacktestRoundLimitError/);
 
   assert.match(controller, /executeBacktest\.execute/);
   assert.doesNotMatch(controller, /expensiveAnalysisGate/);
