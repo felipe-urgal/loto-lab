@@ -2,8 +2,10 @@ import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { createApiRequestHandler, type ApiServerOptions } from "./app.js";
 import type { AiInterpretationProvider } from "../ai/types.js";
+import { StrategyCatalogUseCase } from "../application/strategyCatalog.js";
 import type { ContestSource } from "../data/source.js";
 import { logEvent } from "../observability/log.js";
+import { PostgresStrategyRepository } from "../persistence/strategyRepository.js";
 import { serveFeatureRoutes } from "./routes.js";
 import { serveWebAsset } from "./web.js";
 import { loadAppAuthConfig, requireAppAuthentication } from "./auth.js";
@@ -21,6 +23,9 @@ function isHealthPath(pathname: string): boolean {
 
 export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const apiHandler = createApiRequestHandler(options);
+  const featureRouteDependencies = {
+    strategyCatalog: new StrategyCatalogUseCase(new PostgresStrategyRepository(options.pool)),
+  };
   const auth = loadAppAuthConfig();
   const configuredOrigin = options.corsOrigin
     ?? process.env.API_CORS_ORIGIN
@@ -49,7 +54,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
         return;
       }
 
-      if (await serveFeatureRoutes(request, response, options)) return;
+      if (await serveFeatureRoutes(request, response, options, featureRouteDependencies)) return;
       if ((method === "GET" || method === "HEAD") && await serveWebAsset(url, response, method === "HEAD")) return;
       await apiHandler(request, response);
     } catch (error) {
