@@ -1,0 +1,336 @@
+.agenda-content {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.agenda-content > .stack {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  gap: 18px;
+}
+
+.agenda-content .section-head {
+  margin-bottom: 10px;
+}
+
+.agenda-content .section-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 19px;
+}
+
+.agenda-content .section-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+#agenda-refresh,
+#agenda-read-all {
+  min-height: 44px;
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+}
+
+#agenda-refresh:hover:not(:disabled),
+#agenda-read-all:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.agenda-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agenda-card {
+  min-height: 158px;
+  padding: 16px;
+  border-color: var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.agenda-card::after {
+  width: 112px;
+  height: 112px;
+  right: -50px;
+  top: -50px;
+  background: var(--accent-soft);
+}
+
+.agenda-card-head,
+.agenda-card-footer,
+.agenda-inbox-head,
+.agenda-notification-main {
+  gap: 12px;
+}
+
+.agenda-card h3,
+.agenda-notification h3 {
+  color: var(--text);
+}
+
+.agenda-card h3 {
+  font-size: 18px;
+}
+
+.agenda-card .next-contest {
+  margin: 20px 0 4px;
+  color: var(--accent-strong);
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.agenda-muted,
+.agenda-card p,
+.agenda-notification p {
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.agenda-card-footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top-color: var(--border);
+}
+
+.agenda-prize {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.agenda-status-pill {
+  padding: 4px 8px;
+  border: 1px solid rgba(22, 137, 255, 0.32);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 16px;
+}
+
+.agenda-nav-badge {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.agenda-inbox-head {
+  align-items: flex-end;
+}
+
+.agenda-actions {
+  gap: 8px;
+}
+
+.agenda-filter {
+  padding: 3px;
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.agenda-filter button {
+  min-height: 38px;
+  padding: 7px 11px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.agenda-filter button:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.agenda-filter button.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.agenda-inbox {
+  gap: 8px;
+}
+
+.agenda-notification {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 13px 14px;
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+}
+
+.agenda-notification.is-unread {
+  border-color: rgba(22, 137, 255, 0.38);
+  box-shadow: inset 3px 0 0 var(--accent), 0 6px 18px rgba(0, 0, 0, 0.1);
+}
+
+.agenda-notification h3 {
+  font-size: 16px;
+}
+
+.agenda-notification p {
+  margin-top: 4px;
+}
+
+.agenda-notification-main {
+  align-items: baseline;
+}
+
+.agenda-severity {
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  background: var(--muted-2);
+}
+
+.agenda-severity.success {
+  background: var(--success);
+}
+
+.agenda-severity.warning {
+  background: var(--warning);
+}
+
+.agenda-severity.error {
+  background: var(--danger);
+}
+
+.agenda-notification-actions {
+  gap: 7px;
+}
+
+.agenda-link,
+.agenda-read {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 10px;
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 16px;
+}
+
+.agenda-link:hover,
+.agenda-read:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+}
+
+.agenda-link:focus-visible,
+.agenda-read:focus-visible,
+.agenda-filter button:focus-visible,
+#agenda-refresh:focus-visible,
+#agenda-read-all:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.agenda-loading,
+.agenda-empty {
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+  padding: 28px 20px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 16px;
+}
+
+@media (max-width: 1060px) {
+  .agenda-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agenda-inbox-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 700px) {
+  .agenda-content {
+    padding-inline: 14px;
+  }
+
+  .agenda-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .agenda-card {
+    min-height: 0;
+    padding: 14px;
+  }
+
+  .agenda-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .agenda-filter {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .agenda-filter button,
+  #agenda-read-all {
+    width: 100%;
+  }
+
+  .agenda-notification {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 12px;
+  }
+
+  .agenda-notification-main {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .agenda-notification-actions {
+    grid-column: 2;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agenda-notification-actions > :only-child {
+    grid-column: 1 / -1;
+  }
+
+  .agenda-link,
+  .agenda-read {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agenda-content *,
+  .agenda-content *::before,
+  .agenda-content *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
