@@ -1,3 +1,64 @@
+.experiment-grid {
+  display: grid;
+  align-items: start;
+}
+
+.experiment-form {
+  position: sticky;
+}
+
+.experiment-form textarea {
+  resize: vertical;
+  padding: 10px 11px;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.experiment-card {
+  display: grid;
+}
+
+.experiment-card p {
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.experiment-card-head {
+  display: flex;
+  justify-content: space-between;
+}
+
+.experiment-meta {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.experiment-config {
+  margin: 0;
+  overflow: auto;
+}
+
+.version-list {
+  display: grid;
+}
+
+.version-row {
+  display: grid;
+  align-items: center;
+}
+
+.experiment-card .status-pill {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.experiment-empty {
+  padding: 24px;
+  text-align: center;
+}
+
 .experiment-content {
   max-width: none;
 }
@@ -334,6 +395,12 @@
   }
 }
 
+@media (max-width: 980px) {
+  .experiment-form {
+    position: static;
+  }
+}
+
 @media (max-width: 900px) {
   .experiment-grid {
     grid-template-columns: 1fr;
@@ -346,6 +413,20 @@
 
   .experiment-form .form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .experiment-card-head {
+    flex-direction: column;
+  }
+
+  .version-row {
+    grid-template-columns: auto 1fr;
+  }
+
+  .version-row .button {
+    grid-column: 1 / -1;
   }
 }
 
