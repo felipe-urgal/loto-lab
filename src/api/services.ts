@@ -1,14 +1,17 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import type { Pool } from "pg";
 import type { Contest, LotteryId } from "../domain/types.js";
 import type { buildAdvancedAnalysis } from "../analysis/advanced.js";
 import { runAdvancedAnalysisInWorker } from "../analysis/advancedWorkerClient.js";
 import { AnalyzeLotteryUseCase, type AnalysisResponse } from "../application/analyzeLottery.js";
 import { CheckGameBatchUseCase, type CheckGameBatchResult } from "../application/checkGameBatch.js";
-import { generateMegaSenaGames } from "../generator/megaSena.js";
-import { generateLotofacilGames } from "../generator/lotofacil.js";
-import { generateDiaDeSorteGames } from "../generator/diaDeSorte.js";
-import type { GenerationMode } from "../generator/shared.js";
+import {
+  GenerateGamesUseCase,
+  InsufficientGenerationHistoryError,
+  MIN_GENERATION_HISTORY,
+  type GenerateGamesRequest,
+  type GenerateGamesResponse,
+} from "../application/generateGames.js";
 import { backtestMegaSena } from "../backtest/megaSena.js";
 import { backtestLotofacil } from "../backtest/lotofacil.js";
 import { backtestDiaDeSorte } from "../backtest/diaDeSorte.js";
@@ -19,14 +22,13 @@ import { PostgresBacktestRepository } from "../persistence/backtestRepository.js
 import type {
   BacktestRoundArtifact,
   BacktestRunSummaryRecord,
-  GeneratedGameBatchRecord,
   StrategyRecord,
   UpsertStrategyInput,
 } from "../persistence/types.js";
 
-export type { AnalysisResponse };
+export { InsufficientGenerationHistoryError, MIN_GENERATION_HISTORY };
+export type { AnalysisResponse, GenerateGamesRequest, GenerateGamesResponse };
 
-export const MIN_GENERATION_HISTORY = 20;
 export const MAX_HTTP_BACKTEST_ROUNDS = 500;
 
 export type AdvancedAnalysis = ReturnType<typeof buildAdvancedAnalysis>;
@@ -46,38 +48,10 @@ interface AdvancedAnalysisInFlightEntry {
   promise: Promise<AdvancedAnalysis>;
 }
 
-export class InsufficientGenerationHistoryError extends Error {
-  constructor(
-    readonly lottery: LotteryId,
-    readonly available: number,
-    readonly required = MIN_GENERATION_HISTORY,
-  ) {
-    super(`At least ${required} historical contests are required to generate games for ${lottery}; ${available} available`);
-  }
-}
-
 export class BacktestRoundLimitError extends Error {
   constructor(readonly requested: number, readonly maximum = MAX_HTTP_BACKTEST_ROUNDS) {
     super(`Backtest would process ${requested} contests; the HTTP limit is ${maximum}`);
   }
-}
-
-export interface GenerateGamesRequest {
-  lottery: LotteryId;
-  gameCount: number;
-  fixedCount?: 8 | 9 | 10;
-  targetContestNumber?: number;
-  generationMode?: GenerationMode;
-  seed?: string;
-  persist: boolean;
-}
-
-export interface GenerateGamesResponse {
-  lottery: LotteryId;
-  targetContestNumber?: number;
-  batchId?: number;
-  games: GeneratedGameBatchRecord["games"];
-  generatorOptions: Record<string, unknown>;
 }
 
 export interface RunBacktestRequest {
@@ -97,13 +71,6 @@ export interface RunBacktestResponse {
   summary: Record<string, unknown>;
   roundCount: number;
   createdAt?: string;
-}
-
-function gameFingerprint(games: GeneratedGameBatchRecord["games"]): string {
-  return games
-    .map((game) => `${game.numbers.join("-")}:${game.luckyMonth ?? ""}`)
-    .sort((a, b) => a.localeCompare(b))
-    .join("|");
 }
 
 function analysisSignature(contests: Contest[]): string {
@@ -134,6 +101,7 @@ export class LotoLabApiServices {
   readonly backtests: PostgresBacktestRepository;
   private readonly analyzeLottery: AnalyzeLotteryUseCase;
   private readonly checkGameBatch: CheckGameBatchUseCase;
+  private readonly generateGames: GenerateGamesUseCase;
   private readonly advancedAnalysisCache = new Map<LotteryId, AdvancedAnalysisCacheEntry>();
   private readonly advancedAnalysisInFlight = new Map<LotteryId, AdvancedAnalysisInFlightEntry>();
 
@@ -144,6 +112,7 @@ export class LotoLabApiServices {
     this.backtests = new PostgresBacktestRepository(pool);
     this.analyzeLottery = new AnalyzeLotteryUseCase(this.contests);
     this.checkGameBatch = new CheckGameBatchUseCase(this.games, this.contests);
+    this.generateGames = new GenerateGamesUseCase(this.contests, this.games);
   }
 
   async analyze(lottery: LotteryId): Promise<AnalysisResponse> {
@@ -179,102 +148,7 @@ export class LotoLabApiServices {
   }
 
   async generate(input: GenerateGamesRequest): Promise<GenerateGamesResponse> {
-    const contests = await this.contests.list({ lottery: input.lottery, order: "asc" });
-    const latestContest = contests.at(-1);
-    const history = input.targetContestNumber === undefined
-      ? contests
-      : contests.filter((contest) => contest.number < input.targetContestNumber!);
-    if (history.length < MIN_GENERATION_HISTORY) {
-      throw new InsufficientGenerationHistoryError(input.lottery, history.length);
-    }
-
-    const targetContestNumber = input.targetContestNumber ??
-      (latestContest ? latestContest.number + 1 : undefined);
-    const generationMode = input.generationMode ?? "diversified";
-    const fixedCount = input.lottery === "lotofacil" ? input.fixedCount ?? 8 : undefined;
-    const recentBatches = input.persist && generationMode === "diversified" && input.seed === undefined
-      ? await this.games.listRecent(input.lottery, 100)
-      : [];
-    const existingFingerprints = new Set(
-      recentBatches
-        .filter((batch) => batch.targetContestNumber === targetContestNumber)
-        .map((batch) => gameFingerprint(batch.games)),
-    );
-
-    let generatedGames: GeneratedGameBatchRecord["games"] = [];
-    let seed = generationMode === "diversified" ? input.seed ?? randomUUID() : undefined;
-    let generatorOptions: Record<string, unknown> = {};
-    let unique = false;
-
-    for (let attempt = 0; attempt < 12; attempt += 1) {
-      generatorOptions = {
-        gameCount: input.gameCount,
-        generationMode,
-        ...(seed !== undefined ? { seed } : {}),
-        ...(fixedCount !== undefined ? { fixedCount } : {}),
-      };
-
-      if (input.lottery === "mega-sena") {
-        generatedGames = generateMegaSenaGames(history, {
-          gameCount: input.gameCount,
-          generationMode,
-          ...(seed !== undefined ? { seed } : {}),
-        });
-      } else if (input.lottery === "lotofacil") {
-        generatedGames = generateLotofacilGames(history, {
-          gameCount: input.gameCount,
-          fixedCount: fixedCount!,
-          generationMode,
-          ...(seed !== undefined ? { seed } : {}),
-        });
-      } else {
-        generatedGames = generateDiaDeSorteGames(history, {
-          gameCount: input.gameCount,
-          generationMode,
-          ...(seed !== undefined ? { seed } : {}),
-        });
-      }
-
-      if (
-        !input.persist ||
-        generationMode === "deterministic" ||
-        input.seed !== undefined ||
-        !existingFingerprints.has(gameFingerprint(generatedGames))
-      ) {
-        unique = true;
-        break;
-      }
-
-      seed = randomUUID();
-    }
-
-    if (!unique) {
-      throw new Error("Unable to generate a distinct diversified batch after multiple attempts");
-    }
-
-    if (!input.persist) {
-      return {
-        lottery: input.lottery,
-        ...(targetContestNumber !== undefined ? { targetContestNumber } : {}),
-        games: generatedGames,
-        generatorOptions,
-      };
-    }
-
-    const batch = await this.games.saveBatch({
-      lottery: input.lottery,
-      ...(targetContestNumber !== undefined ? { targetContestNumber } : {}),
-      generatorOptions,
-      games: generatedGames,
-    });
-
-    return {
-      lottery: input.lottery,
-      targetContestNumber: batch.targetContestNumber,
-      batchId: batch.id,
-      games: batch.games,
-      generatorOptions: batch.generatorOptions,
-    };
+    return this.generateGames.execute(input);
   }
 
   async checkBatch(batchId: number, contestNumber: number): Promise<CheckGameBatchResult> {
