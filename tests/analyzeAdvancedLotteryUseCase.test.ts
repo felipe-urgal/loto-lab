@@ -24,16 +24,23 @@ function fakeAdvanced(historySize: number): AdvancedAnalysis {
 test("AnalyzeAdvancedLotteryUseCase shares in-flight work and reuses a matching cache", async () => {
   let contests = makeMegaContests(3);
   let executions = 0;
+  let historyReads = 0;
   let releaseFirst!: () => void;
   let markFirstStarted!: () => void;
+  let markSecondHistoryRead!: () => void;
   const firstStarted = new Promise<void>((resolve) => {
     markFirstStarted = resolve;
+  });
+  const secondHistoryRead = new Promise<void>((resolve) => {
+    markSecondHistoryRead = resolve;
   });
   const firstBlocked = new Promise<void>((resolve) => {
     releaseFirst = resolve;
   });
   const history: AdvancedAnalysisHistoryReader = {
     async listAnalysisHistory() {
+      historyReads += 1;
+      if (historyReads === 2) markSecondHistoryRead();
       return contests;
     },
   };
@@ -49,6 +56,7 @@ test("AnalyzeAdvancedLotteryUseCase shares in-flight work and reuses a matching 
   const first = useCase.execute("mega-sena");
   await firstStarted;
   const second = useCase.execute("mega-sena");
+  await secondHistoryRead;
   await Promise.resolve();
   assert.equal(executions, 1);
 
