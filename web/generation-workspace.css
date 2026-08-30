@@ -275,7 +275,10 @@
   background: var(--surface-2);
 }
 
-.g2-game-month,
+.g2-game-month {
+  color: var(--accent-strong);
+}
+
 .g2-saved {
   color: var(--success-strong);
 }
