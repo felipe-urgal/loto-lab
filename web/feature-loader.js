@@ -81,6 +81,8 @@ async function ensureViewFeatures() {
     await loadModule("generation-readiness");
     // Explainability is additive: if it fails, the audited generator remains usable.
     await loadStyledModule("generation-explainability");
+    // Prototype 1 owns the final presentation after both functional layers exist.
+    await loadStyle("generation-workspace");
   } else if (view === "games") {
     // My Games 2.0 owns the clean management surface. If it cannot load, keep
     // the previous refinements as a functional fallback instead of breaking the view.
