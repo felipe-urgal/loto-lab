@@ -1,3 +1,49 @@
+.experiment-grid:has(#job-form) {
+  display: grid;
+  align-items: start;
+}
+
+#jobs-list .experiment-card {
+  display: grid;
+}
+
+#jobs-list .experiment-card p {
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+#jobs-list .experiment-card-head {
+  display: flex;
+  justify-content: space-between;
+}
+
+#jobs-list .status-pill {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+#jobs-list .experiment-meta {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+#jobs-list .job-result {
+  display: grid;
+}
+
+#jobs-list .job-running {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+#jobs-list .experiment-empty {
+  padding: 24px;
+  text-align: center;
+}
+
 .experiment-content {
   max-width: none;
 }
@@ -338,6 +384,12 @@
 
   #job-form .field.is-wide {
     grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 680px) {
+  #jobs-list .experiment-card-head {
+    flex-direction: column;
   }
 }
 
