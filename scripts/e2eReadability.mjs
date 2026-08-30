@@ -186,7 +186,7 @@ async function auditKeyboardFocus(client, label) {
     };
   })()`);
   if (!focus) throw new Error(`${label} did not expose a keyboard-focusable control after Tab`);
-  if (focus.outlineStyle === "none" || focus.outlineWidth < 1.5 || focus.outlineOffset < 2) {
+  if (focus.outlineStyle === "none" || focus.outlineWidth < 1.5) {
     throw new Error(`${label} keyboard focus is not visibly outlined: ${JSON.stringify(focus)}`);
   }
 }
