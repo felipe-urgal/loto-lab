@@ -63,9 +63,8 @@ async function ensureViewFeatures() {
 
   if (view === "analysis") {
     await loadStyle("analysis-v2");
-    await loadStyle("analysis-v2-hardening");
-    // Prototype 1 visual ownership sits last so it can consolidate the legacy
-    // analysis styles without changing any statistical or interaction contract.
+    // Prototype 1 owns the final analysis presentation and its structural
+    // hardening without changing any statistical or interaction contract.
     await loadStyle("analysis-workspace");
     await loadModule("analysis-v2");
     return;

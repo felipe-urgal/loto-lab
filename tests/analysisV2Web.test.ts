@@ -6,7 +6,7 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
   const [
     source,
     css,
-    hardeningCss,
+    workspaceCss,
     loader,
     services,
     basicAnalysisUseCase,
@@ -20,7 +20,7 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
   ] = await Promise.all([
     readFile("web/analysis-v2.js", "utf8"),
     readFile("web/analysis-v2.css", "utf8"),
-    readFile("web/analysis-v2-hardening.css", "utf8"),
+    readFile("web/analysis-workspace.css", "utf8"),
     readFile("web/feature-loader.js", "utf8"),
     readFile("src/api/services.ts", "utf8"),
     readFile("src/application/analyzeLottery.ts", "utf8"),
@@ -35,7 +35,8 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
 
   assert.match(loader, /view === "analysis"/);
   assert.match(loader, /loadStyle\("analysis-v2"\)/);
-  assert.match(loader, /loadStyle\("analysis-v2-hardening"\)/);
+  assert.match(loader, /loadStyle\("analysis-workspace"\)/);
+  assert.doesNotMatch(loader, /loadStyle\("analysis-v2-hardening"\)/);
   assert.match(loader, /loadModule\("analysis-v2"\)/);
   assert.match(source, /Classificação/);
   assert.match(source, /Estrutura/);
@@ -62,8 +63,8 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
   assert.match(css, /\.a2-tabs/);
   assert.match(css, /\.a2-detail-open/);
   assert.match(css, /:focus-visible/);
-  assert.match(hardeningCss, /\.a2-detail::backdrop/);
-  assert.match(hardeningCss, /repeat\(4/);
+  assert.match(workspaceCss, /\.a2-detail::backdrop/);
+  assert.match(workspaceCss, /repeat\(4/);
 
   assert.match(advanced, /exactBinomialTwoSidedP/);
   assert.match(advanced, /bonferroni-\$\{VALIDATION_COMPARISONS\}-tests/);
