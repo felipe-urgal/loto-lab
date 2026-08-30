@@ -1,5 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { PostgresStrategyRepository } from "../persistence/strategyRepository.js";
+import {
+  StrategyLotteryImmutableError,
+  type StrategyCatalogUseCase,
+} from "../application/strategyCatalog.js";
 import type { ApiServerOptions } from "./app.js";
 import {
   ApiError,
@@ -18,18 +21,11 @@ function requiredString(value: unknown, field: string, maxLength = 160): string 
   return value.trim();
 }
 
-function mapRepositoryError(error: unknown): ApiError | undefined {
-  if (!(error instanceof Error)) return undefined;
-  if (error.message.startsWith("STRATEGY_LOTTERY_IMMUTABLE:")) {
-    return new ApiError(409, "STRATEGY_LOTTERY_IMMUTABLE", "A strategy slug cannot move to another lottery; create a new strategy instead");
-  }
-  return undefined;
-}
-
 export async function serveStrategies(
   request: IncomingMessage,
   response: ServerResponse,
   options: ApiServerOptions,
+  catalog: StrategyCatalogUseCase,
 ): Promise<boolean> {
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://localhost");
@@ -40,7 +36,6 @@ export async function serveStrategies(
   if (!isRoute) return false;
 
   const corsOrigin = options.corsOrigin ?? process.env.API_CORS_ORIGIN ?? "http://localhost:3000";
-  const repository = new PostgresStrategyRepository(options.pool);
 
   try {
     if (method === "OPTIONS") {
@@ -51,7 +46,7 @@ export async function serveStrategies(
     if (method === "GET" && pathname === "/api/v1/strategies") {
       const lotteryParam = url.searchParams.get("lottery");
       const lottery = lotteryParam === null ? undefined : parseLottery(lotteryParam);
-      sendJson(response, 200, { items: await repository.list(lottery) }, corsOrigin);
+      sendJson(response, 200, { items: await catalog.list(lottery) }, corsOrigin);
       return true;
     }
 
@@ -67,7 +62,7 @@ export async function serveStrategies(
       if (body.config !== undefined && !isRecord(body.config)) {
         throw new ApiError(400, "INVALID_ARGUMENT", "config must be a JSON object");
       }
-      const strategy = await repository.upsert({
+      const strategy = await catalog.upsert({
         slug,
         lottery,
         name,
@@ -81,28 +76,32 @@ export async function serveStrategies(
     const versionsMatch = /^\/api\/v1\/strategies\/([^/]+)\/versions$/.exec(pathname);
     if (method === "GET" && versionsMatch) {
       const slug = decodeURIComponent(versionsMatch[1]!);
-      const strategy = await repository.findBySlug(slug);
-      if (!strategy) throw new ApiError(404, "STRATEGY_NOT_FOUND", `Strategy ${slug} was not found`);
-      sendJson(response, 200, {
-        strategy,
-        items: await repository.listVersions(strategy.id),
-      }, corsOrigin);
+      const result = await catalog.listVersions(slug);
+      if (!result) throw new ApiError(404, "STRATEGY_NOT_FOUND", `Strategy ${slug} was not found`);
+      sendJson(response, 200, result, corsOrigin);
       return true;
     }
 
     const versionMatch = /^\/api\/v1\/strategy-versions\/(\d+)$/.exec(pathname);
     if (method === "GET" && versionMatch) {
       const id = parsePositiveInt(versionMatch[1], "strategyVersionId");
-      const version = await repository.findVersionById(id);
-      if (!version) throw new ApiError(404, "STRATEGY_VERSION_NOT_FOUND", `Strategy version ${id} was not found`);
-      const strategy = await repository.findById(version.strategyId);
-      sendJson(response, 200, { ...version, strategy }, corsOrigin);
+      const result = await catalog.getVersion(id);
+      if (!result) throw new ApiError(404, "STRATEGY_VERSION_NOT_FOUND", `Strategy version ${id} was not found`);
+      sendJson(response, 200, result, corsOrigin);
       return true;
     }
 
     throw new ApiError(404, "ROUTE_NOT_FOUND", `${method} ${pathname} was not found`);
   } catch (error) {
-    const mapped = error instanceof ApiError ? error : mapRepositoryError(error);
+    const mapped = error instanceof ApiError
+      ? error
+      : error instanceof StrategyLotteryImmutableError
+        ? new ApiError(
+            409,
+            "STRATEGY_LOTTERY_IMMUTABLE",
+            "A strategy slug cannot move to another lottery; create a new strategy instead",
+          )
+        : undefined;
     if (mapped) {
       sendJson(response, mapped.statusCode, { error: { code: mapped.code, message: mapped.message } }, corsOrigin);
       return true;
