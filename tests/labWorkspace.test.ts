@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 
 test("strategy lab workspace follows Prototype 1 while preserving statistical contracts", async () => {
   const [html, workspace, lab, refinements] = await Promise.all([
@@ -10,16 +10,22 @@ test("strategy lab workspace follows Prototype 1 while preserving statistical co
     readFile("web/lab-refinements.js", "utf8"),
   ]);
 
-  const baseLab = html.indexOf('/assets/lab.css');
-  const labV2 = html.indexOf('/assets/lab-v2.css');
   const sharedRefinements = html.indexOf('/assets/refinements.css');
   const workspaceLayer = html.indexOf('/assets/lab-workspace.css');
-  assert.ok(baseLab >= 0, "base Lab styles must remain available");
-  assert.ok(labV2 > baseLab, "Lab v2 must remain layered after the base Lab styles");
-  assert.ok(sharedRefinements > labV2, "shared refinements must remain before final presentation");
-  assert.ok(workspaceLayer > sharedRefinements, "Prototype 1 must be the final Lab presentation layer");
+  assert.ok(sharedRefinements >= 0, "shared refinements must remain available");
+  assert.ok(workspaceLayer > sharedRefinements, "Prototype 1 must remain the final Lab style layer");
+  assert.doesNotMatch(html, /\/assets\/lab\.css/);
+  assert.doesNotMatch(html, /\/assets\/lab-v2\.css/);
+  await assert.rejects(access("web/lab.css"));
+  await assert.rejects(access("web/lab-v2.css"));
 
-  assert.match(workspace, /\.lab-content > \.stack \{[\s\S]*max-width: 1440px/);
+  assert.match(workspace, /\.lab-intro \{[\s\S]*display: flex[\s\S]*justify-content: space-between/);
+  assert.match(workspace, /\.lab-message \{[\s\S]*display: grid[\s\S]*place-content: center/);
+  assert.match(workspace, /\.lab-ranking \{[\s\S]*display: grid[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(workspace, /\.lab-benchmark-card \{[\s\S]*grid-column: 1 \/ -1[\s\S]*display: flex/);
+  assert.match(workspace, /\.lab-distribution \{[\s\S]*display: grid[\s\S]*grid-template-columns: repeat\(4, minmax\(70px, 1fr\)\)/);
+  assert.match(workspace, /\.lab-predictive-evidence \{[\s\S]*grid-column: 1 \/ -1[\s\S]*display: grid/);
+  assert.match(workspace, /\.lab-chart svg \{[\s\S]*display: block[\s\S]*min-height: 285px/);
   assert.match(workspace, /#lab-form \.lab-form-grid \{[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
   assert.match(workspace, /\.lab-benchmark-card\.is-positive \{[\s\S]*background: var\(--success-soft\)/);
   assert.match(workspace, /\.lab-strategy-card\.is-winner \{[\s\S]*border-color: rgba\(22, 137, 255, 0\.4\)/);

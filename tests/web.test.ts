@@ -105,11 +105,16 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
     "data-status.js",
     "styles.css",
     "refinements.css",
-    "lab.css",
+    "lab-workspace.css",
     "data-status.css",
   ]) {
     const response = await fetch(`${baseUrl}/assets/${asset}`);
     assert.equal(response.status, 200, asset);
+  }
+
+  for (const removedLabAsset of ["lab.css", "lab-v2.css"]) {
+    const response = await fetch(`${baseUrl}/assets/${removedLabAsset}`);
+    assert.equal(response.status, 404, removedLabAsset);
   }
 
   const foundation = await fetch(`${baseUrl}/assets/ui-foundation.css`);
