@@ -26,11 +26,7 @@ import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import { PostgresGameRepository } from "../persistence/gameRepository.js";
 import { PostgresStrategyRepository } from "../persistence/strategyRepository.js";
 import { PostgresBacktestRepository } from "../persistence/backtestRepository.js";
-import type {
-  BacktestRunSummaryRecord,
-  StrategyRecord,
-  UpsertStrategyInput,
-} from "../persistence/types.js";
+import type { StrategyRecord, UpsertStrategyInput } from "../persistence/types.js";
 
 export {
   BacktestRoundLimitError,
@@ -92,10 +88,6 @@ export class LotoLabApiServices {
 
   async runBacktest(input: RunBacktestRequest): Promise<RunBacktestResponse> {
     return this.runBacktestUseCase.execute(input);
-  }
-
-  async listBacktests(lottery: LotteryId, limit: number): Promise<BacktestRunSummaryRecord[]> {
-    return this.backtests.listRecentSummaries(lottery, limit);
   }
 
   async upsertStrategy(input: UpsertStrategyInput): Promise<StrategyRecord> {

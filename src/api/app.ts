@@ -349,6 +349,8 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
 
       // Strategy endpoints live exclusively in serveStrategies() so their validation,
       // versioning and immutable-history semantics cannot drift from a legacy copy.
+      // Backtest catalog GETs live exclusively in serveBacktests(); this handler keeps
+      // only the synchronous execution endpoint until that worker flow is extracted.
 
       if (method === "POST" && pathname === "/api/v1/backtests/run") {
         if (!enforceRateLimit(request, response, backtestLimiter, "backtest")) return;
@@ -407,23 +409,6 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
         } finally {
           release();
         }
-      }
-
-      match = pathMatch(pathname, /^\/api\/v1\/backtest-runs\/(\d+)$/);
-      if (method === "GET" && match) {
-        const id = parsePositiveInt(match[1], "backtestRunId");
-        const run = await services.backtests.findById(id);
-        if (!run) throw new ApiError(404, "BACKTEST_NOT_FOUND", `Backtest run ${id} was not found`);
-        sendJson(response, 200, run, corsOrigin);
-        return;
-      }
-
-      match = pathMatch(pathname, /^\/api\/v1\/backtests\/([^/]+)$/);
-      if (method === "GET" && match) {
-        const lottery = parseLottery(match[1]);
-        const items = await services.listBacktests(lottery, parseLimit(url.searchParams.get("limit"), 20));
-        sendJson(response, 200, { items }, corsOrigin);
-        return;
       }
 
       throw new ApiError(404, "ROUTE_NOT_FOUND", `${method} ${pathname} was not found`);
