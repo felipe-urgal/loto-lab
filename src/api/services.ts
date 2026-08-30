@@ -4,11 +4,11 @@ import type { Contest, LotteryId } from "../domain/types.js";
 import type { buildAdvancedAnalysis } from "../analysis/advanced.js";
 import { runAdvancedAnalysisInWorker } from "../analysis/advancedWorkerClient.js";
 import { AnalyzeLotteryUseCase, type AnalysisResponse } from "../application/analyzeLottery.js";
+import { CheckGameBatchUseCase, type CheckGameBatchResult } from "../application/checkGameBatch.js";
 import { generateMegaSenaGames } from "../generator/megaSena.js";
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { generateDiaDeSorteGames } from "../generator/diaDeSorte.js";
 import type { GenerationMode } from "../generator/shared.js";
-import { evaluateGames } from "../checker/evaluate.js";
 import { backtestMegaSena } from "../backtest/megaSena.js";
 import { backtestLotofacil } from "../backtest/lotofacil.js";
 import { backtestDiaDeSorte } from "../backtest/diaDeSorte.js";
@@ -133,6 +133,7 @@ export class LotoLabApiServices {
   readonly strategies: PostgresStrategyRepository;
   readonly backtests: PostgresBacktestRepository;
   private readonly analyzeLottery: AnalyzeLotteryUseCase;
+  private readonly checkGameBatch: CheckGameBatchUseCase;
   private readonly advancedAnalysisCache = new Map<LotteryId, AdvancedAnalysisCacheEntry>();
   private readonly advancedAnalysisInFlight = new Map<LotteryId, AdvancedAnalysisInFlightEntry>();
 
@@ -142,6 +143,7 @@ export class LotoLabApiServices {
     this.strategies = new PostgresStrategyRepository(pool);
     this.backtests = new PostgresBacktestRepository(pool);
     this.analyzeLottery = new AnalyzeLotteryUseCase(this.contests);
+    this.checkGameBatch = new CheckGameBatchUseCase(this.games, this.contests);
   }
 
   async analyze(lottery: LotteryId): Promise<AnalysisResponse> {
@@ -275,17 +277,8 @@ export class LotoLabApiServices {
     };
   }
 
-  async checkBatch(batchId: number, contestNumber: number) {
-    const batch = await this.games.findBatch(batchId);
-    if (!batch) return undefined;
-    const target = await this.contests.findByNumber(batch.lottery, contestNumber);
-    if (!target) return { batch, target: undefined, checks: undefined };
-
-    return {
-      batch,
-      target,
-      checks: evaluateGames(batch.games, target),
-    };
+  async checkBatch(batchId: number, contestNumber: number): Promise<CheckGameBatchResult> {
+    return this.checkGameBatch.execute(batchId, contestNumber);
   }
 
   async runBacktest(input: RunBacktestRequest): Promise<RunBacktestResponse> {
