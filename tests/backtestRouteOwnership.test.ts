@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 
 async function source(path: string): Promise<string> {
-  return readFile(new URL(`../${path}`, import.meta.url), "utf8");
+  return readFile(resolve(process.cwd(), path), "utf8");
 }
 
 test("backtest catalog routes live exclusively in the feature controller", async () => {
@@ -13,8 +14,8 @@ test("backtest catalog routes live exclusively in the feature controller", async
     source("src/api/services.ts"),
   ]);
 
-  assert.doesNotMatch(app, /\/api\/v1\/backtest-runs/);
-  assert.doesNotMatch(app, /\/api\/v1\/backtests\/\(\[\^\/\]\+\)/);
+  assert.doesNotMatch(app, /services\.backtests\.findById/);
+  assert.doesNotMatch(app, /services\.listBacktests/);
   assert.doesNotMatch(services, /listBacktests\s*\(/);
 
   assert.match(controller, /\/api\/v1\/backtest-runs/);
