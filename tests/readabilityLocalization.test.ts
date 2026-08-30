@@ -35,7 +35,7 @@ test("canonical web source owns the 16px functional typography floor", async () 
   const styles = await source("web/styles.css");
   const uiFoundation = await source("web/ui-foundation.css");
   const experiments = await source("web/experiments.css");
-  const agenda = await source("web/agenda.css");
+  const agenda = await source("web/agenda-workspace.css");
   const build = await source("scripts/buildWeb.mjs");
   const e2e = await source("scripts/e2eReadability.mjs");
 
@@ -53,7 +53,7 @@ test("canonical web source owns the 16px functional typography floor", async () 
   assert.match(uiFoundation, /\.topbar-copy h1 \{ font-size: 24px; \}/);
   assert.match(experiments, /\.experiment-card h3 \{ font-size: 19px; \}/);
   assert.match(experiments, /\.form-inline-note \{[^}]*line-height: 1\.55;/);
-  assert.match(agenda, /\.agenda-card h3 \{ font-size: 19px; \}/);
+  assert.match(agenda, /\.agenda-card h3 \{\s*font-size: 18px;/);
 
   assert.doesNotMatch(build, /readability\.(?:css|js)/);
   assert.doesNotMatch(build, /localization\.js/);

@@ -1,3 +1,11 @@
+.main-nav a.nav-item,
+.main-nav a.nav-item:link,
+.main-nav a.nav-item:visited,
+.main-nav a.nav-item:hover,
+.main-nav a.nav-item:active {
+  text-decoration: none !important;
+}
+
 .agenda-content {
   width: 100%;
   max-width: none;
@@ -44,24 +52,30 @@
 }
 
 .agenda-grid {
+  display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
 .agenda-card {
+  position: relative;
+  overflow: hidden;
   min-height: 158px;
   padding: 16px;
-  border-color: var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 .agenda-card::after {
+  content: "";
+  position: absolute;
   width: 112px;
   height: 112px;
   right: -50px;
   top: -50px;
+  border-radius: 50%;
   background: var(--accent-soft);
 }
 
@@ -69,11 +83,15 @@
 .agenda-card-footer,
 .agenda-inbox-head,
 .agenda-notification-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
 
 .agenda-card h3,
 .agenda-notification h3 {
+  margin: 0;
   color: var(--text);
 }
 
@@ -100,12 +118,24 @@
 .agenda-card-footer {
   margin-top: 14px;
   padding-top: 12px;
-  border-top-color: var(--border);
+  border-top: 1px solid var(--border);
 }
 
 .agenda-prize {
   color: var(--text);
   font-size: 16px;
+  font-weight: 700;
+}
+
+.agenda-status-pill,
+.agenda-severity,
+.agenda-nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 800;
 }
 
 .agenda-status-pill {
@@ -119,6 +149,7 @@
 .agenda-nav-badge {
   min-width: 22px;
   height: 22px;
+  margin-left: auto;
   padding: 0 6px;
   background: var(--accent);
   color: #ffffff;
@@ -130,12 +161,15 @@
 }
 
 .agenda-actions {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
 .agenda-filter {
+  display: inline-flex;
   padding: 3px;
-  border-color: var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
 }
@@ -143,9 +177,14 @@
 .agenda-filter button {
   min-height: 38px;
   padding: 7px 11px;
+  border: 0;
   border-radius: 6px;
+  background: transparent;
   color: var(--muted);
+  cursor: pointer;
+  font: inherit;
   font-size: 16px;
+  font-weight: 700;
 }
 
 .agenda-filter button:hover {
@@ -159,14 +198,17 @@
 }
 
 .agenda-inbox {
+  display: grid;
   gap: 8px;
 }
 
 .agenda-notification {
+  display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
+  align-items: start;
   padding: 13px 14px;
-  border-color: var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
@@ -182,7 +224,7 @@
 }
 
 .agenda-notification p {
-  margin-top: 4px;
+  margin: 4px 0 0;
 }
 
 .agenda-notification-main {
@@ -209,6 +251,8 @@
 }
 
 .agenda-notification-actions {
+  display: flex;
+  align-items: center;
   gap: 7px;
 }
 
@@ -219,11 +263,15 @@
   align-items: center;
   justify-content: center;
   padding: 7px 10px;
-  border-color: var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+  font: inherit;
   font-size: 16px;
+  font-weight: 700;
 }
 
 .agenda-link:hover,
@@ -252,6 +300,7 @@
   background: var(--surface);
   color: var(--muted);
   font-size: 16px;
+  text-align: center;
 }
 
 @media (max-width: 1060px) {

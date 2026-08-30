@@ -9,12 +9,14 @@ test("agenda workspace follows Prototype 1 while preserving notification safety 
     readFile("web/agenda.js", "utf8"),
   ]);
 
-  const baseAgenda = html.indexOf('/assets/agenda.css');
-  const workspaceLayer = html.indexOf('/assets/agenda-workspace.css');
-  assert.ok(baseAgenda >= 0, "base Agenda styles must remain available");
-  assert.ok(workspaceLayer > baseAgenda, "Prototype 1 must be the final Agenda presentation layer");
+  assert.doesNotMatch(html, /\/assets\/agenda\.css/);
+  assert.match(html, /\/assets\/agenda-workspace\.css/);
+  await assert.rejects(readFile("web/agenda.css", "utf8"), /ENOENT/);
 
   assert.match(workspace, /\.agenda-content > \.stack \{[\s\S]*max-width: 1440px/);
+  assert.match(workspace, /\.agenda-grid \{[\s\S]*display: grid[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(workspace, /\.agenda-card \{[\s\S]*position: relative[\s\S]*border: 1px solid var\(--border\)/);
+  assert.match(workspace, /\.agenda-notification \{[\s\S]*display: grid[\s\S]*border: 1px solid var\(--border\)/);
   assert.match(workspace, /\.agenda-status-pill \{[\s\S]*background: var\(--accent-soft\)[\s\S]*color: var\(--accent-strong\)/);
   assert.match(workspace, /\.agenda-notification\.is-unread \{[\s\S]*box-shadow: inset 3px 0 0 var\(--accent\)/);
   assert.match(workspace, /\.agenda-severity\.success \{[\s\S]*background: var\(--success\)/);
