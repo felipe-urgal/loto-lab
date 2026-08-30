@@ -3,10 +3,10 @@ import { backtestDiaDeSorte } from "../backtest/diaDeSorte.js";
 import { backtestLotofacil } from "../backtest/lotofacil.js";
 import { backtestMegaSena } from "../backtest/megaSena.js";
 
-export const MAX_HTTP_BACKTEST_ROUNDS = 500;
+export const MAX_BACKTEST_ROUNDS = 500;
 
 export class BacktestRoundLimitError extends Error {
-  constructor(readonly requested: number, readonly maximum = MAX_HTTP_BACKTEST_ROUNDS) {
+  constructor(readonly requested: number, readonly maximum = MAX_BACKTEST_ROUNDS) {
     super(`Backtest would process ${requested} contests; the HTTP limit is ${maximum}`);
   }
 }
@@ -76,7 +76,7 @@ export class RunBacktestUseCase {
       .filter((contest) => input.startContest === undefined || contest.number >= input.startContest)
       .filter((contest) => input.endContest === undefined || contest.number <= input.endContest)
       .length;
-    if (eligibleRoundCount > MAX_HTTP_BACKTEST_ROUNDS) {
+    if (eligibleRoundCount > MAX_BACKTEST_ROUNDS) {
       throw new BacktestRoundLimitError(eligibleRoundCount);
     }
 
