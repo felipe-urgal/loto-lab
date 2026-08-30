@@ -6,6 +6,8 @@ import { join } from "node:path";
 const baseUrl = process.env.E2E_BASE_URL || "http://127.0.0.1:3099";
 const debugPort = Number(process.env.E2E_READABILITY_CHROME_PORT || 9226);
 const MIN_FONT_PX = 16;
+const MOBILE_WIDTH = 390;
+const MOBILE_HEIGHT = 844;
 
 function findChrome() {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
@@ -156,6 +158,68 @@ async function auditReadableText(client, label) {
   if (offenders.length) throw new Error(`${label} contains visible text below ${MIN_FONT_PX}px: ${JSON.stringify(offenders)}`);
 }
 
+async function auditDocumentOverflow(client, label) {
+  const dimensions = await evaluate(client, `(() => ({
+    viewport: document.documentElement.clientWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    bodyWidth: document.body.scrollWidth,
+  }))()`);
+  if (dimensions.documentWidth > dimensions.viewport + 1 || dimensions.bodyWidth > dimensions.viewport + 1) {
+    throw new Error(`${label} overflows the mobile document: ${JSON.stringify(dimensions)}`);
+  }
+}
+
+async function auditKeyboardFocus(client, label) {
+  await evaluate(client, "document.activeElement?.blur(); true");
+  await client.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
+  await client.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
+  const focus = await evaluate(client, `(() => {
+    const active = document.activeElement;
+    if (!active || active === document.body || active === document.documentElement) return null;
+    const style = getComputedStyle(active);
+    return {
+      tag: active.tagName.toLowerCase(),
+      text: (active.textContent || active.getAttribute('aria-label') || active.getAttribute('placeholder') || '').trim().replace(/\\s+/g, ' ').slice(0, 100),
+      outlineStyle: style.outlineStyle,
+      outlineWidth: Number.parseFloat(style.outlineWidth || '0'),
+      outlineOffset: Number.parseFloat(style.outlineOffset || '0'),
+    };
+  })()`);
+  if (!focus) throw new Error(`${label} did not expose a keyboard-focusable control after Tab`);
+  if (focus.outlineStyle === "none" || focus.outlineWidth < 1.5) {
+    throw new Error(`${label} keyboard focus is not visibly outlined: ${JSON.stringify(focus)}`);
+  }
+}
+
+async function auditReducedMotion(client, label) {
+  await client.send("Emulation.setEmulatedMedia", {
+    media: "screen",
+    features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+  });
+  const state = await evaluate(client, `(() => {
+    const candidate = [...document.querySelectorAll('a,button,input,select,textarea,summary')]
+      .find((node) => node.getClientRects().length > 0);
+    if (!candidate) return null;
+    const style = getComputedStyle(candidate);
+    const durations = (value) => value.split(',').map((part) => {
+      const text = part.trim();
+      if (text.endsWith('ms')) return Number.parseFloat(text);
+      if (text.endsWith('s')) return Number.parseFloat(text) * 1000;
+      return Number.parseFloat(text) || 0;
+    });
+    return {
+      media: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      transitionMs: Math.max(...durations(style.transitionDuration)),
+      animationMs: Math.max(...durations(style.animationDuration)),
+    };
+  })()`);
+  await client.send("Emulation.setEmulatedMedia", { media: "screen", features: [] });
+  if (!state?.media) throw new Error(`${label} did not honor prefers-reduced-motion emulation`);
+  if (state.transitionMs > 0.02 || state.animationMs > 0.02) {
+    throw new Error(`${label} keeps visible motion under reduced-motion: ${JSON.stringify(state)}`);
+  }
+}
+
 const checks = [
   { path: "/#dashboard", ready: "Boolean(document.querySelector('#content')) && !document.querySelector('.loading-state')" },
   { path: "/#analysis", ready: "Boolean(document.querySelector('.a2-shell'))" },
@@ -195,13 +259,32 @@ try {
 
   for (const check of checks) {
     await navigate(client, check.path);
-    await waitFor(client, check.ready, `${check.path} readiness`);
-    await auditReadableText(client, check.path);
+    await waitFor(client, check.ready, `${check.path} desktop readiness`);
+    await auditReadableText(client, `${check.path} desktop`);
+    await auditKeyboardFocus(client, `${check.path} desktop`);
   }
+
+  await client.send("Emulation.setDeviceMetricsOverride", {
+    width: MOBILE_WIDTH,
+    height: MOBILE_HEIGHT,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+
+  for (const check of checks) {
+    await navigate(client, check.path);
+    await waitFor(client, check.ready, `${check.path} mobile readiness`);
+    await auditReadableText(client, `${check.path} mobile`);
+    await auditDocumentOverflow(client, check.path);
+    await auditKeyboardFocus(client, `${check.path} mobile`);
+    await auditReducedMotion(client, check.path);
+  }
+
+  await client.send("Emulation.clearDeviceMetricsOverride");
 
   if (runtimeErrors.length) throw new Error(`Browser runtime exceptions: ${runtimeErrors.join(" | ")}`);
   if (serverErrors.length) throw new Error(`Browser API/server failures: ${serverErrors.join(" | ")}`);
-  console.log(`Readability E2E passed: no visible functional text below ${MIN_FONT_PX}px across all workspaces`);
+  console.log(`Visual/a11y E2E passed: ${MIN_FONT_PX}px readability, keyboard focus, reduced motion and ${MOBILE_WIDTH}px no-overflow across all workspaces`);
 } finally {
   client?.close();
   await stopBrowser(browser);
