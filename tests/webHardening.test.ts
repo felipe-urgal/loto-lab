@@ -93,7 +93,9 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
   assert.match(refinements, /latestCache\.delete/);
   assert.match(refinements, /loto-lab:data-synced/);
 
-  assert.match(realBets, /root\.querySelector\("\.real-performance-section"\)/);
+  assert.doesNotMatch(realBets, /real-performance-section/);
+  assert.doesNotMatch(realBets, /refineDashboard/);
+  assert.match(realBets, /currentView\(\) === "games"/);
   assert.match(realBets, /data-real-bet-error/);
   assert.match(realBets, /refresh-view/);
 

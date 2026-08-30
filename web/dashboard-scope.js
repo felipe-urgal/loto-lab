@@ -105,11 +105,11 @@ function setHeader(scope) {
   if (!title || !subtitle) return;
   if (scope === "all") {
     title.textContent = "Painel";
-    subtitle.textContent = "Concursos, desempenho e atividade das loterias.";
+    subtitle.textContent = "Estado atual, desempenho e atividade das loterias.";
     return;
   }
   title.textContent = `Painel · ${LOTTERIES[scope]}`;
-  subtitle.textContent = "Último concurso, desempenho e atividade em um só lugar.";
+  subtitle.textContent = "Concurso atual, desempenho e atividade em um só lugar.";
 }
 
 function formatDate(value) {
@@ -145,8 +145,61 @@ function dashboardAction(view, lottery, label, variant = "ghost") {
   return `<button class="button compact ${variant}" type="button" data-dashboard-open="${view}" data-dashboard-lottery="${lottery}">${escapeHtml(label)}</button>`;
 }
 
+function metricCard(label, value, detail, tone = "") {
+  return `<article class="panel dashboard-metric-card">
+    <span class="dashboard-metric-label">${escapeHtml(label)}</span>
+    <strong class="dashboard-metric-value ${tone}">${value}</strong>
+    <span class="dashboard-metric-detail">${detail}</span>
+  </article>`;
+}
+
 function performanceMetric(label, value, tone = "") {
   return `<span class="dashboard-performance-metric"><small>${escapeHtml(label)}</small><strong class="${tone}">${value}</strong></span>`;
+}
+
+function batchGameCount(batches) {
+  return (batches?.items || []).reduce((total, batch) => total + (batch.games?.length || 0), 0);
+}
+
+function latestBacktest(backtests) {
+  return backtests?.items?.[0];
+}
+
+function focusedMetrics(contest, backtests, realBets, batches) {
+  const backtest = latestBacktest(backtests);
+  const historical = backtest?.summary || {};
+  const real = realBets?.summary || {};
+  const net = Number(real.netResult || 0);
+  const batchCount = batches?.items?.length || 0;
+
+  return `<section class="dashboard-metrics-grid" aria-label="Resumo do painel">
+    ${metricCard("Último concurso", contest ? `#${contest.number}` : "—", contest ? formatDate(contest.date) : "Sem concurso sincronizado")}
+    ${metricCard("Jogos recentes", String(batchGameCount(batches)), `${batchCount} lote(s) carregado(s)`)}
+    ${metricCard("ROI histórico", formatPercent(historical.roi), backtest ? `Teste #${backtest.id}` : "Sem teste histórico", toneFor(historical.roi))}
+    ${metricCard("Resultado real", formatCurrency(net), `${real.checkedBets || 0} conferida(s) · ${real.pendingBets || 0} pendente(s)`, netTone(net))}
+  </section>`;
+}
+
+function allMetrics(data, backtests, realBets) {
+  const updatedLotteries = data.contests.filter(([, contest]) => Boolean(contest)).length;
+  const batches = data.batches.flatMap(([, value]) => value?.items || []);
+  const gameCount = batches.reduce((total, batch) => total + (batch.games?.length || 0), 0);
+  const realSummaries = LOTTERY_IDS.map((lottery) => realBets.get(lottery)?.summary || {});
+  const checkedCost = realSummaries.reduce((total, summary) => total + Number(summary.checkedCost || 0), 0);
+  const netResult = realSummaries.reduce((total, summary) => total + Number(summary.netResult || 0), 0);
+  const aggregateRoi = checkedCost > 0 ? netResult / checkedCost : undefined;
+  const historicalEntries = LOTTERY_IDS
+    .map((lottery) => ({ lottery, run: latestBacktest(backtests.get(lottery)) }))
+    .filter((entry) => Number.isFinite(Number(entry.run?.summary?.roi)));
+  historicalEntries.sort((a, b) => Number(b.run.summary.roi) - Number(a.run.summary.roi));
+  const bestHistorical = historicalEntries[0];
+
+  return `<section class="dashboard-metrics-grid" aria-label="Resumo do painel">
+    ${metricCard("Cobertura atual", `${updatedLotteries}/${LOTTERY_IDS.length}`, "loterias com concurso sincronizado")}
+    ${metricCard("Jogos recentes", String(gameCount), `${batches.length} lote(s) carregado(s)`)}
+    ${metricCard("ROI real agregado", formatPercent(aggregateRoi), checkedCost > 0 ? `${formatCurrency(checkedCost)} em custo conferido` : "Sem apostas conferidas", toneFor(aggregateRoi))}
+    ${metricCard("Melhor ROI histórico", bestHistorical ? formatPercent(bestHistorical.run.summary.roi) : "—", bestHistorical ? `${LOTTERIES[bestHistorical.lottery]} · teste #${bestHistorical.run.id}` : "Sem testes históricos", bestHistorical ? toneFor(bestHistorical.run.summary.roi) : "")}
+  </section>`;
 }
 
 function focusedLatestCard(lottery, contest) {
@@ -161,8 +214,8 @@ function focusedLatestCard(lottery, contest) {
   return `<article class="panel dashboard-latest-card">
     <div class="dashboard-latest-main">
       <div class="dashboard-latest-head">
-        <div><h2>Último concurso</h2><p>${LOTTERIES[lottery]} · ${formatDate(contest.date)}</p></div>
-        <strong class="dashboard-contest-number">Concurso ${contest.number}</strong>
+        <div><span class="dashboard-eyebrow">Concurso atual</span><h2>${LOTTERIES[lottery]}</h2><p>${formatDate(contest.date)}</p></div>
+        <strong class="dashboard-contest-number">#${contest.number}</strong>
       </div>
       <div class="draw-numbers">${balls(contest.numbers)}</div>
       <span class="dashboard-target">Próximo alvo <strong>${nextContest ? `#${nextContest}` : "—"}</strong></span>
@@ -171,8 +224,32 @@ function focusedLatestCard(lottery, contest) {
   </article>`;
 }
 
+function realStatusCard(lottery, realBets) {
+  const real = realBets?.summary || {};
+  const checked = Number(real.checkedBets || 0);
+  const pending = Number(real.pendingBets || 0);
+  const total = checked + pending;
+  const checkedRatio = total > 0 ? checked / total : 0;
+  const angle = Math.round(checkedRatio * 360);
+  const net = Number(real.netResult || 0);
+
+  return `<article class="panel dashboard-status-card">
+    <div class="dashboard-status-head"><div><span class="dashboard-eyebrow">Apostas reais</span><h2>Conferência</h2></div>${dashboardAction("games", lottery, "Abrir jogos")}</div>
+    <div class="dashboard-status-body">
+      <div class="dashboard-donut" style="--dashboard-checked-angle:${angle}deg" aria-label="${checked} conferidas de ${total} apostas">
+        <span><strong>${total ? Math.round(checkedRatio * 100) : 0}%</strong><small>conferidas</small></span>
+      </div>
+      <dl class="dashboard-status-list">
+        <div><dt>Conferidas</dt><dd>${checked}</dd></div>
+        <div><dt>Pendentes</dt><dd>${pending}</dd></div>
+        <div><dt>Resultado</dt><dd class="${netTone(net)}">${formatCurrency(net)}</dd></div>
+      </dl>
+    </div>
+  </article>`;
+}
+
 function focusedPerformance(lottery, backtests, realBets) {
-  const backtest = backtests?.items?.[0];
+  const backtest = latestBacktest(backtests);
   const summary = backtest?.summary || {};
   const real = realBets?.summary || {};
   const net = Number(real.netResult || 0);
@@ -184,14 +261,14 @@ function focusedPerformance(lottery, backtests, realBets) {
     </div>
     <div class="panel dashboard-performance-panel">
       <div class="dashboard-performance-row">
-        <div class="dashboard-performance-label"><strong>Estratégia</strong><span>${backtest ? `Teste histórico #${backtest.id}` : "Nenhum teste histórico salvo"}</span></div>
+        <div class="dashboard-performance-label"><strong>Histórico</strong><span>${backtest ? `Teste #${backtest.id}` : "Nenhum teste salvo"}</span></div>
         ${performanceMetric("ROI", formatPercent(summary.roi), toneFor(summary.roi))}
         ${performanceMetric("Cobertura", formatPercent(summary.financialCoverage))}
         ${performanceMetric("Melhor acerto", summary.bestHits ?? "—")}
         ${performanceMetric("Prêmios", formatCurrency(summary.totalPrizeValue))}
       </div>
       <div class="dashboard-performance-row">
-        <div class="dashboard-performance-label"><strong>Resultado real</strong><span>${real.checkedBets || 0} conferida(s) · ${real.pendingBets || 0} pendente(s)</span></div>
+        <div class="dashboard-performance-label"><strong>Real</strong><span>${real.checkedBets || 0} conferida(s) · ${real.pendingBets || 0} pendente(s)</span></div>
         ${performanceMetric("ROI", formatPercent(real.roi), toneFor(real.roi))}
         ${performanceMetric("Gasto", formatCurrency(real.actualCost || 0))}
         ${performanceMetric("Prêmios", formatCurrency(real.totalPrizeValue || 0))}
@@ -211,7 +288,7 @@ function focusedRecentGames(lottery, batches) {
     : `<div class="dashboard-inline-empty"><strong>Nenhum lote salvo</strong><span>Gere seus primeiros jogos para começar o histórico.</span></div>`;
 
   return `<section class="dashboard-section">
-    <div class="section-head dashboard-section-head"><div><h2>Jogos recentes</h2><p>Últimos lotes gerados para ${LOTTERIES[lottery]}.</p></div>${dashboardAction("games", lottery, "Ver meus jogos")}</div>
+    <div class="section-head dashboard-section-head"><div><h2>Atividade recente</h2><p>Últimos lotes gerados para ${LOTTERIES[lottery]}.</p></div>${dashboardAction("games", lottery, "Ver meus jogos")}</div>
     <div class="panel list dashboard-recent-list">${markup}</div>
   </section>`;
 }
@@ -230,7 +307,7 @@ function latestLotteryCard(lottery, contest) {
 }
 
 function allPerformanceRow(lottery, backtests, realBets) {
-  const backtest = backtests?.items?.[0];
+  const backtest = latestBacktest(backtests);
   const summary = backtest?.summary || {};
   const real = realBets?.summary || {};
   const net = Number(real.netResult || 0);
@@ -282,7 +359,11 @@ async function loadAllData() {
 
 function renderFocusedDashboard(scope, data) {
   root.innerHTML = `<div class="dashboard-shell is-focused">
-    ${focusedLatestCard(scope, data.contest)}
+    ${focusedMetrics(data.contest, data.backtests, data.realBets, data.batches)}
+    <section class="dashboard-overview-grid">
+      ${focusedLatestCard(scope, data.contest)}
+      ${realStatusCard(scope, data.realBets)}
+    </section>
     ${focusedPerformance(scope, data.backtests, data.realBets)}
     ${focusedRecentGames(scope, data.batches)}
   </div>`;
@@ -293,16 +374,17 @@ function renderAllDashboard(data) {
   const realBets = new Map(data.realBets);
 
   root.innerHTML = `<div class="dashboard-shell is-all">
+    ${allMetrics(data, backtests, realBets)}
     <section class="dashboard-section">
-      <div class="section-head dashboard-section-head"><div><h2>Últimos concursos</h2><p>Um resumo rápido das três loterias.</p></div></div>
+      <div class="section-head dashboard-section-head"><div><h2>Concursos atuais</h2><p>Último resultado sincronizado e próximo alvo por loteria.</p></div></div>
       <div class="dashboard-lottery-grid">${data.contests.map(([lottery, contest]) => latestLotteryCard(lottery, contest)).join("")}</div>
     </section>
     <section class="dashboard-section">
-      <div class="section-head dashboard-section-head"><div><h2>Desempenho</h2><p>Histórico e resultado real, lado a lado.</p></div></div>
+      <div class="section-head dashboard-section-head"><div><h2>Desempenho por loteria</h2><p>Histórico e resultado real no mesmo quadro.</p></div></div>
       <div class="panel dashboard-performance-panel">${LOTTERY_IDS.map((lottery) => allPerformanceRow(lottery, backtests.get(lottery), realBets.get(lottery))).join("")}</div>
     </section>
     <section class="dashboard-section">
-      <div class="section-head dashboard-section-head"><div><h2>Jogos recentes</h2><p>Atividade mais recente entre as loterias.</p></div></div>
+      <div class="section-head dashboard-section-head"><div><h2>Atividade recente</h2><p>Lotes mais recentes entre as três loterias.</p></div></div>
       <div class="panel list dashboard-recent-list">${combinedBatchesMarkup(data.batches)}</div>
     </section>
   </div>`;

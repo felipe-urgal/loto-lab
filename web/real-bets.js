@@ -3,7 +3,6 @@ import {
   escapeHtml,
   formatCurrency,
   formatDateTime,
-  formatPercent,
   onViewRendered,
 } from "./runtime.js";
 
@@ -31,49 +30,11 @@ function load(lottery, force = false) {
   return cache.get(lottery);
 }
 
-function metric(label, value, detail = "", tone = "") {
-  return `<article class="panel metric-card"><span class="metric-label">${escapeHtml(label)}</span><strong class="metric-value ${tone}">${value}</strong><span class="metric-detail">${escapeHtml(detail)}</span></article>`;
-}
-
 function statusInfo(status) {
   if (status === "checked") return { label: "Conferido", className: "is-checked" };
   if (status === "awaiting_result") return { label: "Aguardando resultado", className: "is-waiting" };
   if (status === "placed") return { label: "Apostado", className: "" };
   return { label: "Planejado", className: "" };
-}
-
-async function refineDashboard() {
-  if (!root || root.querySelector(".real-performance-section")) return;
-  const lottery = currentLottery();
-  let data;
-  try {
-    data = await load(lottery);
-  } catch {
-    return;
-  }
-  if (
-    currentView() !== "dashboard"
-    || currentLottery() !== lottery
-    || root.querySelector(".real-performance-section")
-  ) return;
-
-  const sections = [...root.querySelectorAll(":scope > .stack > section")];
-  if (sections.length < 2) return;
-  const summary = data.summary || {};
-  const section = document.createElement("section");
-  section.className = "real-performance-section";
-  const roiTone = typeof summary.roi === "number" ? (summary.roi >= 0 ? "positive" : "negative") : "";
-  section.innerHTML = `
-    <div class="section-head">
-      <div><h2>Desempenho real</h2><p>Apenas apostas marcadas como realmente realizadas · não inclui testes históricos.</p></div>
-    </div>
-    <div class="grid cols-4">
-      ${metric("ROI real", formatPercent(summary.roi), `${summary.checkedBets || 0} aposta(s) conferida(s)`, roiTone)}
-      ${metric("Gasto real", formatCurrency(summary.actualCost || 0), `${summary.pendingBets || 0} aguardando resultado`)}
-      ${metric("Prêmios reais", formatCurrency(summary.totalPrizeValue || 0), "Retorno das apostas conferidas")}
-      ${metric("Resultado líquido", formatCurrency(summary.netResult || 0), "Prêmios menos custo conferido", (summary.netResult || 0) >= 0 ? "positive" : "negative")}
-    </div>`;
-  sections[1].insertAdjacentElement("afterend", section);
 }
 
 function betSummaryMarkup(bet) {
@@ -212,9 +173,7 @@ async function refineGames() {
 }
 
 async function refine() {
-  const view = currentView();
-  if (view === "dashboard") await refineDashboard();
-  else if (view === "games") await refineGames();
+  if (currentView() === "games") await refineGames();
 }
 
 function scheduleRefine() {
