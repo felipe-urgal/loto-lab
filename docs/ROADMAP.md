@@ -1,22 +1,12 @@
 # Roadmap técnico e de produto
 
-> Baseline da auditoria sênior: 2026-08-27.
+> Baseline revisada em **2026-08-30**, após o merge do #137 (`257ebbcc`).
 >
-> Este documento é a fonte de verdade para a evolução estrutural do Loto Lab. Ele substitui listas históricas de “próximos milestones” no README.
-
-## Objetivo
-
-Evoluir o Loto Lab de uma base funcional e robusta para uma plataforma de pesquisa reproduzível, auditável e sustentável, preservando o que já está correto e reduzindo a complexidade acumulada nas bordas do sistema.
-
-A diretriz central permanece:
-
-> **Algoritmo calcula; IA interpreta.**
-
-O roadmap não busca um rewrite. A estratégia é **consolidação incremental por PRs pequenos, testáveis e reversíveis**.
+> Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
 ## North Star
 
-O produto deve permitir rastrear um fluxo completo:
+O Loto Lab deve tornar auditável o fluxo:
 
 ```text
 Hipótese
@@ -27,7 +17,7 @@ Experimento reproduzível
   ↓
 Job auditável
   ↓
-Resultado estatístico/financeiro
+Evidência estatística/financeira
   ↓
 Comparação com baseline/acaso
   ↓
@@ -44,417 +34,261 @@ Resultado real
 Feedback auditável
 ```
 
-Cada transição relevante deve possuir, quando aplicável:
+A diretriz permanece:
 
-- identificador estável;
-- versão da metodologia/configuração;
-- inputs e outputs;
-- timestamps;
-- proveniência;
-- estado explícito;
-- evidência suficiente para reprodução.
+> **Algoritmo calcula; IA interpreta.**
 
-## Princípios de implementação
+## Estado consolidado
 
-1. **Sem rewrite geral.** Refactors devem preservar comportamento e usar os testes como rede de segurança.
-2. **PRs verticais e pequenos.** Evitar mudanças horizontais que alterem muitas camadas ao mesmo tempo.
-3. **Domínio antes da interface.** HTTP, CLI e UI orquestram; cálculo e regra pertencem ao core/application.
-4. **Integridade em profundidade.** Regras críticas continuam protegidas em TypeScript e PostgreSQL quando isso reduz risco real.
-5. **Medição antes de performance.** Índices, concorrência e otimizações precisam de baseline antes/depois.
-6. **Complexidade analítica ≠ complexidade cognitiva.** A UI pode oferecer profundidade por progressive disclosure.
-7. **IA não é motor probabilístico.** A camada de IA interpreta evidências calculadas e não escolhe dezenas.
-8. **CI é contrato de merge.** Nenhuma mudança é considerada pronta com CI vermelho ou revisão incompleta.
+### Concluído desde a auditoria original
 
-## Estado atual resumido
+- redes de segurança de Analysis Jobs, IA e Operações (#54/#55);
+- isolamento PostgreSQL da suíte (#56);
+- contratos TypeScript ↔ PostgreSQL e upgrade de migrations (#57);
+- hardening de CI/supply chain com CodeQL, Dependency Review, SBOM e Trivy (#58);
+- frontend source-of-truth: PT-BR e legibilidade na fonte, sem runtime corretivo (#59);
+- decisão do redesign/protótipo oficial (#120, concluída);
+- rollout visual das superfícies principais (#123–#133);
+- primeiras consolidações de CSS legado (#134–#137);
+- várias fatias da application layer (#106–#119).
 
 ### Pontos fortes a preservar
 
 - core estatístico e anti-leakage;
 - PostgreSQL como fonte de verdade operacional;
-- migrations versionadas com advisory lock e checksum;
+- migrations forward-only com checksum e advisory lock;
 - constraints/triggers de integridade de domínio;
-- worker threads e gates para trabalhos CPU-bound;
+- worker threads e gate conservador para CPU-bound;
 - runtime single-instance explícito por banco;
 - graceful startup/shutdown e recovery;
 - container não-root/read-only com capabilities reduzidas;
-- CI com PostgreSQL, cobertura, audit, Docker smoke, autenticação e browser E2E;
-- IA restrita a interpretação auditável.
+- CI funcional + Security + browser E2E;
+- IA restrita a interpretação auditável;
+- Protótipo 1 aplicado ao produto inteiro;
+- copy PT-BR e piso funcional de 16px pertencendo à fonte canônica.
 
-### Dívidas prioritárias
+### Dívidas ativas reais
 
-- `main` ainda sem proteção obrigatória;
-- cobertura desigual nas bordas HTTP/orquestração;
-- testes PostgreSQL serializados por compartilharem estado;
-- falta de contract tests TS ↔ PostgreSQL e upgrade tests de migrations;
-- frontend depende de camadas corretivas de tipografia/localização em runtime;
-- frontend cresceu por `*-v2`, `*-hardening`, `*-refinements` e módulos grandes;
-- concentração de responsabilidades em `LotoLabApiServices`, handlers e hotspots algorítmicos;
-- observabilidade baseada principalmente em logs, sem métricas operacionais suficientes;
-- README/documentação histórica começou a divergir do produto entregue.
-
----
-
-# Now — P0/P1
-
-## 0. Governança de `main`
-
-**Issue:** #52
-
-Configurar branch protection/ruleset para:
-
-- exigir Pull Request;
-- exigir `CI / test` verde;
-- bloquear force-push;
-- bloquear exclusão de `main`;
-- exigir branch atualizada quando aplicável;
-- aplicar regras a administradores quando a operação permitir;
-- manter squash merge como fluxo preferencial.
-
-**Definition of Done:** `main.protected = true` e o check obrigatório aparece na configuração do repositório.
-
-## 1. Rede de segurança das bordas críticas
-
-### 1.1 Analysis Jobs API
-
-**Issue:** #54
-
-Cobrir criação, consulta, listagem, cancelamento, validações, estados terminais e failure paths da camada HTTP de jobs.
-
-### 1.2 AI e Operations
-
-**Issue:** #55
-
-Cobrir contexto/evidence hash/dedupe/force/provider failures e fluxos operacionais `partial`/`failed`.
-
-**Objetivo da fase:** antes de alterar arquitetura, estabelecer characterization tests das bordas que podem quebrar estado, custo externo ou experiência operacional.
-
-## 2. Isolamento e contratos de dados
-
-### 2.1 PostgreSQL por worker/suíte
-
-**Issue:** #56
-
-Remover a dependência estrutural de `--test-concurrency=1` através de isolamento real de banco/schema.
-
-### 2.2 Contratos TS ↔ PostgreSQL e migrations
-
-**Issue:** #57
-
-Adicionar:
-
-- fixtures compartilhadas de invariantes;
-- contract tests aplicação/banco;
-- testes de upgrade N-1 → N;
-- verificação de preservação de dados.
-
-## 3. CI e supply chain
-
-**Issue:** #58
-
-Adicionar de forma deliberada:
-
-- permissions mínimos;
-- concurrency/timeout;
-- SAST/CodeQL;
-- dependency review quando suportado;
-- scan da imagem;
-- SBOM;
-- política clara de severidade/falsos positivos.
-
-A proteção da #52 torna esses checks realmente vinculantes.
-
-## 4. Frontend: fonte de verdade antes de nova arquitetura
-
-### 4.1 Remover correções em runtime
-
-**Issue:** #59
-
-Estado alvo:
-
-```text
-fonte correta → browser
-```
-
-Não:
-
-```text
-fonte incorreta → CSS corretivo → MutationObserver → classe corretiva
-```
-
-Entregas:
-
-- tipografia correta nos stylesheets canônicos;
-- PT-BR correto nos templates/módulos de origem;
-- remoção gradual de `readability.css`, `readability.js` e `localization.js`;
-- redução de `!important` corretivo;
-- preservação do piso funcional de 16 px, foco, teclado e reduced motion.
-
-### 4.2 Design System + TypeScript + módulos
-
-**Issue:** #60
-
-Arquitetura alvo:
-
-```text
-web/src/
-├── core/
-│   ├── api.ts
-│   ├── router.ts
-│   ├── state.ts
-│   ├── lifecycle.ts
-│   ├── dom.ts
-│   └── format.ts
-├── design-system/
-│   ├── tokens.css
-│   ├── components.css
-│   └── primitives.ts
-├── features/
-│   ├── dashboard/
-│   ├── analysis/
-│   ├── generation/
-│   ├── games/
-│   ├── lab/
-│   ├── strategies/
-│   ├── jobs/
-│   ├── agenda/
-│   └── ai/
-└── app.ts
-```
-
-Não há decisão de adotar React/Vue/Svelte. A primeira meta é um frontend vanilla moderno, tipado e modular.
-
-## 5. Backend application architecture
-
-**Issue:** #61
-
-Arquitetura alvo:
-
-```text
-Interfaces
-HTTP · CLI · Scheduler · Worker
-        ↓
-Application
-Analyze · Generate · Backtest · Sync · Bet · Lab · AI · Jobs
-        ↓
-Domain
-Lottery · Analysis · Generation · Finance · Strategy · Experiment
-        ↓
-Ports
-Repositories · CAIXA · AI · Worker executor
-        ↓
-Infrastructure
-PostgreSQL · OpenAI · CAIXA · worker_threads
-```
-
-Prioridades:
-
-- composition root explícito;
-- handlers HTTP finos;
-- use cases testáveis sem servidor;
-- redução progressiva de responsabilidades de `LotoLabApiServices`;
-- nenhuma mudança de contrato público não intencional.
-
-## 6. Observabilidade
-
-**Issue:** #63
-
-Adicionar métricas antes de tracing distribuído:
-
-- latência HTTP;
-- taxa de erro;
-- jobs por estado e idade do mais antigo;
-- duração/status de sync;
-- latência/erro CAIXA;
-- latência/erro/uso OpenAI;
-- saúde do pool PostgreSQL;
-- poucos SLOs e runbooks úteis.
+- `main` continua sem branch protection obrigatória (#52);
+- consolidação visual final ainda não terminou (#121);
+- `src/api/app.ts` e `LotoLabApiServices` ainda concentram parte do ownership HTTP/infra (#61);
+- frontend segue majoritariamente JavaScript grande/imperativo; TypeScript e primitives compartilhadas ainda são backlog (#60);
+- hotspots algorítmicos continuam grandes (#62);
+- observabilidade segue baseada principalmente em logs/estado persistido, sem métricas/SLOs (#63);
+- arquitetura de informação pós-redesign ainda pode reduzir troca de contexto (#64);
+- otimizações operacionais restantes precisam de baseline antes/depois (#65);
+- o fluxo hipótese → evidência → decisão ainda não é uma entidade explícita (#66).
 
 ---
 
-# Next — P2
+# Now
 
-## 7. Consolidar motores e hotspots algorítmicos
+## #52 — Governança de `main` · P0 · bloqueada
 
-**Issue:** #62
+A API do GitHub foi revalidada em 2026-08-30: `main.protected = false` e não há required status checks.
 
-Entregas graduais:
+**Próxima ação:** configuração administrativa no GitHub/`gh api` para exigir PR + `CI / test`, bloquear force-push/exclusão e então revalidar.
 
-- registry/engine por loteria onde houver contrato comum real;
-- decompor `analysis/advanced.ts` por conceito;
-- decompor `generator/planning.ts`;
-- separar Strategy Lab em experimento, inferência/benchmark e reporting;
-- absorver arquivos transitórios `*-hardening` no módulo canônico;
-- preservar diferenças legítimas entre Mega-Sena, Lotofácil e Dia de Sorte.
+Esta tarefa não precisa de PR de código.
 
-## 8. Arquitetura de informação e UX
+## #121 — Finalizar consolidação do Protótipo 1 · P0 · em andamento
 
-**Issue:** #64
+O rollout visual principal está concluído. Restam:
 
-Jornada alvo:
+- auditar folhas específicas de Painel, Análises, Gerador e Meus Jogos;
+- remover apenas CSS comprovadamente redundante/sem consumidor;
+- absorver hardening/refinement meramente corretivo quando houver ownership canônico claro;
+- revisão transversal de WCAG, contraste, foco, teclado e reduced-motion;
+- revisão de layout shift/performance visual;
+- E2E desktop/mobile e revisão UX/UI final.
 
-```text
-ENTENDER
-Análises
+Refactors maiores de arquitetura frontend devem ir para #60; mudanças de jornada para #64.
 
-EXPERIMENTAR
-Laboratório
+## #61 — Application use cases e controllers finos · P1 · em andamento
 
-APLICAR
-Gerar jogos
+PRs #106–#119 já extraíram análise, geração compatível, conferência, backtest, Strategy Lab, estratégias, operações, apostas reais e status de dados em várias fatias.
 
-ACOMPANHAR
-Meus jogos
+Restam principalmente:
 
-OPERAR
-Agenda · Execuções · Dados
-```
+- concursos e análises ainda em `app.ts`;
+- Generator 2.0 e geração compatível ainda roteados pelo monólito;
+- game batches/conferência remanescentes;
+- redução/remoção final de `LotoLabApiServices` como facade de infrastructure;
+- composition root explícito para todas as features migradas.
 
-Investigar antes de implementar:
+**Regra:** continuar verticalmente, sem misturar decomposição matemática da #62.
 
-- Backtests dentro do contexto do Laboratório;
-- Execuções como detalhe contextual;
-- IA integrada ao resultado/evidência quando isso reduzir troca de contexto;
-- navegação única/coerente em vez de dois modelos de rota percebidos pelo usuário.
+---
 
-Princípio de Análises:
+# Next
 
-1. o que foi observado;
-2. qual é o esperado/baseline;
-3. existe evidência de diferença;
-4. a amostra/resolução é suficiente;
-5. detalhes e metodologia sob demanda.
+## #60 — Frontend TypeScript, módulos e primitives · P1
 
-## 9. Runtime, Docker e performance
+A fundação visual já existe; o backlog restante é arquitetural:
 
-**Issue:** #65
+- `web/src/{core,design-system,features,shared}` gradualmente;
+- API client/errors/formatters/lifecycle/state compartilhados;
+- TypeScript por feature;
+- decomposição de módulos grandes;
+- escaping/`textContent` como padrão seguro;
+- primitives reutilizáveis sem framework obrigatório.
 
-Somente com evidência:
+Começar depois da consolidação visual de #121 nas áreas que compartilham os mesmos arquivos.
 
-- rede de dados interna separada de egress;
-- `stop_grace_period` alinhado ao shutdown;
+## #63 — Métricas e SLOs operacionais · P1
+
+Transformar sinais já existentes em métricas acionáveis:
+
+- latência/erros HTTP;
+- jobs por estado/idade;
+- sync e `partial`;
+- CAIXA/OpenAI;
+- pool PostgreSQL;
+- poucos SLOs + runbooks.
+
+Não introduzir tracing distribuído antes de necessidade demonstrada.
+
+---
+
+# Later / P2
+
+## #62 — Motores e hotspots algorítmicos
+
+Depois da #61:
+
+- registry por loteria quando houver contrato comum real;
+- decompor `analysis/advanced.ts` e `generator/planning.ts`;
+- separar Strategy Lab por experimento/inferência/reporting;
+- absorver nomes transitórios `*-hardening` quando o ownership estiver claro;
+- preservar equivalência matemática por testes.
+
+## #64 — Arquitetura de informação e jornada pós-redesign
+
+O visual já foi unificado. O próximo passo é decidir, com protótipos e tarefas reais:
+
+- Testes históricos contextualizados no Laboratório;
+- Execuções contextualizadas nos trabalhos de origem;
+- IA integrada às evidências quando reduzir troca de contexto;
+- percepção coerente entre hash routes e páginas dedicadas.
+
+Jornada alvo: `Entender → Experimentar → Aplicar → Acompanhar → Operar`.
+
+## #65 — Runtime/Docker/performance baseada em evidência
+
+O baseline de hardening já é forte. Restam decisões medidas:
+
+- redes/egress;
+- `stop_grace_period`;
+- logs/retenção;
 - limites CPU/memória;
-- política de logs;
-- imagem identificada pelo SHA/release;
-- revisão leve de cache antes de carregar histórico completo;
-- profiling PostgreSQL antes de índices;
-- medição de worker heap/tempo antes de elevar concorrência;
-- timeout/backoff/jitter para integrações quando necessário.
+- cache de análise;
+- índices PostgreSQL só após profiling;
+- concorrência de worker só após medir heap/tempo;
+- resiliência CAIXA conforme falhas reais.
 
-## 10. Fluxo científico de ponta a ponta
+## #66 — Hipótese → experimento → evidência → decisão
 
-**Issue:** #66
-
-Modelar explicitamente:
-
-- hipótese;
-- estratégia/configuração versionada;
-- experimento;
-- evidência;
-- conclusão/decisão;
-- proveniência até geração/aposta real quando aplicável.
-
-A UI deve deixar explícito que hipótese e evidência histórica não equivalem a previsão futura.
+Compor as peças já existentes — strategies, jobs, backtests, Lab, previews/seeds, real bets e AI insights — em uma cadeia explícita de proveniência e decisão reproduzível.
 
 ---
 
-# Later
-
-Itens deliberadamente não prioritários até existir requisito ou evidência:
-
-- escala horizontal multi-instância;
-- ownership/lease/heartbeat distribuído de jobs;
-- autenticação multi-user/RBAC;
-- tracing distribuído completo;
-- troca de framework frontend;
-- circuit breaker complexo;
-- aumento agressivo da concorrência de análises;
-- índices PostgreSQL sem `EXPLAIN (ANALYZE, BUFFERS)` mostrando ganho.
-
-## Critérios de pronto para qualquer refactor
-
-Um refactor está pronto apenas quando:
+# Ordem recomendada
 
 ```text
-comportamento antes = comportamento depois
-```
+#52 branch protection (administrativo, independente)
 
-salvo mudança funcional explicitamente documentada.
-
-### Backend
-
-- typecheck;
-- lint/static gates;
-- testes;
-- cobertura relevante;
-- PostgreSQL integration;
-- Docker smoke;
-- E2E quando a superfície pública for afetada.
-
-### Frontend
-
-Validar no mínimo:
-
-- desktop;
-- mobile;
-- teclado;
-- foco;
-- loading;
-- empty;
-- error;
-- success;
-- reduced motion quando houver animação;
-- E2E crítico.
-
-### Arquitetura
-
-O PR precisa responder positivamente a pelo menos uma pergunta concreta:
-
-- reduziu acoplamento?
-- removeu duplicação?
-- melhorou testabilidade?
-- tornou ownership/responsabilidade mais claro?
-- eliminou estado implícito?
-- reduziu risco operacional?
-
-Mover arquivos sem melhorar uma dessas propriedades não é considerado ganho arquitetural.
-
-## Ordem recomendada
-
-```text
-#52 governança
+#121 consolidação visual final
   ↓
-#54 Analysis Jobs API
+#60 frontend TS/primitives
   ↓
-#55 AI / Operations tests
-  ↓
-#56 isolamento PostgreSQL
-  ↓
-#57 contracts / migration upgrades
-  ↓
-#58 CI / supply chain
-  ↓
-#59 frontend source-of-truth
-  ↓
-#60 design system / TS / modularização
-  ↓
+#64 jornada/arquitetura de informação
+
 #61 application architecture
-  ↓
-#63 observabilidade
-  ↓
-#62 engines / hotspots
-  ↓
-#64 UX / IA
-  ↓
-#65 runtime / performance
-  ↓
-#66 fluxo científico
+  ├─→ #63 observabilidade
+  └─→ #62 hotspots/motores
+          ↓
+        #66 fluxo científico
+
+#65 pode avançar em fatias independentes quando houver medição
 ```
 
-Alguns trabalhos podem ocorrer em paralelo quando não compartilham risco, mas a ordem acima indica as principais dependências técnicas.
+A ordem não impede trabalhos paralelos que não compartilhem risco/arquivos, mas evita refactors concorrentes sobre a mesma fronteira.
 
-## Gestão do roadmap
+## Critério de pronto para refactor
 
-- Issues representam epics/entregas rastreáveis.
-- Cada epic grande deve ser dividido em PRs menores conforme a implementação se aproxima.
-- Novas tarefas devem entrar neste roadmap apenas quando alterarem prioridade, dependência ou arquitetura; detalhes de execução pertencem às issues/PRs.
-- Itens concluídos saem de `Now/Next` e podem ser registrados no histórico de releases/PRs em vez de permanecerem como backlog obsoleto.
+Um refactor está pronto quando mantém comportamento salvo mudança explicitamente documentada e melhora pelo menos uma propriedade concreta:
+
+- acoplamento;
+- duplicação;
+- testabilidade;
+- ownership;
+- estado explícito;
+- risco operacional.
+
+Mover arquivos sem ganho verificável não é considerado progresso arquitetural.
+
+### Gate mínimo
+
+Backend:
+
+- typecheck/static gates;
+- testes + cobertura;
+- PostgreSQL integration quando aplicável;
+- Compose/imagem/smoke;
+- E2E se a superfície pública mudar.
+
+Frontend:
+
+- desktop e mobile;
+- teclado/foco;
+- loading/empty/error/success;
+- reduced-motion quando houver animação;
+- browser E2E crítico.
+
+Todos os PRs continuam exigindo **auto code review final no SHA verde** antes do squash merge. Agentes de IA devem seguir também o contrato operacional de [`AGENTS.md`](../AGENTS.md).
+
+---
+
+# Auditoria da documentação · 2026-08-30
+
+Todos os **27 arquivos Markdown** versionados foram revisados contra a `main` após #137. Arquivos corretos não receberam alteração cosmética apenas para trocar data; a tabela registra explicitamente a revisão completa.
+
+| Documento | Resultado da auditoria |
+| --- | --- |
+| `AGENTS.md` | novo — contrato de engenharia, PR, CI e auto-review para agentes de IA |
+| `README.md` | atualizado — estado, rollout, arquitetura e backlog |
+| `docs/AGENDA.md` | atualizado — URL local e retirada de linguagem de milestone |
+| `docs/AI.md` | atualizado — contexto/persistência atuais e URL local |
+| `docs/ANALYSES.md` | validado sem alteração — contrato estatístico atual |
+| `docs/API.md` | atualizado — application layer e famílias atuais |
+| `docs/DATABASE.md` | atualizado — migrations/tabelas/repositories atuais |
+| `docs/DATA_OPERATIONS.md` | validado sem alteração — bootstrap/sync atuais |
+| `docs/DEPLOYMENT.md` | validado sem alteração — stack e segurança atuais |
+| `docs/FINANCIALS.md` | atualizado — separa ROI histórico/real, `financialCost`/`checkedCost` e compatibilidade JSON |
+| `docs/GENERATION.md` | validado sem alteração — score-v2 e geração atuais |
+| `docs/LOTOFACIL_READINESS.md` | validado sem alteração — checklist atual |
+| `docs/MENTAL_MODEL.md` | atualizado — application layer e superfícies atuais |
+| `docs/METHODOLOGY.md` | atualizado — score-v2/Lab já implementados |
+| `docs/MY_GAMES.md` | atualizado — My Games 2.0, ocultar/mostrar, conferência e comparação |
+| `docs/OPERATIONS.md` | atualizado — reparo financeiro, agenda, notificações e status `partial` |
+| `docs/PERFORMANCE.md` | atualizado — workspaces, cascata, lazy loading, workers e E2E atuais |
+| `docs/PLATFORM.md` | validado sem alteração — Node 24.19.0 / TS 7.x |
+| `docs/QUALITY.md` | validado sem alteração — CI/Security atuais |
+| `docs/REAL_BETS.md` | atualizado — anti-hindsight, `checkedCost`, revisões financeiras e integração com Meus Jogos |
+| `docs/RELIABILITY.md` | validado sem alteração — hardening atual |
+| `docs/ROADMAP.md` | atualizado — backlog real, dependências e inventário desta auditoria |
+| `docs/STRATEGY_LAB.md` | atualizado — contrato v2 em linguagem de estado presente, sem linguagem transitória de PR |
+| `docs/WEB.md` | atualizado — sem readability/localization global e rollout completo |
+| `docs/design/PROTOTYPE_1_DARK_MODERN.md` | atualizado — rollout implementado e consolidação restante em #121 |
+| `docs/tasks/MY_GAMES_V2.md` | atualizado — registro histórico/concluído e owners atuais |
+| `docs/tasks/SENIOR_REVIEW_FINANCIAL_INTEGRITY.md` | atualizado — registro histórico/concluído e follow-up já absorvido |
+
+## Gestão futura
+
+- `AGENTS.md` define como agentes de IA devem trabalhar e revisar;
+- README explica como usar/operar e aponta para documentos específicos;
+- ROADMAP contém apenas prioridade/estado/dependência atuais;
+- docs técnicos descrevem contratos presentes, não “milestones” antigos;
+- `docs/tasks/` pode preservar decisões históricas, mas deve marcar explicitamente quando a tarefa estiver concluída;
+- issues concluídas não permanecem abertas como documentação paralela;
+- novos detalhes de execução entram nas issues/PRs, não como listas duplicadas no README.

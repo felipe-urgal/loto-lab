@@ -1,54 +1,46 @@
 # IA interpretativa
 
-A camada de IA do Loto Lab segue a regra central do projeto:
+A camada de IA segue a regra central:
 
-> Algoritmo calcula; IA interpreta.
+> **Algoritmo calcula; IA interpreta.**
 
-A IA não participa da geração de dezenas, não altera scores, não calcula ROI e não muda a metodologia. Ela recebe um snapshot compacto de fatos já produzidos pelo core e transforma esses fatos em uma leitura textual auditável.
+Ela não gera dezenas, não altera pontuação, não calcula ROI e não muda metodologia. Recebe um snapshot compacto de fatos já produzidos pelo sistema e devolve interpretação estruturada/auditável.
 
 ## Configuração
-
-No `.env`:
 
 ```env
 OPENAI_API_KEY=sua-chave
 OPENAI_MODEL=gpt-5.6-luna
 ```
 
-`OPENAI_MODEL` é opcional. O padrão do projeto é `gpt-5.6-luna` e pode ser trocado sem alteração de código.
+`OPENAI_MODEL` é opcional. A chave existe somente no backend e nunca é enviada aos assets web.
 
-A chave existe somente no backend. Nenhum asset web contém ou recebe `OPENAI_API_KEY`.
+## Integração
 
-## API usada
-
-A integração usa a OpenAI Responses API (`POST /v1/responses`) por HTTP usando o `fetch` nativo do Node. Não há dependência adicional de SDK.
+O adapter usa a OpenAI Responses API por HTTP com `fetch` nativo do Node e `store: false`. A resposta usa Structured Outputs/JSON Schema estrito e ainda passa por validação defensiva local.
 
 ## Evidências enviadas
 
-O contexto é deliberadamente limitado e contém:
+`buildAiEvidenceContext()` monta um snapshot com, quando disponível:
 
-- último concurso de referência (número e data);
-- pesos atuais do score;
-- Top 5 e Bottom 5 do ranking calculado;
-- último backtest persistido, quando existir;
-- comparação do Laboratório sobre uma janela recente de até 100 concursos;
+- último concurso de referência;
+- pesos atuais e contagem dos grupos do score;
+- Top 5 e Bottom 5 da classificação calculada;
+- último teste histórico persistido;
+- **último job `strategy-lab` concluído e persistido**, com variante vencedora, evidência, p-values ajustados, percentil, resolução/amostra e variantes;
 - resumo financeiro das apostas reais;
 - até 5 apostas reais recentes.
 
-O histórico completo de concursos e todos os jogos gerados não são enviados ao modelo.
+O histórico completo de concursos e todos os jogos gerados não são enviados ao modelo. O adapter envia as instruções de sistema fixas e o snapshot compacto de evidências necessário para a interpretação.
 
 ## Focos
 
-A interface oferece quatro leituras:
-
-- `overview`: visão geral das evidências;
-- `analysis`: interpretação do ranking e horizontes do score;
-- `strategy`: backtests e comparação de estratégias;
-- `real-performance`: desempenho das apostas efetivamente registradas.
+- `overview` — visão geral das evidências;
+- `analysis` — leitura da classificação e horizontes;
+- `strategy` — testes históricos/Laboratório;
+- `real-performance` — apostas efetivamente registradas.
 
 ## Contrato de saída
-
-A resposta precisa ser JSON válido com:
 
 ```json
 {
@@ -60,73 +52,61 @@ A resposta precisa ser JSON válido com:
 }
 ```
 
-Respostas fora do contrato são rejeitadas e não são persistidas.
+Respostas fora do contrato são rejeitadas. `nextTests` pode sugerir experimentos, validações de dados ou comparações metodológicas; nunca dezenas/jogos.
 
-`nextTests` deve conter somente experimentos, validações de dados ou comparações metodológicas. A IA é instruída a nunca sugerir dezenas ou jogos.
-
-## Auditoria
+## Persistência e auditabilidade
 
 Cada interpretação bem-sucedida é persistida em `ai_insights` com:
 
-- loteria;
-- foco;
-- modelo;
-- ID de resposta do provedor, quando disponível;
-- snapshot completo das evidências enviadas;
+- loteria e foco;
+- modelo usado;
+- ID da resposta do provedor quando disponível;
+- snapshot das evidências enviadas;
 - conteúdo interpretativo;
-- uso retornado pelo provedor, quando disponível;
+- uso retornado pelo provedor quando disponível;
 - timestamp.
 
-Isso permite reconstruir exatamente quais fatos deram origem a uma interpretação mesmo que a base ou metodologia mude no futuro.
+O objetivo é permitir reconstruir quais fatos originaram uma interpretação mesmo depois que histórico/metodologia evoluírem.
 
-## Endpoints
-
-### Status
+## API
 
 ```http
-GET /api/v1/ai/status
+GET  /api/v1/ai/status
+POST /api/v1/ai/insights
+GET  /api/v1/ai/insights/mega-sena?limit=10
 ```
 
-Retorna se a integração está configurada e qual modelo será usado. Nunca retorna a chave.
+Exemplo de criação:
 
-### Gerar interpretação
-
-```http
-POST /api/v1/ai/insights
-Content-Type: application/json
-
+```json
 {
   "lottery": "mega-sena",
   "focus": "overview"
 }
 ```
 
-### Histórico
-
-```http
-GET /api/v1/ai/insights/mega-sena?limit=10
-```
-
 ## Interface
 
-Com a API rodando:
-
 ```text
-http://127.0.0.1:3000/ai
+http://127.0.0.1:5200/ai
 ```
 
-Sem `OPENAI_API_KEY`, a tela continua acessível, mostra o estado `não configurada` e desabilita somente a geração de novas interpretações.
+Sem `OPENAI_API_KEY`, a tela permanece funcional para status/histórico e desabilita apenas a geração de novas interpretações.
+
+O workspace visual segue o Protótipo 1. `ai-workspace.css` é a folha específica canônica desde #134; o antigo `ai.css` foi removido.
 
 ## Limites metodológicos
 
-A camada é explicitamente instruída a:
+A IA deve:
 
-- não recalcular números;
-- não preencher métricas ausentes;
-- não interpretar frequência como aumento de probabilidade;
+- não recalcular métricas;
+- não preencher dado ausente;
+- não interpretar frequência/atraso como aumento de probabilidade;
 - não sugerir dezenas;
-- não confundir backtest com aposta real;
-- destacar amostra pequena, baixa cobertura financeira e risco de sobreajuste;
-- tratar sugestões apenas como próximos testes da metodologia.
+- não confundir teste histórico com aposta real;
+- destacar baixa amostra, baixa cobertura financeira e risco de overfitting;
+- tratar sugestões como próximos testes da metodologia.
 
 A interpretação não é previsão de sorteio nem aconselhamento para apostar.
+
+Veja também [`RELIABILITY.md`](RELIABILITY.md) e [`STRATEGY_LAB.md`](STRATEGY_LAB.md).

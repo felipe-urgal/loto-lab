@@ -1,11 +1,45 @@
-# Senior Review · Integridade financeira
+# Senior Review · Integridade financeira — registro histórico
 
-Este lote do super code review cobre invariantes de auditabilidade de apostas reais.
+> **Status do review original: concluído.** Este arquivo preserva o escopo do review sênior incorporado ao produto. O contrato atual está em [`../FINANCIALS.md`](../FINANCIALS.md), [`../REAL_BETS.md`](../REAL_BETS.md) e [`../RELIABILITY.md`](../RELIABILITY.md).
 
-- `playedAt` só aceita data/hora ISO completa com timezone e calendário civil válido; datas impossíveis não podem ser normalizadas silenciosamente pelo JavaScript.
-- a validação é aplicada na API e novamente no serviço para proteger callers internos.
-- atualização financeira de uma aposta é serializada na própria transação PostgreSQL com `SELECT ... FOR UPDATE` antes de decidir se uma revisão oficial deve ser registrada.
-- duas reconciliações simultâneas do mesmo rateio não podem criar revisões duplicadas.
-- ausência de rateio financeiro continua significando dado desconhecido, nunca prêmio zero.
+## Invariantes revisados
 
-O fallback legado de `web/app.js` ainda possui semântica financeira duplicada e será tratado junto ao trabalho de frontend source-of-truth, para remover a divergência em vez de criar uma terceira implementação do mesmo contrato.
+- `playedAt` aceita somente data/hora ISO completa válida; datas impossíveis não podem ser normalizadas silenciosamente pelo JavaScript;
+- validação existe na fronteira HTTP/application e novamente no serviço quando necessário para proteger callers internos;
+- uma aposta real só pode ser registrada antes de o resultado oficial do concurso estar conhecido;
+- quando o lote possui concurso alvo, a aposta real deve usar exatamente esse concurso;
+- atualização financeira de uma aposta é serializada na própria transação PostgreSQL antes de decidir se uma revisão oficial precisa ser registrada;
+- reconciliações concorrentes do mesmo rateio não podem gerar revisões financeiras duplicadas;
+- ausência de rateio continua significando **dado desconhecido**, nunca prêmio zero;
+- `checked` estatístico pode existir antes de prêmio/resultado líquido financeiramente conhecidos;
+- ROI de apostas reais usa `checkedCost`, não o custo total que inclui pendências;
+- correções oficiais posteriores preservam o `checked_at` original e entram em `real_bet_financial_revisions`.
+
+## Follow-up residual ainda aberto
+
+O fluxo canônico foi consolidado em Meus Jogos 2.0 e no Painel, mas **o fallback legado `web/real-bets.js` ainda possui semântica financeira antiga**: para uma aposta `checked` com `totalPrizeValue`/`netResult` desconhecidos, ele pode renderizar `R$ 0,00` por usar fallback numérico para zero.
+
+Portanto este ponto **não deve ser considerado absorvido**. Ele permanece como dívida do frontend legado a ser corrigida ou eliminada durante a modularização/consolidação da #60.
+
+O que já foi absorvido corretamente:
+
+- o Painel possui sua composição financeira canônica;
+- o refinamento legado de “Desempenho real” deixou de ser injetado tardiamente no dashboard;
+- Meus Jogos 2.0 possui o fluxo principal de lote/aposta/conferência;
+- `RealBetUseCase` e `RealBetService` permanecem donos das regras de criação/reconciliação no backend.
+
+Até o fallback ser removido/corrigido, não usar sua representação de prêmio/resultado desconhecido como contrato de produto.
+
+## Guardrail permanente
+
+Mudanças futuras em custo, prêmio, ROI ou reconciliação devem conferir pelo menos:
+
+1. zero conhecido x dado desconhecido;
+2. `actualCost` x `checkedCost`;
+3. aposta pendente não vira perda;
+4. target contest/anti-hindsight;
+5. correção oficial/revision trail;
+6. concorrência transacional;
+7. agregação de ROI por totais, nunca média simples de percentuais.
+
+Este arquivo é um registro histórico, não uma lista geral de backlog. O follow-up residual acima permanece explicitamente vinculado à #60 até a remoção/correção do fallback legado.

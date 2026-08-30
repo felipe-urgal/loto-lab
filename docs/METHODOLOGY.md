@@ -1,28 +1,24 @@
 # Metodologia de geração de jogos
 
-Este documento é a especificação funcional do motor do Loto Lab.
+Este documento é a especificação funcional da metodologia atual do Loto Lab.
 
 > A metodologia organiza e testa escolhas. Ela não altera a probabilidade matemática individual de uma combinação válida.
 
-## Princípios
+## Regra central
 
-Antes de gerar um jogo, o sistema deve trabalhar somente com informações disponíveis até o concurso anterior ao concurso-alvo.
+Antes de gerar ou avaliar um concurso-alvo, o sistema usa somente informação disponível **antes** desse alvo.
 
-As janelas principais são:
+As janelas principais do `score-v2` são:
 
 - histórico total;
 - ano atual;
 - mês atual;
-- últimos 10 concursos;
-- últimos 20 concursos.
+- últimos 10 concursos do trecho contínuo mais recente;
+- últimos 20 concursos do trecho contínuo mais recente.
 
-As dezenas são classificadas em `strong`, `balanced` e `cold`. Nenhuma dezena deve ser considerada garantida ou "obrigada a sair".
+Pesos operacionais:
 
-## Score inicial
-
-O primeiro modelo usa pesos configuráveis:
-
-| Janela | Peso inicial |
+| Janela | Peso |
 | --- | ---: |
 | Ano atual | 30% |
 | Últimos 20 | 25% |
@@ -30,188 +26,201 @@ O primeiro modelo usa pesos configuráveis:
 | Histórico | 15% |
 | Últimos 10 | 10% |
 
-Esses pesos são uma hipótese inicial. O módulo de backtest deverá medir versões alternativas sem usar informação futura.
+Esses pesos continuam sendo uma hipótese de metodologia, não uma verdade probabilística. Sensibilidade e Strategy Lab medem sua robustez/valor histórico.
+
+## Score v2
+
+O modelo compara a frequência observada com a frequência esperada sob sorteios uniformes e considera o tamanho da amostra.
+
+`50` representa aproximadamente comportamento esperado da janela. Acima/abaixo de 50 significa desvio histórico, não aumento/diminuição automática da chance futura.
+
+O projeto também mantém:
+
+- `score-v1` — modelo legado min/max para comparação;
+- `no-score` — controle estrutural neutro.
+
+`no-score` usa desempate pseudoaleatório estável/reproduzível para não favorecer números menores apenas por ID.
+
+## Grupos
+
+`strong`, `balanced` e `cold` representam consistência do modelo em janelas **sobrepostas**.
+
+Esses grupos são descritivos. Eles não significam “mais provável”, “atrasado” ou “está para sair”.
 
 ## Mega-Sena
 
 Cada jogo tem 6 dezenas.
 
-Regra do lote:
+Padrão operacional:
 
-- 3 dezenas fixas compartilhadas;
-- 3 dezenas variáveis por jogo;
-- preferir variáveis diferentes entre jogos do mesmo lote.
+- 3 fixas;
+- 3 variáveis;
+- diversidade entre jogos do lote;
+- repetição/paridade/soma como estrutura de composição, não previsão.
 
-As três fixas devem representar perfis complementares, e não simplesmente as três maiores frequências:
-
-1. uma forte no ano;
-2. uma forte na combinação histórico + ano;
-3. uma forte recentemente/mês.
-
-Filtros auxiliares:
-
-- normalmente 0 a 2 dezenas repetidas do concurso anterior;
-- variar 3/3, 4/2 e 2/4 em pares/ímpares entre jogos;
-- soma é filtro secundário, nunca regra rígida.
-
-O grupo histórico de 26 dezenas já estudado pode ser usado como referência secundária, mas não como grupo preditivo. Em 2026 ele se comportou próximo do esperado pelo tamanho do próprio grupo.
+O grupo histórico de 26 dezenas pode ser usado apenas como hipótese experimental controlada no Laboratório.
 
 ## Lotofácil
 
 Cada jogo tem 15 dezenas entre 25.
 
-Regra do lote:
+Padrão operacional:
 
-- 8 a 10 dezenas fixas compartilhadas;
-- padrão atual: 8 fixas para maior cobertura;
-- variar as demais dezenas entre os jogos.
-
-Repetição do concurso anterior é estruturalmente importante:
-
-- preferir 8 a 10 repetidas;
-- 7 a 11 é faixa ampliada aceitável.
-
-Ao gerar vários jogos, diversificar pares/ímpares, por exemplo:
-
-- 8/7;
-- 7/8;
-- 9/6;
-- 6/9.
-
-Não exigir linhas `3-3-3-3-3`. Distribuições assimétricas são normais. Também não excluir sequências consecutivas automaticamente.
+- 8 fixas por padrão;
+- 9 e 10 disponíveis para experimentos;
+- repetição preferencial 8–10;
+- guardrail ampliado 7–11 quando não há filtro explícito;
+- diversificação de paridade/estrutura;
+- nenhuma exigência automática de linhas `3-3-3-3-3`;
+- sequências consecutivas não são eliminadas por crença probabilística.
 
 ## Dia de Sorte
 
 Cada jogo tem 7 dezenas entre 31.
 
-Regra do lote:
+Padrão operacional:
 
-- 3 dezenas fixas compartilhadas;
-- 4 dezenas variáveis por jogo.
+- 3 fixas;
+- 4 variáveis;
+- repetição e paridade como parâmetros estruturais;
+- Mês da Sorte selecionado separadamente e diversificado entre jogos quando aplicável.
 
-As fixas devem combinar preferencialmente:
+## Política de geração
 
-1. força no ano;
-2. força histórica;
-3. força recente/mensal.
+Heurísticas de composição ficam centralizadas e auditáveis. Elas controlam, entre outros pontos:
 
-Filtros auxiliares:
+- paridade;
+- repetição;
+- soma quando aplicável;
+- sobreposição entre cartões;
+- diversidade do portfólio.
 
-- preferir 1 ou 2 repetidas do concurso anterior;
-- usar principalmente 3/4 ou 4/3 em pares/ímpares;
-- escolher Mês da Sorte separadamente e diversificar entre jogos.
+O fato de um parâmetro estar centralizado não significa que esteja estatisticamente validado. A validação pertence a backtests/Laboratório.
 
-## Processo pós-sorteio
+## Portfólio e diversidade
 
-Após cada resultado oficial:
+A geração avalia o lote como conjunto, não apenas cada cartão isoladamente.
 
-1. conferir todos os jogos;
-2. registrar acertos e eventual prêmio;
-3. medir quantos acertos vieram do núcleo fixo;
-4. medir quantos vieram das variáveis;
-5. registrar repetição, pares/ímpares, soma e demais estruturas;
-6. não alterar toda a estratégia por causa de um único resultado.
+O objetivo é preservar candidatos fortes sob a função de score e reduzir sobreposição desnecessária entre cartões, sem declarar que diversidade aumenta a chance individual de uma combinação.
+
+Modo determinístico é usado em experimentos/replay. Modo diversificado usa seed auditável.
+
+Detalhes de implementação: [`GENERATION.md`](GENERATION.md).
 
 ## Regra de interpretação das análises
 
-Toda evolução da área de Análises deve separar três conceitos:
+Toda análise deve separar:
 
-1. **observado**: o que apareceu no histórico real;
-2. **esperado**: o que a combinatória/estatística prevê para sorteios uniformes quando existe um modelo implementado;
-3. **validado**: o que continua diferente quando a hipótese é testada sem usar informação futura e levando em conta a incerteza estatística.
+1. **observado**;
+2. **esperado** quando existe baseline matemático válido;
+3. **validado** fora da amostra/sem leakage.
 
-Uma estrutura comum não deve ser chamada de especial apenas porque aparece muitas vezes. Primeiro é obrigatório perguntar se essa concentração já é consequência natural do tamanho do universo e da quantidade de dezenas sorteadas.
+Não inventar baseline para métrica sem modelo implementado.
 
-Exemplos tratados com baseline matemático exato quando aplicáveis:
+### Estruturas
 
-- repetição entre concursos consecutivos;
-- pares/ímpares;
+Podem possuir baseline exato quando aplicável:
+
+- repetição;
+- paridade;
 - faixas de dezenas;
 - moldura da Lotofácil;
-- soma do concurso.
+- soma.
 
-Quando o motor não possui ainda um modelo matemático implementado para uma métrica, ela permanece **descritiva**. Não criar um valor "esperado" arbitrário para sequências, ciclos ou qualquer outro padrão.
+Sequências/ciclos permanecem descritivos quando não há modelo exato implementado.
 
 ### Atraso e ciclos
 
-Atraso pode ser mostrado como:
+Podem ser exibidos como histórico/percentil/estado atual, mas nunca autorizam linguagem de “compensação” ou “maior chance”.
 
-- quantidade atual de concursos sem aparecer;
-- distribuição histórica de atrasos da própria dezena;
-- percentil do atraso atual;
-- sequência atual de aparições.
+### Combinações
 
-Ciclos podem mostrar quantos concursos foram necessários para todas as dezenas aparecerem e quais ainda não apareceram no ciclo atual.
+Duques/trincas devem considerar:
 
-Nenhuma dessas métricas autoriza frases como:
-
-- "está para sair";
-- "ficou mais provável";
-- "deve compensar o atraso".
-
-Elas descrevem o histórico, não mudam a probabilidade matemática do próximo sorteio.
-
-### Combinações e múltiplas comparações
-
-Duques, trincas e outras combinações podem ser explorados, mas o sistema deve comparar:
-
-- ocorrências observadas;
-- ocorrências esperadas para uma combinação fixa;
+- observado;
+- esperado;
 - magnitude do desvio;
-- incerteza estatística;
-- correção pelo número de combinações examinadas.
+- incerteza;
+- correção por múltiplas comparações.
 
-O fato de o maior entre centenas ou milhares de pares parecer extremo não é evidência suficiente. A ferramenta deve controlar falsos sinais produzidos pela busca em massa e manter a interpretação como exploratória.
+Um extremo selecionado entre muitas hipóteses não é evidência suficiente por si só.
 
 ### Sensibilidade dos pesos
 
-Os pesos do score podem ser perturbados para medir robustez do ranking. Essa análise responde perguntas como:
+Perturbar pesos mede fragilidade/robustez. Não deve escolher pesos olhando o resultado futuro.
 
-- a dezena continua no mesmo grupo quando os pesos mudam pouco?
-- a posição permanece em uma faixa estreita?
-- o rótulo `strong` depende fortemente de uma configuração específica?
+## Validação rolling
 
-Sensibilidade mede fragilidade do modelo. Ela não escolhe automaticamente novos pesos e não deve ser usada para otimizar os pesos olhando o resultado futuro.
-
-## Validação rolling do ranking
-
-Antes de interpretar `strong`, `balanced` e `cold` como grupos com comportamento diferente, a classificação deve ser avaliada fora da amostra.
-
-Para cada concurso histórico alvo:
+Para cada alvo histórico:
 
 1. usar somente concursos anteriores;
-2. recalcular todas as janelas e o score;
-3. congelar os grupos;
-4. revelar o concurso alvo;
-5. contar quantas dezenas sorteadas pertenciam a cada grupo;
-6. comparar o observado com o esperado pelo tamanho de cada grupo;
-7. repetir o processo em muitas rodadas.
+2. recalcular análise/grupos;
+3. congelar o estado;
+4. revelar o resultado alvo;
+5. medir comportamento;
+6. comparar ao esperado;
+7. repetir em muitos alvos elegíveis.
 
-A leitura deve considerar diferentes janelas históricas e correção estatística. Um pequeno excesso em uma janela isolada não justifica alteração na geração.
+A validação deve respeitar continuidade real de concursos e nunca atravessar lacuna como se fosse sequência contínua.
 
-A conclusão correta pode ser, inclusive:
+Uma conclusão válida pode ser simplesmente:
 
-> **Nenhuma separação estatisticamente relevante foi detectada entre os grupos.**
+> Nenhuma separação estatisticamente relevante foi detectada.
 
-Esse resultado é útil: impede que uma classificação visualmente convincente seja confundida com capacidade preditiva.
+Esse resultado protege contra transformar uma classificação visualmente convincente em alegação preditiva.
 
-## Backtest
+## Testes históricos
 
-O backtest é obrigatório antes de afirmar que uma regra é melhor que outra.
+O backtest é obrigatório para comparar regras.
 
-Para cada concurso histórico alvo:
+```text
+histórico < alvo
+    ↓
+calcular/generar
+    ↓
+congelar saída
+    ↓
+revelar resultado alvo
+    ↓
+medir acertos/financeiro
+```
 
-1. usar apenas concursos anteriores ao alvo;
-2. calcular as janelas;
-3. gerar os jogos;
-4. revelar o resultado real somente depois da geração;
-5. medir acertos, custo, premiação e desempenho do núcleo;
-6. comparar estratégias alternativas.
+## Strategy Lab
 
-A regra arquitetural central é:
+O Laboratório já está implementado e compara famílias de hipóteses no mesmo recorte, com controles aleatórios reproduzíveis, correção por múltiplas comparações e guardrails de resolução/amostra.
 
-> **Algoritmo calcula; IA interpreta.**
+Ele cobre atualmente:
 
-A IA pode explicar resultados e sugerir hipóteses, mas frequência, score, geração e backtest precisam ser reproduzíveis por código.
+- `fixed-core`;
+- `score-model`;
+- `external-rules` para Mega-Sena.
 
-A especificação detalhada da nova área de análise está em [`ANALYSES.md`](ANALYSES.md).
+Detalhes: [`STRATEGY_LAB.md`](STRATEGY_LAB.md).
+
+## Processo pós-sorteio
+
+Após resultado oficial:
+
+1. conferir jogos;
+2. registrar acertos/prêmio quando aplicável;
+3. medir núcleo/variáveis;
+4. reconciliar aposta real se ela tiver sido registrada antes do resultado;
+5. atualizar histórico/agenda/notificações;
+6. não alterar metodologia por causa de um único sorteio.
+
+## Segurança conceitual
+
+O produto pode dizer:
+
+- “ficou acima do esperado nesta amostra”;
+- “o lote teve mais diversidade”;
+- “a hipótese superou controles neste recorte sob estes critérios”.
+
+Não deve dizer:
+
+- “tem mais chance no próximo sorteio”;
+- “está para sair”;
+- “é garantida”;
+- “esse jogo é mais provável”.
+
+Análises detalhadas: [`ANALYSES.md`](ANALYSES.md).

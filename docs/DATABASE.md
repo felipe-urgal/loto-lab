@@ -1,203 +1,196 @@
 # Persistência PostgreSQL
 
-Este documento descreve a camada de persistência do Loto Lab.
+PostgreSQL é a fonte de verdade operacional do Loto Lab. A API e o frontend usam repositories PostgreSQL; arquivos JSON permanecem apenas como caminho legado de importação/desenvolvimento.
 
-## Objetivo
+## Configuração local
 
-O PostgreSQL é a base persistente do aplicativo. O JSON local continua existindo como formato de importação, exportação e desenvolvimento legado, mas a API HTTP e o frontend consomem os repositórios PostgreSQL.
-
-## Configuração
-
-A conexão local usa a variável de ambiente `DATABASE_URL`.
-
-Exemplo atual:
-
-```text
-postgresql://loto_lab:loto_lab@localhost:5434/loto_lab
+```env
+DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5434/loto_lab
 ```
 
-Nunca versionar credenciais reais. O repositório contém somente `.env.example`.
-
-## Banco local
-
-Subir o PostgreSQL:
+Suba o banco:
 
 ```bash
 docker compose up -d postgres
-```
-
-O container continua ouvindo em `5432` internamente, mas o Docker Compose publica `5434` na máquina para evitar conflito com PostgreSQL local.
-
-Definir a URL no shell, quando não estiver usando `.env`:
-
-```bash
-export DATABASE_URL=postgresql://loto_lab:loto_lab@localhost:5434/loto_lab
-```
-
-O caminho recomendado para desenvolvimento é copiar `.env.example` para `.env`; os comandos operacionais carregam esse arquivo automaticamente.
-
-Aplicar migrations:
-
-```bash
 npm run db:migrate
 ```
 
-As migrations ficam em `db/migrations/` e são executadas em ordem pelo nome do arquivo.
+O container escuta em `5432`, publicado como `5434` no host local.
+
+## Migrations
+
+As migrations ficam em `db/migrations/` e hoje vão de `001_initial.sql` a `012_domain_contract_alignment.sql`.
 
 O runner:
 
-- cria `schema_migrations`;
-- usa advisory lock para impedir duas migrações concorrentes;
-- executa cada arquivo em transação;
-- registra somente migrations concluídas;
-- pode ser executado várias vezes com segurança.
+- cria/controla `schema_migrations`;
+- registra SHA-256 de cada migration aplicada;
+- usa advisory lock com espera limitada;
+- executa cada migration em transação;
+- é idempotente;
+- detecta drift se um arquivo já aplicado for modificado posteriormente.
 
-`npm run api:start` também aplica migrations pendentes antes de iniciar o servidor.
+**Migration aplicada é imutável.** Mudança de schema entra sempre em arquivo novo.
 
-## Migrar o JSON atual
+`npm run api:start` aplica migrations pendentes antes de iniciar a API.
 
-Depois das migrations:
+## Evolução principal do schema
+
+| Migration | Capacidade principal |
+| --- | --- |
+| `001_initial.sql` | concursos, estratégias, lotes/jogos e testes históricos |
+| `002_real_bets.sql` | apostas reais e snapshot de jogos apostados |
+| `003_game_batch_lifecycle.sql` | lifecycle/ocultação de lotes |
+| `004_ai_insights.sql` | interpretações de IA auditáveis |
+| `005_operation_runs.sql` | histórico de sincronizações operacionais |
+| `006_agenda_notifications.sql` | agenda oficial e notificações |
+| `007_data_integrity_hardening.sql` | constraints/integridade adicional |
+| `008_reliability_async_strategies.sql` | jobs, versões de estratégia e hardening assíncrono |
+| `009_generator_previews.sql` | previews auditáveis do Generator 2.0 |
+| `010_reliability_hardening.sql` | reforços operacionais adicionais |
+| `011_real_bet_financial_revisions.sql` | trilha de revisões financeiras oficiais |
+| `012_domain_contract_alignment.sql` | alinhamento final de invariantes TS ↔ PostgreSQL |
+
+## Entidades principais
+
+### Concursos
+
+`contests` armazena:
+
+- loteria;
+- número/data;
+- dezenas;
+- Mês da Sorte quando aplicável;
+- arrecadação e metadados oficiais relevantes.
+
+`contest_prize_tiers` armazena as faixas de premiação oficiais por concurso.
+
+### Estratégias
+
+`strategies` mantém identidade estável. O versionamento imutável preserva configuração/metodologia usada por execuções históricas.
+
+A camada de domínio e o PostgreSQL impedem mutações que destruiriam a auditabilidade das versões.
+
+### Geração
+
+`generated_game_batches` representa um lote; `generated_games` preserva os jogos e posição dentro dele.
+
+O lifecycle permite ocultar/restaurar sem apagar histórico. Lotes vinculados a apostas reais mantêm as restrições de integridade necessárias.
+
+Generator 2.0 também persiste previews auditáveis para conferir seed/snapshot antes de salvar um lote.
+
+### Testes históricos
+
+`backtest_runs` armazena opções, resumo e métricas principais. `backtest_rounds` guarda o artefato compacto por concurso.
+
+Estruturas grandes usadas apenas durante cálculo, como jogos gerados/checks completos, não devem ser persistidas desnecessariamente.
+
+### Apostas reais
+
+`real_bets` separa dinheiro efetivamente apostado de geração e backtest. `real_bet_games` preserva snapshot dos jogos apostados.
+
+`real_bet_financial_revisions` registra correções oficiais posteriores que alterem prêmio/resultado líquido, preservando o `checked_at` original.
+
+### Operação e agenda
+
+- `operation_runs`: auditoria do scheduler/sync;
+- `lottery_agenda`: próximo concurso/metadados oficiais;
+- `notifications`: caixa de entrada deduplicada por `event_key`.
+
+### Jobs
+
+A fila de análises persiste trabalhos `backtest` e `strategy-lab`, incluindo estados, input/result/error e cancelamento.
+
+O runtime single-instance usa advisory lock para tornar o recovery atual seguro.
+
+### IA
+
+`ai_insights` persiste:
+
+- modelo usado e ID da resposta do provedor quando disponível;
+- snapshot de evidências;
+- interpretação estruturada;
+- uso retornado pelo provedor quando disponível.
+
+## Repositories
+
+A camada concreta fica em `src/persistence/`:
+
+- `PostgresContestRepository`;
+- `PostgresGameRepository`;
+- `PostgresBacktestRepository`;
+- `PostgresStrategyRepository`;
+- `PostgresRealBetRepository`;
+- `PostgresAnalysisJobRepository`;
+- `PostgresOperationRepository`;
+- repositories de Agenda/Notificações;
+- repository de AI Insights.
+
+Application use cases novos devem depender de **portas mínimas**, não de repositories concretos, quando isso for suficiente. A composição concreta ocorre progressivamente no servidor.
+
+## Integridade
+
+Invariantes importantes são protegidos em profundidade:
+
+- validação TypeScript no domínio/borda;
+- constraints/triggers PostgreSQL;
+- queries parametrizadas;
+- transações em operações multi-write;
+- locks explícitos quando concorrência pode gerar revisão/duplicidade;
+- versões históricas imutáveis;
+- diferença entre `NULL`/desconhecido e zero conhecido preservada.
+
+## Pool
+
+`createPostgresPool()` mantém um único `pg.Pool` por processo, com limites/timeouts controlados e `application_name = loto-lab`.
+
+O pool não deve ser criado por request.
+
+## Importação e bootstrap
+
+Importação JSON legado:
 
 ```bash
 npm run db:import-json -- data/contests.json
 ```
 
-A operação é idempotente para concursos. A chave natural é:
+Carga histórica recomendada:
 
-```text
-lottery + contest_number
+```bash
+npm run db:bootstrap
+npm run db:status
 ```
 
-Se um concurso já enriquecido com rateio/arrecadação for atualizado por um objeto sem esses campos, a camada PostgreSQL preserva os dados financeiros existentes.
-
-## Modelo
-
-### `contests`
-
-Um registro por concurso:
-
-- loteria;
-- número;
-- data;
-- dezenas sorteadas;
-- Mês da Sorte quando aplicável;
-- arrecadação.
-
-Índice principal adicional: `(lottery, draw_date DESC)`.
-
-### `contest_prize_tiers`
-
-Rateio oficial de um concurso:
-
-- descrição da faixa;
-- ganhadores;
-- valor individual do prêmio.
-
-É dependente de `contests` e removido em cascata quando o concurso é removido.
-
-### `strategies`
-
-Versões executáveis da metodologia:
-
-- `slug` estável;
-- loteria;
-- nome;
-- versão da metodologia;
-- configuração em `JSONB`.
-
-Exemplo de configuração:
-
-```json
-{
-  "fixedCount": 8,
-  "repeatTargets": [8, 9, 10]
-}
-```
-
-### `generated_game_batches`
-
-Representa um lote de jogos gerados juntos:
-
-- loteria;
-- estratégia usada;
-- concurso alvo;
-- opções do gerador;
-- data de geração.
-
-### `generated_games`
-
-Jogos individuais de um lote:
-
-- dezenas;
-- núcleo fixo;
-- variáveis;
-- Mês da Sorte;
-- metadados estruturais.
-
-A ordem dentro do lote é preservada por `position`.
-
-### `backtest_runs`
-
-Uma execução de teste histórico:
-
-- estratégia;
-- loteria;
-- opções;
-- resumo completo em `JSONB`;
-- métricas principais em colunas próprias: concursos, jogos, custos, prêmios, ROI e cobertura financeira.
-
-As colunas próprias evitam leituras caras de JSON para painéis e classificações.
-
-### `backtest_rounds`
-
-Detalhamento imutável de cada concurso simulado. O payload da rodada fica em `JSONB`, ligado ao run e ao número do concurso.
-
-## Repositórios
-
-A camada de acesso está em `src/persistence/`:
-
-- `PostgresContestRepository`;
-- `PostgresStrategyRepository`;
-- `PostgresGameRepository`;
-- `PostgresBacktestRepository`.
-
-Queries usam parâmetros (`$1`, `$2`, ...) e nunca concatenam valores vindos da aplicação.
-
-Operações com múltiplas escritas usam uma única conexão e transação.
-
-## Pool de conexões
-
-`createPostgresPool()` usa `pg.Pool` com:
-
-- limite padrão de 10 conexões;
-- timeout de conexão de 5 segundos;
-- idle timeout de 30 segundos;
-- `application_name = loto-lab`.
-
-O pool é criado uma vez pelo processo da API, não uma vez por request.
+Detalhes em [`DATA_OPERATIONS.md`](DATA_OPERATIONS.md).
 
 ## Produção
 
-No `docker-compose.prod.yml`, o PostgreSQL permanece somente na rede Docker e **não publica porta no host**. A aplicação acessa o banco internamente em `postgres:5432`.
+No `docker-compose.prod.yml`, PostgreSQL fica somente na rede Docker:
 
-Consulte [`DEPLOYMENT.md`](DEPLOYMENT.md) para configuração de produção e backup/restore.
+```text
+app -> postgres:5432
+```
+
+A porta do banco não é publicada no host de produção.
+
+Backup/restore: [`DEPLOYMENT.md`](DEPLOYMENT.md) e [`RELIABILITY.md`](RELIABILITY.md).
 
 ## Testes
 
-O CI sobe um PostgreSQL real e testa:
+As suítes PostgreSQL usam database temporário isolado por arquivo de teste, migrations reais e concorrência controlada.
 
-1. aplicação idempotente de migrations;
-2. upsert e leitura de concursos/rateios;
-3. preservação de enriquecimento financeiro;
-4. estratégia versionada;
-5. persistência de lote de jogos;
-6. persistência de teste histórico e rodadas;
-7. endpoints HTTP consumindo os mesmos repositórios.
+O baseline cobre:
 
-Localmente, os testes de integração PostgreSQL/API são ignorados quando `DATABASE_URL` não está definida.
+- instalação limpa e idempotência de migrations;
+- checksum drift;
+- upgrade de schema anterior para atual;
+- contracts TS ↔ PostgreSQL;
+- contests/rateios;
+- estratégias/versionamento;
+- lotes/jogos;
+- apostas reais/revisões financeiras;
+- jobs/operações;
+- testes históricos;
+- endpoints usando os mesmos adapters concretos.
 
-## API HTTP
-
-A API em `src/api/` depende diretamente desta camada de persistência. Endpoints de produção não leem `data/*.json`.
-
-Consulte [`API.md`](API.md) para rotas e exemplos.
+Veja [`QUALITY.md`](QUALITY.md).
