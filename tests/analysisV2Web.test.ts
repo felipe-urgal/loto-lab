@@ -9,7 +9,8 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
     hardeningCss,
     loader,
     services,
-    analysisUseCase,
+    basicAnalysisUseCase,
+    advancedAnalysisUseCase,
     app,
     advanced,
     hardening,
@@ -23,6 +24,7 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
     readFile("web/feature-loader.js", "utf8"),
     readFile("src/api/services.ts", "utf8"),
     readFile("src/application/analyzeLottery.ts", "utf8"),
+    readFile("src/application/analyzeAdvancedLottery.ts", "utf8"),
     readFile("src/api/app.ts", "utf8"),
     readFile("src/analysis/advanced.ts", "utf8"),
     readFile("src/analysis/advancedHardening.ts", "utf8"),
@@ -73,15 +75,20 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
   assert.match(repository, /listAnalysisHistory/);
   assert.doesNotMatch(repository.match(/async listAnalysisHistory[\s\S]*?\n  }/)?.[0] ?? "", /contest_prize_tiers/);
 
-  assert.match(services, /analysisSignature/);
-  assert.match(services, /createHash\("sha256"\)/);
-  assert.match(services, /advancedAnalysisInFlight/);
   assert.match(services, /async analyze\(lottery: LotteryId\): Promise<AnalysisResponse>/);
   assert.match(services, /this\.analyzeLottery\.execute\(lottery\)/);
-  assert.match(analysisUseCase, /listAnalysisHistory\(lottery: LotteryId\)/);
-  assert.match(analysisUseCase, /buildNumberAnalysis\(contests, config\)/);
+  assert.match(basicAnalysisUseCase, /listAnalysisHistory\(lottery: LotteryId\)/);
+  assert.match(basicAnalysisUseCase, /buildNumberAnalysis\(contests, config\)/);
+
+  assert.match(advancedAnalysisUseCase, /analysisSignature/);
+  assert.match(advancedAnalysisUseCase, /createHash\("sha256"\)/);
+  assert.match(advancedAnalysisUseCase, /private readonly inFlight/);
+  assert.match(advancedAnalysisUseCase, /listAnalysisHistory\(lottery: LotteryId\)/);
+  assert.match(advancedAnalysisUseCase, /this\.executeAnalysis\(contests, lottery\)/);
+  assert.match(services, /new AnalyzeAdvancedLotteryUseCase/);
+  assert.match(services, /runAdvancedAnalysisInWorker/);
   assert.match(services, /async analyzeAdvanced/);
-  assert.match(services, /runAdvancedAnalysisInWorker\(contests, lottery\)/);
+  assert.match(services, /this\.analyzeAdvancedLottery\.execute\(lottery\)/);
   assert.match(app, /analysis\\\/\(\[\^\/\]\+\)\\\/advanced/);
   assert.match(app, /services\.analyzeAdvanced\(lottery\)/);
 
