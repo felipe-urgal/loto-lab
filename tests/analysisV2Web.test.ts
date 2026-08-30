@@ -9,6 +9,7 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
     hardeningCss,
     loader,
     services,
+    analysisUseCase,
     app,
     advanced,
     hardening,
@@ -21,6 +22,7 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
     readFile("web/analysis-v2-hardening.css", "utf8"),
     readFile("web/feature-loader.js", "utf8"),
     readFile("src/api/services.ts", "utf8"),
+    readFile("src/application/analyzeLottery.ts", "utf8"),
     readFile("src/api/app.ts", "utf8"),
     readFile("src/analysis/advanced.ts", "utf8"),
     readFile("src/analysis/advancedHardening.ts", "utf8"),
@@ -75,7 +77,9 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
   assert.match(services, /createHash\("sha256"\)/);
   assert.match(services, /advancedAnalysisInFlight/);
   assert.match(services, /async analyze\(lottery: LotteryId\): Promise<AnalysisResponse>/);
-  assert.match(services, /buildNumberAnalysis\(contests, config\)/);
+  assert.match(services, /this\.analyzeLottery\.execute\(lottery\)/);
+  assert.match(analysisUseCase, /listAnalysisHistory\(lottery: LotteryId\)/);
+  assert.match(analysisUseCase, /buildNumberAnalysis\(contests, config\)/);
   assert.match(services, /async analyzeAdvanced/);
   assert.match(services, /runAdvancedAnalysisInWorker\(contests, lottery\)/);
   assert.match(app, /analysis\\\/\(\[\^\/\]\+\)\\\/advanced/);
