@@ -264,24 +264,24 @@ Todos os **27 arquivos Markdown** versionados foram revisados contra a `main` ap
 | `docs/DATABASE.md` | atualizado — migrations/tabelas/repositories atuais |
 | `docs/DATA_OPERATIONS.md` | validado sem alteração — bootstrap/sync atuais |
 | `docs/DEPLOYMENT.md` | validado sem alteração — stack e segurança atuais |
-| `docs/FINANCIALS.md` | validado sem alteração — pricing/rateio/ROI atuais |
+| `docs/FINANCIALS.md` | atualizado — separa ROI histórico/real, `financialCost`/`checkedCost` e compatibilidade JSON |
 | `docs/GENERATION.md` | validado sem alteração — score-v2 e geração atuais |
 | `docs/LOTOFACIL_READINESS.md` | validado sem alteração — checklist atual |
 | `docs/MENTAL_MODEL.md` | atualizado — application layer e superfícies atuais |
 | `docs/METHODOLOGY.md` | atualizado — score-v2/Lab já implementados |
-| `docs/MY_GAMES.md` | atualizado — linguagem ocultar/mostrar e lifecycle atual |
-| `docs/OPERATIONS.md` | atualizado — reparo financeiro/agenda/notificações |
-| `docs/PERFORMANCE.md` | atualizado — workspaces/cascata e workers atuais |
+| `docs/MY_GAMES.md` | atualizado — My Games 2.0, ocultar/mostrar, conferência e comparação |
+| `docs/OPERATIONS.md` | atualizado — reparo financeiro, agenda, notificações e status `partial` |
+| `docs/PERFORMANCE.md` | atualizado — workspaces, cascata, lazy loading, workers e E2E atuais |
 | `docs/PLATFORM.md` | validado sem alteração — Node 24.19.0 / TS 7.x |
 | `docs/QUALITY.md` | validado sem alteração — CI/Security atuais |
-| `docs/REAL_BETS.md` | atualizado — anti-hindsight e revisões financeiras |
+| `docs/REAL_BETS.md` | atualizado — anti-hindsight, `checkedCost`, revisões financeiras e integração com Meus Jogos |
 | `docs/RELIABILITY.md` | validado sem alteração — hardening atual |
-| `docs/ROADMAP.md` | atualizado — backlog real e dependências |
-| `docs/STRATEGY_LAB.md` | atualizado — remove linguagem transitória de PR |
+| `docs/ROADMAP.md` | atualizado — backlog real, dependências e inventário desta auditoria |
+| `docs/STRATEGY_LAB.md` | atualizado — contrato v2 em linguagem de estado presente, sem linguagem transitória de PR |
 | `docs/WEB.md` | atualizado — sem readability/localization global e rollout completo |
-| `docs/design/PROTOTYPE_1_DARK_MODERN.md` | atualizado — referência implementada e consolidação em #121 |
-| `docs/tasks/MY_GAMES_V2.md` | atualizado — registro histórico/concluído |
-| `docs/tasks/SENIOR_REVIEW_FINANCIAL_INTEGRITY.md` | atualizado — registro histórico e follow-up atual |
+| `docs/design/PROTOTYPE_1_DARK_MODERN.md` | atualizado — rollout implementado e consolidação restante em #121 |
+| `docs/tasks/MY_GAMES_V2.md` | atualizado — registro histórico/concluído e owners atuais |
+| `docs/tasks/SENIOR_REVIEW_FINANCIAL_INTEGRITY.md` | atualizado — registro histórico/concluído e follow-up já absorvido |
 
 ## Gestão futura
 
