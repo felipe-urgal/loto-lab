@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-08-30**, após o merge do #137 (`257ebbcc`).
+> Baseline revisada em **2026-08-30**, após o merge do #143 (`5c46e4d`).
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -49,7 +49,9 @@ A diretriz permanece:
 - frontend source-of-truth: PT-BR e legibilidade na fonte, sem runtime corretivo (#59);
 - decisão do redesign/protótipo oficial (#120, concluída);
 - rollout visual das superfícies principais (#123–#133);
-- primeiras consolidações de CSS legado (#134–#137);
+- consolidação de CSS legado e ownership visual (#134–#142);
+- auditoria transversal final de legibilidade, foco, reduced-motion e mobile, incluindo correção de overflow real em Análises (#143);
+- consolidação do Protótipo 1 concluída (#121);
 - várias fatias da application layer (#106–#119).
 
 ### Pontos fortes a preservar
@@ -64,19 +66,19 @@ A diretriz permanece:
 - container não-root/read-only com capabilities reduzidas;
 - CI funcional + Security + browser E2E;
 - IA restrita a interpretação auditável;
-- Protótipo 1 aplicado ao produto inteiro;
-- copy PT-BR e piso funcional de 16px pertencendo à fonte canônica.
+- Protótipo 1 aplicado e consolidado no produto inteiro;
+- copy PT-BR e piso funcional de 16px pertencendo à fonte canônica;
+- ownership visual explícito por workspace, preservando folhas funcionais/fallbacks apenas quando possuem responsabilidade real.
 
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- consolidação visual final ainda não terminou (#121);
 - `src/api/app.ts` e `LotoLabApiServices` ainda concentram parte do ownership HTTP/infra (#61);
 - frontend segue majoritariamente JavaScript grande/imperativo; TypeScript e primitives compartilhadas ainda são backlog (#60);
 - hotspots algorítmicos continuam grandes (#62);
 - observabilidade segue baseada principalmente em logs/estado persistido, sem métricas/SLOs (#63);
 - arquitetura de informação pós-redesign ainda pode reduzir troca de contexto (#64);
-- otimizações operacionais restantes precisam de baseline antes/depois (#65);
+- otimizações operacionais e Web Vitals precisam de baseline antes/depois quando houver evidência (#65);
 - o fluxo hipótese → evidência → decisão ainda não é uma entidade explícita (#66).
 
 ---
@@ -90,19 +92,6 @@ A API do GitHub foi revalidada em 2026-08-30: `main.protected = false` e não h�
 **Próxima ação:** configuração administrativa no GitHub/`gh api` para exigir PR + `CI / test`, bloquear force-push/exclusão e então revalidar.
 
 Esta tarefa não precisa de PR de código.
-
-## #121 — Finalizar consolidação do Protótipo 1 · P0 · em andamento
-
-O rollout visual principal está concluído. Restam:
-
-- auditar folhas específicas de Painel, Análises, Gerador e Meus Jogos;
-- remover apenas CSS comprovadamente redundante/sem consumidor;
-- absorver hardening/refinement meramente corretivo quando houver ownership canônico claro;
-- revisão transversal de WCAG, contraste, foco, teclado e reduced-motion;
-- revisão de layout shift/performance visual;
-- E2E desktop/mobile e revisão UX/UI final.
-
-Refactors maiores de arquitetura frontend devem ir para #60; mudanças de jornada para #64.
 
 ## #61 — Application use cases e controllers finos · P1 · em andamento
 
@@ -124,7 +113,7 @@ Restam principalmente:
 
 ## #60 — Frontend TypeScript, módulos e primitives · P1
 
-A fundação visual já existe; o backlog restante é arquitetural:
+A consolidação visual da #121 foi concluída. O backlog restante é arquitetural:
 
 - `web/src/{core,design-system,features,shared}` gradualmente;
 - API client/errors/formatters/lifecycle/state compartilhados;
@@ -133,7 +122,7 @@ A fundação visual já existe; o backlog restante é arquitetural:
 - escaping/`textContent` como padrão seguro;
 - primitives reutilizáveis sem framework obrigatório.
 
-Começar depois da consolidação visual de #121 nas áreas que compartilham os mesmos arquivos.
+O trabalho pode avançar agora sobre as fontes canônicas consolidadas, sem reabrir a #121.
 
 ## #63 — Métricas e SLOs operacionais · P1
 
@@ -164,7 +153,7 @@ Depois da #61:
 
 ## #64 — Arquitetura de informação e jornada pós-redesign
 
-O visual já foi unificado. O próximo passo é decidir, com protótipos e tarefas reais:
+O visual já foi unificado e consolidado. O próximo passo é decidir, com protótipos e tarefas reais:
 
 - Testes históricos contextualizados no Laboratório;
 - Execuções contextualizadas nos trabalhos de origem;
@@ -177,6 +166,7 @@ Jornada alvo: `Entender → Experimentar → Aplicar → Acompanhar → Operar`.
 
 O baseline de hardening já é forte. Restam decisões medidas:
 
+- Web Vitals/LCP/INP/CLS quando houver ambiente e medição representativa;
 - redes/egress;
 - `stop_grace_period`;
 - logs/retenção;
@@ -185,6 +175,8 @@ O baseline de hardening já é forte. Restam decisões medidas:
 - índices PostgreSQL só após profiling;
 - concorrência de worker só após medir heap/tempo;
 - resiliência CAIXA conforme falhas reais.
+
+O lifecycle atual e o browser E2E já funcionam como guardrails qualitativos contra FOUC, layout inutilizável, loading infinito, montagem duplicada e overflow estrutural. Otimização adicional exige evidência antes/depois.
 
 ## #66 — Hipótese → experimento → evidência → decisão
 
@@ -197,8 +189,6 @@ Compor as peças já existentes — strategies, jobs, backtests, Lab, previews/s
 ```text
 #52 branch protection (administrativo, independente)
 
-#121 consolidação visual final
-  ↓
 #60 frontend TS/primitives
   ↓
 #64 jornada/arquitetura de informação
@@ -212,7 +202,7 @@ Compor as peças já existentes — strategies, jobs, backtests, Lab, previews/s
 #65 pode avançar em fatias independentes quando houver medição
 ```
 
-A ordem não impede trabalhos paralelos que não compartilhem risco/arquivos, mas evita refactors concorrentes sobre a mesma fronteira.
+A #121 foi concluída e deixa de ser dependência ativa. A ordem não impede trabalhos paralelos que não compartilhem risco/arquivos, mas evita refactors concorrentes sobre a mesma fronteira.
 
 ## Critério de pronto para refactor
 
@@ -251,37 +241,37 @@ Todos os PRs continuam exigindo **auto code review final no SHA verde** antes do
 
 # Auditoria da documentação · 2026-08-30
 
-Todos os **27 arquivos Markdown** versionados foram revisados contra a `main` após #137. Arquivos corretos não receberam alteração cosmética apenas para trocar data; a tabela registra explicitamente a revisão completa.
+Todos os **27 arquivos Markdown** versionados foram revisados contra a `main` após #137. O estado do rollout visual e das prioridades foi novamente reconciliado após #143 para encerrar #121 sem deixar backlog oculto.
 
 | Documento | Resultado da auditoria |
 | --- | --- |
-| `AGENTS.md` | novo — contrato de engenharia, PR, CI e auto-review para agentes de IA |
-| `README.md` | atualizado — estado, rollout, arquitetura e backlog |
-| `docs/AGENDA.md` | atualizado — URL local e retirada de linguagem de milestone |
-| `docs/AI.md` | atualizado — contexto/persistência atuais e URL local |
-| `docs/ANALYSES.md` | validado sem alteração — contrato estatístico atual |
-| `docs/API.md` | atualizado — application layer e famílias atuais |
-| `docs/DATABASE.md` | atualizado — migrations/tabelas/repositories atuais |
-| `docs/DATA_OPERATIONS.md` | validado sem alteração — bootstrap/sync atuais |
-| `docs/DEPLOYMENT.md` | validado sem alteração — stack e segurança atuais |
-| `docs/FINANCIALS.md` | atualizado — separa ROI histórico/real, `financialCost`/`checkedCost` e compatibilidade JSON |
-| `docs/GENERATION.md` | validado sem alteração — score-v2 e geração atuais |
-| `docs/LOTOFACIL_READINESS.md` | validado sem alteração — checklist atual |
-| `docs/MENTAL_MODEL.md` | atualizado — application layer e superfícies atuais |
-| `docs/METHODOLOGY.md` | atualizado — score-v2/Lab já implementados |
-| `docs/MY_GAMES.md` | atualizado — My Games 2.0, ocultar/mostrar, conferência e comparação |
-| `docs/OPERATIONS.md` | atualizado — reparo financeiro, agenda, notificações e status `partial` |
-| `docs/PERFORMANCE.md` | atualizado — workspaces, cascata, lazy loading, workers e E2E atuais |
-| `docs/PLATFORM.md` | validado sem alteração — Node 24.19.0 / TS 7.x |
-| `docs/QUALITY.md` | validado sem alteração — CI/Security atuais |
-| `docs/REAL_BETS.md` | atualizado — anti-hindsight, `checkedCost`, revisões financeiras e integração com Meus Jogos |
-| `docs/RELIABILITY.md` | validado sem alteração — hardening atual |
-| `docs/ROADMAP.md` | atualizado — backlog real, dependências e inventário desta auditoria |
-| `docs/STRATEGY_LAB.md` | atualizado — contrato v2 em linguagem de estado presente, sem linguagem transitória de PR |
-| `docs/WEB.md` | atualizado — sem readability/localization global e rollout completo |
-| `docs/design/PROTOTYPE_1_DARK_MODERN.md` | atualizado — rollout implementado e consolidação restante em #121 |
-| `docs/tasks/MY_GAMES_V2.md` | atualizado — registro histórico/concluído e owners atuais |
-| `docs/tasks/SENIOR_REVIEW_FINANCIAL_INTEGRITY.md` | atualizado — registro histórico/concluído e follow-up já absorvido |
+| `AGENTS.md` | contrato de engenharia, PR, CI e auto-review para agentes de IA |
+| `README.md` | estado, rollout concluído, arquitetura e backlog |
+| `docs/AGENDA.md` | URL local e contrato atual |
+| `docs/AI.md` | contexto/persistência atuais e URL local |
+| `docs/ANALYSES.md` | contrato estatístico atual |
+| `docs/API.md` | application layer e famílias atuais |
+| `docs/DATABASE.md` | migrations/tabelas/repositories atuais |
+| `docs/DATA_OPERATIONS.md` | bootstrap/sync atuais |
+| `docs/DEPLOYMENT.md` | stack e segurança atuais |
+| `docs/FINANCIALS.md` | ROI histórico/real, `financialCost`/`checkedCost` e compatibilidade JSON |
+| `docs/GENERATION.md` | score-v2 e geração atuais |
+| `docs/LOTOFACIL_READINESS.md` | checklist atual |
+| `docs/MENTAL_MODEL.md` | application layer e superfícies atuais |
+| `docs/METHODOLOGY.md` | score-v2/Lab implementados |
+| `docs/MY_GAMES.md` | My Games 2.0, ocultar/mostrar, conferência e comparação |
+| `docs/OPERATIONS.md` | reparo financeiro, agenda, notificações e status `partial` |
+| `docs/PERFORMANCE.md` | workspaces, cascata, lazy loading, workers, E2E e metas medidas |
+| `docs/PLATFORM.md` | Node 24.19.0 / TS 7.x |
+| `docs/QUALITY.md` | CI/Security atuais |
+| `docs/REAL_BETS.md` | anti-hindsight, `checkedCost`, revisões financeiras e integração com Meus Jogos |
+| `docs/RELIABILITY.md` | hardening atual |
+| `docs/ROADMAP.md` | backlog real e #121 concluída |
+| `docs/STRATEGY_LAB.md` | contrato v2 atual |
+| `docs/WEB.md` | rollout/consolidação concluídos e ownership atual |
+| `docs/design/PROTOTYPE_1_DARK_MODERN.md` | direção visual consolidada; #121 concluída |
+| `docs/tasks/MY_GAMES_V2.md` | registro histórico/concluído e owners atuais |
+| `docs/tasks/SENIOR_REVIEW_FINANCIAL_INTEGRITY.md` | registro histórico/concluído e follow-up absorvido |
 
 ## Gestão futura
 
