@@ -34,7 +34,8 @@ test("web build ships canonical styles without global readability or localizatio
 test("canonical web source owns the 16px functional typography floor", async () => {
   const styles = await source("web/styles.css");
   const uiFoundation = await source("web/ui-foundation.css");
-  const experiments = await source("web/experiments.css");
+  const strategiesWorkspace = await source("web/strategies-workspace.css");
+  const jobsWorkspace = await source("web/jobs-workspace.css");
   const agenda = await source("web/agenda-workspace.css");
   const build = await source("scripts/buildWeb.mjs");
   const e2e = await source("scripts/e2eReadability.mjs");
@@ -51,8 +52,8 @@ test("canonical web source owns the 16px functional typography floor", async () 
   assert.match(uiFoundation, /\.ball \{ width: 38px; height: 38px; \}/);
   assert.match(uiFoundation, /\.list-row \{ min-height: 70px; \}/);
   assert.match(uiFoundation, /\.topbar-copy h1 \{ font-size: 24px; \}/);
-  assert.match(experiments, /\.experiment-card h3 \{ font-size: 19px; \}/);
-  assert.match(experiments, /\.form-inline-note \{[^}]*line-height: 1\.55;/);
+  assert.match(strategiesWorkspace, /\.experiment-card-head h3 \{[^}]*font-size: 18px;/);
+  assert.match(jobsWorkspace, /#job-form \.form-inline-note \{[^}]*line-height: 1\.45;/);
   assert.match(agenda, /\.agenda-card h3 \{\s*font-size: 18px;/);
 
   assert.doesNotMatch(build, /readability\.(?:css|js)/);
