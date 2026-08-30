@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-08-30**, após o merge do #143 (`5c46e4d`).
+> Baseline revisada em **2026-08-30**, após o merge do #148 (`255919a`).
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -52,6 +52,7 @@ A diretriz permanece:
 - consolidação de CSS legado e ownership visual (#134–#142);
 - auditoria transversal final de legibilidade, foco, reduced-motion e mobile, incluindo correção de overflow real em Análises (#143);
 - consolidação do Protótipo 1 concluída (#121);
+- fundação TypeScript incremental do frontend com `web/src`, typecheck/lint browser, emissão via `tsc` e primeiro helper compartilhado (#148);
 - várias fatias da application layer (#106–#119).
 
 ### Pontos fortes a preservar
@@ -68,13 +69,14 @@ A diretriz permanece:
 - IA restrita a interpretação auditável;
 - Protótipo 1 aplicado e consolidado no produto inteiro;
 - copy PT-BR e piso funcional de 16px pertencendo à fonte canônica;
-- ownership visual explícito por workspace, preservando folhas funcionais/fallbacks apenas quando possuem responsabilidade real.
+- ownership visual explícito por workspace, preservando folhas funcionais/fallbacks apenas quando possuem responsabilidade real;
+- caminho frontend TypeScript real, incremental e sem framework obrigatório, preservando o boundary JavaScript existente durante a migração.
 
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
 - `src/api/app.ts` e `LotoLabApiServices` ainda concentram parte do ownership HTTP/infra (#61);
-- frontend segue majoritariamente JavaScript grande/imperativo; TypeScript e primitives compartilhadas ainda são backlog (#60);
+- frontend ainda possui módulos grandes/imperativos; a fundação TypeScript existe desde #148, mas API client/errors/escaping/lifecycle/state, primitives e decomposição por feature seguem ativos na #60;
 - hotspots algorítmicos continuam grandes (#62);
 - observabilidade segue baseada principalmente em logs/estado persistido, sem métricas/SLOs (#63);
 - arquitetura de informação pós-redesign ainda pode reduzir troca de contexto (#64);
@@ -111,18 +113,28 @@ Restam principalmente:
 
 # Next
 
-## #60 — Frontend TypeScript, módulos e primitives · P1
+## #60 — Frontend TypeScript, módulos e primitives · P1 · em andamento
 
-A consolidação visual da #121 foi concluída. O backlog restante é arquitetural:
+A consolidação visual da #121 foi concluída e a fundação arquitetural começou em #148.
 
-- `web/src/{core,design-system,features,shared}` gradualmente;
-- API client/errors/formatters/lifecycle/state compartilhados;
+Entregue em #148:
+
+- `tsconfig.web.json` isolando o ambiente browser/DOM;
+- typecheck/lint cobrindo `web/src/**/*.ts`;
+- emissão JavaScript via `tsc` para `web-dist/assets/src` sem publicar fontes `.ts` cruas;
+- `web/src/shared/formatters.ts` como primeiro helper compartilhado;
+- `web/runtime.js` preservado como boundary compatível para consumidores legados.
+
+Próximas fatias:
+
+- expandir `web/src/{core,design-system,features,shared}` conforme ownership real;
+- API client/errors/escaping/lifecycle/state compartilhados;
 - TypeScript por feature;
 - decomposição de módulos grandes;
 - escaping/`textContent` como padrão seguro;
 - primitives reutilizáveis sem framework obrigatório.
 
-O trabalho pode avançar agora sobre as fontes canônicas consolidadas, sem reabrir a #121.
+O trabalho deve continuar sobre as fontes canônicas consolidadas, sem reabrir a #121 e sem big-bang de framework.
 
 ## #63 — Métricas e SLOs operacionais · P1
 
@@ -229,6 +241,7 @@ Backend:
 
 Frontend:
 
+- typecheck/lint da área TypeScript migrada;
 - desktop e mobile;
 - teclado/foco;
 - loading/empty/error/success;
@@ -241,12 +254,12 @@ Todos os PRs continuam exigindo **auto code review final no SHA verde** antes do
 
 # Auditoria da documentação · 2026-08-30
 
-Todos os **27 arquivos Markdown** versionados foram revisados contra a `main` após #137. O estado do rollout visual e das prioridades foi novamente reconciliado após #143 para encerrar #121 sem deixar backlog oculto.
+Todos os **27 arquivos Markdown** versionados foram revisados contra a `main` após #137. O estado do rollout visual e das prioridades foi reconciliado após #143 para encerrar #121 e novamente após #148 para registrar a fundação TypeScript da #60 sem tratar o restante da modularização como concluído.
 
 | Documento | Resultado da auditoria |
 | --- | --- |
 | `AGENTS.md` | contrato de engenharia, PR, CI e auto-review para agentes de IA |
-| `README.md` | estado, rollout concluído, arquitetura e backlog |
+| `README.md` | estado, rollout concluído, arquitetura e fundação TypeScript incremental |
 | `docs/AGENDA.md` | URL local e contrato atual |
 | `docs/AI.md` | contexto/persistência atuais e URL local |
 | `docs/ANALYSES.md` | contrato estatístico atual |
@@ -257,7 +270,7 @@ Todos os **27 arquivos Markdown** versionados foram revisados contra a `main` ap
 | `docs/FINANCIALS.md` | ROI histórico/real, `financialCost`/`checkedCost` e compatibilidade JSON |
 | `docs/GENERATION.md` | score-v2 e geração atuais |
 | `docs/LOTOFACIL_READINESS.md` | checklist atual |
-| `docs/MENTAL_MODEL.md` | application layer e superfícies atuais |
+| `docs/MENTAL_MODEL.md` | application layer, superfícies e fundação frontend TypeScript |
 | `docs/METHODOLOGY.md` | score-v2/Lab implementados |
 | `docs/MY_GAMES.md` | My Games 2.0, ocultar/mostrar, conferência e comparação |
 | `docs/OPERATIONS.md` | reparo financeiro, agenda, notificações e status `partial` |
@@ -266,9 +279,9 @@ Todos os **27 arquivos Markdown** versionados foram revisados contra a `main` ap
 | `docs/QUALITY.md` | CI/Security atuais |
 | `docs/REAL_BETS.md` | anti-hindsight, `checkedCost`, revisões financeiras e integração com Meus Jogos |
 | `docs/RELIABILITY.md` | hardening atual |
-| `docs/ROADMAP.md` | backlog real e #121 concluída |
+| `docs/ROADMAP.md` | backlog real, #121 concluída e #60 em execução após #148 |
 | `docs/STRATEGY_LAB.md` | contrato v2 atual |
-| `docs/WEB.md` | rollout/consolidação concluídos e ownership atual |
+| `docs/WEB.md` | rollout/consolidação concluídos, ownership atual e build TypeScript incremental |
 | `docs/design/PROTOTYPE_1_DARK_MODERN.md` | direção visual consolidada; #121 concluída |
 | `docs/tasks/MY_GAMES_V2.md` | registro histórico/concluído e owners atuais |
 | `docs/tasks/SENIOR_REVIEW_FINANCIAL_INTEGRITY.md` | registro histórico/concluído e follow-up absorvido |
