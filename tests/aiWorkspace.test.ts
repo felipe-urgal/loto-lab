@@ -23,6 +23,7 @@ test("AI workspace follows Prototype 1 while preserving interpretation contracts
   assert.match(workspace, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
 
+  assert.match(html, /Algoritmo calcula\. IA interpreta\./);
   assert.match(ai, /api\("\/ai\/status"\)/);
   assert.match(ai, /api\(`\/ai\/insights\/\$\{requestedLottery\}\?limit=10`\)/);
   assert.match(ai, /api\("\/ai\/insights", \{/);
@@ -32,5 +33,4 @@ test("AI workspace follows Prototype 1 while preserving interpretation contracts
   assert.match(ai, /const token = \+\+historyLoadToken/);
   assert.match(ai, /const token = \+\+insightRequestToken/);
   assert.match(ai, /lotterySelect\.value !== requestedLottery/);
-  assert.match(ai, /Algoritmo calcula\. IA interpreta\./);
 });
