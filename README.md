@@ -17,12 +17,13 @@ O Loto Lab organiza hipóteses, estratégias e jogos de forma reproduzível. Fre
 
 ## Estado atual
 
-Em 2026-08-30, após o merge do #137:
+Em 2026-08-30, após o merge do #143:
 
 - a fonte PT-BR e o piso funcional de 16px pertencem aos módulos/estilos canônicos; não existem mais `localization.js`, `readability.js` ou `readability.css` globais;
-- o **Protótipo 1 — Dark Moderno / Workspace científico compacto** está aplicado às superfícies principais;
+- o **Protótipo 1 — Dark Moderno / Workspace científico compacto** está aplicado e consolidado nas superfícies principais; a #121 foi concluída;
 - Painel, Análises, Gerador, Meus Jogos, Testes históricos, Laboratório, Estratégias, Execuções, Agenda e IA possuem workspaces próprios;
-- a consolidação visual já removeu camadas legadas de IA, Agenda, Laboratório e o antigo `experiments.css` compartilhado;
+- a consolidação visual #134–#142 removeu/absorveu camadas redundantes com ownership comprovado; folhas funcionais e fallbacks deliberados permaneceram quando possuem responsabilidade real;
+- o #143 adicionou auditoria transversal em navegador real para desktop/mobile, texto funcional >=16px, foco por teclado, reduced-motion e ausência de overflow horizontal estrutural;
 - a application layer já cobre várias jornadas, mas `src/api/app.ts` e `LotoLabApiServices` ainda mantêm parte do ownership legado e seguem sendo reduzidos pela #61;
 - CI e Security validam testes, cobertura, PostgreSQL, Compose, imagem, autenticação, navegador real, CodeQL, dependency review, SBOM e vulnerabilidades de container;
 - a `main` **ainda não possui branch protection obrigatória**; isso permanece bloqueado na #52 por configuração administrativa do GitHub.
@@ -85,7 +86,7 @@ Regras principais:
 - tabelas, filtros e métricas compactos sem sacrificar legibilidade;
 - gráficos apenas quando existe dado real que justifique a visualização.
 
-A decisão de design foi encerrada na #120. O rollout principal foi entregue em #123–#133 e a consolidação final permanece na #121.
+A decisão de design foi encerrada na #120. O rollout principal foi entregue em #123–#133 e a consolidação final em #134–#143 encerrou a #121. Evolução arquitetural do frontend segue na #60, jornada/IA na #64 e performance medida na #65.
 
 ## Arquitetura
 
@@ -127,7 +128,7 @@ O frontend continua sem framework. O build:
 - usa lazy loading por feature;
 - executa E2E em Chrome/Chromium real.
 
-A apresentação segue a cascata `styles.css` → `ui-foundation.css` → `design-system.css` → stylesheet canônico da superfície. A consolidação remove folhas redundantes somente depois que o workspace assume todas as regras necessárias.
+A apresentação segue a cascata `styles.css` → `ui-foundation.css` → `design-system.css` → CSS funcional da feature quando necessário → stylesheet canônico da superfície. Folhas adicionais permanecem apenas quando possuem responsabilidade real; redundância visual não deve voltar a ser mascarada por camadas globais.
 
 ### Backend/application layer
 
