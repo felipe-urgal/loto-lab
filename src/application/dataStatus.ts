@@ -1,6 +1,7 @@
 import type { LotteryId } from "../domain/types.js";
+import { LOTTERY_CONFIGS } from "../lotteries/config.js";
 
-const LOTTERIES: LotteryId[] = ["mega-sena", "lotofacil", "dia-de-sorte"];
+const LOTTERIES = Object.keys(LOTTERY_CONFIGS) as LotteryId[];
 
 export interface DataStatusReader {
   getDataStatus(lottery: LotteryId): Promise<unknown>;
