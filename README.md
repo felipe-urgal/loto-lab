@@ -6,11 +6,13 @@ Motor de análise, geração, conferência, testes históricos e laboratório de
 
 O Loto Lab foi construído para organizar experimentos, comparar estratégias e acompanhar jogos de forma **auditável e reproduzível**. Frequências, pontuações, classificações, geração, conferência, custos, premiações, testes históricos e comparações são calculados por código. A integração opcional com IA recebe evidências já calculadas para explicar resultados e sugerir hipóteses; ela não escolhe dezenas no lugar do algoritmo e não substitui o core estatístico.
 
-**Versão atual:** `0.6.0`  
-**Runtime:** Node.js 24.19.0 LTS / linha 24.x  
-**Persistência:** PostgreSQL 16  
-**Frontend:** HTML + CSS + ES Modules, sem framework  
-**Backend:** Node.js + TypeScript  
+| Baseline | Valor |
+| --- | --- |
+| Versão | `0.6.0` |
+| Runtime | Node.js 24.19.0 LTS / linha 24.x |
+| Persistência | PostgreSQL 16 |
+| Frontend | HTML + CSS + ES Modules, sem framework |
+| Backend | Node.js + TypeScript |
 
 ---
 
