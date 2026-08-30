@@ -3,7 +3,7 @@ import type { Pool } from "pg";
 import type { Contest, LotteryId } from "../domain/types.js";
 import type { buildAdvancedAnalysis } from "../analysis/advanced.js";
 import { runAdvancedAnalysisInWorker } from "../analysis/advancedWorkerClient.js";
-import { AnalyzeLotteryUseCase } from "../application/analyzeLottery.js";
+import { AnalyzeLotteryUseCase, type AnalysisResponse } from "../application/analyzeLottery.js";
 import { generateMegaSenaGames } from "../generator/megaSena.js";
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { generateDiaDeSorteGames } from "../generator/diaDeSorte.js";
@@ -24,7 +24,7 @@ import type {
   UpsertStrategyInput,
 } from "../persistence/types.js";
 
-export type { AnalysisResponse } from "../application/analyzeLottery.js";
+export type { AnalysisResponse };
 
 export const MIN_GENERATION_HISTORY = 20;
 export const MAX_HTTP_BACKTEST_ROUNDS = 500;
@@ -144,7 +144,7 @@ export class LotoLabApiServices {
     this.analyzeLottery = new AnalyzeLotteryUseCase(this.contests);
   }
 
-  async analyze(lottery: LotteryId) {
+  async analyze(lottery: LotteryId): Promise<AnalysisResponse> {
     return this.analyzeLottery.execute(lottery);
   }
 
