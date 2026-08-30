@@ -23,5 +23,6 @@ test("data status controller delegates repository work to application", async ()
   assert.doesNotMatch(application, /persistence\//);
   assert.match(routes, /dataStatus: GetDataStatusUseCase/);
   assert.match(routes, /dependencies\.dataStatus/);
-  assert.match(server, /new GetDataStatusUseCase\(new PostgresContestRepository\(options\.pool\)\)/);
+  assert.match(server, /const contests = new PostgresContestRepository\(options\.pool\)/);
+  assert.match(server, /dataStatus: new GetDataStatusUseCase\(contests\)/);
 });
