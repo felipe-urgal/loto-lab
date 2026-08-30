@@ -76,6 +76,8 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.match(loaderSource, /styleLoads/);
   assert.match(loaderSource, /loadStyledModule/);
   assert.match(loaderSource, /addEventListener\("load"/);
+  assert.match(loaderSource, /loadModule\("data-status"\)/);
+  assert.doesNotMatch(loaderSource, /loadStyledModule\("data-status"\)/);
 
   const javascript = await fetch(`${baseUrl}/assets/app.js?v=${buildVersion}`);
   assert.equal(javascript.status, 200);
@@ -106,15 +108,15 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
     "styles.css",
     "refinements.css",
     "lab-workspace.css",
-    "data-status.css",
+    "dashboard-scope.css",
   ]) {
     const response = await fetch(`${baseUrl}/assets/${asset}`);
     assert.equal(response.status, 200, asset);
   }
 
-  for (const removedLabAsset of ["lab.css", "lab-v2.css"]) {
-    const response = await fetch(`${baseUrl}/assets/${removedLabAsset}`);
-    assert.equal(response.status, 404, removedLabAsset);
+  for (const removedAsset of ["lab.css", "lab-v2.css", "data-status.css"]) {
+    const response = await fetch(`${baseUrl}/assets/${removedAsset}`);
+    assert.equal(response.status, 404, removedAsset);
   }
 
   const foundation = await fetch(`${baseUrl}/assets/ui-foundation.css`);
