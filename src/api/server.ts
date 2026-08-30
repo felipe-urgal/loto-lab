@@ -4,6 +4,7 @@ import { createApiRequestHandler, type ApiServerOptions } from "./app.js";
 import type { AiInterpretationProvider } from "../ai/types.js";
 import { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
 import { GetDataStatusUseCase } from "../application/dataStatus.js";
+import { ExecuteBacktestUseCase } from "../application/executeBacktest.js";
 import {
   OperationAlreadyRunningError,
   OperationsUseCase,
@@ -27,8 +28,9 @@ import { serveFeatureRoutes } from "./routes.js";
 import { serveWebAsset } from "./web.js";
 import { loadAppAuthConfig, requireAppAuthentication } from "./auth.js";
 import { requireSameOriginMutation, resolveMutationExpectedOrigin } from "./http.js";
+import { LotoLabApiServices } from "./services.js";
 import { expensiveAnalysisGate } from "./workGate.js";
-import { runStrategyLabInWorker } from "./workerClient.js";
+import { runBacktestInWorker, runStrategyLabInWorker } from "./workerClient.js";
 
 export interface LotoLabServerOptions extends ApiServerOptions {
   aiProvider?: AiInterpretationProvider;
@@ -42,9 +44,14 @@ function isHealthPath(pathname: string): boolean {
 
 export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const apiHandler = createApiRequestHandler(options);
+  const backtestWorkerServices = new LotoLabApiServices(options.pool);
   const featureRouteDependencies = {
     backtestCatalog: new BacktestCatalogUseCase(new PostgresBacktestRepository(options.pool)),
     dataStatus: new GetDataStatusUseCase(new PostgresContestRepository(options.pool)),
+    executeBacktest: new ExecuteBacktestUseCase(
+      expensiveAnalysisGate,
+      (input, signal) => runBacktestInWorker(backtestWorkerServices, input, { signal }),
+    ),
     operations: new OperationsUseCase(
       new PostgresOperationRepository(options.pool),
       async () => {
