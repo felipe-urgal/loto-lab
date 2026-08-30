@@ -87,9 +87,11 @@ Há vários caminhos para reconciliação:
 
 - operação automática/scheduler;
 - sincronização manual;
-- abertura/refresh do fluxo de apostas;
 - `POST /api/v1/real-bets/:id/check`;
+- `POST /api/v1/real-bets/reconcile`;
 - reparo financeiro de concursos recentes.
+
+Abrir ou atualizar a tela **Meus Jogos** apenas relê o estado persistido. Isso não dispara reconciliação por si só; para atualizar uma aposta específica pela interface é necessário usar a ação explícita de atualização, que chama o endpoint de conferência.
 
 Nenhum resultado ou prêmio é digitado manualmente.
 
@@ -101,7 +103,7 @@ O sistema diferencia:
 - **atingiu faixa premiada, mas o rateio necessário não está armazenado** → prêmio desconhecido;
 - **Mês da Sorte acertado sem tier financeiro disponível** → total desconhecido.
 
-Por isso dado ausente não vira `R$ 0,00` e não entra artificialmente no ROI.
+Por isso dado ausente não vira `R$ 0,00` e não entra artificialmente no ROI no fluxo canônico. O fallback legado de Meus Jogos ainda possui uma representação antiga que pode exibir zero para financeiro desconhecido; essa dívida permanece aberta para correção/remoção durante a modularização do frontend (#60) e não deve ser tratada como contrato correto.
 
 ## Reparação de rateios
 
@@ -149,7 +151,7 @@ Exemplo:
 GET /api/v1/real-bets/mega-sena?limit=50
 ```
 
-O resumo contém:
+Exemplo de resumo sem base financeira conferida:
 
 ```json
 {
@@ -161,12 +163,11 @@ O resumo contém:
   "actualCost": 0,
   "checkedCost": 0,
   "totalPrizeValue": 0,
-  "netResult": 0,
-  "roi": null
+  "netResult": 0
 }
 ```
 
-`roi` é opcional/indisponível quando não existe base financeira conferida suficiente.
+Quando `checkedCost > 0`, a resposta inclui também `roi = netResult / checkedCost`. Sem base financeira conferida, a propriedade `roi` é omitida.
 
 ### Conferir uma aposta
 
