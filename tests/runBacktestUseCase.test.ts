@@ -115,9 +115,12 @@ test("RunBacktestUseCase persists compact Lotofácil artifacts and the default f
   assert.equal(result.options.fixedCount, 8);
   assert.equal(saved.length, 1);
   assert.equal(saved[0]?.rounds.length, 2);
+  const allowedKeys = new Set(["contest", "date", "targetNumbers", "hitsByGame", "bestHits", "fixedHits"]);
   for (const round of saved[0]?.rounds ?? []) {
     assert.ok(Array.isArray(round.targetNumbers));
-    assert.ok(Array.isArray(round.hitsByGame));
+    assert.equal(typeof round.bestHits, "number");
+    assert.equal(typeof round.fixedHits, "number");
+    assert.ok(Object.keys(round).every((key) => allowedKeys.has(key)));
     assert.equal("generatedGames" in round, false);
     assert.equal("checks" in round, false);
   }
