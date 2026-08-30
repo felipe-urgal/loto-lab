@@ -279,15 +279,17 @@ Status comuns:
 - `201`: criação/persistência;
 - `202`: trabalho assíncrono enfileirado;
 - `204`: preflight/sem conteúdo;
-- `400`: entrada inválida ou orçamento seguro excedido;
+- `400`: entrada inválida; alguns budgets de validação, como limites de unidades do Strategy Lab, também usam esse status;
 - `401`: autenticação ausente/incorreta;
 - `404`: rota/recurso inexistente;
 - `409`: conflito de estado/operação;
 - `413`: body acima do limite;
+- `422`: request bem formado, mas inviável para execução segura/semântica — por exemplo ausência de combinações válidas no Generator 2.0 ou backtest acima do limite de rounds (`BACKTEST_LIMIT_EXCEEDED`);
 - `429`: rate limit ou gate de trabalho caro ocupado;
-- `500`: erro inesperado.
+- `500`: erro inesperado;
+- `504`: timeout de execução pesada quando mapeado pelo controller.
 
-Erros específicos de timeout/cancelamento podem ser mapeados para códigos próprios sem expor detalhes internos.
+Erros específicos mantêm `code` próprio, como `NO_VALID_COMBINATIONS`, `ALGORITHM_SPACE_UNSATISFIED`, `BACKTEST_LIMIT_EXCEEDED` e `ANALYSIS_TIMEOUT`, sem expor detalhes internos desnecessários.
 
 ## Produção
 
