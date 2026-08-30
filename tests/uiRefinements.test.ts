@@ -29,6 +29,7 @@ test("UI refinement assets are lazy-loaded for the main app and served for strat
   assert.match(loaderSource, /loadStyledModule\("refinements"\)/);
   assert.match(loaderSource, /await loadStyle\(name\)/);
   assert.match(loaderSource, /return loadModule\(name\)/);
+  assert.doesNotMatch(loaderSource, /generation-diversity/);
 
   const app = await fetch(`${baseUrl}/assets/app.js`);
   assert.equal(app.status, 200);
@@ -43,12 +44,16 @@ test("UI refinement assets are lazy-loaded for the main app and served for strat
   assert.match(mainSource, /Aguardando resultado do concurso/);
   assert.match(mainSource, /últimos 100 concursos/i);
 
-  const generationDiversity = await fetch(`${baseUrl}/assets/generation-diversity.js`);
-  assert.equal(generationDiversity.status, 200);
-  const diversitySource = await generationDiversity.text();
-  assert.match(diversitySource, /code\.textContent/);
-  assert.match(diversitySource, /code\.title = seed/);
-  assert.doesNotMatch(diversitySource, /title="\$\{seed\}"/);
+  const legacyGenerationDiversity = await fetch(`${baseUrl}/assets/generation-diversity.js`);
+  assert.equal(legacyGenerationDiversity.status, 404);
+  const legacyGenerationDiversityCss = await fetch(`${baseUrl}/assets/generation-diversity.css`);
+  assert.equal(legacyGenerationDiversityCss.status, 404);
+
+  const generator = await fetch(`${baseUrl}/assets/generation-v2.js`);
+  assert.equal(generator.status, 200);
+  const generatorSource = await generator.text();
+  assert.match(generatorSource, /generationMode: "diversified"/);
+  assert.match(generatorSource, /generatorOptions\?\.seed/);
 
   const labPage = await fetch(`${baseUrl}/lab`);
   assert.equal(labPage.status, 200);
