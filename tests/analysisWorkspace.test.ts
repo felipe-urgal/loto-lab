@@ -18,13 +18,16 @@ test("analysis workspace follows Prototype 1 without changing statistical contra
   assert.doesNotMatch(loader, /loadStyle\("analysis-v2-hardening"\)/);
   await assert.rejects(readFile("web/analysis-v2-hardening.css", "utf8"), /ENOENT/);
 
-  assert.match(workspace, /\.a2-shell \{/);
+  assert.match(workspace, /\.a2-shell \{[\s\S]*min-width: 0/);
   assert.match(workspace, /max-width: 1440px/);
+  assert.match(workspace, /\.a2-stack \{[\s\S]*min-width: 0/);
+  assert.match(workspace, /\.a2-stack > section \{[\s\S]*min-width: 0/);
   assert.match(workspace, /\.a2-tabs \{[\s\S]*position: sticky/);
   assert.match(workspace, /\.a2-tier-list \{[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
   assert.match(workspace, /\.a2-ball\.is-strong \{[\s\S]*background: var\(--accent-soft\)/);
   assert.match(workspace, /\.a2-shell \.positive \{[\s\S]*color: var\(--success-strong\)/);
   assert.match(workspace, /\.a2-filter-numbers \{[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(workspace, /\.a2-table \{[\s\S]*min-width: 820px/);
   assert.match(workspace, /\.a2-detail \{[\s\S]*position: fixed[\s\S]*height: 100dvh[\s\S]*overflow-y: auto/);
   assert.match(workspace, /\.a2-detail:not\(\[open\]\) \{[\s\S]*display: none/);
   assert.match(workspace, /\.a2-detail::backdrop \{[\s\S]*backdrop-filter: blur\(2px\)/);
