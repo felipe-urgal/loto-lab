@@ -1,0 +1,505 @@
+.mg2-shell {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  gap: 14px;
+}
+
+.mg2-toolbar {
+  position: sticky;
+  top: calc(var(--shell-header-height) + 8px);
+  z-index: 10;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(15, 27, 41, 0.96);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(12px);
+}
+
+.mg2-filters {
+  gap: 4px;
+}
+
+.mg2-filter {
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.mg2-filter:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.mg2-filter.is-active {
+  border-color: rgba(22, 137, 255, 0.32);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.mg2-filter.is-active span {
+  color: var(--accent-strong);
+}
+
+.mg2-search {
+  height: 42px;
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.mg2-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.mg2-list {
+  gap: 8px;
+}
+
+.mg2-batch {
+  border-color: var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.mg2-batch:hover {
+  border-color: var(--border-strong);
+}
+
+.mg2-batch.is-expanded {
+  border-color: rgba(22, 137, 255, 0.34);
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--accent), 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+
+.mg2-summary {
+  gap: 16px;
+  padding: 14px 16px;
+}
+
+.mg2-summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.mg2-title-line > strong {
+  font-size: 18px;
+}
+
+.mg2-summary-main p,
+.mg2-trailing-copy span {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.mg2-summary-end {
+  gap: 10px;
+}
+
+.mg2-trailing-copy {
+  min-width: 124px;
+}
+
+.mg2-chevron {
+  background: var(--surface-2);
+}
+
+.mg2-batch.is-expanded .mg2-chevron {
+  color: var(--accent-strong);
+}
+
+.mg2-status {
+  min-height: 28px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 16px;
+}
+
+.mg2-status.is-success {
+  border-color: rgba(36, 199, 125, 0.3);
+  background: var(--success-soft);
+  color: var(--success-strong);
+}
+
+.mg2-status.is-warning {
+  border-color: rgba(239, 185, 88, 0.3);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.mg2-status.is-neutral,
+.mg2-status.is-muted {
+  border-color: var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.mg2-detail {
+  padding: 0 16px 16px;
+  border-top-color: var(--border);
+}
+
+.mg2-games {
+  gap: 6px;
+  padding: 14px 0;
+}
+
+.mg2-game {
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 10px 11px;
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.mg2-number {
+  width: 38px;
+  height: 38px;
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 16px;
+}
+
+.mg2-number.is-fixed {
+  border-color: rgba(22, 137, 255, 0.44);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.mg2-number.is-match {
+  border-color: rgba(36, 199, 125, 0.48);
+  background: var(--success-soft);
+  color: var(--success-strong);
+}
+
+.mg2-number.is-fixed.is-match {
+  border-color: var(--success);
+  background: var(--success-soft);
+  color: var(--success-strong);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.mg2-month,
+.mg2-compare-month {
+  color: var(--warning);
+}
+
+.mg2-detail-actions {
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.mg2-detail-actions .button,
+.mg2-form-actions .button,
+.mg2-comparison-controls .button {
+  min-height: 44px;
+  font-size: 16px;
+}
+
+.mg2-check-control input,
+.mg2-form-grid input,
+.mg2-comparison-controls input {
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.mg2-check-control input:focus,
+.mg2-form-grid input:focus,
+.mg2-comparison-controls input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.mg2-form,
+.mg2-result,
+.mg2-inline-error,
+.mg2-comparison {
+  border-color: var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.mg2-bet-games {
+  gap: 6px;
+}
+
+.mg2-bet-game {
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.mg2-bet-game:hover {
+  border-color: var(--border-strong);
+}
+
+.mg2-bet-game input {
+  accent-color: var(--accent);
+}
+
+.mg2-mini-numbers b {
+  background: var(--surface-3);
+}
+
+.mg2-result-metrics,
+.mg2-comparison-summary {
+  gap: 8px;
+}
+
+.mg2-result-metrics > div,
+.mg2-comparison-summary > div {
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.mg2-result-metrics .is-positive,
+.mg2-trailing-copy .is-positive {
+  color: var(--success-strong);
+}
+
+.mg2-result-metrics .is-negative,
+.mg2-trailing-copy .is-negative {
+  color: var(--danger);
+}
+
+.mg2-official {
+  padding: 14px;
+  border-color: rgba(36, 199, 125, 0.28);
+  border-radius: var(--radius);
+  background: var(--success-soft);
+}
+
+.mg2-official.is-pending {
+  border-color: rgba(239, 185, 88, 0.28);
+  background: var(--warning-soft);
+}
+
+.mg2-official-game {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.mg2-comparison {
+  padding: 16px;
+}
+
+.mg2-comparison-controls {
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.mg2-counts {
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.mg2-count {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.mg2-count.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.mg2-comparison-note {
+  color: var(--muted);
+}
+
+.mg2-comparison-legend i.is-hit {
+  border-color: var(--success);
+  background: var(--success-soft);
+}
+
+.mg2-comparison-legend i.is-fixed {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.mg2-compare-contest {
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.mg2-compare-contest[open] {
+  border-color: rgba(22, 137, 255, 0.3);
+}
+
+.mg2-draw-number.is-used,
+.mg2-compare-hit-summary .is-best {
+  color: var(--success-strong);
+}
+
+.mg2-inline-loading {
+  background: var(--surface-2);
+}
+
+.mg2-empty {
+  min-height: 220px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+@media (max-width: 980px) {
+  .mg2-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mg2-search {
+    width: 100%;
+    flex-basis: auto;
+  }
+
+  .mg2-result-metrics,
+  .mg2-comparison-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .mg2-shell {
+    gap: 12px;
+  }
+
+  .mg2-toolbar {
+    position: static;
+    padding: 0 0 10px;
+    border-width: 0 0 1px;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .mg2-summary {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 13px;
+  }
+
+  .mg2-summary-end {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .mg2-trailing-copy {
+    min-width: 0;
+    justify-items: start;
+  }
+
+  .mg2-detail {
+    padding: 0 13px 13px;
+  }
+
+  .mg2-game {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .mg2-month {
+    white-space: normal;
+  }
+
+  .mg2-detail-actions,
+  .mg2-official-pending,
+  .mg2-result-head,
+  .mg2-comparison-head,
+  .mg2-comparison-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mg2-hide-action {
+    margin-left: 0;
+  }
+
+  .mg2-detail-actions .button,
+  .mg2-form-actions .button,
+  .mg2-comparison-head .button,
+  .mg2-comparison-controls .button {
+    width: 100%;
+  }
+
+  .mg2-check-control {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .mg2-check-control label,
+  .mg2-check-control input {
+    width: 100%;
+  }
+
+  .mg2-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mg2-form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .mg2-comparison-controls label,
+  .mg2-comparison-controls input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .mg2-counts {
+    width: 100%;
+  }
+
+  .mg2-count {
+    flex: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .mg2-filters {
+    margin-inline: -2px;
+  }
+
+  .mg2-filter {
+    padding: 0 10px;
+  }
+
+  .mg2-result-metrics,
+  .mg2-comparison-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .mg2-official,
+  .mg2-form,
+  .mg2-result,
+  .mg2-comparison {
+    padding: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mg2-shell *,
+  .mg2-shell *::before,
+  .mg2-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
