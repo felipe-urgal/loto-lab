@@ -1,6 +1,6 @@
 import { Worker } from "node:worker_threads";
 import type { Contest, LotteryId } from "../domain/types.js";
-import type { AdvancedAnalysis } from "../api/services.js";
+import type { AdvancedAnalysis } from "./advancedTypes.js";
 import { ApiError } from "../api/http.js";
 import { expensiveAnalysisGate } from "../api/workGate.js";
 

@@ -1,8 +1,11 @@
-import { createHash } from "node:crypto";
 import type { Pool } from "pg";
-import type { Contest, LotteryId } from "../domain/types.js";
-import type { buildAdvancedAnalysis } from "../analysis/advanced.js";
+import type { LotteryId } from "../domain/types.js";
+import type { AdvancedAnalysis } from "../analysis/advancedTypes.js";
 import { runAdvancedAnalysisInWorker } from "../analysis/advancedWorkerClient.js";
+import {
+  AnalyzeAdvancedLotteryUseCase,
+  type AdvancedAnalysisResponse,
+} from "../application/analyzeAdvancedLottery.js";
 import { AnalyzeLotteryUseCase, type AnalysisResponse } from "../application/analyzeLottery.js";
 import { CheckGameBatchUseCase, type CheckGameBatchResult } from "../application/checkGameBatch.js";
 import {
@@ -36,6 +39,8 @@ export {
 };
 export const MAX_HTTP_BACKTEST_ROUNDS = MAX_BACKTEST_ROUNDS;
 export type {
+  AdvancedAnalysis,
+  AdvancedAnalysisResponse,
   AnalysisResponse,
   GenerateGamesRequest,
   GenerateGamesResponse,
@@ -43,47 +48,16 @@ export type {
   RunBacktestResponse,
 };
 
-export type AdvancedAnalysis = ReturnType<typeof buildAdvancedAnalysis>;
-
-export interface AdvancedAnalysisResponse {
-  lottery: LotteryId;
-  advanced: AdvancedAnalysis;
-}
-
-interface AdvancedAnalysisCacheEntry {
-  signature: string;
-  value: AdvancedAnalysis;
-}
-
-interface AdvancedAnalysisInFlightEntry {
-  signature: string;
-  promise: Promise<AdvancedAnalysis>;
-}
-
-function analysisSignature(contests: Contest[]): string {
-  const hash = createHash("sha256");
-  for (const contest of contests) {
-    hash.update(String(contest.number));
-    hash.update("|");
-    hash.update(contest.date);
-    hash.update("|");
-    hash.update([...contest.numbers].sort((a, b) => a - b).join(","));
-    hash.update(";");
-  }
-  return hash.digest("hex");
-}
-
 export class LotoLabApiServices {
   readonly contests: PostgresContestRepository;
   readonly games: PostgresGameRepository;
   readonly strategies: PostgresStrategyRepository;
   readonly backtests: PostgresBacktestRepository;
   private readonly analyzeLottery: AnalyzeLotteryUseCase;
+  private readonly analyzeAdvancedLottery: AnalyzeAdvancedLotteryUseCase;
   private readonly checkGameBatch: CheckGameBatchUseCase;
   private readonly generateGames: GenerateGamesUseCase;
   private readonly runBacktestUseCase: RunBacktestUseCase;
-  private readonly advancedAnalysisCache = new Map<LotteryId, AdvancedAnalysisCacheEntry>();
-  private readonly advancedAnalysisInFlight = new Map<LotteryId, AdvancedAnalysisInFlightEntry>();
 
   constructor(pool: Pool) {
     this.contests = new PostgresContestRepository(pool);
@@ -91,6 +65,10 @@ export class LotoLabApiServices {
     this.strategies = new PostgresStrategyRepository(pool);
     this.backtests = new PostgresBacktestRepository(pool);
     this.analyzeLottery = new AnalyzeLotteryUseCase(this.contests);
+    this.analyzeAdvancedLottery = new AnalyzeAdvancedLotteryUseCase(
+      this.contests,
+      runAdvancedAnalysisInWorker,
+    );
     this.checkGameBatch = new CheckGameBatchUseCase(this.games, this.contests);
     this.generateGames = new GenerateGamesUseCase(this.contests, this.games);
     this.runBacktestUseCase = new RunBacktestUseCase(this.contests, this.backtests);
@@ -101,31 +79,7 @@ export class LotoLabApiServices {
   }
 
   async analyzeAdvanced(lottery: LotteryId): Promise<AdvancedAnalysisResponse> {
-    const contests = await this.contests.listAnalysisHistory(lottery);
-    const signature = analysisSignature(contests);
-    const cached = this.advancedAnalysisCache.get(lottery);
-    let advanced: AdvancedAnalysis;
-
-    if (cached?.signature === signature) {
-      advanced = cached.value;
-    } else {
-      const existing = this.advancedAnalysisInFlight.get(lottery);
-      if (existing?.signature === signature) {
-        advanced = await existing.promise;
-      } else {
-        const promise = runAdvancedAnalysisInWorker(contests, lottery);
-        this.advancedAnalysisInFlight.set(lottery, { signature, promise });
-        try {
-          advanced = await promise;
-          this.advancedAnalysisCache.set(lottery, { signature, value: advanced });
-        } finally {
-          const current = this.advancedAnalysisInFlight.get(lottery);
-          if (current?.promise === promise) this.advancedAnalysisInFlight.delete(lottery);
-        }
-      }
-    }
-
-    return { lottery, advanced };
+    return this.analyzeAdvancedLottery.execute(lottery);
   }
 
   async generate(input: GenerateGamesRequest): Promise<GenerateGamesResponse> {
