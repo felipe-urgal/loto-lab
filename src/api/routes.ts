@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
+import type { RunStrategyLabUseCase } from "../application/runStrategyLab.js";
 import type { StrategyCatalogUseCase } from "../application/strategyCatalog.js";
 import { serveDataStatus } from "./dataStatus.js";
 import { serveStrategyLab } from "./strategyLab.js";
@@ -17,6 +18,7 @@ import type { LotoLabServerOptions } from "./server.js";
 export interface FeatureRouteDependencies {
   backtestCatalog: BacktestCatalogUseCase;
   strategyCatalog: StrategyCatalogUseCase;
+  runStrategyLab: RunStrategyLabUseCase;
 }
 
 type FeatureRouteHandler = (
@@ -33,7 +35,8 @@ const featureRoutes: FeatureRouteHandler[] = [
   (request, response, options, dependencies) =>
     serveStrategies(request, response, options, dependencies.strategyCatalog),
   serveAnalysisJobs,
-  serveStrategyLab,
+  (request, response, options, dependencies) =>
+    serveStrategyLab(request, response, options, dependencies.runStrategyLab),
   serveRealBets,
   serveGameBatchManagement,
   serveGameComparison,
