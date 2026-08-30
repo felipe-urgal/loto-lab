@@ -12,18 +12,19 @@ O Loto Lab organiza hipóteses, estratégias e jogos de forma reproduzível. Fre
 | Runtime | Node.js 24.19.0 LTS / linha 24.x |
 | TypeScript | 7.x |
 | Persistência | PostgreSQL 16 |
-| Frontend | HTML + CSS + ES Modules, sem framework |
+| Frontend | HTML + CSS + ES Modules; source TypeScript incremental, sem framework |
 | Backend | Node.js + TypeScript |
 
 ## Estado atual
 
-Em 2026-08-30, após o merge do #143:
+Em 2026-08-30, após o merge do #148:
 
 - a fonte PT-BR e o piso funcional de 16px pertencem aos módulos/estilos canônicos; não existem mais `localization.js`, `readability.js` ou `readability.css` globais;
 - o **Protótipo 1 — Dark Moderno / Workspace científico compacto** está aplicado e consolidado nas superfícies principais; a #121 foi concluída;
 - Painel, Análises, Gerador, Meus Jogos, Testes históricos, Laboratório, Estratégias, Execuções, Agenda e IA possuem workspaces próprios;
 - a consolidação visual #134–#142 removeu/absorveu camadas redundantes com ownership comprovado; folhas funcionais e fallbacks deliberados permaneceram quando possuem responsabilidade real;
 - o #143 adicionou auditoria transversal em navegador real para desktop/mobile, texto funcional >=16px, foco por teclado, reduced-motion e ausência de overflow horizontal estrutural;
+- o #148 iniciou a modularização TypeScript do frontend com `tsconfig.web.json`, typecheck/lint de `web/src`, emissão via `tsc` para `web-dist/assets/src` e `web/src/shared/formatters.ts` como primeiro helper compartilhado;
 - a application layer já cobre várias jornadas, mas `src/api/app.ts` e `LotoLabApiServices` ainda mantêm parte do ownership legado e seguem sendo reduzidos pela #61;
 - CI e Security validam testes, cobertura, PostgreSQL, Compose, imagem, autenticação, navegador real, CodeQL, dependency review, SBOM e vulnerabilidades de container;
 - a `main` **ainda não possui branch protection obrigatória**; isso permanece bloqueado na #52 por configuração administrativa do GitHub.
@@ -94,6 +95,8 @@ A decisão de design foi encerrada na #120. O rollout principal foi entregue em 
 Browser
   │
   ├─ web/                         HTML + CSS + ES Modules
+  │   ├─ runtime.js               boundary compatível do runtime atual
+  │   └─ src/shared/*.ts          fundação TypeScript incremental (#60)
   │
   ▼
 Node HTTP Server
@@ -119,14 +122,18 @@ A arquitetura está em transição incremental. Várias features já possuem con
 
 ### Frontend
 
-O frontend continua sem framework. O build:
+O frontend continua sem framework. A #60 agora possui uma fundação TypeScript real: `tsconfig.web.json` cobre `web/src/**/*.ts`; `typecheck` e `lint` validam essa camada sem emissão, e `npm run web:build` emite JavaScript via `tsc` para `web-dist/assets/src`.
 
-- copia assets para `web-dist/`;
+O build também:
+
+- copia os demais assets para `web-dist/`, sem publicar fontes `.ts` cruas;
 - calcula fingerprint SHA-256;
 - reescreve URLs com `?v=<hash>`;
 - mantém HTML sem cache permanente;
 - usa lazy loading por feature;
 - executa E2E em Chrome/Chromium real.
+
+`web/runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; os formatters compartilhados já vivem em `web/src/shared/formatters.ts` e são reexportados pelo runtime. A migração seguinte deve expandir essa base em fatias pequenas, sem big-bang.
 
 A apresentação segue a cascata `styles.css` → `ui-foundation.css` → `design-system.css` → CSS funcional da feature quando necessário → stylesheet canônico da superfície. Folhas adicionais permanecem apenas quando possuem responsabilidade real; redundância visual não deve voltar a ser mascarada por camadas globais.
 
@@ -239,7 +246,7 @@ npm run check
 npm run audit:prod
 ```
 
-`npm run check` cobre plataforma, typecheck, higiene de texto, lint, build e testes com thresholds de cobertura.
+`npm run check` cobre plataforma, typecheck (backend + `web/src`), higiene de texto, lint, build e testes com thresholds de cobertura.
 
 E2E completo:
 

@@ -161,6 +161,10 @@ src/
 
 web/
 ├── shell + feature-loader
+├── runtime.js         boundary compatível durante a migração
+├── src/
+│   └── shared/
+│       └── formatters.ts
 ├── design-system.css / ui-foundation.css
 ├── Painel
 ├── Análises
@@ -194,7 +198,9 @@ A migração está avançada, mas não concluída. `src/api/app.ts` e `LotoLabAp
 
 A linguagem oficial é o **Protótipo 1 — Dark Moderno**.
 
-O rollout visual principal está concluído; #121 acompanha a consolidação final. #60 acompanha TypeScript, primitives e modularização. #64 acompanha arquitetura de informação pós-redesign.
+O rollout visual e sua consolidação estão concluídos pela #121. A #60 agora está em execução arquitetural: #148 estabeleceu `tsconfig.web.json`, typecheck/lint de `web/src`, emissão via `tsc` e `web/src/shared/formatters.ts` como primeiro helper compartilhado, preservando `runtime.js` como boundary para os módulos JavaScript atuais.
+
+As próximas fatias da #60 devem expandir `web/src` apenas quando houver ownership claro — API client/errors/escaping/lifecycle/state, primitives e features — e decompor módulos grandes por responsabilidade, sem rewrite de framework. #64 acompanha arquitetura de informação pós-redesign.
 
 ## Fronteiras que o projeto não deve cruzar
 
