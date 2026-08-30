@@ -1,21 +1,11 @@
 import { evaluateGames, type GameCheckResult } from "../checker/evaluate.js";
-import type { Contest, GeneratedGame, LotteryId } from "../domain/types.js";
+import type { Contest, LotteryId } from "../domain/types.js";
+import type { ApplicationGameBatch } from "./gameBatch.js";
 
-export interface CheckableGameBatch {
-  id: number;
-  lottery: LotteryId;
-  strategyId?: number;
-  strategyVersionId?: number;
-  targetContestNumber?: number;
-  generatorOptions: Record<string, unknown>;
-  createdAt: string;
-  archivedAt?: string;
-  hasRealBet: boolean;
-  games: GeneratedGame[];
-}
+export type CheckableGameBatch = ApplicationGameBatch;
 
 export interface GeneratedBatchReader {
-  findBatch(id: number): Promise<CheckableGameBatch | undefined>;
+  findBatch(id: number): Promise<ApplicationGameBatch | undefined>;
 }
 
 export interface ContestReader {
@@ -25,7 +15,7 @@ export interface ContestReader {
 export type CheckGameBatchResult =
   | undefined
   | {
-      batch: CheckableGameBatch;
+      batch: ApplicationGameBatch;
       target: Contest | undefined;
       checks: GameCheckResult[] | undefined;
     };
