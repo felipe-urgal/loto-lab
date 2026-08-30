@@ -3,12 +3,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 test("dashboard scope keeps comparison mode separate from the active lottery", async () => {
-  const [scopeSource, loaderSource, statusSource, scopeCss, statusCss] = await Promise.all([
+  const [scopeSource, loaderSource, statusSource, scopeCss] = await Promise.all([
     readFile("web/dashboard-scope.js", "utf8"),
     readFile("web/feature-loader.js", "utf8"),
     readFile("web/data-status.js", "utf8"),
     readFile("web/dashboard-scope.css", "utf8"),
-    readFile("web/data-status.css", "utf8"),
   ]);
 
   assert.match(scopeSource, /loto-lab:dashboard-scope/);
@@ -30,9 +29,12 @@ test("dashboard scope keeps comparison mode separate from the active lottery", a
   assert.match(scopeSource, /localStorage\.setItem\(DASHBOARD_SCOPE_KEY, previousScope\)/);
 
   const scopeLoad = loaderSource.indexOf('loadStyledModule("dashboard-scope")');
-  const statusLoad = loaderSource.indexOf('loadStyledModule("data-status")');
+  const statusLoad = loaderSource.indexOf('loadModule("data-status")');
   assert.ok(scopeLoad >= 0, "dashboard scope module must be lazy-loaded");
   assert.ok(statusLoad > scopeLoad, "dashboard scope must load before operational status");
+  assert.doesNotMatch(loaderSource, /loadStyledModule\("data-status"\)/);
+  assert.doesNotMatch(loaderSource, /loadStyle\("data-status"\)/);
+  await assert.rejects(readFile("web/data-status.css", "utf8"), /ENOENT/);
 
   assert.match(statusSource, /scope === "all" \|\| item\.lottery === scope/);
   assert.match(statusSource, /data-status-compact/);
@@ -61,5 +63,7 @@ test("dashboard scope keeps comparison mode separate from the active lottery", a
   assert.match(scopeCss, /\.dashboard-performance-panel/);
   assert.match(scopeCss, /\.dashboard-lottery-grid/);
   assert.match(scopeCss, /color: var\(--success-strong\)/);
-  assert.match(statusCss, /data-status-compact/);
+  assert.match(scopeCss, /\.data-status-compact/);
+  assert.match(scopeCss, /\.data-status-compact\.is-warning/);
+  assert.match(scopeCss, /@media \(max-width: 620px\)[\s\S]*\.data-status-compact/);
 });
