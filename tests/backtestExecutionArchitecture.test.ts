@@ -8,11 +8,12 @@ async function source(path: string): Promise<string> {
 }
 
 test("active backtest execution is owned by the feature controller and application use case", async () => {
-  const [controller, application, routes, server] = await Promise.all([
+  const [controller, application, routes, server, workerClient] = await Promise.all([
     source("src/api/backtests.ts"),
     source("src/application/executeBacktest.ts"),
     source("src/api/routes.ts"),
     source("src/api/server.ts"),
+    source("src/api/workerClient.ts"),
   ]);
 
   assert.match(controller, /executeBacktest\.execute/);
@@ -24,4 +25,7 @@ test("active backtest execution is owned by the feature controller and applicati
   assert.match(routes, /dependencies\.executeBacktest/);
   assert.match(server, /new ExecuteBacktestUseCase/);
   assert.match(server, /runBacktestInWorker/);
+  assert.doesNotMatch(server, /new LotoLabApiServices/);
+  assert.doesNotMatch(workerClient, /from "\.\/services\.js"/);
+  assert.match(workerClient, /services: BacktestWorkerServices/);
 });
