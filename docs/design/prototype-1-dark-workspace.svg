@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="720" viewBox="0 0 960 720">
+  <defs>
+    <style>
+      .bg{fill:#08111d}.shell{fill:#0c1724;stroke:#20344a}.side{fill:#08121d}.panel{fill:#101d2b;stroke:#22364b}.muted{fill:#8ea1b7;font:12px Arial}.text{fill:#eaf2ff;font:14px Arial}.title{fill:#eaf2ff;font:bold 18px Arial}.small{fill:#8ea1b7;font:10px Arial}.metric{fill:#eaf2ff;font:bold 22px Arial}.active{fill:#1689ff}.good{fill:#24c77d}.line{fill:none;stroke:#1689ff;stroke-width:3}.grid{stroke:#1c2b3d;stroke-width:1}
+    </style>
+  </defs>
+  <rect width="960" height="720" rx="16" class="bg"/>
+  <text x="28" y="34" class="title">Loto Lab — Protótipo 1 · Dark Moderno</text>
+  <text x="28" y="54" class="muted">Referência oficial do redesign: workspace científico compacto</text>
+
+  <rect x="24" y="76" width="912" height="612" rx="12" class="shell"/>
+  <rect x="24" y="76" width="170" height="612" rx="12" class="side"/>
+  <text x="44" y="108" class="title">◉ Loto Lab</text>
+  <rect x="40" y="128" width="138" height="34" rx="7" fill="#123a66"/>
+  <text x="58" y="150" class="text">Painel</text>
+  <g class="muted">
+    <text x="58" y="190">Análises</text><text x="58" y="224">Gerar jogos</text><text x="58" y="258">Meus jogos</text>
+    <text x="58" y="292">Testes históricos</text><text x="58" y="326">Laboratório</text><text x="58" y="360">Estratégias</text>
+    <text x="58" y="394">Execuções</text><text x="58" y="428">Agenda</text><text x="58" y="462">IA</text><text x="58" y="496">Configurações</text>
+  </g>
+
+  <text x="222" y="112" class="title">Painel</text>
+  <g>
+    <rect x="222" y="130" width="158" height="74" rx="8" class="panel"/><rect x="392" y="130" width="158" height="74" rx="8" class="panel"/>
+    <rect x="562" y="130" width="158" height="74" rx="8" class="panel"/><rect x="732" y="130" width="176" height="74" rx="8" class="panel"/>
+  </g>
+  <g class="small"><text x="238" y="151">Concursos</text><text x="408" y="151">Jogos</text><text x="578" y="151">Acerto médio</text><text x="748" y="151">Custo</text></g>
+  <g class="metric"><text x="238" y="181">1.248</text><text x="408" y="181">89</text><text x="578" y="181">67,3%</text><text x="748" y="181">R$ 12.540</text></g>
+
+  <rect x="222" y="220" width="290" height="176" rx="9" class="panel"/><rect x="524" y="220" width="180" height="176" rx="9" class="panel"/><rect x="716" y="220" width="192" height="176" rx="9" class="panel"/>
+  <text x="238" y="246" class="text">Evolução</text><text x="540" y="246" class="text">Distribuição</text><text x="732" y="246" class="text">Performance</text>
+  <g class="grid"><line x1="238" y1="285" x2="494" y2="285"/><line x1="238" y1="325" x2="494" y2="325"/><line x1="238" y1="365" x2="494" y2="365"/></g>
+  <path d="M238 356 L270 316 L300 338 L334 274 L366 304 L398 260 L434 288 L494 244" class="line"/>
+  <circle cx="614" cy="312" r="54" fill="none" stroke="#1689ff" stroke-width="17"/><path d="M614 258 A54 54 0 0 1 665 330" fill="none" stroke="#375574" stroke-width="17"/>
+  <g fill="#1689ff"><rect x="742" y="335" width="20" height="35"/><rect x="774" y="302" width="20" height="68"/><rect x="806" y="270" width="20" height="100"/><rect x="838" y="320" width="20" height="50"/><rect x="870" y="246" width="20" height="124"/></g>
+
+  <rect x="222" y="412" width="686" height="122" rx="9" class="panel"/>
+  <text x="238" y="440" class="title">Gerar jogos</text><text x="238" y="465" fill="#1689ff" font-family="Arial" font-size="12">Rápido</text><text x="292" y="465" class="muted">Personalizado</text><text x="386" y="465" class="muted">Avançado</text>
+  <rect x="238" y="480" width="110" height="34" rx="7" fill="#123a66"/><rect x="358" y="480" width="100" height="34" rx="7" class="panel"/><rect x="468" y="480" width="110" height="34" rx="7" class="panel"/>
+  <rect x="784" y="474" width="108" height="42" rx="8" class="active"/><text x="810" y="500" fill="#fff" font-family="Arial" font-size="12">Gerar jogos</text>
+  <text x="260" y="501" class="text">Mega-Sena</text><text x="378" y="501" class="text">Lotofácil</text><text x="490" y="501" class="text">Dia de Sorte</text>
+
+  <rect x="222" y="550" width="686" height="116" rx="9" class="panel"/>
+  <text x="238" y="578" class="title">Meus jogos</text>
+  <g class="small"><text x="238" y="600">Lote</text><text x="318" y="600">Loteria</text><text x="410" y="600">Números</text><text x="704" y="600">Pontos</text><text x="806" y="600">Ações</text></g>
+  <line x1="238" y1="610" x2="890" y2="610" class="grid"/><line x1="238" y1="638" x2="890" y2="638" class="grid"/>
+  <text x="238" y="630" class="text">Jogo 001</text><text x="318" y="630" class="text">Mega-Sena</text><text x="238" y="657" class="text">Jogo 002</text><text x="318" y="657" class="text">Lotofácil</text>
+  <g class="good"><circle cx="424" cy="626" r="7"/><circle cx="446" cy="626" r="7"/><circle cx="468" cy="626" r="7"/><circle cx="490" cy="626" r="7"/></g><g class="active"><circle cx="512" cy="626" r="7"/><circle cx="534" cy="626" r="7"/></g>
+
+  <text x="30" y="706" class="small">Mesma linguagem para Análises, Testes históricos, Laboratório, Estratégias, Execuções, Agenda e IA.</text>
+</svg>
