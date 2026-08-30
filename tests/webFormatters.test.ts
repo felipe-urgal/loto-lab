@@ -8,10 +8,11 @@ import {
   formatPercent,
 } from "../web/src/shared/formatters.js";
 
-const [runtimeSource, buildSource, webTsconfigSource] = await Promise.all([
+const [runtimeSource, buildSource, webTsconfigSource, packageSource] = await Promise.all([
   readFile(resolve(process.cwd(), "web/runtime.js"), "utf8"),
   readFile(resolve(process.cwd(), "scripts/buildWeb.mjs"), "utf8"),
   readFile(resolve(process.cwd(), "tsconfig.web.json"), "utf8"),
+  readFile(resolve(process.cwd(), "package.json"), "utf8"),
 ]);
 
 test("shared web formatters preserve PT-BR display contracts", () => {
@@ -44,16 +45,24 @@ test("runtime keeps the existing formatter API while implementation moves to Typ
   assert.doesNotMatch(runtimeSource, /function formatPercent/);
 });
 
-test("web build typechecks and transpiles TypeScript sources to browser JavaScript", () => {
-  assert.match(buildSource, /ts\.transpileModule/);
+test("web build skips TypeScript sources and emits browser JavaScript through tsc", () => {
   assert.match(buildSource, /extension === "\.ts"/);
-  assert.match(buildSource, /rel\.replace\(\/\\\.ts\$\/, "\.js"\)/);
+  assert.doesNotMatch(buildSource, /transpileModule/);
 
   const webTsconfig = JSON.parse(webTsconfigSource) as {
-    compilerOptions?: { noEmit?: boolean; lib?: string[] };
+    compilerOptions?: { rootDir?: string; lib?: string[] };
     include?: string[];
   };
-  assert.equal(webTsconfig.compilerOptions?.noEmit, true);
+  assert.equal(webTsconfig.compilerOptions?.rootDir, "web/src");
   assert.deepEqual(webTsconfig.include, ["web/src/**/*.ts"]);
   assert.ok(webTsconfig.compilerOptions?.lib?.includes("DOM"));
+
+  const packageJson = JSON.parse(packageSource) as {
+    scripts?: Record<string, string>;
+  };
+  assert.equal(
+    packageJson.scripts?.["web:build"],
+    "node scripts/buildWeb.mjs && tsc -p tsconfig.web.json --outDir web-dist/assets/src",
+  );
+  assert.match(packageJson.scripts?.typecheck || "", /tsconfig\.web\.json --noEmit/);
 });
