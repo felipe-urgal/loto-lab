@@ -1,12 +1,7 @@
 import type { Pool } from "pg";
-import type { LotteryId } from "../domain/types.js";
 import type { AdvancedAnalysis } from "../analysis/advancedTypes.js";
-import { runAdvancedAnalysisInWorker } from "../analysis/advancedWorkerClient.js";
-import {
-  AnalyzeAdvancedLotteryUseCase,
-  type AdvancedAnalysisResponse,
-} from "../application/analyzeAdvancedLottery.js";
-import { AnalyzeLotteryUseCase, type AnalysisResponse } from "../application/analyzeLottery.js";
+import type { AdvancedAnalysisResponse } from "../application/analyzeAdvancedLottery.js";
+import type { AnalysisResponse } from "../application/analyzeLottery.js";
 import { CheckGameBatchUseCase, type CheckGameBatchResult } from "../application/checkGameBatch.js";
 import {
   GenerateGamesUseCase,
@@ -49,8 +44,6 @@ export class LotoLabApiServices {
   readonly games: PostgresGameRepository;
   readonly strategies: PostgresStrategyRepository;
   readonly backtests: PostgresBacktestRepository;
-  private readonly analyzeLottery: AnalyzeLotteryUseCase;
-  private readonly analyzeAdvancedLottery: AnalyzeAdvancedLotteryUseCase;
   private readonly checkGameBatch: CheckGameBatchUseCase;
   private readonly generateGames: GenerateGamesUseCase;
   private readonly runBacktestUseCase: RunBacktestUseCase;
@@ -60,22 +53,9 @@ export class LotoLabApiServices {
     this.games = new PostgresGameRepository(pool);
     this.strategies = new PostgresStrategyRepository(pool);
     this.backtests = new PostgresBacktestRepository(pool);
-    this.analyzeLottery = new AnalyzeLotteryUseCase(this.contests);
-    this.analyzeAdvancedLottery = new AnalyzeAdvancedLotteryUseCase(
-      this.contests,
-      runAdvancedAnalysisInWorker,
-    );
     this.checkGameBatch = new CheckGameBatchUseCase(this.games, this.contests);
     this.generateGames = new GenerateGamesUseCase(this.contests, this.games);
     this.runBacktestUseCase = new RunBacktestUseCase(this.contests, this.backtests);
-  }
-
-  async analyze(lottery: LotteryId): Promise<AnalysisResponse> {
-    return this.analyzeLottery.execute(lottery);
-  }
-
-  async analyzeAdvanced(lottery: LotteryId): Promise<AdvancedAnalysisResponse> {
-    return this.analyzeAdvancedLottery.execute(lottery);
   }
 
   async generate(input: GenerateGamesRequest): Promise<GenerateGamesResponse> {

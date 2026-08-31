@@ -180,20 +180,6 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
         return;
       }
 
-      let match = pathMatch(pathname, /^\/api\/v1\/analysis\/([^/]+)\/advanced$/);
-      if (method === "GET" && match) {
-        const lottery = parseLottery(match[1]);
-        sendJson(response, 200, await services.analyzeAdvanced(lottery), corsOrigin);
-        return;
-      }
-
-      match = pathMatch(pathname, /^\/api\/v1\/analysis\/([^/]+)$/);
-      if (method === "GET" && match) {
-        const lottery = parseLottery(match[1]);
-        sendJson(response, 200, await services.analyze(lottery), corsOrigin);
-        return;
-      }
-
       if (method === "POST" && pathname === "/api/v1/generation/plan") {
         if (!enforceRateLimit(request, response, generationPlanLimiter, "generation-plan")) return;
         const body = await readJsonBody(request);
@@ -266,7 +252,7 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
         return;
       }
 
-      match = pathMatch(pathname, /^\/api\/v1\/game-batches\/id\/(\d+)$/);
+      let match = pathMatch(pathname, /^\/api\/v1\/game-batches\/id\/(\d+)$/);
       if (method === "GET" && match) {
         const id = parsePositiveInt(match[1], "batchId");
         const batch = await services.games.findBatch(id);

@@ -8,10 +8,11 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
     css,
     workspaceCss,
     loader,
-    services,
+    controller,
     basicAnalysisUseCase,
     advancedAnalysisUseCase,
-    app,
+    routes,
+    server,
     advanced,
     hardening,
     repository,
@@ -22,10 +23,11 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
     readFile("web/analysis-v2.css", "utf8"),
     readFile("web/analysis-workspace.css", "utf8"),
     readFile("web/feature-loader.js", "utf8"),
-    readFile("src/api/services.ts", "utf8"),
+    readFile("src/api/analysis.ts", "utf8"),
     readFile("src/application/analyzeLottery.ts", "utf8"),
     readFile("src/application/analyzeAdvancedLottery.ts", "utf8"),
-    readFile("src/api/app.ts", "utf8"),
+    readFile("src/api/routes.ts", "utf8"),
+    readFile("src/api/server.ts", "utf8"),
     readFile("src/analysis/advanced.ts", "utf8"),
     readFile("src/analysis/advancedHardening.ts", "utf8"),
     readFile("src/persistence/contestRepository.ts", "utf8"),
@@ -76,8 +78,14 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
   assert.match(repository, /listAnalysisHistory/);
   assert.doesNotMatch(repository.match(/async listAnalysisHistory[\s\S]*?\n  }/)?.[0] ?? "", /contest_prize_tiers/);
 
-  assert.match(services, /async analyze\(lottery: LotteryId\): Promise<AnalysisResponse>/);
-  assert.match(services, /this\.analyzeLottery\.execute\(lottery\)/);
+  assert.match(controller, /analyzeLottery\.execute\(lottery\)/);
+  assert.match(controller, /analyzeAdvancedLottery\.execute\(lottery\)/);
+  assert.match(routes, /serveAnalysis/);
+  assert.match(routes, /dependencies\.analyzeLottery/);
+  assert.match(routes, /dependencies\.analyzeAdvancedLottery/);
+  assert.match(server, /analyzeLottery: new AnalyzeLotteryUseCase\(contests\)/);
+  assert.match(server, /analyzeAdvancedLottery: new AnalyzeAdvancedLotteryUseCase/);
+  assert.match(server, /runAdvancedAnalysisInWorker/);
   assert.match(basicAnalysisUseCase, /listAnalysisHistory\(lottery: LotteryId\)/);
   assert.match(basicAnalysisUseCase, /buildNumberAnalysis\(contests, config\)/);
 
@@ -86,12 +94,6 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
   assert.match(advancedAnalysisUseCase, /private readonly inFlight/);
   assert.match(advancedAnalysisUseCase, /listAnalysisHistory\(lottery: LotteryId\)/);
   assert.match(advancedAnalysisUseCase, /this\.executeAnalysis\(contests, lottery\)/);
-  assert.match(services, /new AnalyzeAdvancedLotteryUseCase/);
-  assert.match(services, /runAdvancedAnalysisInWorker/);
-  assert.match(services, /async analyzeAdvanced/);
-  assert.match(services, /this\.analyzeAdvancedLottery\.execute\(lottery\)/);
-  assert.match(app, /analysis\\\/\(\[\^\/\]\+\)\\\/advanced/);
-  assert.match(app, /services\.analyzeAdvanced\(lottery\)/);
 
   assert.match(workerClient, /ADVANCED_ANALYSIS_TIMEOUT_MS = 15_000/);
   assert.match(workerClient, /worker\.terminate\(\)/);
