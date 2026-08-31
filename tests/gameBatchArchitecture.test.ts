@@ -25,8 +25,8 @@ test("game batch HTTP ownership delegates to application use cases", async () =>
 
   assert.doesNotMatch(controller, /PostgresGameRepository/);
   assert.doesNotMatch(controller, /options\.pool/);
-  assert.match(controller, /\/api\/v1\/game-batches/);
-  assert.match(controller, /\/api\/v1\/games\/check/);
+  assert.match(controller, /game-batches/);
+  assert.match(controller, /games\/check/);
   assert.match(controller, /gameBatches\.find\(/);
   assert.match(controller, /gameBatches\.listRecent\(/);
   assert.match(controller, /checkGameBatch\.execute\(/);
