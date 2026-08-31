@@ -3,16 +3,16 @@ import type { Pool } from "pg";
 import { LOTTERY_CONFIGS } from "../lotteries/config.js";
 import type { LotteryId } from "../domain/types.js";
 import type { GenerationConstraints } from "../generator/planning.js";
-import type { GenerationMode } from "../generator/shared.js";
 import {
   InsufficientGenerationHistoryError,
   LotoLabApiServices,
 } from "./services.js";
 import { planGenerationV2, runGenerationV2 } from "./generationV2.js";
+import { optionalString, parseGenerationMode } from "./generationInput.js";
+import { generationLimiter, generationPlanLimiter } from "./generationRateLimit.js";
 import {
   ApiError,
   isRecord,
-  parseBoolean,
   parseLottery,
   parseOptionalPositiveInt,
   parsePositiveInt,
@@ -20,42 +20,11 @@ import {
   sendJson,
   sendNoContent,
 } from "./http.js";
-import { enforceRateLimit, FixedWindowRateLimiter } from "./rateLimit.js";
+import { enforceRateLimit } from "./rateLimit.js";
 
 export interface ApiServerOptions {
   pool: Pool;
   corsOrigin?: string;
-}
-
-const generationLimiter = new FixedWindowRateLimiter({ limit: 30, windowMs: 60_000 });
-const generationPlanLimiter = new FixedWindowRateLimiter({ limit: 120, windowMs: 60_000 });
-
-function requiredString(value: unknown, field: string, maxLength = 160): string {
-  if (typeof value !== "string" || value.trim().length === 0 || value.length > maxLength) {
-    throw new ApiError(400, "INVALID_ARGUMENT", `${field} must be a non-empty string up to ${maxLength} characters`);
-  }
-  return value.trim();
-}
-
-function optionalString(value: unknown, field: string, maxLength = 160): string | undefined {
-  if (value === undefined || value === null || value === "") return undefined;
-  return requiredString(value, field, maxLength);
-}
-
-function parseGenerationMode(value: unknown): GenerationMode {
-  if (value === undefined || value === null || value === "") return "diversified";
-  if (value !== "deterministic" && value !== "diversified") {
-    throw new ApiError(400, "INVALID_ARGUMENT", "generationMode must be deterministic or diversified");
-  }
-  return value;
-}
-
-function parseFixedCount(value: unknown): 8 | 9 | 10 {
-  const parsed = parsePositiveInt(value, "fixedCount", { min: 8, max: 10, defaultValue: 8 });
-  if (parsed !== 8 && parsed !== 9 && parsed !== 10) {
-    throw new ApiError(400, "INVALID_ARGUMENT", "fixedCount must be 8, 9 or 10");
-  }
-  return parsed;
 }
 
 function parseV2FixedCount(lottery: LotteryId, value: unknown): number {
@@ -218,34 +187,6 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
           generationMode,
           ...(seed !== undefined ? { seed } : {}),
           ...selection,
-          persist,
-        });
-        sendJson(response, persist ? 201 : 200, result, corsOrigin);
-        return;
-      }
-
-      if (method === "POST" && pathname === "/api/v1/games/generate") {
-        if (!enforceRateLimit(request, response, generationLimiter, "generate-games")) return;
-        const body = await readJsonBody(request);
-        const lottery = parseLottery(body.lottery);
-        const defaultGameCount = lottery === "mega-sena" ? 2 : 4;
-        const gameCount = parsePositiveInt(body.gameCount, "gameCount", {
-          min: 1,
-          max: 10,
-          defaultValue: defaultGameCount,
-        });
-        const targetContestNumber = parseOptionalPositiveInt(body.targetContestNumber, "targetContestNumber");
-        const persist = parseBoolean(body.persist, "persist", true);
-        const fixedCount = lottery === "lotofacil" ? parseFixedCount(body.fixedCount) : undefined;
-        const generationMode = parseGenerationMode(body.generationMode);
-        const seed = optionalString(body.seed, "seed", 160);
-        const result = await services.generate({
-          lottery,
-          gameCount,
-          ...(fixedCount !== undefined ? { fixedCount } : {}),
-          ...(targetContestNumber !== undefined ? { targetContestNumber } : {}),
-          generationMode,
-          ...(seed !== undefined ? { seed } : {}),
           persist,
         });
         sendJson(response, persist ? 201 : 200, result, corsOrigin);

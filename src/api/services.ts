@@ -4,7 +4,6 @@ import type { AdvancedAnalysisResponse } from "../application/analyzeAdvancedLot
 import type { AnalysisResponse } from "../application/analyzeLottery.js";
 import { CheckGameBatchUseCase, type CheckGameBatchResult } from "../application/checkGameBatch.js";
 import {
-  GenerateGamesUseCase,
   InsufficientGenerationHistoryError,
   MIN_GENERATION_HISTORY,
   type GenerateGamesRequest,
@@ -45,7 +44,6 @@ export class LotoLabApiServices {
   readonly strategies: PostgresStrategyRepository;
   readonly backtests: PostgresBacktestRepository;
   private readonly checkGameBatch: CheckGameBatchUseCase;
-  private readonly generateGames: GenerateGamesUseCase;
   private readonly runBacktestUseCase: RunBacktestUseCase;
 
   constructor(pool: Pool) {
@@ -54,12 +52,7 @@ export class LotoLabApiServices {
     this.strategies = new PostgresStrategyRepository(pool);
     this.backtests = new PostgresBacktestRepository(pool);
     this.checkGameBatch = new CheckGameBatchUseCase(this.games, this.contests);
-    this.generateGames = new GenerateGamesUseCase(this.contests, this.games);
     this.runBacktestUseCase = new RunBacktestUseCase(this.contests, this.backtests);
-  }
-
-  async generate(input: GenerateGamesRequest): Promise<GenerateGamesResponse> {
-    return this.generateGames.execute(input);
   }
 
   async checkBatch(batchId: number, contestNumber: number): Promise<CheckGameBatchResult> {
