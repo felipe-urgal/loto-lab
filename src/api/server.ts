@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import { createApiRequestHandler, type ApiServerOptions } from "./app.js";
 import type { AiInterpretationProvider } from "../ai/types.js";
 import { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
+import { ContestCatalogUseCase } from "../application/contestCatalog.js";
 import { GetDataStatusUseCase } from "../application/dataStatus.js";
 import { ExecuteBacktestUseCase } from "../application/executeBacktest.js";
 import {
@@ -47,6 +48,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const backtests = new PostgresBacktestRepository(options.pool);
   const featureRouteDependencies = {
     backtestCatalog: new BacktestCatalogUseCase(backtests),
+    contestCatalog: new ContestCatalogUseCase(contests),
     dataStatus: new GetDataStatusUseCase(contests),
     executeBacktest: new ExecuteBacktestUseCase(
       expensiveAnalysisGate,

@@ -180,50 +180,7 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
         return;
       }
 
-      let match = pathMatch(pathname, /^\/api\/v1\/contests\/([^/]+)\/latest$/);
-      if (method === "GET" && match) {
-        const lottery = parseLottery(match[1]);
-        const contests = await services.contests.list({ lottery, order: "desc", limit: 1 });
-        const contest = contests[0];
-        if (!contest) throw new ApiError(404, "CONTEST_NOT_FOUND", `No contest stored for ${lottery}`);
-        sendJson(response, 200, contest, corsOrigin);
-        return;
-      }
-
-      match = pathMatch(pathname, /^\/api\/v1\/contests\/([^/]+)\/(\d+)$/);
-      if (method === "GET" && match) {
-        const lottery = parseLottery(match[1]);
-        const contestNumber = parsePositiveInt(match[2], "contestNumber");
-        const contest = await services.contests.findByNumber(lottery, contestNumber);
-        if (!contest) throw new ApiError(404, "CONTEST_NOT_FOUND", `Contest ${contestNumber} was not found for ${lottery}`);
-        sendJson(response, 200, contest, corsOrigin);
-        return;
-      }
-
-      match = pathMatch(pathname, /^\/api\/v1\/contests\/([^/]+)$/);
-      if (method === "GET" && match) {
-        const lottery = parseLottery(match[1]);
-        const startContest = parseOptionalPositiveInt(url.searchParams.get("startContest"), "startContest");
-        const endContest = parseOptionalPositiveInt(url.searchParams.get("endContest"), "endContest");
-        const orderParam = url.searchParams.get("order") ?? "desc";
-        if (orderParam !== "asc" && orderParam !== "desc") {
-          throw new ApiError(400, "INVALID_ARGUMENT", "order must be asc or desc");
-        }
-        if (startContest !== undefined && endContest !== undefined && startContest > endContest) {
-          throw new ApiError(400, "INVALID_ARGUMENT", "startContest must be less than or equal to endContest");
-        }
-        const items = await services.contests.list({
-          lottery,
-          ...(startContest !== undefined ? { startContest } : {}),
-          ...(endContest !== undefined ? { endContest } : {}),
-          order: orderParam,
-          limit: parseLimit(url.searchParams.get("limit"), 20),
-        });
-        sendJson(response, 200, { items }, corsOrigin);
-        return;
-      }
-
-      match = pathMatch(pathname, /^\/api\/v1\/analysis\/([^/]+)\/advanced$/);
+      let match = pathMatch(pathname, /^\/api\/v1\/analysis\/([^/]+)\/advanced$/);
       if (method === "GET" && match) {
         const lottery = parseLottery(match[1]);
         sendJson(response, 200, await services.analyzeAdvanced(lottery), corsOrigin);
