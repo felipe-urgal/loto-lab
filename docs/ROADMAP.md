@@ -261,9 +261,9 @@ Todos os PRs continuam exigindo **auto code review final no SHA verde** antes do
 
 # Auditoria da documentação · 2026-08-30
 
-Todos os **27 arquivos Markdown** versionados foram revisados contra a `main` após #137. O estado do rollout visual e das prioridades foi reconciliado após #143 para encerrar #121 e novamente após #148 para registrar a fundação TypeScript da #60 sem tratar o restante da modularização como concluído.
+Todos os **27 arquivos Markdown** versionados à época foram revisados contra a `main` após #137. O estado do rollout visual e das prioridades foi reconciliado após #143 para encerrar #121 e novamente após #148 para registrar a fundação TypeScript da #60 sem tratar o restante da modularização como concluído.
 
-Sincronização pontual em **2026-08-31**, após #157: `README.md`, `docs/ROADMAP.md` e a issue #61 foram reconciliados com a extração de concursos, análises e geração compatível. Esta atualização não substitui uma nova auditoria integral dos 27 Markdown.
+Sincronização pontual em **2026-08-31**, após #157: `README.md`, `docs/ROADMAP.md` e a issue #61 foram reconciliados com a extração de concursos, análises e geração compatível. Esta atualização não substitui uma nova auditoria integral do corpus Markdown atual.
 
 | Documento | Resultado da auditoria |
 | --- | --- |
@@ -285,6 +285,7 @@ Sincronização pontual em **2026-08-31**, após #157: `README.md`, `docs/ROADMA
 | `docs/OPERATIONS.md` | reparo financeiro, agenda, notificações e status `partial` |
 | `docs/PERFORMANCE.md` | workspaces, cascata, lazy loading, workers, E2E e metas medidas |
 | `docs/PLATFORM.md` | Node 24.19.0 / TS 7.x |
+| `docs/PRODUCTION-CONTRACT.md` | contrato de produção adicionado em #154; não fazia parte da auditoria de 2026-08-30 |
 | `docs/QUALITY.md` | CI/Security atuais |
 | `docs/REAL_BETS.md` | anti-hindsight, `checkedCost`, revisões financeiras e integração com Meus Jogos |
 | `docs/RELIABILITY.md` | hardening atual |
