@@ -9,6 +9,7 @@ import { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
 import { ContestCatalogUseCase } from "../application/contestCatalog.js";
 import { GetDataStatusUseCase } from "../application/dataStatus.js";
 import { ExecuteBacktestUseCase } from "../application/executeBacktest.js";
+import { GenerateGamesUseCase } from "../application/generateGames.js";
 import {
   OperationAlreadyRunningError,
   OperationsUseCase,
@@ -24,6 +25,7 @@ import {
 } from "../operations/sync.js";
 import { PostgresBacktestRepository } from "../persistence/backtestRepository.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
+import { PostgresGameRepository } from "../persistence/gameRepository.js";
 import { PostgresOperationRepository } from "../persistence/operationRepository.js";
 import { PostgresRealBetRepository } from "../persistence/realBetRepository.js";
 import { PostgresStrategyRepository } from "../persistence/strategyRepository.js";
@@ -48,6 +50,7 @@ function isHealthPath(pathname: string): boolean {
 export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const apiHandler = createApiRequestHandler(options);
   const contests = new PostgresContestRepository(options.pool);
+  const games = new PostgresGameRepository(options.pool);
   const backtests = new PostgresBacktestRepository(options.pool);
   const featureRouteDependencies = {
     analyzeAdvancedLottery: new AnalyzeAdvancedLotteryUseCase(
@@ -66,6 +69,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
         signal ? { signal } : {},
       ),
     ),
+    generateGames: new GenerateGamesUseCase(contests, games),
     operations: new OperationsUseCase(
       new PostgresOperationRepository(options.pool),
       async () => {
