@@ -10,6 +10,7 @@ import { ContestCatalogUseCase } from "../application/contestCatalog.js";
 import { GetDataStatusUseCase } from "../application/dataStatus.js";
 import { ExecuteBacktestUseCase } from "../application/executeBacktest.js";
 import { GenerateGamesUseCase } from "../application/generateGames.js";
+import { GenerationV2UseCase } from "../application/generationV2.js";
 import {
   OperationAlreadyRunningError,
   OperationsUseCase,
@@ -18,6 +19,7 @@ import { RealBetUseCase } from "../application/realBets.js";
 import { RunStrategyLabUseCase } from "../application/runStrategyLab.js";
 import { StrategyCatalogUseCase } from "../application/strategyCatalog.js";
 import type { ContestSource } from "../data/source.js";
+import { runGenerationPlanInWorker } from "../generator/planningWorkerClient.js";
 import { logEvent } from "../observability/log.js";
 import {
   OperationAlreadyRunningError as LegacyOperationAlreadyRunningError,
@@ -70,6 +72,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
       ),
     ),
     generateGames: new GenerateGamesUseCase(contests, games),
+    generationV2: new GenerationV2UseCase(contests, games, runGenerationPlanInWorker),
     operations: new OperationsUseCase(
       new PostgresOperationRepository(options.pool),
       async () => {

@@ -26,7 +26,8 @@ test("legacy generation HTTP ownership delegates to the application use case", a
 
   assert.doesNotMatch(app, /\/api\/v1\/games\/generate/);
   assert.doesNotMatch(app, /services\.generate\(/);
-  assert.match(app, /generationLimiter/);
+  assert.doesNotMatch(app, /generationLimiter/);
+  assert.doesNotMatch(app, /generationPlanLimiter/);
 
   assert.doesNotMatch(services, /new GenerateGamesUseCase/);
   assert.doesNotMatch(services, /async generate\(/);

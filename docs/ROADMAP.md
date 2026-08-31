@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-08-31**, após o merge do #157 (`af3ddce`).
+> Baseline revisada em **2026-08-31**, com #155–#157 já na `main` e a extração do Generator 2.0 desta mudança.
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -56,7 +56,8 @@ A diretriz permanece:
 - várias fatias da application layer (#106–#119);
 - leitura de concursos extraída do monólito para controller/use case dedicado (#155);
 - análise básica/avançada extraída de `app.ts` e da facade temporária (#156);
-- ownership HTTP da geração compatível extraído para controller + `GenerateGamesUseCase` injetado (#157).
+- ownership HTTP da geração compatível extraído para controller + `GenerateGamesUseCase` injetado (#157);
+- ownership HTTP do Generator 2.0 extraído para controller + `GenerationV2UseCase`, com portas explícitas para histórico, previews/lotes e planner (#159).
 
 ### Pontos fortes a preservar
 
@@ -78,7 +79,7 @@ A diretriz permanece:
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- `src/api/app.ts` ainda concentra Generator 2.0 e parte de game batches/conferência, enquanto `LotoLabApiServices` permanece como facade temporária para responsabilidades remanescentes (#61);
+- `src/api/app.ts` ainda concentra parte de game batches/conferência, enquanto `LotoLabApiServices` permanece como facade temporária para responsabilidades remanescentes (#61);
 - frontend ainda possui módulos grandes/imperativos; a fundação TypeScript existe desde #148, mas API client/errors/escaping/lifecycle/state, primitives e decomposição por feature seguem ativos na #60;
 - hotspots algorítmicos continuam grandes (#62);
 - observabilidade segue baseada principalmente em logs/estado persistido, sem métricas/SLOs (#63);
@@ -100,15 +101,15 @@ Esta tarefa não precisa de PR de código.
 
 ## #61 — Application use cases e controllers finos · P1 · em andamento
 
-PRs #106–#119 construíram a base de application use cases. Em 2026-08-31, #155–#157 avançaram a etapa final do strangler:
+PRs #106–#119 construíram a base de application use cases. Em 2026-08-31, #155–#159 avançaram a etapa final do strangler:
 
 - #155 moveu leitura de concursos para feature controller + `ContestCatalogUseCase`;
 - #156 moveu análise básica/avançada para controller dedicado e retirou esses fluxos da facade;
-- #157 moveu `POST /api/v1/games/generate` para controller dedicado com `GenerateGamesUseCase` composto em `server.ts`.
+- #157 moveu `POST /api/v1/games/generate` para controller dedicado com `GenerateGamesUseCase` composto em `server.ts`;
+- #159 move o Generator 2.0 (`/generation/plan`, `/generation/preview`, `/generation/save`) para controller dedicado + `GenerationV2UseCase`, com PostgreSQL e worker concreto compostos em `server.ts`.
 
 Restam principalmente:
 
-- Generator 2.0 (`/generation/plan`, `/generation/preview`, `/generation/save`) ainda roteado pelo monólito e acoplado à facade/erro HTTP no módulo atual;
 - game batches/conferência remanescentes no monólito;
 - redução/remoção final de `LotoLabApiServices` como facade de infraestrutura;
 - confirmação de `server.ts` como composition root de todas as features migradas;
@@ -263,7 +264,7 @@ Todos os PRs continuam exigindo **auto code review final no SHA verde** antes do
 
 Todos os **27 arquivos Markdown** versionados à época foram revisados contra a `main` após #137. O estado do rollout visual e das prioridades foi reconciliado após #143 para encerrar #121 e novamente após #148 para registrar a fundação TypeScript da #60 sem tratar o restante da modularização como concluído.
 
-Sincronização pontual em **2026-08-31**, após #157: `README.md`, `docs/ROADMAP.md` e a issue #61 foram reconciliados com a extração de concursos, análises e geração compatível. Esta atualização não substitui uma nova auditoria integral do corpus Markdown atual.
+Sincronização pontual em **2026-08-31**, incluindo #159: `docs/ROADMAP.md` e a issue #61 foram reconciliados com a extração de concursos, análises, geração compatível e Generator 2.0. Esta atualização não substitui uma nova auditoria integral do corpus Markdown atual.
 
 | Documento | Resultado da auditoria |
 | --- | --- |
@@ -289,7 +290,7 @@ Sincronização pontual em **2026-08-31**, após #157: `README.md`, `docs/ROADMA
 | `docs/QUALITY.md` | CI/Security atuais |
 | `docs/REAL_BETS.md` | anti-hindsight, `checkedCost`, revisões financeiras e integração com Meus Jogos |
 | `docs/RELIABILITY.md` | hardening atual |
-| `docs/ROADMAP.md` | backlog real, #61 atualizado após #155–#157 e #60 em execução após #148 |
+| `docs/ROADMAP.md` | backlog real, #61 atualizado após #155–#159 e #60 em execução após #148 |
 | `docs/STRATEGY_LAB.md` | contrato v2 atual |
 | `docs/WEB.md` | rollout/consolidação concluídos, ownership atual e build TypeScript incremental |
 | `docs/design/PROTOTYPE_1_DARK_MODERN.md` | direção visual consolidada; #121 concluída |
