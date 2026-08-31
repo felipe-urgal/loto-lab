@@ -2,9 +2,11 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { AnalyzeAdvancedLotteryUseCase } from "../application/analyzeAdvancedLottery.js";
 import type { AnalyzeLotteryUseCase } from "../application/analyzeLottery.js";
 import type { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
+import type { CheckGameBatchUseCase } from "../application/checkGameBatch.js";
 import type { ContestCatalogUseCase } from "../application/contestCatalog.js";
 import type { GetDataStatusUseCase } from "../application/dataStatus.js";
 import type { ExecuteBacktestUseCase } from "../application/executeBacktest.js";
+import type { GameBatchUseCase } from "../application/gameBatches.js";
 import type { GenerateGamesUseCase } from "../application/generateGames.js";
 import type { GenerationV2UseCase } from "../application/generationV2.js";
 import type { OperationsUseCase } from "../application/operations.js";
@@ -14,12 +16,13 @@ import type { StrategyCatalogUseCase } from "../application/strategyCatalog.js";
 import { serveAnalysis } from "./analysis.js";
 import { serveContests } from "./contests.js";
 import { serveDataStatus } from "./dataStatus.js";
+import { serveGameBatchManagement } from "./gameBatchManagement.js";
+import { serveGameBatches } from "./gameBatches.js";
+import { serveGameComparison } from "./gameComparison.js";
 import { serveGeneration } from "./generation.js";
 import { serveGenerationV2 } from "./generationV2.js";
 import { serveStrategyLab } from "./strategyLab.js";
 import { serveRealBets } from "./realBets.js";
-import { serveGameBatchManagement } from "./gameBatchManagement.js";
-import { serveGameComparison } from "./gameComparison.js";
 import { serveAiInsights } from "./aiInsights.js";
 import { serveOperations } from "./operations.js";
 import { serveAgenda } from "./agenda.js";
@@ -32,9 +35,11 @@ export interface FeatureRouteDependencies {
   analyzeAdvancedLottery: AnalyzeAdvancedLotteryUseCase;
   analyzeLottery: AnalyzeLotteryUseCase;
   backtestCatalog: BacktestCatalogUseCase;
+  checkGameBatch: CheckGameBatchUseCase;
   contestCatalog: ContestCatalogUseCase;
   dataStatus: GetDataStatusUseCase;
   executeBacktest: ExecuteBacktestUseCase;
+  gameBatches: GameBatchUseCase;
   generateGames: GenerateGamesUseCase;
   generationV2: GenerationV2UseCase;
   operations: OperationsUseCase;
@@ -82,7 +87,16 @@ const featureRoutes: FeatureRouteHandler[] = [
     serveStrategyLab(request, response, options, dependencies.runStrategyLab),
   (request, response, options, dependencies) =>
     serveRealBets(request, response, options, dependencies.realBets),
-  serveGameBatchManagement,
+  (request, response, options, dependencies) =>
+    serveGameBatches(
+      request,
+      response,
+      options,
+      dependencies.gameBatches,
+      dependencies.checkGameBatch,
+    ),
+  (request, response, options, dependencies) =>
+    serveGameBatchManagement(request, response, options, dependencies.gameBatches),
   serveGameComparison,
   serveAiInsights,
   (request, response, options, dependencies) =>
