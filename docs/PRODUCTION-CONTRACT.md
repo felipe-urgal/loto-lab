@@ -25,10 +25,14 @@ npm run prod:logs
 | `prod:status` | Docker Compose `ps` | leitura do estado da stack |
 | `prod:check` | `prod:config` + quality gate estático + build de produção | preflight sem alterar a stack ativa |
 | `prod:backup` | `ops:backup` | cria backup PostgreSQL conforme política existente |
-| `prod:deploy` | `prod:up` | build/recreate da stack de produção |
-| `prod:verify` | `/health/ready` dentro do container `app` | confirma readiness sem depender da porta publicada no host |
+| `prod:deploy` | `prod:up` | build/recreate da stack e aguarda os healthchecks com timeout bounded |
+| `prod:verify` | `/health/ready` dentro do container `app` | confirmação adicional de readiness sem depender da porta publicada no host |
 | `prod:restore-check` | `ops:restore-check` | valida um backup em restore-check controlado |
 | `prod:logs` | Docker Compose logs | acompanha a aplicação ativa |
+
+`prod:up` usa `docker compose up -d --build --wait --wait-timeout 120`. Assim a etapa de deploy só termina quando os healthchecks já declarados para PostgreSQL e aplicação ficarem saudáveis, ou quando o Compose expirar com erro. Não há `sleep` arbitrário e o `prod:verify` continua sendo uma operação separada e somente leitura.
+
+O quality gate estático executa `production:contract:verify`, que protege esse comportamento contra regressão: exige `--wait`, timeout explícito, os healthchecks da stack e garante que `prod:verify` não passe a subir, parar ou reiniciar serviços.
 
 ## Políticas declaradas
 
