@@ -43,6 +43,12 @@
     "prod:config": "docker compose --env-file .env.production -f docker-compose.prod.yml config",
     "prod:up": "docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build",
     "prod:down": "docker compose --env-file .env.production -f docker-compose.prod.yml down",
+    "prod:status": "docker compose --env-file .env.production -f docker-compose.prod.yml ps",
+    "prod:check": "npm run prod:config && npm run quality:static && npm run build:prod",
+    "prod:backup": "npm run ops:backup",
+    "prod:deploy": "npm run prod:up",
+    "prod:verify": "docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app node -e \"fetch('http://127.0.0.1:3000/health/ready',{signal:AbortSignal.timeout(5000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\"",
+    "prod:restore-check": "npm run ops:restore-check --",
     "prod:logs": "docker compose --env-file .env.production -f docker-compose.prod.yml logs -f app"
   },
   "dependencies": {
