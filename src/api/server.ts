@@ -6,9 +6,11 @@ import type { AiInterpretationProvider } from "../ai/types.js";
 import { AnalyzeAdvancedLotteryUseCase } from "../application/analyzeAdvancedLottery.js";
 import { AnalyzeLotteryUseCase } from "../application/analyzeLottery.js";
 import { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
+import { CheckGameBatchUseCase } from "../application/checkGameBatch.js";
 import { ContestCatalogUseCase } from "../application/contestCatalog.js";
 import { GetDataStatusUseCase } from "../application/dataStatus.js";
 import { ExecuteBacktestUseCase } from "../application/executeBacktest.js";
+import { GameBatchUseCase } from "../application/gameBatches.js";
 import { GenerateGamesUseCase } from "../application/generateGames.js";
 import { GenerationV2UseCase } from "../application/generationV2.js";
 import {
@@ -61,6 +63,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
     ),
     analyzeLottery: new AnalyzeLotteryUseCase(contests),
     backtestCatalog: new BacktestCatalogUseCase(backtests),
+    checkGameBatch: new CheckGameBatchUseCase(games, contests),
     contestCatalog: new ContestCatalogUseCase(contests),
     dataStatus: new GetDataStatusUseCase(contests),
     executeBacktest: new ExecuteBacktestUseCase(
@@ -71,6 +74,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
         signal ? { signal } : {},
       ),
     ),
+    gameBatches: new GameBatchUseCase(games),
     generateGames: new GenerateGamesUseCase(contests, games),
     generationV2: new GenerationV2UseCase(contests, games, runGenerationPlanInWorker),
     operations: new OperationsUseCase(
