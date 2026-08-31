@@ -15,10 +15,6 @@
       "restoreCheck": "prod:restore-check",
       "logs": "prod:logs"
     },
-    "health": {
-      "type": "http",
-      "url": "http://127.0.0.1:5200/health/ready"
-    },
     "policies": {
       "backup": "required-before-deploy",
       "migrations": "startup",
