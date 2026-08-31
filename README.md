@@ -140,7 +140,7 @@ A apresentação segue a cascata `styles.css` → `ui-foundation.css` → `desig
 
 ### Backend/application layer
 
-Use cases já extraídos incluem catálogo de concursos, análise básica/avançada, geração compatível, conferência, backtest, Strategy Lab, catálogo de estratégias/backtests, operações, apostas reais e status de dados. A composição concreta dessas features fica em `server.ts`; a #61 segue reduzindo Generator 2.0, game batches/conferência remanescentes e a facade temporária.
+Use cases já extraídos incluem catálogo de concursos, análise básica/avançada, geração compatível, conferência, backtest, Strategy Lab, catálogo de estratégias/backtests, operações, apostas reais e status de dados. Concursos, análises e geração compatível já são compostos em `server.ts`; conferência e outros fluxos remanescentes ainda passam pela facade temporária e seguem na #61.
 
 ### Persistência
 
