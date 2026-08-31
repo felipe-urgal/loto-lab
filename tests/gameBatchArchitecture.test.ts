@@ -1,0 +1,52 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
+async function source(path: string): Promise<string> {
+  return readFile(resolve(process.cwd(), path), "utf8");
+}
+
+test("game batch HTTP ownership delegates to application use cases", async () => {
+  const [application, controller, management, app, routes, server] = await Promise.all([
+    source("src/application/gameBatches.ts"),
+    source("src/api/gameBatches.ts"),
+    source("src/api/gameBatchManagement.ts"),
+    source("src/api/app.ts"),
+    source("src/api/routes.ts"),
+    source("src/api/server.ts"),
+  ]);
+
+  assert.doesNotMatch(application, /ApiError/);
+  assert.doesNotMatch(application, /Postgres/);
+  assert.doesNotMatch(application, /from "pg"/);
+  assert.match(application, /interface GameBatchStore/);
+  assert.match(application, /class GameBatchUseCase/);
+
+  assert.doesNotMatch(controller, /PostgresGameRepository/);
+  assert.doesNotMatch(controller, /options\.pool/);
+  assert.match(controller, /\/api\/v1\/game-batches/);
+  assert.match(controller, /\/api\/v1\/games\/check/);
+  assert.match(controller, /gameBatches\.find\(/);
+  assert.match(controller, /gameBatches\.listRecent\(/);
+  assert.match(controller, /checkGameBatch\.execute\(/);
+
+  assert.doesNotMatch(management, /PostgresGameRepository/);
+  assert.doesNotMatch(management, /options\.pool/);
+  assert.match(management, /gameBatches\.manage\(/);
+  assert.match(management, /gameBatches\.setHidden\(/);
+
+  assert.doesNotMatch(app, /\/api\/v1\/game-batches/);
+  assert.doesNotMatch(app, /\/api\/v1\/games\/check/);
+  assert.doesNotMatch(app, /LotoLabApiServices/);
+  assert.doesNotMatch(app, /services\.games/);
+  assert.doesNotMatch(app, /services\.checkBatch/);
+
+  assert.match(routes, /checkGameBatch: CheckGameBatchUseCase/);
+  assert.match(routes, /gameBatches: GameBatchUseCase/);
+  assert.match(routes, /dependencies\.checkGameBatch/);
+  assert.match(routes, /dependencies\.gameBatches/);
+
+  assert.match(server, /checkGameBatch: new CheckGameBatchUseCase\(games, contests\)/);
+  assert.match(server, /gameBatches: new GameBatchUseCase\(games\)/);
+});
