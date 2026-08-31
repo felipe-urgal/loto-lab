@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { PostgresGameRepository, type GeneratedBatchScope } from "../persistence/gameRepository.js";
+import type { GameBatchScope, GameBatchUseCase } from "../application/gameBatches.js";
 import type { ApiServerOptions } from "./app.js";
 import {
   ApiError,
@@ -8,7 +8,7 @@ import {
   sendJson,
 } from "./http.js";
 
-function parseScope(value: string | null): GeneratedBatchScope {
+function parseScope(value: string | null): GameBatchScope {
   if (value === null || value === "active") return "active";
   if (value === "archived" || value === "all") return value;
   throw new ApiError(400, "INVALID_ARGUMENT", "scope must be active, archived or all");
@@ -18,12 +18,12 @@ export async function serveGameBatchManagement(
   request: IncomingMessage,
   response: ServerResponse,
   options: ApiServerOptions,
+  gameBatches: GameBatchUseCase,
 ): Promise<boolean> {
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://localhost");
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/$/, "") : url.pathname;
   const corsOrigin = options.corsOrigin ?? process.env.API_CORS_ORIGIN ?? "http://localhost:3000";
-  const repository = new PostgresGameRepository(options.pool);
 
   const listMatch = /^\/api\/v1\/game-batches\/manage\/([^/]+)$/.exec(pathname);
   if (method === "GET" && listMatch) {
@@ -34,11 +34,8 @@ export async function serveGameBatchManagement(
       defaultValue: 100,
     });
     const scope = parseScope(url.searchParams.get("scope"));
-    const [items, counts] = await Promise.all([
-      repository.listRecent(lottery, limit, scope),
-      repository.counts(lottery),
-    ]);
-    sendJson(response, 200, { items, counts, scope }, corsOrigin);
+    const result = await gameBatches.manage(lottery, limit, scope);
+    sendJson(response, 200, result, corsOrigin);
     return true;
   }
 
@@ -48,7 +45,7 @@ export async function serveGameBatchManagement(
   if (method === "POST" && lifecycleMatch) {
     const id = parsePositiveInt(lifecycleMatch[1], "batchId");
     const hidden = lifecycleMatch[2] === "archive" || lifecycleMatch[2] === "hide";
-    const item = await repository.setArchived(id, hidden);
+    const item = await gameBatches.setHidden(id, hidden);
     if (!item) {
       throw new ApiError(404, "BATCH_NOT_FOUND", `Game batch ${id} was not found`);
     }
