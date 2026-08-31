@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { createApiRequestHandler, type ApiServerOptions } from "./app.js";
+import { runAdvancedAnalysisInWorker } from "../analysis/advancedWorkerClient.js";
 import type { AiInterpretationProvider } from "../ai/types.js";
+import { AnalyzeAdvancedLotteryUseCase } from "../application/analyzeAdvancedLottery.js";
+import { AnalyzeLotteryUseCase } from "../application/analyzeLottery.js";
 import { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
 import { ContestCatalogUseCase } from "../application/contestCatalog.js";
 import { GetDataStatusUseCase } from "../application/dataStatus.js";
@@ -47,6 +50,11 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const contests = new PostgresContestRepository(options.pool);
   const backtests = new PostgresBacktestRepository(options.pool);
   const featureRouteDependencies = {
+    analyzeAdvancedLottery: new AnalyzeAdvancedLotteryUseCase(
+      contests,
+      runAdvancedAnalysisInWorker,
+    ),
+    analyzeLottery: new AnalyzeLotteryUseCase(contests),
     backtestCatalog: new BacktestCatalogUseCase(backtests),
     contestCatalog: new ContestCatalogUseCase(contests),
     dataStatus: new GetDataStatusUseCase(contests),
