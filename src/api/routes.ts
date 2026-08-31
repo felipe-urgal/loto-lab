@@ -1,4 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { AnalyzeAdvancedLotteryUseCase } from "../application/analyzeAdvancedLottery.js";
+import type { AnalyzeLotteryUseCase } from "../application/analyzeLottery.js";
 import type { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
 import type { ContestCatalogUseCase } from "../application/contestCatalog.js";
 import type { GetDataStatusUseCase } from "../application/dataStatus.js";
@@ -7,6 +9,7 @@ import type { OperationsUseCase } from "../application/operations.js";
 import type { RealBetUseCase } from "../application/realBets.js";
 import type { RunStrategyLabUseCase } from "../application/runStrategyLab.js";
 import type { StrategyCatalogUseCase } from "../application/strategyCatalog.js";
+import { serveAnalysis } from "./analysis.js";
 import { serveContests } from "./contests.js";
 import { serveDataStatus } from "./dataStatus.js";
 import { serveStrategyLab } from "./strategyLab.js";
@@ -22,6 +25,8 @@ import { serveAnalysisJobs } from "./analysisJobs.js";
 import type { LotoLabServerOptions } from "./server.js";
 
 export interface FeatureRouteDependencies {
+  analyzeAdvancedLottery: AnalyzeAdvancedLotteryUseCase;
+  analyzeLottery: AnalyzeLotteryUseCase;
   backtestCatalog: BacktestCatalogUseCase;
   contestCatalog: ContestCatalogUseCase;
   dataStatus: GetDataStatusUseCase;
@@ -40,6 +45,14 @@ type FeatureRouteHandler = (
 ) => Promise<boolean>;
 
 const featureRoutes: FeatureRouteHandler[] = [
+  (request, response, options, dependencies) =>
+    serveAnalysis(
+      request,
+      response,
+      options,
+      dependencies.analyzeLottery,
+      dependencies.analyzeAdvancedLottery,
+    ),
   (request, response, options, dependencies) =>
     serveContests(request, response, options, dependencies.contestCatalog),
   (request, response, options, dependencies) =>
