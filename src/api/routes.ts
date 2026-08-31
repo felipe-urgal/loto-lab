@@ -5,6 +5,7 @@ import type { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
 import type { ContestCatalogUseCase } from "../application/contestCatalog.js";
 import type { GetDataStatusUseCase } from "../application/dataStatus.js";
 import type { ExecuteBacktestUseCase } from "../application/executeBacktest.js";
+import type { GenerateGamesUseCase } from "../application/generateGames.js";
 import type { OperationsUseCase } from "../application/operations.js";
 import type { RealBetUseCase } from "../application/realBets.js";
 import type { RunStrategyLabUseCase } from "../application/runStrategyLab.js";
@@ -12,6 +13,7 @@ import type { StrategyCatalogUseCase } from "../application/strategyCatalog.js";
 import { serveAnalysis } from "./analysis.js";
 import { serveContests } from "./contests.js";
 import { serveDataStatus } from "./dataStatus.js";
+import { serveGeneration } from "./generation.js";
 import { serveStrategyLab } from "./strategyLab.js";
 import { serveRealBets } from "./realBets.js";
 import { serveGameBatchManagement } from "./gameBatchManagement.js";
@@ -31,6 +33,7 @@ export interface FeatureRouteDependencies {
   contestCatalog: ContestCatalogUseCase;
   dataStatus: GetDataStatusUseCase;
   executeBacktest: ExecuteBacktestUseCase;
+  generateGames: GenerateGamesUseCase;
   operations: OperationsUseCase;
   realBets: RealBetUseCase;
   strategyCatalog: StrategyCatalogUseCase;
@@ -57,6 +60,8 @@ const featureRoutes: FeatureRouteHandler[] = [
     serveContests(request, response, options, dependencies.contestCatalog),
   (request, response, options, dependencies) =>
     serveDataStatus(request, response, options, dependencies.dataStatus),
+  (request, response, options, dependencies) =>
+    serveGeneration(request, response, options, dependencies.generateGames),
   (request, response, options, dependencies) =>
     serveBacktests(
       request,
