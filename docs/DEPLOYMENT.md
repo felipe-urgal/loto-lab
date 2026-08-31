@@ -126,8 +126,10 @@ npm run prod:up
 Equivalente a:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build --wait --wait-timeout 120
 ```
+
+O comando só retorna sucesso depois que os healthchecks do Compose ficarem saudáveis, limitado a 120 segundos. Assim, `prod:deploy` não conclui antes do PostgreSQL e da aplicação estarem prontos.
 
 A ordem de startup é:
 
@@ -202,7 +204,7 @@ npm run prod:config
 npm run prod:up
 ```
 
-`up -d --build` reconstrói a imagem e recria a aplicação quando necessário. O volume PostgreSQL é preservado.
+`up -d --build --wait --wait-timeout 120` reconstrói a imagem, recria a aplicação quando necessário e só retorna sucesso quando os serviços ficam saudáveis. O volume PostgreSQL é preservado.
 
 As migrations são forward-only. Por isso o backup antes de mudanças de schema é parte do procedimento de atualização.
 
