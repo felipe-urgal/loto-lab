@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-08-31**, com #155–#159 já na `main` e a extração de game batches/conferência desta mudança.
+> Baseline revisada em **2026-09-01**, com #155–#160 já na `main` e a remoção da facade concreta `LotoLabApiServices` desta mudança.
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -58,7 +58,8 @@ A diretriz permanece:
 - análise básica/avançada extraída de `app.ts` e da facade temporária (#156);
 - ownership HTTP da geração compatível extraído para controller + `GenerateGamesUseCase` injetado (#157);
 - ownership HTTP do Generator 2.0 extraído para controller + `GenerationV2UseCase`, com portas explícitas para histórico, previews/lotes e planner (#159);
-- leitura, gestão e conferência de game batches extraídas do monólito/controllers concretos para `GameBatchUseCase` + `CheckGameBatchUseCase`, com composição em `server.ts` (#160).
+- leitura, gestão e conferência de game batches extraídas do monólito/controllers concretos para `GameBatchUseCase` + `CheckGameBatchUseCase`, com composição em `server.ts` (#160);
+- facade concreta `LotoLabApiServices` removida de `src/api/services.ts`, preservando apenas exports auxiliares de compatibilidade e deixando composição concreta em `server.ts` (esta mudança).
 
 ### Pontos fortes a preservar
 
@@ -80,7 +81,7 @@ A diretriz permanece:
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- `LotoLabApiServices` permanece como facade temporária a remover após a extração das rotas legadas; `server.ts` precisa ser confirmado como composition root completo da API (#61);
+- #61 está na auditoria final: `server.ts` precisa ser confirmado como composition root completo das features migradas e CLI/scheduler só devem ser alterados se houver duplicação de orquestração relevante e comprovada;
 - frontend ainda possui módulos grandes/imperativos; a fundação TypeScript existe desde #148, mas API client/errors/escaping/lifecycle/state, primitives e decomposição por feature seguem ativos na #60;
 - hotspots algorítmicos continuam grandes (#62);
 - observabilidade segue baseada principalmente em logs/estado persistido, sem métricas/SLOs (#63);
@@ -108,13 +109,14 @@ PRs #106–#119 construíram a base de application use cases. Em 2026-08-31, #15
 - #156 moveu análise básica/avançada para controller dedicado e retirou esses fluxos da facade;
 - #157 moveu `POST /api/v1/games/generate` para controller dedicado com `GenerateGamesUseCase` composto em `server.ts`;
 - #159 moveu o Generator 2.0 (`/generation/plan`, `/generation/preview`, `/generation/save`) para controller dedicado + `GenerationV2UseCase`, com PostgreSQL e worker concreto compostos em `server.ts`;
-- #160 move leitura/conferência de game batches para controller dedicado, injeta `GameBatchUseCase` na gestão hide/show e remove `LotoLabApiServices` de `app.ts`.
+- #160 move leitura/conferência de game batches para controller dedicado, injeta `GameBatchUseCase` na gestão hide/show e remove `LotoLabApiServices` de `app.ts`;
+- esta mudança remove a classe `LotoLabApiServices` e o acoplamento de `src/api/services.ts` a `pg`/repositories concretos, mantendo no módulo apenas exports auxiliares compatíveis e adicionando uma guarda arquitetural contra regressão.
 
 Restam principalmente:
 
-- redução/remoção final de `LotoLabApiServices` como facade de infraestrutura quando não houver consumidores reais;
-- confirmação de `server.ts` como composition root de todas as features migradas;
-- revisão de CLI/scheduler apenas se ainda houver orquestração duplicada relevante.
+- confirmar `server.ts` como composition root completo de todas as features migradas, sem composição concreta escondida na borda HTTP;
+- revisar CLI/scheduler apenas onde houver orquestração duplicada relevante e comprovada; não mover engines puros para application layer por estética arquitetural;
+- ao concluir essa auditoria final, reconciliar a documentação e fechar #61 como `completed`.
 
 **Regra:** continuar verticalmente, sem misturar decomposição matemática da #62. Cada fatia precisa manter os contratos HTTP e passar CI, Security e E2E aplicável, seguida de auto code review final registrado no SHA verde conforme `AGENTS.md`.
 
@@ -265,7 +267,7 @@ Todos os PRs continuam exigindo **auto code review final no SHA verde** antes do
 
 Todos os **27 arquivos Markdown** versionados à época foram revisados contra a `main` após #137. O estado do rollout visual e das prioridades foi reconciliado após #143 para encerrar #121 e novamente após #148 para registrar a fundação TypeScript da #60 sem tratar o restante da modularização como concluído.
 
-Sincronização pontual em **2026-08-31**, incluindo #160: `docs/ROADMAP.md` e a issue #61 foram reconciliados com a extração de concursos, análises, geração compatível, Generator 2.0 e game batches/conferência. Esta atualização não substitui uma nova auditoria integral do corpus Markdown atual.
+Sincronização pontual em **2026-09-01**, incluindo #160 e esta mudança: `README.md`, `docs/API.md`, `docs/MENTAL_MODEL.md`, `docs/ROADMAP.md` e a issue #61 foram reconciliados com a extração de concursos, análises, geração compatível, Generator 2.0, game batches/conferência e a remoção da facade concreta `LotoLabApiServices`. Esta atualização não substitui uma nova auditoria integral do corpus Markdown atual.
 
 | Documento | Resultado da auditoria |
 | --- | --- |
@@ -291,7 +293,7 @@ Sincronização pontual em **2026-08-31**, incluindo #160: `docs/ROADMAP.md` e a
 | `docs/QUALITY.md` | CI/Security atuais |
 | `docs/REAL_BETS.md` | anti-hindsight, `checkedCost`, revisões financeiras e integração com Meus Jogos |
 | `docs/RELIABILITY.md` | hardening atual |
-| `docs/ROADMAP.md` | backlog real, #61 atualizado após #155–#160 e #60 em execução após #148 |
+| `docs/ROADMAP.md` | backlog real, #61 na auditoria final após remoção da facade concreta e #60 em execução após #148 |
 | `docs/STRATEGY_LAB.md` | contrato v2 atual |
 | `docs/WEB.md` | rollout/consolidação concluídos, ownership atual e build TypeScript incremental |
 | `docs/design/PROTOTYPE_1_DARK_MODERN.md` | direção visual consolidada; #121 concluída |
