@@ -103,7 +103,7 @@ O sistema diferencia:
 - **atingiu faixa premiada, mas o rateio necessário não está armazenado** → prêmio desconhecido;
 - **Mês da Sorte acertado sem tier financeiro disponível** → total desconhecido.
 
-Por isso dado ausente não vira `R$ 0,00` e não entra artificialmente no ROI no fluxo canônico. O fallback legado de Meus Jogos ainda possui uma representação antiga que pode exibir zero para financeiro desconhecido; essa dívida permanece aberta para correção/remoção durante a modularização do frontend (#60) e não deve ser tratada como contrato correto.
+Por isso dado ausente não vira `R$ 0,00` e não entra artificialmente no ROI. Esse contrato também vale para o fallback `web/real-bets.js`: desde #147, os formatters compartilhados exibem `—` para valores ausentes ou inválidos, preservando **desconhecido != zero**. A evolução ou remoção futura do fallback continua sendo trabalho arquitetural da #60, mas não existe mais uma dívida financeira aberta nesse ponto.
 
 ## Reparação de rateios
 

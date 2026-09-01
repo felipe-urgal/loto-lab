@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-08-31**, com #155–#159 já na `main` e a extração de game batches/conferência desta mudança.
+> Baseline revisada em **2026-09-01**, com #155–#160 já na `main` e o PR #163 removendo a facade concreta `LotoLabApiServices`.
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -52,13 +52,16 @@ A diretriz permanece:
 - consolidação de CSS legado e ownership visual (#134–#142);
 - auditoria transversal final de legibilidade, foco, reduced-motion e mobile, incluindo correção de overflow real em Análises (#143);
 - consolidação do Protótipo 1 concluída (#121);
+- correção do fallback financeiro para preservar `desconhecido != zero` (#147);
 - fundação TypeScript incremental do frontend com `web/src`, typecheck/lint browser, emissão via `tsc` e primeiro helper compartilhado (#148);
+- reconciliação da documentação frontend após a fundação TypeScript (#149);
 - várias fatias da application layer (#106–#119);
 - leitura de concursos extraída do monólito para controller/use case dedicado (#155);
 - análise básica/avançada extraída de `app.ts` e da facade temporária (#156);
 - ownership HTTP da geração compatível extraído para controller + `GenerateGamesUseCase` injetado (#157);
 - ownership HTTP do Generator 2.0 extraído para controller + `GenerationV2UseCase`, com portas explícitas para histórico, previews/lotes e planner (#159);
-- leitura, gestão e conferência de game batches extraídas do monólito/controllers concretos para `GameBatchUseCase` + `CheckGameBatchUseCase`, com composição em `server.ts` (#160).
+- leitura, gestão e conferência de game batches extraídas do monólito/controllers concretos para `GameBatchUseCase` + `CheckGameBatchUseCase`, com composição em `server.ts` (#160);
+- PR #163 remove a facade concreta `LotoLabApiServices` de `src/api/services.ts`, preservando somente exports auxiliares de compatibilidade e mantendo a issue #61 aberta para as fronteiras concretas restantes.
 
 ### Pontos fortes a preservar
 
@@ -80,7 +83,7 @@ A diretriz permanece:
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- `LotoLabApiServices` permanece como facade temporária a remover após a extração das rotas legadas; `server.ts` precisa ser confirmado como composition root completo da API (#61);
+- #61 continua em execução: `aiInsights.ts`, `agenda.ts`, `analysisJobs.ts` e `gameComparison.ts` ainda compõem dependências concretas ou acessam `options.pool` na borda HTTP; `server.ts` ainda não é composition root completo;
 - frontend ainda possui módulos grandes/imperativos; a fundação TypeScript existe desde #148, mas API client/errors/escaping/lifecycle/state, primitives e decomposição por feature seguem ativos na #60;
 - hotspots algorítmicos continuam grandes (#62);
 - observabilidade segue baseada principalmente em logs/estado persistido, sem métricas/SLOs (#63);
@@ -94,7 +97,7 @@ A diretriz permanece:
 
 ## #52 — Governança de `main` · P0 · bloqueada
 
-A API do GitHub foi revalidada em 2026-08-30: `main.protected = false` e não há required status checks.
+A API do GitHub foi revalidada em **2026-09-01**: `main.protected = false`, `required_status_checks.enforcement_level = off` e não há checks obrigatórios.
 
 **Próxima ação:** configuração administrativa no GitHub/`gh api` para exigir PR + `CI / test`, bloquear force-push/exclusão e então revalidar.
 
@@ -108,13 +111,21 @@ PRs #106–#119 construíram a base de application use cases. Em 2026-08-31, #15
 - #156 moveu análise básica/avançada para controller dedicado e retirou esses fluxos da facade;
 - #157 moveu `POST /api/v1/games/generate` para controller dedicado com `GenerateGamesUseCase` composto em `server.ts`;
 - #159 moveu o Generator 2.0 (`/generation/plan`, `/generation/preview`, `/generation/save`) para controller dedicado + `GenerationV2UseCase`, com PostgreSQL e worker concreto compostos em `server.ts`;
-- #160 move leitura/conferência de game batches para controller dedicado, injeta `GameBatchUseCase` na gestão hide/show e remove `LotoLabApiServices` de `app.ts`.
+- #160 move leitura/conferência de game batches para controller dedicado, injeta `GameBatchUseCase` na gestão hide/show e remove `LotoLabApiServices` de `app.ts`;
+- #163 remove a classe `LotoLabApiServices` e o acoplamento de `src/api/services.ts` a `pg`/repositories concretos, mantém no módulo apenas exports auxiliares compatíveis e adiciona guarda arquitetural contra regressão.
 
-Restam principalmente:
+A auditoria do #163 identificou ownership HTTP restante que precisa ser tratado em fatias próprias:
 
-- redução/remoção final de `LotoLabApiServices` como facade de infraestrutura quando não houver consumidores reais;
-- confirmação de `server.ts` como composition root de todas as features migradas;
-- revisão de CLI/scheduler apenas se ainda houver orquestração duplicada relevante.
+- `aiInsights.ts` instancia `OpenAiInterpretationProvider`/`AiInsightService` com `options.pool`;
+- `agenda.ts` instancia repositories PostgreSQL e `NotificationService` diretamente;
+- `analysisJobs.ts` resolve manager/repositories e validações dependentes de persistência dentro do controller;
+- `gameComparison.ts` instancia `PostgresGameRepository` e `PostgresContestRepository` no handler.
+
+Depois dessas extrações, restam:
+
+- confirmar `server.ts` como composition root completo de todas as features HTTP;
+- revisar CLI/scheduler apenas onde houver orquestração duplicada relevante e comprovada; não mover engines puros para application layer por estética arquitetural;
+- reconciliar a documentação final e fechar #61 como `completed` somente quando não houver ownership concreto relevante na borda.
 
 **Regra:** continuar verticalmente, sem misturar decomposição matemática da #62. Cada fatia precisa manter os contratos HTTP e passar CI, Security e E2E aplicável, seguida de auto code review final registrado no SHA verde conforme `AGENTS.md`.
 
@@ -124,15 +135,17 @@ Restam principalmente:
 
 ## #60 — Frontend TypeScript, módulos e primitives · P1 · em andamento
 
-A consolidação visual da #121 foi concluída e a fundação arquitetural começou em #148.
+A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149.
 
-Entregue em #148:
+Entregue:
 
-- `tsconfig.web.json` isolando o ambiente browser/DOM;
-- typecheck/lint cobrindo `web/src/**/*.ts`;
-- emissão JavaScript via `tsc` para `web-dist/assets/src` sem publicar fontes `.ts` cruas;
-- `web/src/shared/formatters.ts` como primeiro helper compartilhado;
-- `web/runtime.js` preservado como boundary compatível para consumidores legados.
+- `web/real-bets.js` preserva valor financeiro ausente como `—`, sem fabricar zero (#147);
+- `tsconfig.web.json` isolando o ambiente browser/DOM (#148);
+- typecheck/lint cobrindo `web/src/**/*.ts` (#148);
+- emissão JavaScript via `tsc` para `web-dist/assets/src` sem publicar fontes `.ts` cruas (#148);
+- `web/src/shared/formatters.ts` como primeiro helper compartilhado (#148);
+- `web/runtime.js` preservado como boundary compatível para consumidores legados (#148);
+- README/ROADMAP/WEB/MENTAL_MODEL reconciliados com a fundação incremental (#149).
 
 Próximas fatias:
 
@@ -156,7 +169,7 @@ Transformar sinais já existentes em métricas acionáveis:
 - pool PostgreSQL;
 - poucos SLOs + runbooks.
 
-Não introduzir tracing distribuído antes de necessidade demonstrada.
+Não introduzir tracing distribuído antes de necessidade demonstrada. O #163 melhora a fronteira de composição, mas não fecha a #61; iniciar #63 deve evitar disputar os mesmos arquivos de arquitetura enquanto houver PR ativo no fluxo.
 
 ---
 
@@ -164,13 +177,15 @@ Não introduzir tracing distribuído antes de necessidade demonstrada.
 
 ## #62 — Motores e hotspots algorítmicos
 
-Depois da #61:
+Depois da consolidação principal da #61:
 
 - registry por loteria quando houver contrato comum real;
 - decompor `analysis/advanced.ts` e `generator/planning.ts`;
 - separar Strategy Lab por experimento/inferência/reporting;
 - absorver nomes transitórios `*-hardening` quando o ownership estiver claro;
 - preservar equivalência matemática por testes.
+
+O #163 remove a facade temporária, mas não elimina as quatro fronteiras HTTP concretas ainda rastreadas pela #61; por isso a dependência permanece ativa.
 
 ## #64 — Arquitetura de informação e jornada pós-redesign
 
@@ -202,6 +217,8 @@ O lifecycle atual e o browser E2E já funcionam como guardrails qualitativos con
 ## #66 — Hipótese → experimento → evidência → decisão
 
 Compor as peças já existentes — strategies, jobs, backtests, Lab, previews/seeds, real bets e AI insights — em uma cadeia explícita de proveniência e decisão reproduzível.
+
+A dependência de arquitetura permanece: concluir a consolidação principal da #61 e coordenar com a decomposição algorítmica da #62 antes de criar uma nova camada transversal de proveniência.
 
 ---
 
@@ -261,42 +278,48 @@ Todos os PRs continuam exigindo **auto code review final no SHA verde** antes do
 
 ---
 
-# Auditoria da documentação · 2026-08-30
+# Auditoria integral da documentação · 2026-09-01
 
-Todos os **27 arquivos Markdown** versionados à época foram revisados contra a `main` após #137. O estado do rollout visual e das prioridades foi reconciliado após #143 para encerrar #121 e novamente após #148 para registrar a fundação TypeScript da #60 sem tratar o restante da modularização como concluído.
+Todos os **28 arquivos Markdown** versionados no branch do PR #163 foram revisados contra o estado atual do código, as 8 issues abertas e a `main` em `382f2a1`.
 
-Sincronização pontual em **2026-08-31**, incluindo #160: `docs/ROADMAP.md` e a issue #61 foram reconciliados com a extração de concursos, análises, geração compatível, Generator 2.0 e game batches/conferência. Esta atualização não substitui uma nova auditoria integral do corpus Markdown atual.
+A auditoria confirmou que a maior parte do corpus já estava correta. Foram necessárias três correções materiais nesta rodada:
+
+1. `docs/ROADMAP.md` — substitui a revisão pontual por esta auditoria integral, revalida #52 e reconcilia dependências/status de #60–#66;
+2. `docs/REAL_BETS.md` — remove a dívida falsa sobre o fallback financeiro, corrigida em #147;
+3. `docs/tasks/SENIOR_REVIEW_FINANCIAL_INTEGRITY.md` — registra o follow-up financeiro como absorvido e deixa de usar um review histórico concluído como backlog.
+
+Os demais documentos foram lidos e mantidos sem churn porque continuam descrevendo corretamente contratos presentes.
 
 | Documento | Resultado da auditoria |
 | --- | --- |
-| `AGENTS.md` | contrato de engenharia, PR, CI e auto-review para agentes de IA |
-| `README.md` | estado, rollout concluído, arquitetura e fundação TypeScript incremental |
-| `docs/AGENDA.md` | URL local e contrato atual |
-| `docs/AI.md` | contexto/persistência atuais e URL local |
-| `docs/ANALYSES.md` | contrato estatístico atual |
-| `docs/API.md` | application layer e famílias atuais |
-| `docs/DATABASE.md` | migrations/tabelas/repositories atuais |
+| `AGENTS.md` | contrato de engenharia, PR, CI e auto-review permanece atual |
+| `README.md` | estado, arquitetura, rollout e fundação TypeScript permanecem atuais |
+| `docs/AGENDA.md` | contrato atual de agenda/notificações |
+| `docs/AI.md` | contexto, provider, persistência e limites metodológicos atuais |
+| `docs/ANALYSES.md` | contrato estatístico/anti-leakage atual |
+| `docs/API.md` | application layer, famílias HTTP e quatro fronteiras restantes da #61 atuais |
+| `docs/DATABASE.md` | migrations, tabelas, repositories e invariantes atuais |
 | `docs/DATA_OPERATIONS.md` | bootstrap/sync atuais |
-| `docs/DEPLOYMENT.md` | stack e segurança atuais |
-| `docs/FINANCIALS.md` | ROI histórico/real, `financialCost`/`checkedCost` e compatibilidade JSON |
-| `docs/GENERATION.md` | score-v2 e geração atuais |
-| `docs/LOTOFACIL_READINESS.md` | checklist atual |
-| `docs/MENTAL_MODEL.md` | application layer, superfícies e fundação frontend TypeScript |
-| `docs/METHODOLOGY.md` | score-v2/Lab implementados |
-| `docs/MY_GAMES.md` | My Games 2.0, ocultar/mostrar, conferência e comparação |
-| `docs/OPERATIONS.md` | reparo financeiro, agenda, notificações e status `partial` |
-| `docs/PERFORMANCE.md` | workspaces, cascata, lazy loading, workers, E2E e metas medidas |
-| `docs/PLATFORM.md` | Node 24.19.0 / TS 7.x |
-| `docs/PRODUCTION-CONTRACT.md` | contrato de produção adicionado em #154; não fazia parte da auditoria de 2026-08-30 |
-| `docs/QUALITY.md` | CI/Security atuais |
-| `docs/REAL_BETS.md` | anti-hindsight, `checkedCost`, revisões financeiras e integração com Meus Jogos |
-| `docs/RELIABILITY.md` | hardening atual |
-| `docs/ROADMAP.md` | backlog real, #61 atualizado após #155–#160 e #60 em execução após #148 |
-| `docs/STRATEGY_LAB.md` | contrato v2 atual |
-| `docs/WEB.md` | rollout/consolidação concluídos, ownership atual e build TypeScript incremental |
+| `docs/DEPLOYMENT.md` | stack e segurança de produção atuais |
+| `docs/FINANCIALS.md` | ROI histórico/real e distinção `desconhecido != zero` atuais |
+| `docs/GENERATION.md` | score-v2, portfólio e geração atuais |
+| `docs/LOTOFACIL_READINESS.md` | checklist operacional atual |
+| `docs/MENTAL_MODEL.md` | arquitetura backend/frontend e North Star atuais |
+| `docs/METHODOLOGY.md` | score-v2, validação e Lab atuais |
+| `docs/MY_GAMES.md` | My Games 2.0, lifecycle, conferência e comparação atuais |
+| `docs/OPERATIONS.md` | reparo financeiro, agenda, notificações e status `partial` atuais |
+| `docs/PERFORMANCE.md` | lazy loading, workers, PostgreSQL e política evidence-based atuais |
+| `docs/PLATFORM.md` | Node 24.19.0 / TypeScript 7.x atuais |
+| `docs/PRODUCTION-CONTRACT.md` | contrato `prod:*` atual |
+| `docs/QUALITY.md` | gates CI/Security atuais |
+| `docs/REAL_BETS.md` | corrigido: fallback também preserva `desconhecido != zero` desde #147 |
+| `docs/RELIABILITY.md` | hardening e invariantes atuais |
+| `docs/ROADMAP.md` | corrigido: auditoria integral, backlog e dependências reconciliados |
+| `docs/STRATEGY_LAB.md` | contrato v2 e inferência atuais |
+| `docs/WEB.md` | rollout concluído e migração TypeScript incremental atuais |
 | `docs/design/PROTOTYPE_1_DARK_MODERN.md` | direção visual consolidada; #121 concluída |
-| `docs/tasks/MY_GAMES_V2.md` | registro histórico/concluído e owners atuais |
-| `docs/tasks/SENIOR_REVIEW_FINANCIAL_INTEGRITY.md` | registro histórico/concluído e follow-up absorvido |
+| `docs/tasks/MY_GAMES_V2.md` | registro histórico concluído, sem backlog oculto |
+| `docs/tasks/SENIOR_REVIEW_FINANCIAL_INTEGRITY.md` | corrigido: review concluído e follow-up financeiro absorvido por #147 |
 
 ## Gestão futura
 

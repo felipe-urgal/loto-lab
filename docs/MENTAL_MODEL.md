@@ -192,7 +192,9 @@ Ports
 PostgreSQL / CAIXA / OpenAI / worker_threads
 ```
 
-A migração está avançada, mas não concluída. `src/api/app.ts` e `LotoLabApiServices` ainda mantêm parte do ownership legado (#61).
+Na borda HTTP, concursos, análises, geração, backtests, estratégias, Strategy Lab, operações, apostas reais, status de dados e game batches já seguem controllers/use cases injetados com composição concreta em `src/api/server.ts`. `src/api/app.ts` ficou restrito à infraestrutura comum e `src/api/services.ts` preserva apenas exports auxiliares de compatibilidade, sem `LotoLabApiServices` nem repositories concretos.
+
+A #61 continua aberta porque `aiInsights.ts`, `agenda.ts`, `analysisJobs.ts` e `gameComparison.ts` ainda criam dependências concretas ou acessam `options.pool` na borda HTTP. Depois dessas fatias, ainda deve haver uma revisão direcionada de CLI/scheduler apenas onde existir orquestração duplicada real.
 
 ## Direção frontend
 

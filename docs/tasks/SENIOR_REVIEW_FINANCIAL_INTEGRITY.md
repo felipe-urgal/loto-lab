@@ -15,20 +15,19 @@
 - ROI de apostas reais usa `checkedCost`, não o custo total que inclui pendências;
 - correções oficiais posteriores preservam o `checked_at` original e entram em `real_bet_financial_revisions`.
 
-## Follow-up residual ainda aberto
+## Follow-up residual absorvido
 
-O fluxo canônico foi consolidado em Meus Jogos 2.0 e no Painel, mas **o fallback legado `web/real-bets.js` ainda possui semântica financeira antiga**: para uma aposta `checked` com `totalPrizeValue`/`netResult` desconhecidos, ele pode renderizar `R$ 0,00` por usar fallback numérico para zero.
+O follow-up financeiro que ainda existia no fallback legado `web/real-bets.js` foi concluído em #147. Valores `totalPrizeValue`/`netResult` ausentes ou inválidos passam pelos formatters compartilhados e são exibidos como `—`, preservando **desconhecido != zero** em vez de fabricar `R$ 0,00`.
 
-Portanto este ponto **não deve ser considerado absorvido**. Ele permanece como dívida do frontend legado a ser corrigida ou eliminada durante a modularização/consolidação da #60.
-
-O que já foi absorvido corretamente:
+O que está consolidado:
 
 - o Painel possui sua composição financeira canônica;
 - o refinamento legado de “Desempenho real” deixou de ser injetado tardiamente no dashboard;
 - Meus Jogos 2.0 possui o fluxo principal de lote/aposta/conferência;
+- o fallback `web/real-bets.js` respeita a semântica financeira de dado desconhecido desde #147;
 - `RealBetUseCase` e `RealBetService` permanecem donos das regras de criação/reconciliação no backend.
 
-Até o fallback ser removido/corrigido, não usar sua representação de prêmio/resultado desconhecido como contrato de produto.
+A #60 continua podendo evoluir ou remover esse fallback por razões de arquitetura frontend, ownership e TypeScript, mas **não há follow-up financeiro aberto deste review**.
 
 ## Guardrail permanente
 
@@ -42,4 +41,4 @@ Mudanças futuras em custo, prêmio, ROI ou reconciliação devem conferir pelo 
 6. concorrência transacional;
 7. agregação de ROI por totais, nunca média simples de percentuais.
 
-Este arquivo é um registro histórico, não uma lista geral de backlog. O follow-up residual acima permanece explicitamente vinculado à #60 até a remoção/correção do fallback legado.
+Este arquivo é um registro histórico, não uma lista geral de backlog. Novas dívidas devem ser registradas na issue que realmente possui o trabalho, sem reabrir artificialmente o review concluído.
