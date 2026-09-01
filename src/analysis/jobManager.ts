@@ -1,15 +1,18 @@
 import type { Pool } from "pg";
+import type { RunBacktestRequest } from "../application/runBacktest.js";
 import type { StrategyLabOptions } from "../lab/strategyLab.js";
 import {
   PostgresAnalysisJobRepository,
   type AnalysisJobKind,
   type AnalysisJobRecord,
 } from "../persistence/analysisJobRepository.js";
-import { LotoLabApiServices, type RunBacktestRequest } from "../api/services.js";
+import { PostgresBacktestRepository } from "../persistence/backtestRepository.js";
+import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import {
   AnalysisCancelledError,
   runBacktestInWorker,
   runStrategyLabInWorker,
+  type BacktestWorkerServices,
 } from "../api/workerClient.js";
 import { expensiveAnalysisGate } from "../api/workGate.js";
 import { logEvent } from "../observability/log.js";
@@ -32,7 +35,8 @@ function serializedError(error: unknown): { code?: string; message: string } {
 
 export class AnalysisJobManager {
   private readonly repository: PostgresAnalysisJobRepository;
-  private readonly services: LotoLabApiServices;
+  private readonly contests: PostgresContestRepository;
+  private readonly backtestServices: BacktestWorkerServices;
   private running?: Promise<void>;
   private stopped = false;
   private retryTimer?: NodeJS.Timeout;
@@ -42,7 +46,11 @@ export class AnalysisJobManager {
 
   constructor(pool: Pool) {
     this.repository = new PostgresAnalysisJobRepository(pool);
-    this.services = new LotoLabApiServices(pool);
+    this.contests = new PostgresContestRepository(pool);
+    this.backtestServices = {
+      contests: this.contests,
+      backtests: new PostgresBacktestRepository(pool),
+    };
   }
 
   async start(): Promise<number> {
@@ -118,14 +126,14 @@ export class AnalysisJobManager {
   private async execute(job: AnalysisJobRecord, signal: AbortSignal): Promise<Record<string, unknown>> {
     if (job.kind === "backtest") {
       const result = await runBacktestInWorker(
-        this.services,
+        this.backtestServices,
         job.input as unknown as RunBacktestRequest,
         { signal },
       );
       return result as unknown as Record<string, unknown>;
     }
 
-    const contests = await this.services.contests.list({ lottery: job.lottery, order: "asc" });
+    const contests = await this.contests.list({ lottery: job.lottery, order: "asc" });
     const result = await runStrategyLabInWorker(
       contests,
       job.input as unknown as StrategyLabOptions,
