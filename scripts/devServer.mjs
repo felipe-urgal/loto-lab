@@ -26,10 +26,8 @@ if (process.env.PORT) {
   serverEnvironment.API_PORT = process.env.PORT;
 }
 
-if (process.env.HOST) {
-  serverEnvironment.API_HOST = process.env.HOST;
-}
-
+// Generic process managers may use HOST=0.0.0.0. Keep API_HOST under the
+// Loto Lab public-exposure contract and translate only the managed port.
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 run(npmCommand, ["run", "api:start"], {
   env: serverEnvironment,
