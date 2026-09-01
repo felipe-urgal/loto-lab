@@ -10,6 +10,9 @@ const [packageSource, composeSource] = await Promise.all([
 
 const packageJson = JSON.parse(packageSource);
 const scripts = packageJson.scripts ?? {};
+const prodConfig = scripts['prod:config'];
+const prodConfigCheck = scripts['prod:config:check'];
+const prodCheck = scripts['prod:check'];
 const prodUp = scripts['prod:up'];
 const prodDeploy = scripts['prod:deploy'];
 const prodVerify = scripts['prod:verify'];
@@ -32,6 +35,33 @@ function extractComposeService(source, serviceName) {
 
   return lines.slice(start, end).join('\n');
 }
+
+const expectedProdConfig =
+  'docker compose --env-file .env.production -f docker-compose.prod.yml config --quiet';
+const expectedProdConfigCheck =
+  'docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet';
+const expectedProdCheck =
+  'npm run prod:config:check && npm run quality:static && npm run build:prod';
+
+assert.equal(
+  prodConfig,
+  expectedProdConfig,
+  'prod:config deve validar a configuração real silenciosamente',
+);
+assert.equal(
+  prodConfigCheck,
+  expectedProdConfigCheck,
+  'prod:config:check deve validar somente o exemplo versionado e seguro',
+);
+assert.equal(
+  prodCheck,
+  expectedProdCheck,
+  'prod:check deve usar somente a configuração segura antes dos gates estáticos e build',
+);
+assert.ok(
+  !prodCheck.includes('prod:config &&'),
+  'prod:check não pode voltar a carregar .env.production real',
+);
 
 assert.equal(typeof prodUp, 'string', 'package.json precisa declarar prod:up');
 assert.equal(prodDeploy, 'npm run prod:up', 'prod:deploy deve continuar delegando para prod:up');
@@ -56,4 +86,6 @@ assert.equal(
   'prod:verify deve permanecer no comando read-only allowlisted de readiness',
 );
 
-console.log('Contrato de produção validado: deploy aguarda healthchecks e verify permanece somente leitura.');
+console.log(
+  'Contrato de produção validado: check usa configuração segura, deploy aguarda healthchecks e verify permanece somente leitura.',
+);
