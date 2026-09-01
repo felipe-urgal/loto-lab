@@ -8,16 +8,20 @@ async function source(path: string): Promise<string> {
 }
 
 test("legacy API services module no longer owns infrastructure composition", async () => {
-  const [services, index, server] = await Promise.all([
+  const [services, index, server, jobManager] = await Promise.all([
     source("src/api/services.ts"),
     source("src/index.ts"),
     source("src/api/server.ts"),
+    source("src/analysis/jobManager.ts"),
   ]);
 
   assert.doesNotMatch(services, /class LotoLabApiServices/);
   assert.doesNotMatch(services, /from "pg"/);
   assert.doesNotMatch(services, /\.\.\/persistence\//);
   assert.doesNotMatch(services, /new Postgres/);
+
+  assert.doesNotMatch(jobManager, /LotoLabApiServices/);
+  assert.doesNotMatch(jobManager, /\.\.\/api\/services\.js/);
 
   assert.match(index, /export \* from "\.\/api\/services\.js"/);
   assert.match(server, /const contests = new PostgresContestRepository\(options\.pool\)/);
