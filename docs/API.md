@@ -18,7 +18,7 @@ Domain / engines / ports
 PostgreSQL / CAIXA / OpenAI / workers
 ```
 
-Várias features já seguem essa fronteira diretamente: Estratégias, Testes históricos, Strategy Lab, Operações, Apostas Reais e Status de Dados. `src/api/app.ts` ainda mantém algumas rotas legadas de concursos, análises, Generator 2.0 e game batches; a redução restante é rastreada pela #61.
+As famílias de feature já entram por controllers dedicados e application use cases injetados, com repositories/workers concretos compostos em `src/api/server.ts`. `src/api/app.ts` ficou restrito à borda comum da API, health, catálogo estático de loterias e fallback; `src/api/services.ts` não possui mais facade de infraestrutura. A #61 permanece aberta apenas para a auditoria final do composition root e de eventual orquestração duplicada em CLI/scheduler.
 
 Controllers devem cuidar de parse, CORS/auth/rate-limit quando aplicável, serialização e error mapping. Regras de negócio pertencem ao application/core.
 
