@@ -192,7 +192,7 @@ Ports
 PostgreSQL / CAIXA / OpenAI / worker_threads
 ```
 
-A migração está avançada, mas não concluída. `src/api/app.ts` e `LotoLabApiServices` ainda mantêm parte do ownership legado (#61).
+Na borda HTTP, as features migradas entram por controllers e use cases injetados, enquanto `src/api/server.ts` concentra a composição concreta. `src/api/app.ts` ficou restrito à infraestrutura comum da API e `src/api/services.ts` preserva apenas exports auxiliares de compatibilidade, sem `LotoLabApiServices` nem repositories concretos. A #61 está na auditoria final do composition root e de eventual orquestração duplicada em CLI/scheduler.
 
 ## Direção frontend
 
