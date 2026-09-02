@@ -117,10 +117,10 @@ function renderInsight(record: AiInsightRecord, disclaimer: string | undefined):
         <section class="ai-section"><h3>Próximos testes</h3><ul>${list(record.insight.nextTests)}</ul></section>
       </div>
       <div class="ai-evidence">
-        <div class="ai-evidence-item"><span>Referência</span><strong>${latest ? `#${latest.number} · ${escapeHtml(latest.date)}` : "Sem concurso"}</strong></div>
-        <div class="ai-evidence-item"><span>Teste histórico</span><strong>${backtest ? `#${backtest.id}` : "Não disponível"}</strong></div>
+        <div class="ai-evidence-item"><span>Referência</span><strong>${latest ? `#${escapeHtml(latest.number)} · ${escapeHtml(latest.date)}` : "Sem concurso"}</strong></div>
+        <div class="ai-evidence-item"><span>Teste histórico</span><strong>${backtest ? `#${escapeHtml(backtest.id)}` : "Não disponível"}</strong></div>
         <div class="ai-evidence-item"><span>Laboratório</span><strong>${lab ? `${lab.variants.length} variantes · ${lab.rankingBasis === "roi" ? "ROI" : "premiação"}` : "Não disponível"}</strong></div>
-        <div class="ai-evidence-item"><span>Resultado real</span><strong>${real.checkedBets || 0} conferida(s) · ROI ${formatPercent(real.roi)}</strong></div>
+        <div class="ai-evidence-item"><span>Resultado real</span><strong>${escapeHtml(real.checkedBets || 0)} conferida(s) · ROI ${formatPercent(real.roi)}</strong></div>
       </div>
       <div class="ai-disclaimer">${escapeHtml(disclaimer || "")}</div>
     </article>`;
@@ -165,9 +165,9 @@ function renderHistory(): void {
   historyRoot.innerHTML = historyItems
     .map(
       (item) => `
-    <button class="ai-history-row" type="button" data-insight-id="${item.id}">
+    <button class="ai-history-row" type="button" data-insight-id="${escapeHtml(item.id)}">
       <div><strong>${escapeHtml(item.insight.headline)}</strong><p>${escapeHtml(FOCUS_LABELS[item.focus] || item.focus)} · ${escapeHtml(item.insight.summary)}</p></div>
-      <div class="ai-history-meta">#${item.id}<br />${escapeHtml(formatDateTime(item.createdAt))}</div>
+      <div class="ai-history-meta">#${escapeHtml(item.id)}<br />${escapeHtml(formatDateTime(item.createdAt))}</div>
     </button>`,
     )
     .join("");
@@ -227,8 +227,8 @@ form.addEventListener("submit", async (event) => {
     renderInsight(record, record.disclaimer);
     message.className = "panel ai-message";
     message.innerHTML = record.reused
-      ? `<strong>Interpretação reutilizada</strong><p>A evidência não mudou; o registro #${record.id} foi reutilizado sem nova chamada ao provedor.</p>`
-      : `<strong>Interpretação salva</strong><p>Registro #${record.id} criado sem alterar qualquer cálculo ou jogo.</p>`;
+      ? `<strong>Interpretação reutilizada</strong><p>A evidência não mudou; o registro #${escapeHtml(record.id)} foi reutilizado sem nova chamada ao provedor.</p>`
+      : `<strong>Interpretação salva</strong><p>Registro #${escapeHtml(record.id)} criado sem alterar qualquer cálculo ou jogo.</p>`;
     if (forceInput) forceInput.checked = false;
     await loadHistory();
   } catch (error) {
