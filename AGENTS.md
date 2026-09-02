@@ -444,7 +444,7 @@ Você está atuando como o Principal Engineer e Arquiteto de Software deste repo
 
 ## 1. Engenharia de Código e Manutenibilidade
 *   **Princípios Práticos:** Aplique KISS (mantenha simples), DRY (não se repita) e YAGNI (não crie o que não precisa agora).
-*   **SOLID Restrito:** 
+*   **SOLID Restrito:**
     *   Toda classe, função ou componente deve ter uma única responsabilidade.
     *   Sistemas devem ser abertos para extensão e fechados para modificação.
     *   Dependa de abstrações/interfaces, nunca de implementações concretas diretamente.

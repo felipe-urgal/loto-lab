@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { extname } from 'node:path';
+
+const writeMode = process.argv.includes('--write');
 
 const trackedFiles = execFileSync('git', ['ls-files', '-z'], {
   encoding: 'utf8',
@@ -33,6 +35,23 @@ const textNames = new Set([
 
 const failures = [];
 let inspectedFiles = 0;
+let updatedFiles = 0;
+
+function normalizeText(content) {
+  let normalized = content;
+
+  if (normalized.startsWith('\uFEFF')) {
+    normalized = normalized.slice(1);
+  }
+
+  normalized = normalized.replace(/\r\n?/g, '\n');
+  normalized = normalized
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+$/, ''))
+    .join('\n');
+
+  return normalized;
+}
 
 for (const file of trackedFiles) {
   if (!textNames.has(file) && !textExtensions.has(extname(file))) {
@@ -45,6 +64,15 @@ for (const file of trackedFiles) {
 
   inspectedFiles += 1;
   const content = readFileSync(file, 'utf8');
+
+  if (writeMode) {
+    const normalized = normalizeText(content);
+    if (normalized !== content) {
+      writeFileSync(file, normalized, 'utf8');
+      updatedFiles += 1;
+    }
+    continue;
+  }
 
   if (content.startsWith('\uFEFF')) {
     failures.push(`${file}: BOM UTF-8 não permitido`);
@@ -60,6 +88,13 @@ for (const file of trackedFiles) {
       failures.push(`${file}:${index + 1}: whitespace no fim da linha`);
     }
   }
+}
+
+if (writeMode) {
+  console.log(
+    `Repository text format applied: ${inspectedFiles} text files inspected, ${updatedFiles} updated`,
+  );
+  process.exit(0);
 }
 
 if (failures.length > 0) {
