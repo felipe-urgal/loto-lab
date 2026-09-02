@@ -1,3 +1,4 @@
+import { AiInterpretationError } from "./types.js";
 import type {
   AiInsightContent,
   AiInterpretationProvider,
@@ -48,15 +49,7 @@ interface OpenAiResponse {
   error?: { message?: string; code?: string };
 }
 
-export class OpenAiProviderError extends Error {
-  constructor(
-    readonly code: string,
-    message: string,
-    readonly status?: number,
-  ) {
-    super(message);
-  }
-}
+export class OpenAiProviderError extends AiInterpretationError {}
 
 function extractText(response: OpenAiResponse): string {
   if (typeof response.output_text === "string" && response.output_text.trim()) {
