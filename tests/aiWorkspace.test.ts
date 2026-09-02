@@ -40,5 +40,11 @@ test("AI workspace follows Prototype 1 while preserving interpretation contracts
   assert.match(ai, /const token = \+\+historyLoadToken/);
   assert.match(ai, /const token = \+\+insightRequestToken/);
   assert.match(ai, /lotterySelect\.value !== requestedLottery/);
+  assert.match(ai, /data-insight-id="\$\{escapeHtml\(item\.id\)\}"/);
+  assert.match(ai, /#\$\{escapeHtml\(latest\.number\)\}/);
+  assert.match(ai, /#\$\{escapeHtml\(backtest\.id\)\}/);
+  assert.match(ai, /registro #\$\{escapeHtml\(record\.id\)\} foi reutilizado/);
+  assert.match(ai, /Registro #\$\{escapeHtml\(record\.id\)\} criado/);
+  assert.doesNotMatch(ai, /data-insight-id="\$\{item\.id\}"/);
   assert.doesNotMatch(ai, /\.\/runtime\.js/);
 });
