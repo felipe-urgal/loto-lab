@@ -37,7 +37,11 @@ export interface AiInsightStore {
 
 export class AiInsightStoreConflictError extends Error {}
 
-const inFlight = new Map<string, Promise<AiInsightRecord>>();
+interface AiInsightInFlight {
+  promise: Promise<AiInsightRecord>;
+}
+
+const inFlight = new Map<string, AiInsightInFlight>();
 
 function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -92,7 +96,7 @@ export class AiInsightsUseCase {
 
     const key = `${lottery}:${focus}:${model}:${hash}`;
     const existingRun = !force ? inFlight.get(key) : undefined;
-    if (existingRun) return { ...(await existingRun), reused: true };
+    if (existingRun) return { ...(await existingRun.promise), reused: true };
 
     const run = (async () => {
       const result = await this.provider.interpret({ focus, evidence });
@@ -116,11 +120,12 @@ export class AiInsightsUseCase {
       }
     })();
 
-    if (!force) inFlight.set(key, run);
+    const entry: AiInsightInFlight = { promise: run };
+    if (!force) inFlight.set(key, entry);
     try {
       return await run;
     } finally {
-      if (!force && inFlight.get(key) === run) inFlight.delete(key);
+      if (!force && inFlight.get(key) === entry) inFlight.delete(key);
     }
   }
 
