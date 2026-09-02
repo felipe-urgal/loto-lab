@@ -269,7 +269,7 @@ Backtests, Strategy Lab e análise avançada usam workers/gates no backend. O fr
 
 O lifecycle, lazy loading e E2E atual protegem qualitativamente contra loading infinito, montagem duplicada, FOUC/layout inutilizável, navegação quebrada e overflow estrutural.
 
-Medições quantitativas de LCP, INP e CLS e otimizações guiadas por baseline pertencem à #65 quando houver baseline representativo. Fechar #121 não converte metas de Web Vitals em promessa sem medição representativa.
+Medições quantitativas de LCP, INP e CLS e otimizações guiadas por baseline pertencem à #65. Fechar #121 não converte metas de Web Vitals em promessa sem medição representativa.
 
 ## Testes
 
