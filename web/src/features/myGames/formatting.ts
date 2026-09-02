@@ -11,7 +11,7 @@ export function numberLabel(value: number): string {
 }
 
 export function hitText(value: number | undefined): string {
-  const hits = Number(value) || 0;
+  const hits = value ?? 0;
   return `${hits} acerto${hits === 1 ? "" : "s"}`;
 }
 
