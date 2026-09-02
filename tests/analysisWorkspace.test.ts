@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 test("analysis workspace follows Prototype 1 without changing statistical contracts", async () => {
-  const [loader, workspace, analysis] = await Promise.all([
+  const [loader, workspace, boundary, analysis] = await Promise.all([
     readFile("web/feature-loader.js", "utf8"),
     readFile("web/analysis-workspace.css", "utf8"),
     readFile("web/analysis-v2.js", "utf8"),
+    readFile("web/src/features/analysisV2.ts", "utf8"),
   ]);
 
   const baseStyle = loader.indexOf('loadStyle("analysis-v2")');
@@ -17,6 +18,11 @@ test("analysis workspace follows Prototype 1 without changing statistical contra
   assert.ok(moduleLoad > workspaceStyle, "analysis module must mount after its visual layers are ready");
   assert.doesNotMatch(loader, /loadStyle\("analysis-v2-hardening"\)/);
   await assert.rejects(readFile("web/analysis-v2-hardening.css", "utf8"), /ENOENT/);
+
+  assert.equal(boundary, 'import "./src/features/analysisV2.js";\n');
+  assert.match(analysis, /currentMainView/);
+  assert.match(analysis, /onMainViewChanged/);
+  assert.doesNotMatch(analysis, /runtime\.js/);
 
   assert.match(workspace, /\.a2-shell \{[\s\S]*min-width: 0/);
   assert.match(workspace, /max-width: 1440px/);
@@ -36,8 +42,8 @@ test("analysis workspace follows Prototype 1 without changing statistical contra
   assert.match(workspace, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
 
-  assert.match(analysis, /const TABS = \["ranking", "structure", "dynamics", "combinations", "validation"\]/);
-  assert.match(analysis, /api\(`\/analysis\/\$\{lottery\}\/advanced`\)/);
+  assert.match(analysis, /const TABS: readonly AnalysisTab\[\] = \["ranking", "structure", "dynamics", "combinations", "validation"\]/);
+  assert.match(analysis, /api<AnalysisPayload>\(`\/analysis\/\$\{lottery\}\/advanced`\)/);
   assert.match(analysis, /role="tablist"/);
   assert.match(analysis, /<dialog class="a2-detail"/);
   assert.match(analysis, /Atraso e frequência são descrições históricas/);
