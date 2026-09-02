@@ -146,20 +146,14 @@ function resetForm(): void {
   syncLotteryFields();
 }
 
-function renderStrategies(): void {
-  countRoot.textContent = `${strategies.length} estratégia(s)`;
-  if (!strategies.length) {
-    listRoot.innerHTML =
-      '<div class="panel experiment-empty">Nenhuma estratégia cadastrada neste filtro.</div>';
-    return;
-  }
+function jobsHref(lotteryId: LotteryId, versionId: number): string {
+  return `/jobs?lottery=${encodeURIComponent(lotteryId)}&strategyVersionId=${encodeURIComponent(String(versionId))}`;
+}
 
-  listRoot.innerHTML = strategies
-    .map((strategy) => {
-      const strategyId = escapeHtml(strategy.id);
-      const versionId = escapeHtml(strategy.latestVersionId);
-      const jobsHref = `/jobs?lottery=${encodeURIComponent(strategy.lottery)}&strategyVersionId=${encodeURIComponent(String(strategy.latestVersionId))}`;
-      return `
+function renderStrategyCard(strategy: StrategySummary): string {
+  const strategyId = escapeHtml(strategy.id);
+  const versionId = escapeHtml(strategy.latestVersionId);
+  return `
     <article class="panel experiment-card" data-strategy-id="${strategyId}">
       <div class="experiment-card-head">
         <div><h3>${escapeHtml(strategy.name)}</h3><p>${escapeHtml(labels[strategy.lottery] || strategy.lottery)} · ${escapeHtml(strategy.slug)}</p></div>
@@ -175,12 +169,29 @@ function renderStrategies(): void {
         <button class="button compact ghost" type="button" data-edit="${strategyId}">Nova versão</button>
         <button class="button compact ghost" type="button" data-duplicate="${strategyId}">Duplicar</button>
         <button class="button compact ghost" type="button" data-versions="${strategyId}">Histórico</button>
-        <a class="button compact primary" href="${escapeHtml(jobsHref)}">Executar</a>
+        <a class="button compact primary" href="${escapeHtml(jobsHref(strategy.lottery, strategy.latestVersionId))}">Executar</a>
       </div>
       <div class="version-list" data-version-root="${strategyId}" hidden></div>
     </article>`;
-    })
-    .join("");
+}
+
+function renderVersionRow(strategy: StrategySummary, version: StrategyVersion): string {
+  return `
+      <div class="version-row">
+        <strong>v${escapeHtml(version.version)}</strong>
+        <span>${escapeHtml(version.methodologyVersion)} · ${escapeHtml(formatDateTime(version.createdAt))}</span>
+        <a class="button compact" href="${escapeHtml(jobsHref(strategy.lottery, version.id))}">Executar #${escapeHtml(version.id)}</a>
+      </div>`;
+}
+
+function renderStrategies(): void {
+  countRoot.textContent = `${strategies.length} estratégia(s)`;
+  if (!strategies.length) {
+    listRoot.innerHTML =
+      '<div class="panel experiment-empty">Nenhuma estratégia cadastrada neste filtro.</div>';
+    return;
+  }
+  listRoot.innerHTML = strategies.map(renderStrategyCard).join("");
 }
 
 async function loadVersions(strategyId: number): Promise<void> {
@@ -192,6 +203,7 @@ async function loadVersions(strategyId: number): Promise<void> {
     root.hidden = true;
     return;
   }
+
   root.hidden = false;
   root.innerHTML =
     '<div class="loading-state"><span class="spinner"></span><span>Carregando versões...</span></div>';
@@ -199,17 +211,7 @@ async function loadVersions(strategyId: number): Promise<void> {
     const data = await api<StrategyVersionsResponse>(
       `/strategies/${encodeURIComponent(strategy.slug)}/versions`,
     );
-    root.innerHTML = (data.items ?? [])
-      .map((version) => {
-        const jobsHref = `/jobs?lottery=${encodeURIComponent(strategy.lottery)}&strategyVersionId=${encodeURIComponent(String(version.id))}`;
-        return `
-      <div class="version-row">
-        <strong>v${escapeHtml(version.version)}</strong>
-        <span>${escapeHtml(version.methodologyVersion)} · ${escapeHtml(formatDateTime(version.createdAt))}</span>
-        <a class="button compact" href="${escapeHtml(jobsHref)}">Executar #${escapeHtml(version.id)}</a>
-      </div>`;
-      })
-      .join("");
+    root.innerHTML = (data.items ?? []).map((version) => renderVersionRow(strategy, version)).join("");
   } catch (error) {
     root.innerHTML = `<div class="job-error">${escapeHtml(errorMessage(error))}</div>`;
   }
