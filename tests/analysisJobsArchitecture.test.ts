@@ -8,8 +8,10 @@ async function source(path: string): Promise<string> {
 }
 
 test("analysis jobs HTTP ownership delegates to an injected application use case", async () => {
-  const [application, controller, routes, server, startup] = await Promise.all([
+  const [application, strategyLabInput, apiStrategyLabInput, controller, routes, server, startup] = await Promise.all([
     source("src/application/analysisJobs.ts"),
+    source("src/application/strategyLabInput.ts"),
+    source("src/api/strategyLabInput.ts"),
     source("src/api/analysisJobs.ts"),
     source("src/api/routes.ts"),
     source("src/api/server.ts"),
@@ -24,6 +26,14 @@ test("analysis jobs HTTP ownership delegates to an injected application use case
   assert.match(application, /interface AnalysisJobStrategyReader/);
   assert.match(application, /interface AnalysisJobHistoryReader/);
   assert.match(application, /class AnalysisJobsUseCase/);
+  assert.match(application, /from "\.\/strategyLabInput\.js"/);
+  assert.doesNotMatch(application, /function parseStrategyLabExperiment/);
+
+  assert.doesNotMatch(strategyLabInput, /\.\.\/api\//);
+  assert.doesNotMatch(strategyLabInput, /from "pg"/);
+  assert.match(strategyLabInput, /export function parseStrategyLabOptions/);
+  assert.match(apiStrategyLabInput, /from "\.\.\/application\/strategyLabInput\.js"/);
+  assert.doesNotMatch(apiStrategyLabInput, /function parsePositiveInt/);
 
   assert.doesNotMatch(controller, /getAnalysisJobManager/);
   assert.doesNotMatch(controller, /PostgresContestRepository/);
