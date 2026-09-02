@@ -222,6 +222,18 @@ O motor:
 
 A mesma seed, histórico e configuração reproduzem o lote.
 
+## Ownership do frontend
+
+A implementação funcional do Generator 2.0 pertence a `web/src/features/generationV2.ts`. O arquivo público `web/generation-v2.js` é somente um boundary de asset compatível que importa o JavaScript emitido pelo build TypeScript.
+
+Os contratos consumidos pela interface ficam explícitos em `web/src/features/generationV2/types.ts`, incluindo plano, baseline, espaços do algoritmo, auditoria, preview/save, jogo gerado, filtros e estado da UI. O módulo consome diretamente:
+
+- `web/src/core/api.ts` para `/generation/plan`, `/generation/preview` e `/generation/save`;
+- `web/src/core/viewLifecycle.ts` para view atual, montagem e cleanup de navegação;
+- `web/src/shared/escaping.ts` para conteúdo dinâmico interpolado em markup.
+
+A feature não mantém mais client HTTP próprio nem parsing próprio de `location.hash`. A migração é arquitetural: o fluxo `plano → prévia congelada → save exato`, seed/Preview ID, seleção manual, filtros estruturais, modo diversificado e rejeição de histórico stale permanecem com o mesmo contrato. `generation-explainability.js` e `generation-readiness.js` continuam camadas aditivas, sem tomar ownership funcional do Gerador.
+
 ## Explicabilidade na página
 
 A tela mostra:

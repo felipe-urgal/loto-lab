@@ -98,7 +98,7 @@ test("Analyses 2.0 owns its Portuguese product vocabulary in source", async () =
 });
 
 test("Generator 2.0 owns its conditioned reference copy in Portuguese", async () => {
-  const generator = await source("web/generation-v2.js");
+  const generator = await source("web/src/features/generationV2.ts");
 
   assert.match(generator, />Referência condicionada</);
   assert.match(generator, /As referências abaixo são condicionadas/);

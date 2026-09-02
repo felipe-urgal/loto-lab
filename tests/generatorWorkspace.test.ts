@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 test("generator workspace follows Prototype 1 while preserving audited generation", async () => {
-  const [loader, workspace, generator, explainability] = await Promise.all([
+  const [loader, workspace, boundary, generator, types, explainability] = await Promise.all([
     readFile("web/feature-loader.js", "utf8"),
     readFile("web/generation-workspace.css", "utf8"),
     readFile("web/generation-v2.js", "utf8"),
+    readFile("web/src/features/generationV2.ts", "utf8"),
+    readFile("web/src/features/generationV2/types.ts", "utf8"),
     readFile("web/generation-explainability.js", "utf8"),
   ]);
 
@@ -35,11 +37,19 @@ test("generator workspace follows Prototype 1 while preserving audited generatio
   assert.match(workspace, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
 
-  assert.match(generator, /postJson\("\/generation\/plan"/);
-  assert.match(generator, /postJson\("\/generation\/preview"/);
-  assert.match(generator, /postJson\("\/generation\/save"/);
+  assert.equal(boundary, 'import "./src/features/generationV2.js";\n');
+  assert.match(generator, /from "\.\.\/core\/api\.js"/);
+  assert.match(generator, /from "\.\.\/core\/viewLifecycle\.js"/);
+  assert.match(generator, /from "\.\.\/shared\/escaping\.js"/);
+  assert.doesNotMatch(generator, /fetch\(/);
+  assert.doesNotMatch(generator, /location\.hash/);
+  assert.match(types, /export type GenerationPlan/);
+  assert.match(types, /export type GeneratorState/);
+  assert.match(generator, /postJson<GenerationPlan>\("\/generation\/plan"/);
+  assert.match(generator, /postJson<GenerationPreviewResponse>\("\/generation\/preview"/);
+  assert.match(generator, /postJson<GenerationSaveResponse>\("\/generation\/save"/);
   assert.match(generator, /generationMode: "diversified"/);
-  assert.match(generator, /includeSeed && state\.preview\?\.generatorOptions\?\.seed/);
+  assert.match(generator, /includeSeed \? state\.preview\?\.generatorOptions\.seed/);
   assert.match(generator, /Se o histórico mudar, o save é recusado/);
   assert.match(explainability, /Isto não é previsão/);
   assert.match(explainability, /loto-lab:view-rendered/);
