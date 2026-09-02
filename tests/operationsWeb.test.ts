@@ -17,18 +17,22 @@ test("dashboard operational controls are served by the web process", async (t) =
   assert.ok(address && typeof address !== "string");
   const baseUrl = `http://127.0.0.1:${(address as AddressInfo).port}`;
 
-  const [statusResponse, dashboardResponse] = await Promise.all([
+  const [statusBoundaryResponse, typedStatusResponse, dashboardResponse] = await Promise.all([
     fetch(`${baseUrl}/assets/data-status.js`),
+    fetch(`${baseUrl}/assets/src/features/dataStatus.js`),
     fetch(`${baseUrl}/assets/dashboard-scope.js`),
   ]);
-  assert.equal(statusResponse.status, 200);
+  assert.equal(statusBoundaryResponse.status, 200);
+  assert.equal(typedStatusResponse.status, 200);
   assert.equal(dashboardResponse.status, 200);
 
-  const [statusSource, dashboardSource] = await Promise.all([
-    statusResponse.text(),
+  const [statusBoundarySource, statusSource, dashboardSource] = await Promise.all([
+    statusBoundaryResponse.text(),
+    typedStatusResponse.text(),
     dashboardResponse.text(),
   ]);
 
+  assert.match(statusBoundarySource, /\.\/src\/features\/dataStatus\.js/);
   assert.match(statusSource, /\/api\/v1\/operations\/status/);
   assert.doesNotMatch(statusSource, /Sincronizar agora/);
   assert.match(dashboardSource, /api\("\/operations\/sync", \{ method: "POST" \}\)/);
