@@ -44,7 +44,7 @@ test("strategies workspace follows Prototype 1 while preserving immutable versio
   assert.ok(strategies.includes("token !== loadToken || filter.value !== requestedFilter"));
   assert.ok(strategies.includes("const strategyId = escapeHtml(strategy.id)"));
   assert.ok(strategies.includes("const versionId = escapeHtml(strategy.latestVersionId)"));
-  assert.ok(strategies.includes("encodeURIComponent(String(strategy.latestVersionId))"));
-  assert.ok(strategies.includes("encodeURIComponent(String(version.id))"));
+  assert.ok(strategies.includes("function jobsHref(lotteryId: LotteryId, versionId: number)"));
+  assert.ok(strategies.includes("encodeURIComponent(String(versionId))"));
   assert.ok(strategies.includes("escapeHtml(version.id)"));
 });
