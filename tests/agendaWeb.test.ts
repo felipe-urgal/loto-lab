@@ -35,10 +35,20 @@ test("agenda notification center is served by the web process", async (t) => {
   const legacyStyles = await fetch(`${baseUrl}/assets/agenda.css`);
   assert.equal(legacyStyles.status, 404);
 
-  const script = await fetch(`${baseUrl}/assets/agenda.js`);
-  assert.equal(script.status, 200);
-  const source = await script.text();
-  assert.match(source, /\/api\/v1\/agenda/);
-  assert.match(source, /notifications\/read-all/);
-  assert.match(source, /data-read-notification/);
+  const [boundaryResponse, typedResponse] = await Promise.all([
+    fetch(`${baseUrl}/assets/agenda.js`),
+    fetch(`${baseUrl}/assets/src/features/agenda.js`),
+  ]);
+  assert.equal(boundaryResponse.status, 200);
+  assert.equal(typedResponse.status, 200);
+
+  const [boundarySource, typedSource] = await Promise.all([
+    boundaryResponse.text(),
+    typedResponse.text(),
+  ]);
+  assert.match(boundarySource, /\.\/src\/features\/agenda\.js/);
+  assert.match(typedSource, /notifications\/read-all/);
+  assert.match(typedSource, /data-read-notification/);
+  assert.match(typedSource, /\.\.\/core\/api\.js/);
+  assert.doesNotMatch(typedSource, /fetch\(`\/api\/v1\/agenda/);
 });
