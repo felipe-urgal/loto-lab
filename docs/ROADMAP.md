@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-09-02**, com #155–#160/#163 já na `main` e comparação de game batches + Agenda/notificações + IA interpretativa + Analysis Jobs extraídos para application use cases e composition root.
+> Baseline revisada em **2026-09-02**, com #155–#160/#163/#175 já na `main`, composition root HTTP concluído e a modularização TypeScript do frontend avançando em fatias pequenas.
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -55,6 +55,8 @@ A diretriz permanece:
 - correção do fallback financeiro para preservar `desconhecido != zero` (#147);
 - fundação TypeScript incremental do frontend com `web/src`, typecheck/lint browser, emissão via `tsc` e primeiro helper compartilhado (#148);
 - reconciliação da documentação frontend após a fundação TypeScript (#149);
+- client HTTP, `ApiError` e escaping compartilhado migrados para `web/src`, com hardening de paths e boundary compatível em `runtime.js` (#175);
+- contrato compartilhado de lifecycle da view centralizado em `web/src/core/viewLifecycle.ts`, mantendo o `feature-loader` como produtor e o runtime como boundary compatível;
 - várias fatias da application layer (#106–#119);
 - leitura de concursos extraída do monólito para controller/use case dedicado (#155);
 - análise básica/avançada extraída de `app.ts` e da facade temporária (#156);
@@ -87,7 +89,7 @@ A diretriz permanece:
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- frontend ainda possui módulos grandes/imperativos; a fundação TypeScript existe desde #148, mas API client/errors/escaping/lifecycle/state, primitives e decomposição por feature seguem ativos na #60;
+- frontend ainda possui módulos grandes/imperativos; formatters, API client/errors, escaping e o contrato compartilhado de lifecycle já estão em TypeScript, mas state/lifecycle internos por feature, primitives e decomposição seguem ativos na #60;
 - hotspots algorítmicos continuam grandes (#62);
 - observabilidade segue baseada principalmente em logs/estado persistido, sem métricas/SLOs (#63);
 - arquitetura de informação pós-redesign ainda pode reduzir troca de contexto (#64);
@@ -133,7 +135,7 @@ A revisão de CLI/scheduler não encontrou motivo para mover engines puros ou li
 
 ## #60 — Frontend TypeScript, módulos e primitives · P1 · em andamento
 
-A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149.
+A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript; a fatia atual centraliza também o contrato de lifecycle da view.
 
 Entregue:
 
@@ -143,12 +145,14 @@ Entregue:
 - emissão JavaScript via `tsc` para `web-dist/assets/src` sem publicar fontes `.ts` cruas (#148);
 - `web/src/shared/formatters.ts` como primeiro helper compartilhado (#148);
 - `web/runtime.js` preservado como boundary compatível para consumidores legados (#148);
-- README/ROADMAP/WEB/MENTAL_MODEL reconciliados com a fundação incremental (#149).
+- README/ROADMAP/WEB/MENTAL_MODEL reconciliados com a fundação incremental (#149);
+- `web/src/core/api.ts` + `ApiError`, escaping compartilhado, regressões e hardening contra traversal/URLs absolutas (#175);
+- `web/src/core/viewLifecycle.ts` como contrato único de view atual, evento renderizado, emissão e subscribe/unsubscribe; `feature-loader.js` consome o mesmo contrato sem redefinir hash/evento.
 
 Próximas fatias:
 
 - expandir `web/src/{core,design-system,features,shared}` conforme ownership real;
-- API client/errors/escaping/lifecycle/state compartilhados;
+- state/lifecycle internos por feature, eliminando duplicações concretas de hash/cleanup;
 - TypeScript por feature;
 - decomposição de módulos grandes;
 - escaping/`textContent` como padrão seguro;
