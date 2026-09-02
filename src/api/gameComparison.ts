@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { evaluateGames, type GameCheckResult } from "../checker/evaluate.js";
-import type { GeneratedGameBatchRecord } from "../persistence/types.js";
-import { PostgresContestRepository } from "../persistence/contestRepository.js";
-import { PostgresGameRepository } from "../persistence/gameRepository.js";
+import {
+  ComparisonStartRequiredError,
+  type CompareGameBatchUseCase,
+} from "../application/compareGameBatch.js";
 import type { ApiServerOptions } from "./app.js";
 import {
   ApiError,
@@ -12,119 +12,11 @@ import {
   sendNoContent,
 } from "./http.js";
 
-interface ComparisonGameResult {
-  position: number;
-  hits: number;
-  matchedNumbers: number[];
-  fixedMatchedNumbers: number[];
-  variableMatchedNumbers: number[];
-  prizeTier?: string;
-  luckyMonthHit?: boolean;
-}
-
-interface ComparisonContestResult {
-  contestNumber: number;
-  date: string;
-  numbers: number[];
-  luckyMonth?: string;
-  bestHits: number;
-  matchedAnyNumbers: number[];
-  games: ComparisonGameResult[];
-}
-
-export interface ComparisonAvailability {
-  status: "available" | "pending";
-  targetContestNumber: number;
-  lastAvailableContestNumber?: number;
-}
-
-function compactGameCheck(check: GameCheckResult, position: number): ComparisonGameResult {
-  return {
-    position,
-    hits: check.hits,
-    matchedNumbers: check.matchedNumbers,
-    fixedMatchedNumbers: check.fixedMatchedNumbers,
-    variableMatchedNumbers: check.variableMatchedNumbers,
-    ...(check.prizeTier ? { prizeTier: check.prizeTier } : {}),
-    ...(check.luckyMonthHit !== undefined ? { luckyMonthHit: check.luckyMonthHit } : {}),
-  };
-}
-
-function summarize(items: ComparisonContestResult[]) {
-  if (items.length === 0) {
-    return {
-      contestCount: 0,
-      bestHits: 0,
-      bestContestNumber: undefined,
-      averageBestHits: 0,
-    };
-  }
-
-  let best = items[0]!;
-  for (const item of items.slice(1)) {
-    if (item.bestHits > best.bestHits) best = item;
-  }
-
-  return {
-    contestCount: items.length,
-    bestHits: best.bestHits,
-    bestContestNumber: best.contestNumber,
-    averageBestHits: items.reduce((sum, item) => sum + item.bestHits, 0) / items.length,
-  };
-}
-
-export function buildComparisonAvailability(
-  targetContestNumber: number,
-  selected: Array<{ number: number }>,
-  lastAvailableBeforeStart?: number,
-): ComparisonAvailability {
-  return {
-    status: selected.length > 0 ? "available" : "pending",
-    targetContestNumber,
-    ...(selected.at(-1)?.number ?? lastAvailableBeforeStart) !== undefined
-      ? { lastAvailableContestNumber: selected.at(-1)?.number ?? lastAvailableBeforeStart }
-      : {},
-  };
-}
-
-export function buildBatchComparison(
-  batch: GeneratedGameBatchRecord,
-  contests: Array<{ number: number; date: string; numbers: number[]; luckyMonth?: string }>,
-) {
-  const items: ComparisonContestResult[] = contests.map((contest) => {
-    const checks = evaluateGames(batch.games, {
-      lottery: batch.lottery,
-      number: contest.number,
-      date: contest.date,
-      numbers: contest.numbers,
-      ...(contest.luckyMonth ? { luckyMonth: contest.luckyMonth } : {}),
-    });
-    const matchedAnyNumbers = [...new Set(checks.flatMap((check) => check.matchedNumbers))].sort((a, b) => a - b);
-    return {
-      contestNumber: contest.number,
-      date: contest.date,
-      numbers: contest.numbers,
-      ...(contest.luckyMonth ? { luckyMonth: contest.luckyMonth } : {}),
-      bestHits: checks.length ? Math.max(...checks.map((check) => check.hits)) : 0,
-      matchedAnyNumbers,
-      games: checks.map((check, index) => compactGameCheck(check, index + 1)),
-    };
-  });
-
-  return {
-    batchId: batch.id,
-    lottery: batch.lottery,
-    targetContestNumber: batch.targetContestNumber,
-    drawSize: batch.games[0]?.numbers.length ?? 0,
-    summary: summarize(items),
-    items,
-  };
-}
-
 export async function serveGameComparison(
   request: IncomingMessage,
   response: ServerResponse,
   options: ApiServerOptions,
+  compareGameBatch: CompareGameBatchUseCase,
 ): Promise<boolean> {
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://localhost");
@@ -148,54 +40,23 @@ export async function serveGameComparison(
     defaultValue: 5,
   });
   const requestedStart = parseOptionalPositiveInt(url.searchParams.get("startContest"), "startContest");
-  const games = new PostgresGameRepository(options.pool);
-  const contests = new PostgresContestRepository(options.pool);
-  const batch = await games.findBatch(batchId);
-  if (!batch) throw new ApiError(404, "BATCH_NOT_FOUND", `Game batch ${batchId} was not found`);
 
-  const minimumContest = batch.targetContestNumber;
-  const startContest = requestedStart ?? minimumContest;
-  if (startContest === undefined) {
-    throw new ApiError(
-      400,
-      "COMPARISON_START_REQUIRED",
-      "This legacy batch has no target contest; choose a starting contest to compare it safely",
-    );
+  let comparison;
+  try {
+    comparison = await compareGameBatch.execute({
+      batchId,
+      count,
+      ...(requestedStart !== undefined ? { startContest: requestedStart } : {}),
+    });
+  } catch (error) {
+    if (error instanceof ComparisonStartRequiredError) {
+      throw new ApiError(400, "COMPARISON_START_REQUIRED", error.message);
+    }
+    throw error;
   }
 
-  const selected = await contests.list({
-    lottery: batch.lottery,
-    startContest,
-    order: "asc",
-    limit: count,
-  });
+  if (!comparison) throw new ApiError(404, "BATCH_NOT_FOUND", `Game batch ${batchId} was not found`);
 
-  const comparison = buildBatchComparison(batch, selected);
-  const lastAvailableBeforeStart = selected.length === 0
-    ? (await contests.list({
-      lottery: batch.lottery,
-      endContest: startContest - 1,
-      order: "desc",
-      limit: 1,
-    }))[0]?.number
-    : undefined;
-  const availability = buildComparisonAvailability(startContest, selected, lastAvailableBeforeStart);
-
-  sendJson(response, 200, {
-    ...comparison,
-    startContestNumber: startContest,
-    requestedCount: count,
-    availability,
-    scope: {
-      kind: minimumContest !== undefined && startContest < minimumContest ? "backtest" : "post-target",
-      minimumContestNumber: minimumContest,
-      financial: false,
-      note: minimumContest !== undefined && startContest < minimumContest
-        ? "Backtest histórico dos jogos gerados contra concursos anteriores ao alvo; nenhum valor financeiro é registrado."
-        : minimumContest === undefined
-          ? "Comparação exploratória a partir do concurso escolhido; nenhum valor financeiro é registrado."
-          : "Comparação dos jogos a partir do concurso-alvo; nenhum valor financeiro é registrado.",
-    },
-  }, corsOrigin);
+  sendJson(response, 200, comparison, corsOrigin);
   return true;
 }
