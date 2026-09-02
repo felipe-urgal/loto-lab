@@ -17,7 +17,7 @@ O Loto Lab organiza hipóteses, estratégias e jogos de forma reproduzível. Fre
 
 ## Estado atual
 
-Em 2026-09-01, após #155–#160 e a remoção da facade concreta desta mudança:
+Em 2026-09-02, após #155–#160/#163 e as extrações finais #167–#170:
 
 - a fonte PT-BR e o piso funcional de 16px pertencem aos módulos/estilos canônicos; não existem mais `localization.js`, `readability.js` ou `readability.css` globais;
 - o **Protótipo 1 — Dark Moderno / Workspace científico compacto** está aplicado e consolidado nas superfícies principais; a #121 foi concluída;
@@ -26,8 +26,9 @@ Em 2026-09-01, após #155–#160 e a remoção da facade concreta desta mudança
 - o #143 adicionou auditoria transversal em navegador real para desktop/mobile, texto funcional >=16px, foco por teclado, reduced-motion e ausência de overflow horizontal estrutural;
 - o #148 iniciou a modularização TypeScript do frontend com `tsconfig.web.json`, typecheck/lint de `web/src`, emissão via `tsc` para `web-dist/assets/src` e `web/src/shared/formatters.ts` como primeiro helper compartilhado;
 - #155–#160 retiraram do monólito HTTP concursos, análise básica/avançada, geração compatível, Generator 2.0 e game batches/conferência; esses fluxos agora entram por feature controllers/use cases injetados, com composição concreta em `server.ts`;
-- `src/api/services.ts` não contém mais `LotoLabApiServices`, `Pool` ou repositories concretos; o módulo preserva somente exports auxiliares compatíveis;
-- a #61 continua em execução porque IA, Agenda, Analysis Jobs e comparação de lotes ainda possuem composição concreta dentro da borda HTTP; essas fronteiras serão migradas em fatias pequenas antes de considerar `server.ts` o composition root completo;
+- #163 removeu a facade concreta `LotoLabApiServices` de `src/api/services.ts`, que preserva somente exports auxiliares compatíveis;
+- #167–#170 extraíram comparação de game batches, Agenda/notificações, IA interpretativa e Analysis Jobs para application use cases, concluindo a #61; não resta controller de feature HTTP compondo repositories, managers ou providers concretos, e `src/api/server.ts` é o composition root das features HTTP;
+- o lifecycle de processo permanece deliberadamente em `src/cli/apiStart.ts`, que inicia/recover/draina o mesmo `AnalysisJobManager` singleton e continua dono do scheduler/runtime lock;
 - CI e Security validam testes, cobertura, PostgreSQL, Compose, imagem, autenticação, navegador real, CodeQL, dependency review, SBOM e vulnerabilidades de container;
 - a `main` **ainda não possui branch protection obrigatória**; isso permanece bloqueado na #52 por configuração administrativa do GitHub.
 
@@ -120,7 +121,7 @@ Node HTTP Server
   └─ workers/scheduler/observability
 ```
 
-A arquitetura segue em transição incremental. O strangler já removeu de `src/api/app.ts` o ownership de concursos, análises, geração e game batches, e esta mudança remove a facade concreta de `src/api/services.ts`. Ainda existem quatro fronteiras HTTP com dependências concretas dentro do controller — IA, Agenda, Analysis Jobs e comparação de lotes — rastreadas pela #61 antes da confirmação de `server.ts` como composition root completo.
+A arquitetura segue em transição incremental. O strangler já retirou da borda HTTP o ownership de concursos, análises, geração, game batches/conferência, comparação de lotes, Agenda, IA e Analysis Jobs. Controllers de feature delegam a application use cases, `src/api/app.ts` fica restrito à infraestrutura comum e `src/api/services.ts` preserva apenas exports auxiliares compatíveis. A #61 foi concluída no #170 com `src/api/server.ts` confirmado como composition root das features HTTP; lifecycle de processo continua separado em `src/cli/apiStart.ts`.
 
 ### Frontend
 
@@ -141,9 +142,9 @@ A apresentação segue a cascata `styles.css` → `ui-foundation.css` → `desig
 
 ### Backend/application layer
 
-Use cases extraídos incluem catálogo de concursos, análise básica/avançada, geração compatível e Generator 2.0, game batches/conferência, backtest, Strategy Lab, catálogo de estratégias/backtests, operações, apostas reais e status de dados. As dependências concretas dessas features HTTP são compostas em `server.ts`.
+Use cases extraídos incluem catálogo de concursos, análise básica/avançada, geração compatível e Generator 2.0, game batches/conferência e comparação, backtest, Strategy Lab, catálogo de estratégias/backtests, operações, apostas reais, status de dados, Agenda/notificações, IA interpretativa e Analysis Jobs. As dependências concretas dessas features HTTP são compostas em `server.ts`.
 
-A #61 ainda precisa retirar da borda HTTP a composição concreta de `aiInsights.ts`, `agenda.ts`, `analysisJobs.ts` e `gameComparison.ts`; somente depois disso cabe a revisão final de composition root e de eventual duplicação de orquestração em CLI/scheduler.
+A #61 está concluída: nenhum controller de feature HTTP compõe repositories, managers ou providers concretos. `src/cli/apiStart.ts` permanece dono do lifecycle de processo (start/recovery/drain, scheduler e runtime lock), sem duplicar a composição das features HTTP. A decomposição algorítmica restante pertence à #62 e deve avançar sem reabrir essa fronteira.
 
 ### Persistência
 
