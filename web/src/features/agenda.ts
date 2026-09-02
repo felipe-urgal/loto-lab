@@ -1,4 +1,4 @@
-import { api } from "../core/api.js";
+import { ApiError, api } from "../core/api.js";
 import { escapeHtml } from "../shared/escaping.js";
 
 type AgendaFilter = "all" | "unread";
@@ -184,6 +184,7 @@ function isAbortError(error: unknown): boolean {
 }
 
 function errorMessage(error: unknown): string {
+  if (error instanceof ApiError) return `HTTP ${error.status}`;
   return error instanceof Error ? error.message : "Erro desconhecido";
 }
 
