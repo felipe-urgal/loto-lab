@@ -38,7 +38,10 @@ web/
 ├── runtime.js
 ├── app.js
 ├── src/
+│   ├── core/
+│   │   └── api.ts
 │   └── shared/
+│       ├── escaping.ts
 │       └── formatters.ts
 ├── design-system.css
 ├── ui-foundation.css
@@ -94,7 +97,7 @@ O rollout e a consolidação visual estão concluídos pela #121:
 - #142 — explainability visual do Gerador absorvida no workspace;
 - #143 — auditoria final desktop/mobile de legibilidade, foco, reduced-motion e overflow estrutural.
 
-A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
+A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. A fatia atual também move o client HTTP, o contrato de erro da API e o escaping compartilhado para `web/src`, mantendo `runtime.js` como boundary de compatibilidade. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
 
 As folhas adicionais que permanecem têm responsabilidade funcional, estrutural ou de fallback explícita; coexistir com um `*-workspace.css` não torna uma camada automaticamente redundante.
 
@@ -242,9 +245,10 @@ O browser E2E transversal do #143 repete a auditoria de legibilidade em desktop/
 - segredo nunca entra em asset web;
 - dados externos devem preferir `textContent`/escaping seguro;
 - `innerHTML` com conteúdo dinâmico precisa ser tratado como superfície de risco;
+- o client HTTP compartilhado aceita apenas rotas relativas sob `/api/v1` e rejeita traversal/URLs absolutas antes de chamar `fetch`;
 - o frontend não deve replicar validação crítica como única defesa — invariantes continuam no backend/PostgreSQL.
 
-A evolução para TypeScript/primitives compartilhadas é rastreada pela #60 e começou em #148 pelos formatters. API client, errors, escaping, lifecycle/state, primitives e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
+A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. A fundação TypeScript/formatters veio em #148; API client, errors e escaping compartilhado já foram migrados. Lifecycle/state, primitives e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
 
 ## Trabalho pesado
 
