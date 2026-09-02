@@ -41,7 +41,7 @@ export async function serveGameComparison(
   });
   const requestedStart = parseOptionalPositiveInt(url.searchParams.get("startContest"), "startContest");
 
-  let comparison;
+  let comparison: Awaited<ReturnType<CompareGameBatchUseCase["execute"]>>;
   try {
     comparison = await compareGameBatch.execute({
       batchId,
