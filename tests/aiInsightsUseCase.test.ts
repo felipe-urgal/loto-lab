@@ -62,7 +62,7 @@ test("AI insights rejects generation before reading evidence when provider is no
 });
 
 test("AI insights history delegates only the requested lottery and limit", async () => {
-  const calls: Array<{ lottery: string; limit?: number }> = [];
+  const calls: Array<{ lottery: string; limit: number | undefined }> = [];
   const useCase = new AiInsightsUseCase(
     { load: async () => { throw new Error("evidence should not be loaded"); } },
     {
