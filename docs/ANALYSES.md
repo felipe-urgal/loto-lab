@@ -242,6 +242,18 @@ A resposta contém:
 
 A view básica é renderizada primeiro. Se o cálculo avançado falhar, estiver ocupado ou atingir o limite operacional, a visão básica permanece utilizável e recebe apenas um aviso. Uma falha opcional não transforma Análises em uma tela totalmente indisponível.
 
+## Ownership do frontend
+
+A implementação funcional avançada pertence a `web/src/features/analysisV2.ts`. O arquivo público `web/analysis-v2.js` é somente um boundary de asset compatível que importa o JavaScript emitido pelo build TypeScript.
+
+Os DTOs que a interface consome ficam explícitos em `web/src/features/analysisV2/types.ts`. O módulo usa diretamente:
+
+- `web/src/core/api.ts` para o contrato HTTP;
+- `web/src/core/viewLifecycle.ts` para view atual, render e cleanup de navegação;
+- `web/src/shared/escaping.ts` para conteúdo dinâmico interpolado em markup.
+
+Análises não mantém parsing próprio de `location.hash` nem depende de `web/runtime.js`. A migração é arquitetural, não visual: os cinco modos, a degradação para a visão básica, o diálogo modal, teclado/foco e os contratos estatísticos permanecem inalterados.
+
 ## Lifecycle, snapshot e execução pesada
 
 O navegador **não mantém cache permanente por loteria**. Cada render oficial consulta novamente a rota avançada, evitando que uma sincronização automática no servidor deixe a tela presa ao concurso anterior.
