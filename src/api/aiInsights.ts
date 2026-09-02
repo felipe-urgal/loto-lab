@@ -44,6 +44,7 @@ export async function serveAiInsights(
 
     if (method === "POST" && pathname === "/api/v1/ai/insights") {
       if (!enforceRateLimit(request, response, insightLimiter, "ai-insights")) return true;
+      aiInsights.ensureConfigured();
       const body = await readJsonBody(request);
       const lottery = parseLottery(body.lottery);
       const focus = parseFocus(body.focus);
