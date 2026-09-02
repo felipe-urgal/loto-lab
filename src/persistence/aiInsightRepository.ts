@@ -6,6 +6,10 @@ import type {
   AiInsightFocus,
   AiInsightRecord,
 } from "../ai/types.js";
+import {
+  AiInsightStoreConflictError,
+  type AiInsightSaveInput,
+} from "../application/aiInsights.js";
 
 interface AiInsightRow {
   id: string;
@@ -18,17 +22,6 @@ interface AiInsightRow {
   insight: AiInsightContent;
   usage: Record<string, unknown> | null;
   created_at: Date;
-}
-
-export interface SaveAiInsightInput {
-  lottery: LotteryId;
-  focus: AiInsightFocus;
-  model: string;
-  providerResponseId?: string;
-  evidenceHash?: string;
-  evidence: AiEvidenceContext;
-  insight: AiInsightContent;
-  usage?: Record<string, unknown>;
 }
 
 function mapRow(row: AiInsightRow): AiInsightRecord {
@@ -46,29 +39,38 @@ function mapRow(row: AiInsightRow): AiInsightRecord {
   };
 }
 
+function isUniqueViolation(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === "23505");
+}
+
 export class PostgresAiInsightRepository {
   constructor(private readonly pool: Pool) {}
 
-  async save(input: SaveAiInsightInput): Promise<AiInsightRecord> {
-    const result = await this.pool.query<AiInsightRow>(
-      `
-        INSERT INTO ai_insights (
-          lottery, focus, model, provider_response_id, evidence_hash, evidence, insight, usage
-        ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb)
-        RETURNING id, lottery, focus, model, provider_response_id, evidence_hash, evidence, insight, usage, created_at
-      `,
-      [
-        input.lottery,
-        input.focus,
-        input.model,
-        input.providerResponseId ?? null,
-        input.evidenceHash ?? null,
-        JSON.stringify(input.evidence),
-        JSON.stringify(input.insight),
-        input.usage ? JSON.stringify(input.usage) : null,
-      ],
-    );
-    return mapRow(result.rows[0]!);
+  async save(input: AiInsightSaveInput): Promise<AiInsightRecord> {
+    try {
+      const result = await this.pool.query<AiInsightRow>(
+        `
+          INSERT INTO ai_insights (
+            lottery, focus, model, provider_response_id, evidence_hash, evidence, insight, usage
+          ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb)
+          RETURNING id, lottery, focus, model, provider_response_id, evidence_hash, evidence, insight, usage, created_at
+        `,
+        [
+          input.lottery,
+          input.focus,
+          input.model,
+          input.providerResponseId ?? null,
+          input.evidenceHash ?? null,
+          JSON.stringify(input.evidence),
+          JSON.stringify(input.insight),
+          input.usage ? JSON.stringify(input.usage) : null,
+        ],
+      );
+      return mapRow(result.rows[0]!);
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new AiInsightStoreConflictError("AI insight already exists");
+      throw error;
+    }
   }
 
   async findByEvidenceHash(

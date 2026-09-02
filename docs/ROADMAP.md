@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-09-02**, com #155–#160/#163 já na `main` e comparação de game batches + Agenda/notificações extraídas para application use cases e composition root.
+> Baseline revisada em **2026-09-02**, com #155–#160/#163 já na `main` e comparação de game batches + Agenda/notificações + IA interpretativa extraídas para application use cases e composition root.
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -63,7 +63,8 @@ A diretriz permanece:
 - leitura, gestão e conferência de game batches extraídas do monólito/controllers concretos para `GameBatchUseCase` + `CheckGameBatchUseCase`, com composição em `server.ts` (#160);
 - PR #163 remove a facade concreta `LotoLabApiServices` de `src/api/services.ts`, preservando somente exports auxiliares de compatibilidade e mantendo a issue #61 aberta para as fronteiras concretas restantes;
 - comparação de game batches extraída de `gameComparison.ts` para `CompareGameBatchUseCase`, com portas explícitas e composição em `server.ts`;
-- Agenda/notificações extraídas de `agenda.ts` para `AgendaUseCase`, com portas mínimas para leitura, notificações e refresh e composição concreta em `server.ts`.
+- Agenda/notificações extraídas de `agenda.ts` para `AgendaUseCase`, com portas mínimas para leitura, notificações e refresh e composição concreta em `server.ts`;
+- IA interpretativa extraída de `aiInsights.ts` para `AiInsightsUseCase`, com portas para evidência, persistência e provider e composição de PostgreSQL/OpenAI em `server.ts`.
 
 ### Pontos fortes a preservar
 
@@ -85,7 +86,7 @@ A diretriz permanece:
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- #61 continua em execução: `aiInsights.ts` e `analysisJobs.ts` ainda compõem dependências concretas ou acessam `options.pool` na borda HTTP; `server.ts` ainda não é composition root completo;
+- #61 continua em execução: `analysisJobs.ts` é a última fronteira HTTP com ownership concreto de infraestrutura/orquestração dependente de persistência; `server.ts` ainda não é composition root completo;
 - frontend ainda possui módulos grandes/imperativos; a fundação TypeScript existe desde #148, mas API client/errors/escaping/lifecycle/state, primitives e decomposição por feature seguem ativos na #60;
 - hotspots algorítmicos continuam grandes (#62);
 - observabilidade segue baseada principalmente em logs/estado persistido, sem métricas/SLOs (#63);
@@ -116,14 +117,14 @@ PRs #106–#119 construíram a base de application use cases. Em 2026-08-31, #15
 - #160 move leitura/conferência de game batches para controller dedicado, injeta `GameBatchUseCase` na gestão hide/show e remove `LotoLabApiServices` de `app.ts`;
 - #163 remove a classe `LotoLabApiServices` e o acoplamento de `src/api/services.ts` a `pg`/repositories concretos, mantém no módulo apenas exports auxiliares compatíveis e adiciona guarda arquitetural contra regressão;
 - a comparação de game batches agora passa por `CompareGameBatchUseCase`, deixando `gameComparison.ts` responsável apenas por HTTP/error mapping e movendo a composição concreta para `server.ts`;
-- Agenda/notificações agora passam por `AgendaUseCase`, deixando `agenda.ts` responsável apenas por rota/parse/serialização e movendo repositories + `NotificationService` para `server.ts`.
+- Agenda/notificações agora passam por `AgendaUseCase`, deixando `agenda.ts` responsável apenas por rota/parse/serialização e movendo repositories + `NotificationService` para `server.ts`;
+- IA interpretativa agora passa por `AiInsightsUseCase`, deixando `aiInsights.ts` responsável por rota/parse/rate-limit/serialização e movendo provider + persistência para `server.ts`.
 
-Após essas extrações, o ownership HTTP concreto restante precisa ser tratado em fatias próprias:
+Após essas extrações, resta uma fronteira HTTP concreta:
 
-- `aiInsights.ts` instancia `OpenAiInterpretationProvider`/`AiInsightService` com `options.pool`;
 - `analysisJobs.ts` resolve manager/repositories e validações dependentes de persistência dentro do controller.
 
-Depois dessas extrações, restam:
+Depois dessa última extração, restam:
 
 - confirmar `server.ts` como composition root completo de todas as features HTTP;
 - revisar CLI/scheduler apenas onde houver orquestração duplicada relevante e comprovada; não mover engines puros para application layer por estética arquitetural;
@@ -187,7 +188,7 @@ Depois da consolidação principal da #61:
 - absorver nomes transitórios `*-hardening` quando o ownership estiver claro;
 - preservar equivalência matemática por testes.
 
-O #163 remove a facade temporária; comparação de game batches e Agenda/notificações já saíram da borda concreta. Permanecem duas fronteiras HTTP rastreadas pela #61, por isso a dependência segue ativa.
+O #163 remove a facade temporária; comparação de game batches, Agenda/notificações e IA interpretativa já saíram da borda concreta. Permanece uma fronteira HTTP rastreada pela #61, por isso a dependência segue ativa.
 
 ## #64 — Arquitetura de informação e jornada pós-redesign
 
@@ -297,9 +298,9 @@ Os demais documentos foram lidos e mantidos sem churn porque continuam descreven
 | `AGENTS.md` | contrato de engenharia, PR, CI e auto-review permanece atual |
 | `README.md` | estado, arquitetura, rollout e fundação TypeScript permanecem atuais |
 | `docs/AGENDA.md` | contrato e application layer atuais de agenda/notificações |
-| `docs/AI.md` | contexto, provider, persistência e limites metodológicos atuais |
+| `docs/AI.md` | contexto, application layer, provider, persistência e limites metodológicos atuais |
 | `docs/ANALYSES.md` | contrato estatístico/anti-leakage atual |
-| `docs/API.md` | application layer, famílias HTTP e duas fronteiras restantes da #61 atuais |
+| `docs/API.md` | application layer, famílias HTTP e uma fronteira restante da #61 atuais |
 | `docs/DATABASE.md` | migrations, tabelas, repositories e invariantes atuais |
 | `docs/DATA_OPERATIONS.md` | bootstrap/sync atuais |
 | `docs/DEPLOYMENT.md` | stack e segurança de produção atuais |

@@ -2,8 +2,11 @@ import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { createApiRequestHandler, type ApiServerOptions } from "./app.js";
 import { runAdvancedAnalysisInWorker } from "../analysis/advancedWorkerClient.js";
+import { buildAiEvidenceContext } from "../ai/context.js";
+import { OpenAiInterpretationProvider } from "../ai/openai.js";
 import type { AiInterpretationProvider } from "../ai/types.js";
 import { AgendaUseCase } from "../application/agenda.js";
+import { AiInsightsUseCase } from "../application/aiInsights.js";
 import { AnalyzeAdvancedLotteryUseCase } from "../application/analyzeAdvancedLottery.js";
 import { AnalyzeLotteryUseCase } from "../application/analyzeLottery.js";
 import { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
@@ -31,6 +34,7 @@ import {
   runOperationalSync,
 } from "../operations/sync.js";
 import { PostgresAgendaRepository } from "../persistence/agendaRepository.js";
+import { PostgresAiInsightRepository } from "../persistence/aiInsightRepository.js";
 import { PostgresBacktestRepository } from "../persistence/backtestRepository.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import { PostgresGameRepository } from "../persistence/gameRepository.js";
@@ -63,11 +67,17 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const backtests = new PostgresBacktestRepository(options.pool);
   const agendaRepository = new PostgresAgendaRepository(options.pool);
   const notificationRepository = new PostgresNotificationRepository(options.pool);
+  const aiProvider = options.aiProvider ?? new OpenAiInterpretationProvider();
   const featureRouteDependencies = {
     agenda: new AgendaUseCase(
       agendaRepository,
       notificationRepository,
       new NotificationService(options.pool),
+    ),
+    aiInsights: new AiInsightsUseCase(
+      { load: (lottery) => buildAiEvidenceContext(options.pool, lottery) },
+      new PostgresAiInsightRepository(options.pool),
+      aiProvider,
     ),
     analyzeAdvancedLottery: new AnalyzeAdvancedLotteryUseCase(
       contests,

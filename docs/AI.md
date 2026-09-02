@@ -19,6 +19,22 @@ OPENAI_MODEL=gpt-5.6-luna
 
 O adapter usa a OpenAI Responses API por HTTP com `fetch` nativo do Node e `store: false`. A resposta usa Structured Outputs/JSON Schema estrito e ainda passa por validação defensiva local.
 
+A borda HTTP segue o fluxo:
+
+```text
+HTTP controller
+  ↓
+AiInsightsUseCase
+  ↓
+AiEvidenceReader / AiInsightStore / AiInterpretationProvider
+  ↓
+PostgreSQL / OpenAI
+```
+
+`src/api/aiInsights.ts` cuida apenas de rota, parse, rate limit, serialização e error mapping. Status, geração, histórico, hash semântico, reaproveitamento de interpretação e compartilhamento de trabalho in-flight pertencem ao `AiInsightsUseCase`.
+
+As dependências concretas são ligadas em `src/api/server.ts`: o provider OpenAI pode ser substituído por `aiProvider` em testes, o snapshot de evidências continua sendo montado por `buildAiEvidenceContext()` e a persistência usa `PostgresAiInsightRepository`. A application layer não importa `pg` nem repositories concretos.
+
 ## Evidências enviadas
 
 `buildAiEvidenceContext()` monta um snapshot com, quando disponível:
@@ -67,6 +83,8 @@ Cada interpretação bem-sucedida é persistida em `ai_insights` com:
 - timestamp.
 
 O objetivo é permitir reconstruir quais fatos originaram uma interpretação mesmo depois que histórico/metodologia evoluírem.
+
+Interpretações sem `force` usam um hash semântico que ignora somente `generatedAt`. Evidência equivalente reutiliza o registro persistido; execuções concorrentes equivalentes compartilham o mesmo trabalho in-flight e o conflito de unicidade do PostgreSQL é traduzido pelo adapter para um conflito semântico do port.
 
 ## API
 

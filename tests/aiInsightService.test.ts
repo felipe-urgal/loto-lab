@@ -1,12 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AiInsightService } from "../src/ai/service.js";
+import { buildAiEvidenceContext } from "../src/ai/context.js";
+import { AiInsightsUseCase } from "../src/application/aiInsights.js";
 import type {
   AiInterpretationProvider,
   AiInterpretationRequest,
   AiProviderResult,
 } from "../src/ai/types.js";
 import type { Contest } from "../src/domain/types.js";
+import { PostgresAiInsightRepository } from "../src/persistence/aiInsightRepository.js";
 import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
 import { createIsolatedPostgresDatabase } from "./helpers/postgres.js";
 
@@ -70,7 +72,7 @@ function delay(ms: number): Promise<void> {
 }
 
 test(
-  "AI insight service deduplicates semantic evidence, shares in-flight work, honors force and recovers from provider failures",
+  "AI insights use case deduplicates semantic evidence, shares in-flight work, honors force and recovers from provider failures",
   { skip: !databaseUrl, timeout: 20_000 },
   async (t) => {
     const database = await createIsolatedPostgresDatabase({ label: "ai-insight-service", max: 4 });
@@ -134,7 +136,11 @@ test(
     );
 
     const provider = new TestProvider();
-    const service = new AiInsightService(pool, provider);
+    const service = new AiInsightsUseCase(
+      { load: (lottery) => buildAiEvidenceContext(pool, lottery) },
+      new PostgresAiInsightRepository(pool),
+      provider,
+    );
     assert.deepEqual(service.status(), {
       provider: "test-provider",
       configured: true,

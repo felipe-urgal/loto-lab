@@ -18,9 +18,9 @@ Domain / engines / ports
 PostgreSQL / CAIXA / OpenAI / workers
 ```
 
-Concursos, análises, geração compatível/Generator 2.0, backtests, estratégias, Strategy Lab, operações, apostas reais, status de dados, game batches, comparação de game batches e Agenda/notificações já entram por controllers dedicados e application use cases injetados, com dependências concretas compostas em `src/api/server.ts`. `src/api/app.ts` ficou restrito à borda comum da API e `src/api/services.ts` não possui mais facade de infraestrutura.
+Concursos, análises, geração compatível/Generator 2.0, backtests, estratégias, Strategy Lab, operações, apostas reais, status de dados, game batches, comparação de game batches, Agenda/notificações e IA interpretativa já entram por controllers dedicados e application use cases injetados, com dependências concretas compostas em `src/api/server.ts`. `src/api/app.ts` ficou restrito à borda comum da API e `src/api/services.ts` não possui mais facade de infraestrutura.
 
-A migração da #61 ainda não terminou: `aiInsights.ts` e `analysisJobs.ts` continuam compondo provider/service/repositories concretos ou acessando `options.pool` dentro da borda HTTP. Essas fronteiras devem ser extraídas em fatias próprias antes de declarar `server.ts` como composition root completo.
+A migração da #61 ainda não terminou: `analysisJobs.ts` é a última fronteira HTTP que ainda resolve manager/repositories concretos e orquestração dependente de persistência dentro do controller. Essa fronteira deve ser extraída antes de declarar `server.ts` como composition root completo.
 
 Controllers devem cuidar de parse, CORS/auth/rate-limit quando aplicável, serialização e error mapping. Regras de negócio pertencem ao application/core.
 
@@ -258,7 +258,7 @@ Histórico:
 GET /api/v1/ai/insights/:lottery?limit=10
 ```
 
-A IA recebe evidências calculadas e nunca substitui o core.
+A IA recebe evidências calculadas e nunca substitui o core. O controller delega status, geração, cache semântico e histórico ao `AiInsightsUseCase`; OpenAI e PostgreSQL são injetados no composition root.
 
 Detalhes: [`AI.md`](AI.md).
 

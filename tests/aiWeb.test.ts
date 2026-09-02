@@ -23,18 +23,21 @@ const provider: AiInterpretationProvider = {
   },
 };
 
-test("AI workspace and provider status are served without exposing credentials", async (t) => {
-  const pool = { query: async () => ({ rows: [] }) } as unknown as Pool;
-  const server = createLotoLabServer({ pool, aiProvider: provider });
+async function listen(server: ReturnType<typeof createLotoLabServer>): Promise<string> {
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", resolve);
   });
-  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
-
   const address = server.address();
   assert.ok(address && typeof address !== "string");
-  const baseUrl = `http://127.0.0.1:${(address as AddressInfo).port}`;
+  return `http://127.0.0.1:${(address as AddressInfo).port}`;
+}
+
+test("AI workspace and provider status are served without exposing credentials", async (t) => {
+  const pool = { query: async () => ({ rows: [] }) } as unknown as Pool;
+  const server = createLotoLabServer({ pool, aiProvider: provider });
+  const baseUrl = await listen(server);
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
 
   const page = await fetch(`${baseUrl}/ai`);
   assert.equal(page.status, 200);
@@ -79,4 +82,36 @@ test("AI workspace and provider status are served without exposing credentials",
     model: "fake-model",
     disclaimer: "A IA apenas interpreta métricas já calculadas. Ela não prevê sorteios, não aumenta a probabilidade matemática e não escolhe dezenas para apostar.",
   });
+});
+
+test("AI generation preserves not-configured precedence before request body parsing", async (t) => {
+  let interpretations = 0;
+  const unconfiguredProvider: AiInterpretationProvider = {
+    name: "fake",
+    isConfigured: () => false,
+    model: () => "fake-model",
+    async interpret() {
+      interpretations += 1;
+      throw new Error("interpret should not be called");
+    },
+  };
+  const pool = { query: async () => ({ rows: [] }) } as unknown as Pool;
+  const server = createLotoLabServer({ pool, aiProvider: unconfiguredProvider });
+  const baseUrl = await listen(server);
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const response = await fetch(`${baseUrl}/api/v1/ai/insights`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{invalid-json",
+  });
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {
+    error: {
+      code: "AI_NOT_CONFIGURED",
+      message: "Configure OPENAI_API_KEY to enable AI interpretation",
+    },
+  });
+  assert.equal(interpretations, 0);
 });
