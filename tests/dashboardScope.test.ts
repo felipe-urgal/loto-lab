@@ -6,7 +6,7 @@ test("dashboard scope keeps comparison mode separate from the active lottery", a
   const [scopeSource, loaderSource, statusSource, scopeCss] = await Promise.all([
     readFile("web/dashboard-scope.js", "utf8"),
     readFile("web/feature-loader.js", "utf8"),
-    readFile("web/data-status.js", "utf8"),
+    readFile("web/src/features/dataStatus.ts", "utf8"),
     readFile("web/dashboard-scope.css", "utf8"),
   ]);
 

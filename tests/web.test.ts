@@ -105,6 +105,7 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
     "my-games-management.js",
     "lab.js",
     "data-status.js",
+    "src/features/dataStatus.js",
     "styles.css",
     "refinements.css",
     "lab-workspace.css",
@@ -113,6 +114,16 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
     const response = await fetch(`${baseUrl}/assets/${asset}`);
     assert.equal(response.status, 200, asset);
   }
+
+  const dataStatusBoundary = await fetch(`${baseUrl}/assets/data-status.js`);
+  assert.equal(dataStatusBoundary.status, 200);
+  assert.match(await dataStatusBoundary.text(), /\.\/src\/features\/dataStatus\.js/);
+
+  const typedDataStatus = await fetch(`${baseUrl}/assets/src/features/dataStatus.js`);
+  assert.equal(typedDataStatus.status, 200);
+  const typedDataStatusSource = await typedDataStatus.text();
+  assert.match(typedDataStatusSource, /currentMainView/);
+  assert.doesNotMatch(typedDataStatusSource, /location\.hash/);
 
   for (const removedAsset of ["lab.css", "lab-v2.css", "data-status.css"]) {
     const response = await fetch(`${baseUrl}/assets/${removedAsset}`);

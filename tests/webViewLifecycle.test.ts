@@ -6,7 +6,8 @@ import { VIEW_RENDERED_EVENT, mainViewFromHash } from "../web/src/core/viewLifec
 
 const runtimeSource = await readFile(resolve(process.cwd(), "web/runtime.js"), "utf8");
 const featureLoaderSource = await readFile(resolve(process.cwd(), "web/feature-loader.js"), "utf8");
-const dataStatusSource = await readFile(resolve(process.cwd(), "web/data-status.js"), "utf8");
+const dataStatusBoundarySource = await readFile(resolve(process.cwd(), "web/data-status.js"), "utf8");
+const dataStatusSource = await readFile(resolve(process.cwd(), "web/src/features/dataStatus.ts"), "utf8");
 
 test("view lifecycle normalizes the main hash contract", () => {
   assert.equal(mainViewFromHash(""), "dashboard");
@@ -34,12 +35,18 @@ test("feature loader emits the shared lifecycle contract", () => {
   assert.doesNotMatch(featureLoaderSource, /location\.hash\.replace\("#", ""\)/);
 });
 
-test("data status consumes the shared main-view lifecycle", () => {
+test("data status is implemented in TypeScript and consumes shared core contracts directly", () => {
+  assert.equal(dataStatusBoundarySource.trim(), 'import "./src/features/dataStatus.js";');
+  assert.match(dataStatusSource, /import \{ api \} from "\.\.\/core\/api\.js"/);
   assert.match(
     dataStatusSource,
-    /import \{ currentMainView, onMainViewChanged \} from "\.\/runtime\.js"/,
+    /import \{ currentMainView, onMainViewChanged \} from "\.\.\/core\/viewLifecycle\.js"/,
   );
+  assert.match(dataStatusSource, /api<DataStatusPayload>\("\/data\/status"\)/);
+  assert.match(dataStatusSource, /api<OperationsStatus>\("\/operations\/status"\)/);
   assert.match(dataStatusSource, /onMainViewChanged\(\(\) => \{/);
   assert.doesNotMatch(dataStatusSource, /location\.hash/);
   assert.doesNotMatch(dataStatusSource, /addEventListener\("hashchange"/);
+  assert.doesNotMatch(dataStatusSource, /from "\.\.\/\.\.\/runtime\.js"/);
+  assert.doesNotMatch(dataStatusSource, /fetch\("\/api\/v1/);
 });
