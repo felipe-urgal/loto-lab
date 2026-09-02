@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 
 test("jobs workspace follows Prototype 1 while preserving queue contracts", async () => {
-  const [html, workspace, jobs] = await Promise.all([
+  const [html, workspace, boundary, jobs] = await Promise.all([
     readFile("web/jobs.html", "utf8"),
     readFile("web/jobs-workspace.css", "utf8"),
     readFile("web/jobs.js", "utf8"),
+    readFile("web/src/features/jobs.ts", "utf8"),
   ]);
 
   assert.match(html, /\/assets\/jobs-workspace\.css/);
@@ -28,11 +29,22 @@ test("jobs workspace follows Prototype 1 while preserving queue contracts", asyn
   assert.match(workspace, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
 
-  assert.match(jobs, /api\("\/analysis-jobs", \{ method: "POST"/);
-  assert.match(jobs, /api\(`\/analysis-jobs\/\$\{button\.dataset\.cancelJob\}\/cancel`, \{ method: "POST" \}\)/);
-  assert.match(jobs, /api\(`\/analysis-jobs\?lottery=\$\{encodeURIComponent\(requestedLottery\)\}&limit=100`\)/);
-  assert.match(jobs, /body\.strategyVersionId = Number\(strategySelect\.value\)/);
-  assert.match(jobs, /body\.randomSamples = Number\(randomSamples\.value\)/);
-  assert.match(jobs, /window\.setTimeout\(\(\) => \{ void loadJobs\(false\); \}, 1800\)/);
-  assert.match(jobs, /await loadStrategies\(params\.get\("strategyVersionId"\)\)/);
+  assert.equal(boundary.trim(), 'import "./src/features/jobs.js";');
+  assert.ok(jobs.includes('from "../core/api.js"'));
+  assert.ok(jobs.includes('from "../shared/escaping.js"'));
+  assert.ok(jobs.includes('from "../shared/formatters.js"'));
+  assert.ok(jobs.includes('from "../shared/toast.js"'));
+  assert.ok(!jobs.includes("runtime.js"));
+
+  assert.ok(jobs.includes('api<AnalysisJob>("/analysis-jobs", {'));
+  assert.ok(jobs.includes('method: "POST"'));
+  assert.ok(jobs.includes("body.strategyVersionId = Number(strategySelect.value)"));
+  assert.ok(jobs.includes("body.randomSamples = Number(randomSamples.value)"));
+  assert.ok(jobs.includes("pollTimer = window.setTimeout(() =>"));
+  assert.ok(jobs.includes("void loadJobs(false)"));
+  assert.ok(jobs.includes('await loadStrategies(params.get("strategyVersionId"))'));
+  assert.ok(jobs.includes("token !== strategyLoadToken || lottery.value !== requestedLottery"));
+  assert.ok(jobs.includes("token !== loadToken || lottery.value !== requestedLottery"));
+  assert.ok(jobs.includes("await Promise.all([loadStrategies(), loadJobs()])"));
+  assert.ok(jobs.includes("requiredPayload("));
 });
