@@ -1,14 +1,15 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { ApiServerOptions } from "./app.js";
+import type { AiInsightsUseCase } from "../application/aiInsights.js";
+import {
+  AI_DISCLAIMER,
+  AiInterpretationError,
+  type AiInsightFocus,
+} from "../ai/types.js";
 import { ApiError, parseBoolean, parseLottery, parsePositiveInt, readJsonBody, sendJson } from "./http.js";
-import { AiInsightService } from "../ai/service.js";
-import { OpenAiInterpretationProvider, OpenAiProviderError } from "../ai/openai.js";
-import type { AiInsightFocus, AiInterpretationProvider } from "../ai/types.js";
-import { AI_DISCLAIMER } from "../ai/types.js";
 import { enforceRateLimit, FixedWindowRateLimiter } from "./rateLimit.js";
 
-export interface AiApiOptions extends ApiServerOptions {
-  aiProvider?: AiInterpretationProvider;
+export interface AiApiOptions {
+  corsOrigin?: string;
 }
 
 const FOCUSES: AiInsightFocus[] = ["overview", "analysis", "strategy", "real-performance"];
@@ -26,6 +27,7 @@ export async function serveAiInsights(
   request: IncomingMessage,
   response: ServerResponse,
   options: AiApiOptions,
+  aiInsights: AiInsightsUseCase,
 ): Promise<boolean> {
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://localhost");
@@ -33,25 +35,20 @@ export async function serveAiInsights(
   if (!pathname.startsWith("/api/v1/ai")) return false;
 
   const corsOrigin = options.corsOrigin ?? process.env.API_CORS_ORIGIN ?? "http://127.0.0.1:3000";
-  const provider = options.aiProvider ?? new OpenAiInterpretationProvider();
-  const service = new AiInsightService(options.pool, provider);
 
   try {
     if (method === "GET" && pathname === "/api/v1/ai/status") {
-      sendJson(response, 200, { ...service.status(), disclaimer: AI_DISCLAIMER }, corsOrigin);
+      sendJson(response, 200, { ...aiInsights.status(), disclaimer: AI_DISCLAIMER }, corsOrigin);
       return true;
     }
 
     if (method === "POST" && pathname === "/api/v1/ai/insights") {
       if (!enforceRateLimit(request, response, insightLimiter, "ai-insights")) return true;
-      if (!provider.isConfigured()) {
-        throw new ApiError(503, "AI_NOT_CONFIGURED", "Configure OPENAI_API_KEY to enable AI interpretation");
-      }
       const body = await readJsonBody(request);
       const lottery = parseLottery(body.lottery);
       const focus = parseFocus(body.focus);
       const force = parseBoolean(body.force, "force", false);
-      const insight = await service.generate(lottery, focus, force);
+      const insight = await aiInsights.generate(lottery, focus, force);
       sendJson(response, insight.reused ? 200 : 201, { ...insight, disclaimer: AI_DISCLAIMER }, corsOrigin);
       return true;
     }
@@ -64,7 +61,7 @@ export async function serveAiInsights(
         max: 50,
         defaultValue: 10,
       });
-      const items = await service.history(lottery, limit);
+      const items = await aiInsights.history(lottery, limit);
       sendJson(response, 200, { items, disclaimer: AI_DISCLAIMER }, corsOrigin);
       return true;
     }
@@ -75,7 +72,7 @@ export async function serveAiInsights(
       sendJson(response, error.statusCode, { error: { code: error.code, message: error.message } }, corsOrigin);
       return true;
     }
-    if (error instanceof OpenAiProviderError) {
+    if (error instanceof AiInterpretationError) {
       const status = error.code === "AI_NOT_CONFIGURED"
         ? 503
         : error.code === "AI_PROVIDER_TIMEOUT"
