@@ -72,7 +72,7 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
     fetchSource("real-bets.js"),
     fetchSource("my-games-management.js"),
     fetchSource("src/features/agenda.js"),
-    fetchSource("strategies.js"),
+    fetchSource("src/features/strategies.js"),
     fetchSource("jobs.js"),
     fetchSource("ui-foundation.css"),
   ]);

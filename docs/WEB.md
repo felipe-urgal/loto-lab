@@ -44,7 +44,8 @@ web/
 │   ├── features/
 │   │   ├── agenda.ts
 │   │   ├── ai.ts
-│   │   └── dataStatus.ts
+│   │   ├── dataStatus.ts
+│   │   └── strategies.ts
 │   └── shared/
 │       ├── escaping.ts
 │       ├── formatters.ts
@@ -55,7 +56,7 @@ web/
 └── módulos/folhas específicos por feature
 ```
 
-`feature-loader.js` carrega módulos específicos sob demanda. `runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; helpers migrados vivem em `web/src` e podem ser reexportados sem forçar uma migração big-bang. API, escaping, formatters, lifecycle e a primitive de toast já possuem ownership TypeScript; o runtime não redefine essas implementações. O status operacional do Painel foi a primeira feature com implementação canônica em `web/src/features`, seguido por Agenda e IA. `web/data-status.js`, `web/agenda.js` e `web/ai.js` permanecem apenas como boundaries de assets compatíveis e importam o JavaScript emitido das respectivas fontes TypeScript.
+`feature-loader.js` carrega módulos específicos sob demanda. `runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; helpers migrados vivem em `web/src` e podem ser reexportados sem forçar uma migração big-bang. API, escaping, formatters, lifecycle e a primitive de toast já possuem ownership TypeScript; o runtime não redefine essas implementações. O status operacional do Painel foi a primeira feature com implementação canônica em `web/src/features`, seguido por Agenda, IA e Estratégias. `web/data-status.js`, `web/agenda.js`, `web/ai.js` e `web/strategies.js` permanecem apenas como boundaries de assets compatíveis e importam o JavaScript emitido das respectivas fontes TypeScript.
 
 O build `npm run web:build` primeiro prepara `web-dist/`, ignora fontes `.ts` como assets brutos e depois usa o `tsc` com `tsconfig.web.json` para emitir JavaScript em `web-dist/assets/src`. O conjunto web continua alimentando o fingerprint SHA-256 usado para reescrever referências de assets com `?v=<hash>`.
 
@@ -103,7 +104,7 @@ O rollout e a consolidação visual estão concluídos pela #121:
 - #142 — explainability visual do Gerador absorvida no workspace;
 - #143 — auditoria final desktop/mobile de legibilidade, foco, reduced-motion e overflow estrutural.
 
-A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. As fatias seguintes moveram client HTTP, contrato de erro, escaping compartilhado, contrato de lifecycle da view e a primitive de toast para `web/src`; #177 começou a eliminar lifecycle duplicado nas features, #178 deu ownership TypeScript completo ao status de dados, e Agenda e IA seguem o mesmo padrão consumindo diretamente os helpers compartilhados. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
+A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. As fatias seguintes moveram client HTTP, contrato de erro, escaping compartilhado, contrato de lifecycle da view e a primitive de toast para `web/src`; #177 começou a eliminar lifecycle duplicado nas features, #178 deu ownership TypeScript completo ao status de dados, e Agenda, IA e Estratégias seguem o mesmo padrão consumindo diretamente os helpers compartilhados. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
 
 As folhas adicionais que permanecem têm responsabilidade funcional, estrutural ou de fallback explícita; coexistir com um `*-workspace.css` não torna uma camada automaticamente redundante.
 
@@ -185,7 +186,7 @@ Compara hipóteses e estratégias com evidência, benchmark e progressive disclo
 
 ### Estratégias — `/strategies`
 
-Catálogo/versionamento com workspace próprio. Após #137 não depende mais do antigo `experiments.css`.
+Catálogo/versionamento com workspace próprio. `web/src/features/strategies.ts` é a implementação funcional canônica e consome diretamente client HTTP, escaping, formatters e toast compartilhados; `web/strategies.js` permanece somente como boundary de asset compatível. Após #137 a superfície também não depende mais do antigo `experiments.css`.
 
 ### Execuções — `/jobs`
 
@@ -256,7 +257,7 @@ O browser E2E transversal do #143 repete a auditoria de legibilidade em desktop/
 - mensagens do toast compartilhado usam `textContent`, nunca `innerHTML`;
 - o frontend não deve replicar validação crítica como única defesa — invariantes continuam no backend/PostgreSQL.
 
-A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. A fundação TypeScript/formatters veio em #148; API client, errors, escaping, toast e o contrato compartilhado de lifecycle já foram migrados. Status de dados, Agenda e IA já possuem implementação canônica TypeScript; state/lifecycle interno das demais features, novas primitives justificadas e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
+A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. A fundação TypeScript/formatters veio em #148; API client, errors, escaping, toast e o contrato compartilhado de lifecycle já foram migrados. Status de dados, Agenda, IA e Estratégias já possuem implementação canônica TypeScript; state/lifecycle interno das demais features, novas primitives justificadas e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
 
 ## Trabalho pesado
 

@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 
 test("strategies workspace follows Prototype 1 while preserving immutable version contracts", async () => {
-  const [html, workspace, strategies] = await Promise.all([
+  const [html, workspace, boundary, strategies] = await Promise.all([
     readFile("web/strategies.html", "utf8"),
     readFile("web/strategies-workspace.css", "utf8"),
     readFile("web/strategies.js", "utf8"),
+    readFile("web/src/features/strategies.ts", "utf8"),
   ]);
 
   assert.match(html, /\/assets\/strategies-workspace\.css/);
@@ -28,11 +29,22 @@ test("strategies workspace follows Prototype 1 while preserving immutable versio
   assert.match(workspace, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
 
-  assert.match(strategies, /api\("\/strategies", \{/);
-  assert.match(strategies, /method: "POST"/);
-  assert.match(strategies, /api\(`\/strategies\/\$\{encodeURIComponent\(strategy\.slug\)\}\/versions`\)/);
-  assert.match(strategies, /slug\.readOnly = !duplicate/);
-  assert.match(strategies, /lottery\.disabled = !duplicate/);
-  assert.match(strategies, /strategyVersionId=\$\{strategy\.latestVersionId\}/);
-  assert.match(strategies, /strategyVersionId=\$\{version\.id\}/);
+  assert.equal(boundary.trim(), 'import "./src/features/strategies.js";');
+  assert.ok(strategies.includes('from "../core/api.js"'));
+  assert.ok(strategies.includes('from "../shared/escaping.js"'));
+  assert.ok(strategies.includes('from "../shared/formatters.js"'));
+  assert.ok(strategies.includes('from "../shared/toast.js"'));
+  assert.ok(!strategies.includes("runtime.js"));
+
+  assert.ok(strategies.includes('api<SavedStrategy>("/strategies", {'));
+  assert.ok(strategies.includes('method: "POST"'));
+  assert.ok(strategies.includes("slug.readOnly = !duplicate"));
+  assert.ok(strategies.includes("lottery.disabled = !duplicate"));
+  assert.ok(strategies.includes("const token = ++loadToken"));
+  assert.ok(strategies.includes("token !== loadToken || filter.value !== requestedFilter"));
+  assert.ok(strategies.includes("const strategyId = escapeHtml(strategy.id)"));
+  assert.ok(strategies.includes("const versionId = escapeHtml(strategy.latestVersionId)"));
+  assert.ok(strategies.includes("function jobsHref(lotteryId: LotteryId, versionId: number)"));
+  assert.ok(strategies.includes("encodeURIComponent(String(versionId))"));
+  assert.ok(strategies.includes("escapeHtml(version.id)"));
 });
