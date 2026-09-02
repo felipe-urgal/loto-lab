@@ -77,13 +77,17 @@ export class AiInsightsUseCase {
     };
   }
 
-  async generate(lottery: LotteryId, focus: AiInsightFocus, force = false): Promise<AiInsightRecord> {
+  ensureConfigured(): void {
     if (!this.provider.isConfigured()) {
       throw new AiInterpretationError(
         "AI_NOT_CONFIGURED",
         "Configure OPENAI_API_KEY to enable AI interpretation",
       );
     }
+  }
+
+  async generate(lottery: LotteryId, focus: AiInsightFocus, force = false): Promise<AiInsightRecord> {
+    this.ensureConfigured();
 
     const evidence = await this.evidence.load(lottery);
     const hash = evidenceHash(evidence);
