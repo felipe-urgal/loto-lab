@@ -53,6 +53,9 @@ test("strategy lab workspace follows Prototype 1 while preserving statistical co
   assert.ok(lab.includes("selectedLottery() !== requestedLottery"));
   assert.ok(lab.includes("selectedExperiment() !== requestedExperiment"));
   assert.ok(lab.includes("message.replaceChildren(strong, paragraph)"));
+  assert.ok(lab.includes("const contestCount = finiteNumber(item.contestCount)"));
+  assert.ok(lab.includes("formatPercent(item.financialCoverage)"));
+  assert.ok(!lab.includes("formatPercent(Number(item.financialCoverage))"));
   assert.match(lab, /AUC 0,500 equivale a ordenação sem informação/);
   assert.match(lab, /corrigir o número de variantes testadas/);
 
