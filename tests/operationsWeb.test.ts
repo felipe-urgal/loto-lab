@@ -33,7 +33,8 @@ test("dashboard operational controls are served by the web process", async (t) =
   ]);
 
   assert.match(statusBoundarySource, /\.\/src\/features\/dataStatus\.js/);
-  assert.match(statusSource, /\/api\/v1\/operations\/status/);
+  assert.match(statusSource, /api\("\/operations\/status"\)/);
+  assert.doesNotMatch(statusSource, /fetch\("\/api\/v1\/operations\/status"/);
   assert.doesNotMatch(statusSource, /Sincronizar agora/);
   assert.match(dashboardSource, /api\("\/operations\/sync", \{ method: "POST" \}\)/);
   assert.match(dashboardSource, /Atualizar dados/);
