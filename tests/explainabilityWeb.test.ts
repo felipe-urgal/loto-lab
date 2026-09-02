@@ -9,7 +9,8 @@ async function source(path: string): Promise<string> {
 
 test("Generator explainability layer exposes the five-step flow and methodology guardrails", async () => {
   const javascript = await source("web/generation-explainability.js");
-  const generator = await source("web/generation-v2.js");
+  const boundary = await source("web/generation-v2.js");
+  const generator = await source("web/src/features/generationV2.ts");
   const workspace = await source("web/generation-workspace.css");
   const loader = await source("web/feature-loader.js");
 
@@ -35,8 +36,9 @@ test("Generator explainability layer exposes the five-step flow and methodology 
   assert.doesNotMatch(javascript, /\bguardrail\b/);
   assert.doesNotMatch(javascript, /Seed, histórico e fingerprint/);
 
+  assert.equal(boundary, 'import "./src/features/generationV2.js";\n');
   assert.match(generator, /generationMode: "diversified"/);
-  assert.match(generator, /generatorOptions\?\.seed/);
+  assert.match(generator, /generatorOptions\.seed/);
   await assert.rejects(source("web/generation-diversity.js"), /ENOENT/);
   await assert.rejects(source("web/generation-explainability.css"), /ENOENT/);
 
