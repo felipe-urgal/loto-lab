@@ -47,6 +47,32 @@ test("typed API client preserves success, JSON headers and 204 responses", async
   assert.equal(await api("/empty"), null);
 });
 
+test("typed API client rejects request paths that can escape the API namespace", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  let fetchCalls = 0;
+  const countingFetch: typeof fetch = async () => {
+    fetchCalls += 1;
+    return new Response(null, { status: 204 });
+  };
+  globalThis.fetch = countingFetch;
+
+  for (const unsafePath of [
+    "/../health/ready",
+    "/%2e%2e/health/ready",
+    "/%252e%252e/health/ready",
+    "//example.invalid/path",
+    "https://example.invalid/path",
+  ]) {
+    await assert.rejects(api(unsafePath), TypeError);
+  }
+
+  assert.equal(fetchCalls, 0);
+});
+
 test("typed API client keeps backend error message/code and exposes status", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => {
