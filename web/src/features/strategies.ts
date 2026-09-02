@@ -58,6 +58,11 @@ function requiredElement<T extends Element>(selector: string): T {
   return element;
 }
 
+function requiredPayload<T>(payload: T | null, context: string): T {
+  if (payload === null) throw new Error(`Resposta vazia ao ${context}.`);
+  return payload;
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Erro desconhecido";
 }
@@ -208,8 +213,11 @@ async function loadVersions(strategyId: number): Promise<void> {
   root.innerHTML =
     '<div class="loading-state"><span class="spinner"></span><span>Carregando versões...</span></div>';
   try {
-    const data = await api<StrategyVersionsResponse>(
-      `/strategies/${encodeURIComponent(strategy.slug)}/versions`,
+    const data = requiredPayload(
+      await api<StrategyVersionsResponse>(
+        `/strategies/${encodeURIComponent(strategy.slug)}/versions`,
+      ),
+      "carregar versões da estratégia",
     );
     root.innerHTML = (data.items ?? []).map((version) => renderVersionRow(strategy, version)).join("");
   } catch (error) {
@@ -224,7 +232,10 @@ async function loadStrategies(): Promise<void> {
     '<div class="loading-state"><span class="spinner"></span><span>Carregando estratégias...</span></div>';
   try {
     const query = requestedFilter ? `?lottery=${encodeURIComponent(requestedFilter)}` : "";
-    const data = await api<StrategyListResponse>(`/strategies${query}`);
+    const data = requiredPayload(
+      await api<StrategyListResponse>(`/strategies${query}`),
+      "carregar estratégias",
+    );
     if (token !== loadToken || filter.value !== requestedFilter) return;
     strategies = data.items ?? [];
     renderStrategies();
@@ -240,16 +251,19 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   submitButton.disabled = true;
   try {
-    const saved = await api<SavedStrategy>("/strategies", {
-      method: "POST",
-      body: JSON.stringify({
-        slug: slug.value.trim(),
-        lottery: lottery.value,
-        name: nameInput.value.trim(),
-        methodologyVersion: methodology.value.trim(),
-        config: strategyConfig(),
+    const saved = requiredPayload(
+      await api<SavedStrategy>("/strategies", {
+        method: "POST",
+        body: JSON.stringify({
+          slug: slug.value.trim(),
+          lottery: lottery.value,
+          name: nameInput.value.trim(),
+          methodologyVersion: methodology.value.trim(),
+          config: strategyConfig(),
+        }),
       }),
-    });
+      "salvar estratégia",
+    );
     toast(`Estratégia ${saved.slug} salva como v${saved.version}.`);
     resetForm();
     await loadStrategies();
