@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 test("AI workspace follows Prototype 1 while preserving interpretation contracts", async () => {
-  const [html, workspace, ai] = await Promise.all([
+  const [html, workspace, aiBoundary, ai] = await Promise.all([
     readFile("web/ai.html", "utf8"),
     readFile("web/ai-workspace.css", "utf8"),
     readFile("web/ai.js", "utf8"),
+    readFile("web/src/features/ai.ts", "utf8"),
   ]);
 
   assert.doesNotMatch(html, /\/assets\/ai\.css/);
@@ -26,13 +27,18 @@ test("AI workspace follows Prototype 1 while preserving interpretation contracts
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
 
   assert.match(html, /Algoritmo calcula\. IA interpreta\./);
-  assert.match(ai, /api\("\/ai\/status"\)/);
-  assert.match(ai, /api\(`\/ai\/insights\/\$\{requestedLottery\}\?limit=10`\)/);
-  assert.match(ai, /api\("\/ai\/insights", \{/);
+  assert.equal(aiBoundary.trim(), 'import "./src/features/ai.js";');
+  assert.match(ai, /import \{ api \} from "\.\.\/core\/api\.js"/);
+  assert.match(ai, /import \{ escapeHtml \} from "\.\.\/shared\/escaping\.js"/);
+  assert.match(ai, /import \{ formatDateTime, formatPercent \} from "\.\.\/shared\/formatters\.js"/);
+  assert.match(ai, /api<AiStatus>\("\/ai\/status"\)/);
+  assert.match(ai, /api<AiHistoryResponse>\(`\/ai\/insights\/\$\{requestedLottery\}\?limit=10`\)/);
+  assert.match(ai, /api<AiInsightRecord>\("\/ai\/insights", \{/);
   assert.match(ai, /method: "POST"/);
   assert.match(ai, /force: Boolean\(forceInput\?\.checked\)/);
   assert.match(ai, /record\.reused/);
   assert.match(ai, /const token = \+\+historyLoadToken/);
   assert.match(ai, /const token = \+\+insightRequestToken/);
   assert.match(ai, /lotterySelect\.value !== requestedLottery/);
+  assert.doesNotMatch(ai, /\.\/runtime\.js/);
 });
