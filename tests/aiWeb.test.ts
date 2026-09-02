@@ -50,32 +50,50 @@ test("AI workspace and provider status are served without exposing credentials",
   const legacyStyle = await fetch(`${baseUrl}/assets/ai.css`);
   assert.equal(legacyStyle.status, 404);
 
-  const script = await fetch(`${baseUrl}/assets/ai.js`);
-  assert.equal(script.status, 200);
-  const source = await script.text();
-  assert.match(source, /\/ai\/insights/);
-  assert.match(source, /let historyLoadToken = 0/);
-  assert.match(source, /let insightRequestToken = 0/);
-  assert.match(source, /const token = \+\+historyLoadToken/);
-  assert.match(source, /token !== historyLoadToken \|\| lotterySelect\.value !== requestedLottery/);
-  assert.match(source, /const token = \+\+insightRequestToken/);
-  assert.match(source, /token !== insightRequestToken \|\| lotterySelect\.value !== requestedLottery/);
-  assert.match(source, /insightRequestToken \+= 1/);
-  assert.match(source, /<span>Teste histórico<\/span>/);
-  assert.match(source, /o registro #\$\{record\.id\} foi reutilizado sem nova chamada ao provedor/);
-  assert.match(source, /Registro #\$\{record\.id\} criado sem alterar qualquer cálculo ou jogo/);
-  assert.doesNotMatch(source, /<span>Backtest<\/span>/);
-  assert.doesNotMatch(source, /o snapshot #\$\{record\.id\}/);
-  assert.doesNotMatch(source, /nova chamada ao provider/);
+  const [boundaryResponse, typedResponse] = await Promise.all([
+    fetch(`${baseUrl}/assets/ai.js`),
+    fetch(`${baseUrl}/assets/src/features/ai.js`),
+  ]);
+  assert.equal(boundaryResponse.status, 200);
+  assert.equal(typedResponse.status, 200);
+
+  const [boundarySource, typedSource] = await Promise.all([
+    boundaryResponse.text(),
+    typedResponse.text(),
+  ]);
+  assert.match(boundarySource, /\.\/src\/features\/ai\.js/);
+  assert.match(typedSource, /\/ai\/insights/);
+  assert.match(typedSource, /\.\.\/core\/api\.js/);
+  assert.match(typedSource, /\.\.\/shared\/escaping\.js/);
+  assert.match(typedSource, /\.\.\/shared\/formatters\.js/);
+  assert.match(typedSource, /let historyLoadToken = 0/);
+  assert.match(typedSource, /let insightRequestToken = 0/);
+  assert.match(typedSource, /const token = \+\+historyLoadToken/);
+  assert.match(typedSource, /token !== historyLoadToken \|\| lotterySelect\.value !== requestedLottery/);
+  assert.match(typedSource, /const token = \+\+insightRequestToken/);
+  assert.match(typedSource, /token !== insightRequestToken \|\| lotterySelect\.value !== requestedLottery/);
+  assert.match(typedSource, /insightRequestToken \+= 1/);
+  assert.match(typedSource, /<span>Teste histórico<\/span>/);
+  assert.match(typedSource, /o registro #\$\{record\.id\} foi reutilizado sem nova chamada ao provedor/);
+  assert.match(typedSource, /Registro #\$\{record\.id\} criado sem alterar qualquer cálculo ou jogo/);
+  assert.doesNotMatch(typedSource, /<span>Backtest<\/span>/);
+  assert.doesNotMatch(typedSource, /o snapshot #\$\{record\.id\}/);
+  assert.doesNotMatch(typedSource, /nova chamada ao provider/);
+  assert.doesNotMatch(typedSource, /\.\/runtime\.js/);
   // The UI may name OPENAI_API_KEY to explain local setup, but authentication
   // material and provider headers must remain exclusively on the backend.
-  assert.doesNotMatch(source, /Authorization\s*:/i);
-  assert.doesNotMatch(source, /Bearer\s+/i);
-  assert.doesNotMatch(source, /sk-[A-Za-z0-9_-]{8,}/);
+  assert.doesNotMatch(typedSource, /Authorization\s*:/i);
+  assert.doesNotMatch(typedSource, /Bearer\s+/i);
+  assert.doesNotMatch(typedSource, /sk-[A-Za-z0-9_-]{8,}/);
 
   const statusResponse = await fetch(`${baseUrl}/api/v1/ai/status`);
   assert.equal(statusResponse.status, 200);
-  const status = (await statusResponse.json()) as { configured: boolean; model: string; provider: string };
+  const status = (await statusResponse.json()) as {
+    configured: boolean;
+    model: string;
+    provider: string;
+    disclaimer: string;
+  };
   assert.deepEqual(status, {
     provider: "fake",
     configured: true,
