@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { AgendaUseCase } from "../application/agenda.js";
 import type { AiInsightsUseCase } from "../application/aiInsights.js";
+import type { AnalysisJobsUseCase } from "../application/analysisJobs.js";
 import type { AnalyzeAdvancedLotteryUseCase } from "../application/analyzeAdvancedLottery.js";
 import type { AnalyzeLotteryUseCase } from "../application/analyzeLottery.js";
 import type { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
@@ -37,6 +38,7 @@ import type { LotoLabServerOptions } from "./server.js";
 export interface FeatureRouteDependencies {
   agenda: AgendaUseCase;
   aiInsights: AiInsightsUseCase;
+  analysisJobs: AnalysisJobsUseCase;
   analyzeAdvancedLottery: AnalyzeAdvancedLotteryUseCase;
   analyzeLottery: AnalyzeLotteryUseCase;
   backtestCatalog: BacktestCatalogUseCase;
@@ -88,7 +90,8 @@ const featureRoutes: FeatureRouteHandler[] = [
     ),
   (request, response, options, dependencies) =>
     serveStrategies(request, response, options, dependencies.strategyCatalog),
-  serveAnalysisJobs,
+  (request, response, options, dependencies) =>
+    serveAnalysisJobs(request, response, options, dependencies.analysisJobs),
   (request, response, options, dependencies) =>
     serveStrategyLab(request, response, options, dependencies.runStrategyLab),
   (request, response, options, dependencies) =>

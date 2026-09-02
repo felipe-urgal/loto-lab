@@ -18,9 +18,9 @@ Domain / engines / ports
 PostgreSQL / CAIXA / OpenAI / workers
 ```
 
-Concursos, análises, geração compatível/Generator 2.0, backtests, estratégias, Strategy Lab, operações, apostas reais, status de dados, game batches, comparação de game batches, Agenda/notificações e IA interpretativa já entram por controllers dedicados e application use cases injetados, com dependências concretas compostas em `src/api/server.ts`. `src/api/app.ts` ficou restrito à borda comum da API e `src/api/services.ts` não possui mais facade de infraestrutura.
+Concursos, análises, geração compatível/Generator 2.0, backtests, estratégias, Strategy Lab, Analysis Jobs, operações, apostas reais, status de dados, game batches, comparação de game batches, Agenda/notificações e IA interpretativa entram por controllers dedicados e application use cases injetados, com dependências concretas compostas em `src/api/server.ts`. `src/api/app.ts` ficou restrito à borda comum da API e `src/api/services.ts` não possui mais facade de infraestrutura.
 
-A migração da #61 ainda não terminou: `analysisJobs.ts` é a última fronteira HTTP que ainda resolve manager/repositories concretos e orquestração dependente de persistência dentro do controller. Essa fronteira deve ser extraída antes de declarar `server.ts` como composition root completo.
+Com a extração de Analysis Jobs, não resta controller de feature HTTP compondo repositories, managers ou providers concretos. `src/api/server.ts` é o composition root das features HTTP; lifecycle de processo, como start/drain da fila e scheduler, continua pertencendo ao entrypoint `src/cli/apiStart.ts`.
 
 Controllers devem cuidar de parse, CORS/auth/rate-limit quando aplicável, serialização e error mapping. Regras de negócio pertencem ao application/core.
 
@@ -202,6 +202,8 @@ POST /api/v1/analysis-jobs/:id/cancel
 - `strategy-lab`.
 
 A criação valida loteria, estratégia/versionamento opcional, período e orçamento antes de enfileirar. A fila persistida diferencia `queued`, `running`, estados terminais e cancelamento.
+
+O controller HTTP delega resolução de estratégia/config, validação dependente do histórico e operações de fila ao `AnalysisJobsUseCase`. O `AnalysisJobManager` singleton, repositories de estratégia/concursos e demais dependências concretas são ligados em `src/api/server.ts`; `src/cli/apiStart.ts` continua responsável apenas pelo lifecycle de start/recovery/drain do manager.
 
 ## Operação e dados
 
