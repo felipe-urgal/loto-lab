@@ -4,6 +4,7 @@ export {
   currentMainView,
   emitViewRendered,
   mainViewFromHash,
+  onMainViewChanged,
   onViewRendered,
 } from "./src/core/viewLifecycle.js";
 export { escapeHtml } from "./src/shared/escaping.js";
