@@ -6,6 +6,7 @@ import { VIEW_RENDERED_EVENT, mainViewFromHash } from "../web/src/core/viewLifec
 
 const runtimeSource = await readFile(resolve(process.cwd(), "web/runtime.js"), "utf8");
 const featureLoaderSource = await readFile(resolve(process.cwd(), "web/feature-loader.js"), "utf8");
+const dataStatusSource = await readFile(resolve(process.cwd(), "web/data-status.js"), "utf8");
 
 test("view lifecycle normalizes the main hash contract", () => {
   assert.equal(mainViewFromHash(""), "dashboard");
@@ -17,7 +18,9 @@ test("view lifecycle normalizes the main hash contract", () => {
 
 test("runtime keeps lifecycle compatibility while implementation moves to TypeScript", () => {
   assert.match(runtimeSource, /from "\.\/src\/core\/viewLifecycle\.js"/);
+  assert.match(runtimeSource, /onMainViewChanged/);
   assert.doesNotMatch(runtimeSource, /export function currentMainView/);
+  assert.doesNotMatch(runtimeSource, /export function onMainViewChanged/);
   assert.doesNotMatch(runtimeSource, /export function onViewRendered/);
 });
 
@@ -29,4 +32,14 @@ test("feature loader emits the shared lifecycle contract", () => {
   assert.match(featureLoaderSource, /emitViewRendered\(\{ view, lottery, token \}\)/);
   assert.doesNotMatch(featureLoaderSource, /new CustomEvent\("loto-lab:view-rendered"/);
   assert.doesNotMatch(featureLoaderSource, /location\.hash\.replace\("#", ""\)/);
+});
+
+test("data status consumes the shared main-view lifecycle", () => {
+  assert.match(
+    dataStatusSource,
+    /import \{ currentMainView, onMainViewChanged \} from "\.\/runtime\.js"/,
+  );
+  assert.match(dataStatusSource, /onMainViewChanged\(\(\) => \{/);
+  assert.doesNotMatch(dataStatusSource, /location\.hash/);
+  assert.doesNotMatch(dataStatusSource, /addEventListener\("hashchange"/);
 });
