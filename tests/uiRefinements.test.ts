@@ -49,11 +49,15 @@ test("UI refinement assets are lazy-loaded for the main app and served for strat
   const legacyGenerationDiversityCss = await fetch(`${baseUrl}/assets/generation-diversity.css`);
   assert.equal(legacyGenerationDiversityCss.status, 404);
 
-  const generator = await fetch(`${baseUrl}/assets/generation-v2.js`);
+  const generatorBoundary = await fetch(`${baseUrl}/assets/generation-v2.js`);
+  assert.equal(generatorBoundary.status, 200);
+  assert.match(await generatorBoundary.text(), /src\/features\/generationV2\.js/);
+
+  const generator = await fetch(`${baseUrl}/assets/src/features/generationV2.js`);
   assert.equal(generator.status, 200);
   const generatorSource = await generator.text();
   assert.match(generatorSource, /generationMode: "diversified"/);
-  assert.match(generatorSource, /generatorOptions\?\.seed/);
+  assert.match(generatorSource, /generatorOptions\.seed/);
 
   const labPage = await fetch(`${baseUrl}/lab`);
   assert.equal(labPage.status, 200);
