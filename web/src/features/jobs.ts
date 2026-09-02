@@ -27,29 +27,21 @@ type HistoricalStrategyVersion = {
   id: number;
   version: number;
   config?: StrategyConfig;
-  strategy?: {
-    lottery?: string;
-    name?: string;
-  };
+  strategy?: { lottery?: string; name?: string };
 };
 
-type StrategyListResponse = {
-  items?: StrategySummary[];
-};
-
+type StrategyListResponse = { items?: StrategySummary[] };
 type JobInput = {
   strategyVersionId?: number;
   gameCount?: number;
   warmupContests?: number;
   randomSamples?: number;
 };
-
 type JobBenchmark = {
   status?: string;
   adjustedPValue?: number;
   distribution?: { samples?: number };
 };
-
 type JobResult = {
   id?: number;
   roundCount?: number;
@@ -58,12 +50,8 @@ type JobResult = {
   winner?: string;
   benchmark?: JobBenchmark;
   variants?: Array<{ key?: string; label?: string }>;
-  summary?: {
-    roi?: number | null;
-    financialCoverage?: number | null;
-  };
+  summary?: { roi?: number | null; financialCoverage?: number | null };
 };
-
 type AnalysisJob = {
   id: number;
   kind: JobKind;
@@ -76,11 +64,7 @@ type AnalysisJob = {
   startedAt?: string;
   finishedAt?: string;
 };
-
-type JobListResponse = {
-  items?: AnalysisJob[];
-};
-
+type JobListResponse = { items?: AnalysisJob[] };
 type CreateJobBody = {
   kind: string;
   lottery: string;
@@ -101,7 +85,6 @@ const labels: Record<LotteryId, string> = {
   lotofacil: "Lotofácil",
   "dia-de-sorte": "Dia de Sorte",
 };
-
 const statusLabels: Record<string, string> = {
   queued: "na fila",
   running: "em execução",
@@ -111,13 +94,11 @@ const statusLabels: Record<string, string> = {
   cancelled: "cancelada",
   abandoned: "abandonada",
 };
-
 const rankingLabels: Record<string, string> = {
   prizeRate: "taxa de premiação",
   averageHitsPerGame: "média de acertos",
   roi: "ROI",
 };
-
 const evidenceLabels: Record<string, string> = {
   "beats-random": "evidência favorável",
   inconclusive: "inconclusiva",
@@ -126,7 +107,6 @@ const evidenceLabels: Record<string, string> = {
   "insufficient-resolution": "resolução insuficiente",
   "insufficient-sample": "amostra insuficiente",
 };
-
 const knownStatusClasses = new Set([
   "queued",
   "running",
@@ -232,24 +212,37 @@ function renderStrategyOptions(items: StrategySummary[]): string {
   );
 }
 
-async function selectPreferredVersion(preferredVersionId: string): Promise<void> {
-  const preferred = String(preferredVersionId);
-  if (Array.from(strategySelect.options).some((option) => option.value === preferred)) {
-    strategySelect.value = preferred;
-    return;
-  }
-
+async function loadHistoricalVersion(
+  preferred: string,
+  requestedLottery: string,
+  token: number,
+): Promise<void> {
   const historical = requiredPayload(
     await api<HistoricalStrategyVersion>(`/strategy-versions/${encodeURIComponent(preferred)}`),
     "carregar versão histórica",
   );
-  if (historical.strategy?.lottery !== lottery.value) return;
+  if (token !== strategyLoadToken || lottery.value !== requestedLottery) return;
+  if (historical.strategy?.lottery !== requestedLottery) return;
+
   selectedHistoricalVersion = historical;
   const option = document.createElement("option");
   option.value = String(historical.id);
   option.textContent = `${historical.strategy.name ?? "Estratégia"} · v${historical.version} (#${historical.id})`;
   strategySelect.append(option);
   strategySelect.value = option.value;
+}
+
+async function selectPreferredVersion(
+  preferredVersionId: string,
+  requestedLottery: string,
+  token: number,
+): Promise<void> {
+  const preferred = String(preferredVersionId);
+  if (Array.from(strategySelect.options).some((option) => option.value === preferred)) {
+    strategySelect.value = preferred;
+    return;
+  }
+  await loadHistoricalVersion(preferred, requestedLottery, token);
 }
 
 function applySelectedStrategyConfig(): void {
@@ -274,7 +267,7 @@ async function loadStrategies(preferredVersionId?: string | null): Promise<void>
     strategies = data.items ?? [];
     strategySelect.innerHTML = renderStrategyOptions(strategies);
     if (preferredVersionId) {
-      await selectPreferredVersion(preferredVersionId);
+      await selectPreferredVersion(preferredVersionId, requestedLottery, token);
       if (token !== strategyLoadToken || lottery.value !== requestedLottery) return;
     }
     applySelectedStrategyConfig();
@@ -293,12 +286,13 @@ function strategyResult(job: AnalysisJob): string {
   const best = job.result?.variants?.find((variant) => variant.key === job.result?.winner);
   const bestLabel = best?.label ?? job.result?.winner ?? "empate/indefinido";
   const basis = job.result?.rankingBasis ?? "";
-  const ranking = rankingLabels[basis] ?? basis || "—";
+  const ranking = rankingLabels[basis] ?? (basis || "—");
   const adjustedP =
     typeof benchmark.adjustedPValue === "number"
       ? benchmark.adjustedPValue.toFixed(4).replace(".", ",")
       : "—";
-  const samples = benchmark.distribution?.samples ?? job.result?.randomSamples ?? job.input?.randomSamples ?? "—";
+  const samples =
+    benchmark.distribution?.samples ?? job.result?.randomSamples ?? job.input?.randomSamples ?? "—";
   return `<div class="job-result"><strong>Laboratório concluído</strong><span>Melhor no período: ${escapeHtml(bestLabel)} · evidência ${escapeHtml(status)} · p ajustado ${escapeHtml(adjustedP)} · ${escapeHtml(samples)} controles · classificação por ${escapeHtml(ranking)}</span></div>`;
 }
 
