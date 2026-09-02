@@ -126,7 +126,7 @@ test("core app owns dashboard, analyses and historical-test copy in Portuguese",
 
 test("strategy lab owns its visible vocabulary in Portuguese while preserving internal contracts", async () => {
   const html = await source("web/lab.html");
-  const lab = await source("web/lab.js");
+  const lab = await source("web/src/features/lab.ts");
 
   assert.match(html, /Hipótese → regra → teste histórico → referência → evidência → decisão/);
   assert.match(html, /Evidência acima do acaso/);

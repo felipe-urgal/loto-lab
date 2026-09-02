@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 
 test("strategy lab workspace follows Prototype 1 while preserving statistical contracts", async () => {
-  const [html, workspace, lab, refinements] = await Promise.all([
+  const [html, workspace, boundary, lab, refinements] = await Promise.all([
     readFile("web/lab.html", "utf8"),
     readFile("web/lab-workspace.css", "utf8"),
     readFile("web/lab.js", "utf8"),
+    readFile("web/src/features/lab.ts", "utf8"),
     readFile("web/lab-refinements.js", "utf8"),
   ]);
 
@@ -35,10 +36,26 @@ test("strategy lab workspace follows Prototype 1 while preserving statistical co
   assert.match(workspace, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
 
-  assert.match(lab, /api\("\/lab\/compare", \{/);
-  assert.match(lab, /experiment: selectedExperiment\(\)/);
-  assert.match(lab, /warmupContests: Number\(warmupInput\.value\)/);
-  assert.match(lab, /randomSamples: Number\(randomSamplesInput\.value\)/);
+  assert.equal(boundary.trim(), 'import "./src/features/lab.js";');
+  assert.ok(lab.includes('from "../core/api.js"'));
+  assert.ok(lab.includes('from "../shared/escaping.js"'));
+  assert.ok(lab.includes('from "../shared/formatters.js"'));
+  assert.ok(!lab.includes('const API = "/api/v1"'));
+  assert.ok(!lab.includes("async function api("));
+  assert.ok(!lab.includes("function escapeHtml("));
+  assert.ok(!lab.includes("function formatPercent("));
+  assert.ok(!lab.includes("function formatCurrency("));
+
+  assert.ok(lab.includes('api<StrategyLabResult>("/lab/compare", {'));
+  assert.ok(lab.includes("experiment: selectedExperiment()"));
+  assert.ok(lab.includes("warmupContests: Number(warmupInput.value)"));
+  assert.ok(lab.includes("randomSamples: Number(randomSamplesInput.value)"));
+  assert.ok(lab.includes("selectedLottery() !== requestedLottery"));
+  assert.ok(lab.includes("selectedExperiment() !== requestedExperiment"));
+  assert.ok(lab.includes("message.replaceChildren(strong, paragraph)"));
+  assert.ok(lab.includes("const contestCount = finiteNumber(item.contestCount)"));
+  assert.ok(lab.includes("formatPercent(item.financialCoverage)"));
+  assert.ok(!lab.includes("formatPercent(Number(item.financialCoverage))"));
   assert.match(lab, /AUC 0,500 equivale a ordenação sem informação/);
   assert.match(lab, /corrigir o número de variantes testadas/);
 

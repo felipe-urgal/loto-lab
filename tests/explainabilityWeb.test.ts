@@ -48,7 +48,7 @@ test("Generator explainability layer exposes the five-step flow and methodology 
 
 test("Strategy Lab UI exposes score-model, inference resolution and predictive validation", async () => {
   const html = await source("web/lab.html");
-  const javascript = await source("web/lab.js");
+  const javascript = await source("web/src/features/lab.ts");
 
   assert.match(html, /Controles aleatórios/);
   assert.match(html, /mínimo prático \(3 variantes\)/);

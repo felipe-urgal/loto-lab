@@ -67,7 +67,11 @@ test("UI refinement assets are lazy-loaded for the main app and served for strat
   assert.match(labSource, /Empate em/);
   assert.match(labSource, /averageHitsPerGame/);
 
-  const labApp = await fetch(`${baseUrl}/assets/lab.js`);
+  const labBoundary = await fetch(`${baseUrl}/assets/lab.js`);
+  assert.equal(labBoundary.status, 200);
+  assert.match(await labBoundary.text(), /src\/features\/lab\.js/);
+
+  const labApp = await fetch(`${baseUrl}/assets/src/features/lab.js`);
   assert.equal(labApp.status, 200);
   const labAppSource = await labApp.text();
   assert.match(labAppSource, /external-rules/);
