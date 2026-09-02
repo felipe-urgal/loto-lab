@@ -1,6 +1,6 @@
 export type AnalysisTab = "ranking" | "structure" | "dynamics" | "combinations" | "validation";
 export type AnalysisTier = "strong" | "balanced" | "cold";
-export type EvidenceLevel = "moderate" | "weak" | "none" | string;
+export type EvidenceLevel = "moderate" | "weak" | "none";
 
 export type AnalysisDataQuality = {
   continuous: boolean;
