@@ -18,6 +18,16 @@ function readApiErrorDetails(payload: unknown): ApiErrorDetails {
   };
 }
 
+function requestHeaders(options: RequestInit): HeadersInit | undefined {
+  if (!options.body) return options.headers;
+
+  const headers = new Headers(options.headers);
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  return headers;
+}
+
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
@@ -33,9 +43,7 @@ export class ApiError extends Error {
 export async function api<T = unknown>(path: string, options: RequestInit = {}): Promise<T | null> {
   const response = await fetch(`${API}${path}`, {
     ...options,
-    headers: options.body
-      ? { "Content-Type": "application/json", ...(options.headers || {}) }
-      : options.headers,
+    headers: requestHeaders(options),
   });
   const payload: unknown =
     response.status === 204 ? null : await response.json().catch(() => null);
