@@ -41,6 +41,8 @@ test("my games workspace follows Prototype 1 while preserving real-bet auditabil
   assert.ok(controller.includes('from "../shared/escaping.js"'));
   assert.ok(controller.includes('from "../shared/toast.js"'));
   assert.ok(!myGames.includes('from "./runtime.js"'));
+  assert.match(controller, /currentMainView\(\)/);
+  assert.doesNotMatch(controller, /function currentView\(/);
   assert.match(betForm, /api\("\/real-bets"/);
   assert.match(comparison, /\/game-batches\/\$\{batch\.id\}\/comparison/);
   assert.match(controller, /\/game-batches\/\$\{batchId\}\/hide/);
