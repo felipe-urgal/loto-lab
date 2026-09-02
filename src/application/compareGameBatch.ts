@@ -11,6 +11,8 @@ export interface GameComparisonContestReader {
   list(options: ContestListQuery): Promise<Contest[]>;
 }
 
+export type ComparisonContest = Pick<Contest, "number" | "date" | "numbers" | "luckyMonth">;
+
 interface ComparisonGameResult {
   position: number;
   hits: number;
@@ -99,19 +101,25 @@ export function buildComparisonAvailability(
 ): ComparisonAvailability {
   return {
     status: selected.length > 0 ? "available" : "pending",
-    targetContestNumber,
     ...(selected.at(-1)?.number ?? lastAvailableBeforeStart) !== undefined
       ? { lastAvailableContestNumber: selected.at(-1)?.number ?? lastAvailableBeforeStart }
       : {},
+    targetContestNumber,
   };
 }
 
 export function buildBatchComparison(
   batch: ApplicationGameBatch,
-  contests: Contest[],
+  contests: ComparisonContest[],
 ) {
   const items: ComparisonContestResult[] = contests.map((contest) => {
-    const checks = evaluateGames(batch.games, contest);
+    const checks = evaluateGames(batch.games, {
+      lottery: batch.lottery,
+      number: contest.number,
+      date: contest.date,
+      numbers: contest.numbers,
+      ...(contest.luckyMonth ? { luckyMonth: contest.luckyMonth } : {}),
+    });
     const matchedAnyNumbers = [...new Set(checks.flatMap((check) => check.matchedNumbers))].sort((a, b) => a - b);
     return {
       contestNumber: contest.number,
