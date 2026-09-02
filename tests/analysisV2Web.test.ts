@@ -2,9 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five modes", async () => {
+test("Analyses 2.0 is lazy-loaded, typed, independently degradable and exposes the five modes", async () => {
   const [
+    boundary,
     source,
+    types,
     css,
     workspaceCss,
     loader,
@@ -20,6 +22,8 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
     worker,
   ] = await Promise.all([
     readFile("web/analysis-v2.js", "utf8"),
+    readFile("web/src/features/analysisV2.ts", "utf8"),
+    readFile("web/src/features/analysisV2/types.ts", "utf8"),
     readFile("web/analysis-v2.css", "utf8"),
     readFile("web/analysis-workspace.css", "utf8"),
     readFile("web/feature-loader.js", "utf8"),
@@ -34,6 +38,15 @@ test("Analyses 2.0 is lazy-loaded, independently degradable and exposes the five
     readFile("src/analysis/advancedWorkerClient.ts", "utf8"),
     readFile("src/api/analysisWorker.ts", "utf8"),
   ]);
+
+  assert.equal(boundary, 'import "./src/features/analysisV2.js";\n');
+  assert.match(source, /from "\.\.\/core\/api\.js"/);
+  assert.match(source, /from "\.\.\/core\/viewLifecycle\.js"/);
+  assert.match(source, /from "\.\.\/shared\/escaping\.js"/);
+  assert.doesNotMatch(source, /runtime\.js/);
+  assert.match(source, /api<AnalysisPayload>/);
+  assert.match(types, /export type AnalysisPayload/);
+  assert.match(types, /export type AnalysisNumberItem/);
 
   assert.match(loader, /view === "analysis"/);
   assert.match(loader, /loadStyle\("analysis-v2"\)/);
