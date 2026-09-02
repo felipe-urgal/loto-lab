@@ -1,3 +1,4 @@
+import { api } from "../core/api.js";
 import { currentMainView, onMainViewChanged } from "../core/viewLifecycle.js";
 
 const root = document.querySelector<HTMLElement>("#data-status-bar");
@@ -125,17 +126,12 @@ async function refreshDataStatus(): Promise<void> {
   root.innerHTML = '<div class="data-status-compact is-loading"><span class="data-status-dot"></span><span>Verificando dados...</span></div>';
 
   try {
-    const [dataResponse, operationsResponse] = await Promise.all([
-      fetch("/api/v1/data/status"),
-      fetch("/api/v1/operations/status"),
+    const [payload, operations] = await Promise.all([
+      api<DataStatusPayload>("/data/status"),
+      api<OperationsStatus>("/operations/status").catch(() => null),
     ]);
-    if (!dataResponse.ok) throw new Error(`HTTP ${dataResponse.status}`);
-    const payload = await dataResponse.json() as DataStatusPayload;
-    const operations = operationsResponse.ok
-      ? await operationsResponse.json() as OperationsStatus
-      : null;
     const scope = currentScope();
-    const items = (payload.items || []).filter(
+    const items = (payload?.items || []).filter(
       (item) => scope === "all" || item.lottery === scope,
     );
     const status = statusCopy(operations, items, scope);
