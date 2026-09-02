@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildBatchComparison, buildComparisonAvailability } from "../src/api/gameComparison.js";
-import type { GeneratedGameBatchRecord } from "../src/persistence/types.js";
+import {
+  buildBatchComparison,
+  buildComparisonAvailability,
+  CompareGameBatchUseCase,
+  ComparisonStartRequiredError,
+} from "../src/application/compareGameBatch.js";
+import type { ApplicationGameBatch } from "../src/application/gameBatch.js";
+import type { ContestListQuery } from "../src/application/contestCatalog.js";
 
-function batch(lottery: GeneratedGameBatchRecord["lottery"], games: GeneratedGameBatchRecord["games"]): GeneratedGameBatchRecord {
+function batch(lottery: ApplicationGameBatch["lottery"], games: ApplicationGameBatch["games"]): ApplicationGameBatch {
   return {
     id: 77,
     lottery,
@@ -151,4 +157,125 @@ test("Dia de Sorte comparison keeps lucky-month hits separate from number hits",
   assert.equal(result.items[0]!.games[0]!.hits, 1);
   assert.equal(result.items[0]!.games[0]!.luckyMonthHit, true);
   assert.equal(result.summary.bestHits, 1);
+});
+
+test("comparison use case starts at the target contest and preserves the non-financial scope", async () => {
+  const input = batch("mega-sena", [{
+    lottery: "mega-sena",
+    numbers: [1, 2, 3, 4, 5, 6],
+    fixedNumbers: [1, 2, 3],
+    variableNumbers: [4, 5, 6],
+    metadata: { odd: 3, even: 3, sum: 21, repeatedFromLastContest: [] },
+  }]);
+  const queries: ContestListQuery[] = [];
+  const useCase = new CompareGameBatchUseCase(
+    { findBatch: async () => input },
+    {
+      list: async (query) => {
+        queries.push(query);
+        return [{
+          lottery: "mega-sena",
+          number: 100,
+          date: "2026-08-21",
+          numbers: [1, 2, 8, 9, 10, 11],
+        }];
+      },
+    },
+  );
+
+  const result = await useCase.execute({ batchId: 77, count: 5 });
+
+  assert.deepEqual(queries, [{ lottery: "mega-sena", startContest: 100, order: "asc", limit: 5 }]);
+  assert.equal(result?.startContestNumber, 100);
+  assert.equal(result?.requestedCount, 5);
+  assert.deepEqual(result?.availability, {
+    status: "available",
+    targetContestNumber: 100,
+    lastAvailableContestNumber: 100,
+  });
+  assert.deepEqual(result?.scope, {
+    kind: "post-target",
+    minimumContestNumber: 100,
+    financial: false,
+    note: "Comparação dos jogos a partir do concurso-alvo; nenhum valor financeiro é registrado.",
+  });
+});
+
+test("comparison use case reports the last synchronized contest when the requested range is pending", async () => {
+  const input = batch("mega-sena", [{
+    lottery: "mega-sena",
+    numbers: [1, 2, 3, 4, 5, 6],
+    fixedNumbers: [1, 2, 3],
+    variableNumbers: [4, 5, 6],
+    metadata: { odd: 3, even: 3, sum: 21, repeatedFromLastContest: [] },
+  }]);
+  const queries: ContestListQuery[] = [];
+  const useCase = new CompareGameBatchUseCase(
+    { findBatch: async () => input },
+    {
+      list: async (query) => {
+        queries.push(query);
+        if (query.startContest !== undefined) return [];
+        return [{
+          lottery: "mega-sena",
+          number: 99,
+          date: "2026-08-20",
+          numbers: [7, 8, 9, 10, 11, 12],
+        }];
+      },
+    },
+  );
+
+  const result = await useCase.execute({ batchId: 77, count: 5 });
+
+  assert.deepEqual(queries, [
+    { lottery: "mega-sena", startContest: 100, order: "asc", limit: 5 },
+    { lottery: "mega-sena", endContest: 99, order: "desc", limit: 1 },
+  ]);
+  assert.deepEqual(result?.availability, {
+    status: "pending",
+    targetContestNumber: 100,
+    lastAvailableContestNumber: 99,
+  });
+});
+
+test("comparison use case requires an explicit starting contest for legacy batches without a target", async () => {
+  const input = batch("mega-sena", []);
+  delete input.targetContestNumber;
+  const useCase = new CompareGameBatchUseCase(
+    { findBatch: async () => input },
+    { list: async () => [] },
+  );
+
+  await assert.rejects(
+    () => useCase.execute({ batchId: 77, count: 5 }),
+    ComparisonStartRequiredError,
+  );
+});
+
+test("comparison use case supports an explicit exploratory start for legacy batches", async () => {
+  const input = batch("mega-sena", []);
+  delete input.targetContestNumber;
+  const useCase = new CompareGameBatchUseCase(
+    { findBatch: async () => input },
+    { list: async () => [] },
+  );
+
+  const result = await useCase.execute({ batchId: 77, count: 5, startContest: 42 });
+
+  assert.equal(result?.startContestNumber, 42);
+  assert.deepEqual(result?.scope, {
+    kind: "post-target",
+    financial: false,
+    note: "Comparação exploratória a partir do concurso escolhido; nenhum valor financeiro é registrado.",
+  });
+});
+
+test("comparison use case returns undefined when the batch does not exist", async () => {
+  const useCase = new CompareGameBatchUseCase(
+    { findBatch: async () => undefined },
+    { list: async () => assert.fail("contest history should not be read for a missing batch") },
+  );
+
+  assert.equal(await useCase.execute({ batchId: 999, count: 5 }), undefined);
 });

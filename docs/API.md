@@ -18,9 +18,9 @@ Domain / engines / ports
 PostgreSQL / CAIXA / OpenAI / workers
 ```
 
-Concursos, análises, geração compatível/Generator 2.0, backtests, estratégias, Strategy Lab, operações, apostas reais, status de dados e game batches já entram por controllers dedicados e application use cases injetados, com dependências concretas compostas em `src/api/server.ts`. `src/api/app.ts` ficou restrito à borda comum da API e `src/api/services.ts` não possui mais facade de infraestrutura.
+Concursos, análises, geração compatível/Generator 2.0, backtests, estratégias, Strategy Lab, operações, apostas reais, status de dados, game batches e comparação de game batches já entram por controllers dedicados e application use cases injetados, com dependências concretas compostas em `src/api/server.ts`. `src/api/app.ts` ficou restrito à borda comum da API e `src/api/services.ts` não possui mais facade de infraestrutura.
 
-A migração da #61 ainda não terminou: `aiInsights.ts`, `agenda.ts`, `analysisJobs.ts` e `gameComparison.ts` continuam compondo provider/service/repositories concretos ou acessando `options.pool` dentro da borda HTTP. Essas fronteiras devem ser extraídas em fatias próprias antes de declarar `server.ts` como composition root completo.
+A migração da #61 ainda não terminou: `aiInsights.ts`, `agenda.ts` e `analysisJobs.ts` continuam compondo provider/service/repositories concretos ou acessando `options.pool` dentro da borda HTTP. Essas fronteiras devem ser extraídas em fatias próprias antes de declarar `server.ts` como composition root completo.
 
 Controllers devem cuidar de parse, CORS/auth/rate-limit quando aplicável, serialização e error mapping. Regras de negócio pertencem ao application/core.
 

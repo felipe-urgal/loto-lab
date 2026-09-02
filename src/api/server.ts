@@ -7,6 +7,7 @@ import { AnalyzeAdvancedLotteryUseCase } from "../application/analyzeAdvancedLot
 import { AnalyzeLotteryUseCase } from "../application/analyzeLottery.js";
 import { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
 import { CheckGameBatchUseCase } from "../application/checkGameBatch.js";
+import { CompareGameBatchUseCase } from "../application/compareGameBatch.js";
 import { ContestCatalogUseCase } from "../application/contestCatalog.js";
 import { GetDataStatusUseCase } from "../application/dataStatus.js";
 import { ExecuteBacktestUseCase } from "../application/executeBacktest.js";
@@ -64,6 +65,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
     analyzeLottery: new AnalyzeLotteryUseCase(contests),
     backtestCatalog: new BacktestCatalogUseCase(backtests),
     checkGameBatch: new CheckGameBatchUseCase(games, contests),
+    compareGameBatch: new CompareGameBatchUseCase(games, contests),
     contestCatalog: new ContestCatalogUseCase(contests),
     dataStatus: new GetDataStatusUseCase(contests),
     executeBacktest: new ExecuteBacktestUseCase(
