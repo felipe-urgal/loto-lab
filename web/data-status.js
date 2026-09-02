@@ -1,3 +1,5 @@
+import { currentMainView, onMainViewChanged } from "./runtime.js";
+
 const root = document.querySelector("#data-status-bar");
 const lotterySelect = document.querySelector("#lottery-select");
 const labels = {
@@ -66,8 +68,7 @@ function statusCopy(operations, items, scope) {
 
 async function refreshDataStatus() {
   if (!root) return;
-  const view = location.hash.replace("#", "") || "dashboard";
-  if (view !== "dashboard") {
+  if (currentMainView() !== "dashboard") {
     root.hidden = true;
     return;
   }
@@ -99,12 +100,14 @@ async function refreshDataStatus() {
   }
 }
 
-window.addEventListener("hashchange", refreshDataStatus);
+onMainViewChanged(() => {
+  void refreshDataStatus();
+});
 window.addEventListener("loto-lab:data-synced", refreshDataStatus);
 lotterySelect?.addEventListener("change", () => {
-  if ((location.hash.replace("#", "") || "dashboard") === "dashboard") {
+  if (currentMainView() === "dashboard") {
     window.setTimeout(refreshDataStatus, 0);
   }
 });
 
-refreshDataStatus();
+void refreshDataStatus();
