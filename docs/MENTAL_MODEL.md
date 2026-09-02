@@ -192,9 +192,9 @@ Ports
 PostgreSQL / CAIXA / OpenAI / worker_threads
 ```
 
-Na borda HTTP, concursos, análises, geração, backtests, estratégias, Strategy Lab, operações, apostas reais, status de dados e game batches já seguem controllers/use cases injetados com composição concreta em `src/api/server.ts`. `src/api/app.ts` ficou restrito à infraestrutura comum e `src/api/services.ts` preserva apenas exports auxiliares de compatibilidade, sem `LotoLabApiServices` nem repositories concretos.
+Na borda HTTP, concursos, análises, geração, backtests, estratégias, Strategy Lab, operações, apostas reais, status de dados, game batches/comparação, Agenda/notificações, IA interpretativa e Analysis Jobs seguem controllers/use cases injetados com composição concreta em `src/api/server.ts`. `src/api/app.ts` ficou restrito à infraestrutura comum e `src/api/services.ts` preserva apenas exports auxiliares de compatibilidade, sem `LotoLabApiServices` nem repositories concretos.
 
-A #61 continua aberta porque `aiInsights.ts`, `agenda.ts`, `analysisJobs.ts` e `gameComparison.ts` ainda criam dependências concretas ou acessam `options.pool` na borda HTTP. Depois dessas fatias, ainda deve haver uma revisão direcionada de CLI/scheduler apenas onde existir orquestração duplicada real.
+A #61 foi concluída em 2026-09-02: não resta controller de feature HTTP criando repositories, managers ou providers concretos, e `src/api/server.ts` é o composition root das features HTTP. O lifecycle de processo permanece corretamente separado em `src/cli/apiStart.ts`, responsável por start/recovery/drain do `AnalysisJobManager`, scheduler e runtime lock. A decomposição de motores/hotspots pertence à #62 e não deve reabrir a fronteira HTTP sem necessidade comprovada.
 
 ## Direção frontend
 

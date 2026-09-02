@@ -352,7 +352,7 @@ Regras:
 - prefira compatibilidade estrutural de interfaces quando suficiente;
 - remova implementações legadas mortas após strangler, em PR pequeno próprio se necessário.
 
-A migração restante é rastreada pela #61.
+A #61 concluiu a migração da borda HTTP em 2026-09-02: `src/api/server.ts` é o composition root das features HTTP. Novas mudanças devem preservar essa fronteira; decomposição de motores/hotspots pertence à #62 ou a novo trabalho com necessidade comprovada.
 
 ## PostgreSQL e migrations
 
