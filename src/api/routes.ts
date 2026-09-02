@@ -3,6 +3,7 @@ import type { AnalyzeAdvancedLotteryUseCase } from "../application/analyzeAdvanc
 import type { AnalyzeLotteryUseCase } from "../application/analyzeLottery.js";
 import type { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
 import type { CheckGameBatchUseCase } from "../application/checkGameBatch.js";
+import type { CompareGameBatchUseCase } from "../application/compareGameBatch.js";
 import type { ContestCatalogUseCase } from "../application/contestCatalog.js";
 import type { GetDataStatusUseCase } from "../application/dataStatus.js";
 import type { ExecuteBacktestUseCase } from "../application/executeBacktest.js";
@@ -36,6 +37,7 @@ export interface FeatureRouteDependencies {
   analyzeLottery: AnalyzeLotteryUseCase;
   backtestCatalog: BacktestCatalogUseCase;
   checkGameBatch: CheckGameBatchUseCase;
+  compareGameBatch: CompareGameBatchUseCase;
   contestCatalog: ContestCatalogUseCase;
   dataStatus: GetDataStatusUseCase;
   executeBacktest: ExecuteBacktestUseCase;
@@ -97,7 +99,8 @@ const featureRoutes: FeatureRouteHandler[] = [
     ),
   (request, response, options, dependencies) =>
     serveGameBatchManagement(request, response, options, dependencies.gameBatches),
-  serveGameComparison,
+  (request, response, options, dependencies) =>
+    serveGameComparison(request, response, options, dependencies.compareGameBatch),
   serveAiInsights,
   (request, response, options, dependencies) =>
     serveOperations(request, response, options, dependencies.operations),
