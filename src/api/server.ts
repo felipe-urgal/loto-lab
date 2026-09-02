@@ -2,11 +2,13 @@ import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { createApiRequestHandler, type ApiServerOptions } from "./app.js";
 import { runAdvancedAnalysisInWorker } from "../analysis/advancedWorkerClient.js";
+import { getAnalysisJobManager } from "../analysis/jobManager.js";
 import { buildAiEvidenceContext } from "../ai/context.js";
 import { OpenAiInterpretationProvider } from "../ai/openai.js";
 import type { AiInterpretationProvider } from "../ai/types.js";
 import { AgendaUseCase } from "../application/agenda.js";
 import { AiInsightsUseCase } from "../application/aiInsights.js";
+import { AnalysisJobsUseCase } from "../application/analysisJobs.js";
 import { AnalyzeAdvancedLotteryUseCase } from "../application/analyzeAdvancedLottery.js";
 import { AnalyzeLotteryUseCase } from "../application/analyzeLottery.js";
 import { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
@@ -65,6 +67,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const contests = new PostgresContestRepository(options.pool);
   const games = new PostgresGameRepository(options.pool);
   const backtests = new PostgresBacktestRepository(options.pool);
+  const strategies = new PostgresStrategyRepository(options.pool);
   const agendaRepository = new PostgresAgendaRepository(options.pool);
   const notificationRepository = new PostgresNotificationRepository(options.pool);
   const aiProvider = options.aiProvider ?? new OpenAiInterpretationProvider();
@@ -78,6 +81,11 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
       { load: (lottery) => buildAiEvidenceContext(options.pool, lottery) },
       new PostgresAiInsightRepository(options.pool),
       aiProvider,
+    ),
+    analysisJobs: new AnalysisJobsUseCase(
+      getAnalysisJobManager(options.pool),
+      strategies,
+      contests,
     ),
     analyzeAdvancedLottery: new AnalyzeAdvancedLotteryUseCase(
       contests,
@@ -119,7 +127,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
       new RealBetService(options.pool),
       new PostgresRealBetRepository(options.pool),
     ),
-    strategyCatalog: new StrategyCatalogUseCase(new PostgresStrategyRepository(options.pool)),
+    strategyCatalog: new StrategyCatalogUseCase(strategies),
     runStrategyLab: new RunStrategyLabUseCase(
       contests,
       expensiveAnalysisGate,
