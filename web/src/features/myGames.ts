@@ -1,5 +1,5 @@
 import { api } from "../core/api.js";
-import { onViewRendered } from "../core/viewLifecycle.js";
+import { currentMainView, onViewRendered } from "../core/viewLifecycle.js";
 import { escapeHtml } from "../shared/escaping.js";
 import { toast } from "../shared/toast.js";
 import { renderBetForm } from "./myGames/betForm.js";
@@ -22,10 +22,6 @@ const lotterySelect = requiredElement<HTMLSelectElement>("#lottery-select");
 const subtitle = requiredElement<HTMLElement>("#view-subtitle");
 const ui: UiState = { filter: "visible", query: "", expandedBatchId: null, requestToken: 0 };
 
-function currentView(): string {
-  return location.hash.replace("#", "") || "dashboard";
-}
-
 function currentLottery(): LotteryId {
   const value = lotterySelect.value;
   return value === "mega-sena" || value === "lotofacil" || value === "dia-de-sorte" ? value : "mega-sena";
@@ -39,7 +35,7 @@ function renderScreen(data: GameBatchResponse, betData: RealBetResponse): void {
 }
 
 function rerender(data: GameBatchResponse, betData: RealBetResponse): void {
-  if (currentView() === "games") renderScreen(data, betData);
+  if (currentMainView() === "games") renderScreen(data, betData);
 }
 
 async function hideBatch(batchId: number): Promise<void> {
@@ -130,7 +126,7 @@ function bindScreen(data: GameBatchResponse, betData: RealBetResponse): void {
 }
 
 async function mount(options: MountOptions = {}): Promise<void> {
-  if (currentView() !== "games") return;
+  if (currentMainView() !== "games") return;
   const lottery = currentLottery();
   const token = ++ui.requestToken;
   if (options.preserveExpanded !== undefined) ui.expandedBatchId = options.preserveExpanded;
@@ -143,10 +139,10 @@ async function mount(options: MountOptions = {}): Promise<void> {
     ]);
     const data = requiredPayload(dataPayload, "carregar lotes");
     const betData = requiredPayload(betPayload, "carregar apostas reais");
-    if (token !== ui.requestToken || currentView() !== "games" || currentLottery() !== lottery) return;
+    if (token !== ui.requestToken || currentMainView() !== "games" || currentLottery() !== lottery) return;
     renderScreen(data, betData);
   } catch (error) {
-    if (token !== ui.requestToken || currentView() !== "games") return;
+    if (token !== ui.requestToken || currentMainView() !== "games") return;
     root.innerHTML = `<div class="error-state"><strong>Não foi possível carregar seus jogos</strong><p>${escapeHtml(errorMessage(error))}</p><button class="button" type="button" data-mg2-retry>Tentar novamente</button></div>`;
     root.querySelector<HTMLButtonElement>("[data-mg2-retry]")?.addEventListener("click", () => { void mount(); });
   }
