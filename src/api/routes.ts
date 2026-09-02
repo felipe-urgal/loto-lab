@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { AgendaUseCase } from "../application/agenda.js";
+import type { AiInsightsUseCase } from "../application/aiInsights.js";
 import type { AnalyzeAdvancedLotteryUseCase } from "../application/analyzeAdvancedLottery.js";
 import type { AnalyzeLotteryUseCase } from "../application/analyzeLottery.js";
 import type { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
@@ -35,6 +36,7 @@ import type { LotoLabServerOptions } from "./server.js";
 
 export interface FeatureRouteDependencies {
   agenda: AgendaUseCase;
+  aiInsights: AiInsightsUseCase;
   analyzeAdvancedLottery: AnalyzeAdvancedLotteryUseCase;
   analyzeLottery: AnalyzeLotteryUseCase;
   backtestCatalog: BacktestCatalogUseCase;
@@ -103,7 +105,8 @@ const featureRoutes: FeatureRouteHandler[] = [
     serveGameBatchManagement(request, response, options, dependencies.gameBatches),
   (request, response, options, dependencies) =>
     serveGameComparison(request, response, options, dependencies.compareGameBatch),
-  serveAiInsights,
+  (request, response, options, dependencies) =>
+    serveAiInsights(request, response, options, dependencies.aiInsights),
   (request, response, options, dependencies) =>
     serveOperations(request, response, options, dependencies.operations),
   (request, response, options, dependencies) =>
