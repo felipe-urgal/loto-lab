@@ -8,10 +8,12 @@ async function source(path: string): Promise<string> {
 }
 
 test("game batch HTTP ownership delegates to application use cases", async () => {
-  const [application, controller, management, app, routes, server] = await Promise.all([
+  const [application, comparisonApplication, controller, management, comparison, app, routes, server] = await Promise.all([
     source("src/application/gameBatches.ts"),
+    source("src/application/compareGameBatch.ts"),
     source("src/api/gameBatches.ts"),
     source("src/api/gameBatchManagement.ts"),
+    source("src/api/gameComparison.ts"),
     source("src/api/app.ts"),
     source("src/api/routes.ts"),
     source("src/api/server.ts"),
@@ -22,6 +24,13 @@ test("game batch HTTP ownership delegates to application use cases", async () =>
   assert.doesNotMatch(application, /from "pg"/);
   assert.match(application, /interface GameBatchStore/);
   assert.match(application, /class GameBatchUseCase/);
+
+  assert.doesNotMatch(comparisonApplication, /ApiError/);
+  assert.doesNotMatch(comparisonApplication, /Postgres/);
+  assert.doesNotMatch(comparisonApplication, /from "pg"/);
+  assert.match(comparisonApplication, /interface GameComparisonBatchReader/);
+  assert.match(comparisonApplication, /interface GameComparisonContestReader/);
+  assert.match(comparisonApplication, /class CompareGameBatchUseCase/);
 
   assert.doesNotMatch(controller, /PostgresGameRepository/);
   assert.doesNotMatch(controller, /options\.pool/);
@@ -36,6 +45,11 @@ test("game batch HTTP ownership delegates to application use cases", async () =>
   assert.match(management, /gameBatches\.manage\(/);
   assert.match(management, /gameBatches\.setHidden\(/);
 
+  assert.doesNotMatch(comparison, /PostgresGameRepository/);
+  assert.doesNotMatch(comparison, /PostgresContestRepository/);
+  assert.doesNotMatch(comparison, /options\.pool/);
+  assert.match(comparison, /compareGameBatch\.execute\(/);
+
   assert.doesNotMatch(app, /\/api\/v1\/game-batches/);
   assert.doesNotMatch(app, /\/api\/v1\/games\/check/);
   assert.doesNotMatch(app, /LotoLabApiServices/);
@@ -43,10 +57,13 @@ test("game batch HTTP ownership delegates to application use cases", async () =>
   assert.doesNotMatch(app, /services\.checkBatch/);
 
   assert.match(routes, /checkGameBatch: CheckGameBatchUseCase/);
+  assert.match(routes, /compareGameBatch: CompareGameBatchUseCase/);
   assert.match(routes, /gameBatches: GameBatchUseCase/);
   assert.match(routes, /dependencies\.checkGameBatch/);
+  assert.match(routes, /dependencies\.compareGameBatch/);
   assert.match(routes, /dependencies\.gameBatches/);
 
   assert.match(server, /checkGameBatch: new CheckGameBatchUseCase\(games, contests\)/);
+  assert.match(server, /compareGameBatch: new CompareGameBatchUseCase\(games, contests\)/);
   assert.match(server, /gameBatches: new GameBatchUseCase\(games\)/);
 });
