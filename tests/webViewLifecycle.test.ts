@@ -35,14 +35,18 @@ test("feature loader emits the shared lifecycle contract", () => {
   assert.doesNotMatch(featureLoaderSource, /location\.hash\.replace\("#", ""\)/);
 });
 
-test("data status is implemented in TypeScript and consumes the shared lifecycle directly", () => {
+test("data status is implemented in TypeScript and consumes shared core contracts directly", () => {
   assert.equal(dataStatusBoundarySource.trim(), 'import "./src/features/dataStatus.js";');
+  assert.match(dataStatusSource, /import \{ api \} from "\.\.\/core\/api\.js"/);
   assert.match(
     dataStatusSource,
     /import \{ currentMainView, onMainViewChanged \} from "\.\.\/core\/viewLifecycle\.js"/,
   );
+  assert.match(dataStatusSource, /api<DataStatusPayload>\("\/data\/status"\)/);
+  assert.match(dataStatusSource, /api<OperationsStatus>\("\/operations\/status"\)/);
   assert.match(dataStatusSource, /onMainViewChanged\(\(\) => \{/);
   assert.doesNotMatch(dataStatusSource, /location\.hash/);
   assert.doesNotMatch(dataStatusSource, /addEventListener\("hashchange"/);
   assert.doesNotMatch(dataStatusSource, /from "\.\.\/\.\.\/runtime\.js"/);
+  assert.doesNotMatch(dataStatusSource, /fetch\("\/api\/v1/);
 });
