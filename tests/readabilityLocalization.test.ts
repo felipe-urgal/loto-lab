@@ -86,7 +86,7 @@ test("canonical web source owns the 16px functional typography floor", async () 
 });
 
 test("Analyses 2.0 owns its Portuguese product vocabulary in source", async () => {
-  const analysis = await source("web/analysis-v2.js");
+  const analysis = await source("web/src/features/analysisV2.ts");
 
   assert.match(analysis, /ranking: "Classificação"/);
   assert.match(analysis, /Decomposição da pontuação/);
