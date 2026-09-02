@@ -4,8 +4,13 @@ import { resolve } from "node:path";
 import test from "node:test";
 import { API, ApiError, api } from "../web/src/core/api.js";
 import { escapeHtml } from "../web/src/shared/escaping.js";
+import { toast } from "../web/src/shared/toast.js";
 
 const runtimeSource = await readFile(resolve(process.cwd(), "web/runtime.js"), "utf8");
+const toastSource = await readFile(
+  resolve(process.cwd(), "web/src/shared/toast.ts"),
+  "utf8",
+);
 
 test("shared escaping preserves the legacy runtime contract", () => {
   assert.equal(escapeHtml(undefined), "");
@@ -13,6 +18,12 @@ test("shared escaping preserves the legacy runtime contract", () => {
     escapeHtml(`<span data-value="a&b">O'Reilly</span>`),
     "&lt;span data-value=&quot;a&amp;b&quot;&gt;O&#039;Reilly&lt;/span&gt;",
   );
+});
+
+test("shared toast is typed and keeps external messages text-only", () => {
+  assert.equal(typeof toast, "function");
+  assert.match(toastSource, /item\.textContent = String\(message \?\? ""\)/);
+  assert.doesNotMatch(toastSource, /innerHTML/);
 });
 
 test("typed API client preserves success, JSON headers and 204 responses", async (context) => {
@@ -110,9 +121,11 @@ test("typed API client keeps backend error message/code and exposes status", asy
   });
 });
 
-test("runtime keeps API and escaping exports while implementation moves to TypeScript", () => {
+test("runtime keeps shared exports while implementation moves to TypeScript", () => {
   assert.match(runtimeSource, /from "\.\/src\/core\/api\.js"/);
   assert.match(runtimeSource, /from "\.\/src\/shared\/escaping\.js"/);
+  assert.match(runtimeSource, /from "\.\/src\/shared\/toast\.js"/);
   assert.doesNotMatch(runtimeSource, /export async function api/);
   assert.doesNotMatch(runtimeSource, /export function escapeHtml/);
+  assert.doesNotMatch(runtimeSource, /export function toast/);
 });
