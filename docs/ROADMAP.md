@@ -259,3 +259,81 @@ Um refactor está pronto quando mantém comportamento salvo mudança explicitame
 - ownership;
 - estado explícito;
 - risco operacional.
+
+Mover arquivos sem ganho verificável não é considerado progresso arquitetural.
+
+### Gate mínimo
+
+Backend:
+
+- typecheck/static gates;
+- testes + cobertura;
+- PostgreSQL integration quando aplicável;
+- Compose/imagem/smoke;
+- E2E se a superfície pública mudar.
+
+Frontend:
+
+- typecheck/lint da área TypeScript migrada;
+- desktop e mobile;
+- teclado/foco;
+- loading/empty/error/success;
+- reduced-motion quando houver animação;
+- browser E2E crítico.
+
+Todos os PRs continuam exigindo **auto code review final no SHA verde** antes do squash merge. Agentes de IA devem seguir também o contrato operacional de [`AGENTS.md`](../AGENTS.md).
+
+---
+
+# Auditoria integral da documentação · 2026-09-01
+
+Todos os **28 arquivos Markdown** versionados no branch do PR #163 foram revisados contra o estado atual do código, as 8 issues abertas e a `main` em `382f2a1`.
+
+A auditoria confirmou que a maior parte do corpus já estava correta. Foram necessárias três correções materiais nesta rodada:
+
+1. `docs/ROADMAP.md` — substitui a revisão pontual por esta auditoria integral, revalida #52 e reconcilia dependências/status de #60–#66;
+2. `docs/REAL_BETS.md` — remove a dívida falsa sobre o fallback financeiro, corrigida em #147;
+3. `docs/tasks/SENIOR_REVIEW_FINANCIAL_INTEGRITY.md` — registra o follow-up financeiro como absorvido e deixa de usar um review histórico concluído como backlog.
+
+Os demais documentos foram lidos e mantidos sem churn porque continuam descrevendo corretamente contratos presentes.
+
+| Documento | Resultado da auditoria |
+| --- | --- |
+| `AGENTS.md` | contrato de engenharia, PR, CI e auto-review permanece atual |
+| `README.md` | estado, arquitetura, rollout e fundação TypeScript permanecem atuais |
+| `docs/AGENDA.md` | contrato e application layer atuais de agenda/notificações |
+| `docs/AI.md` | contexto, application layer, provider, persistência e limites metodológicos atuais |
+| `docs/ANALYSES.md` | contrato estatístico/anti-leakage atual |
+| `docs/API.md` | application layer e composition root HTTP completos atuais |
+| `docs/DATABASE.md` | migrations, tabelas, repositories e invariantes atuais |
+| `docs/DATA_OPERATIONS.md` | bootstrap/sync atuais |
+| `docs/DEPLOYMENT.md` | stack e segurança de produção atuais |
+| `docs/FINANCIALS.md` | ROI histórico/real e distinção `desconhecido != zero` atuais |
+| `docs/GENERATION.md` | score-v2, portfólio e geração atuais |
+| `docs/LOTOFACIL_READINESS.md` | checklist operacional atual |
+| `docs/MENTAL_MODEL.md` | arquitetura backend/frontend e North Star atuais |
+| `docs/METHODOLOGY.md` | score-v2, validação e Lab atuais |
+| `docs/MY_GAMES.md` | My Games 2.0, lifecycle, conferência e comparação atuais |
+| `docs/OPERATIONS.md` | reparo financeiro, agenda, notificações e status `partial` atuais |
+| `docs/PERFORMANCE.md` | lazy loading, workers, PostgreSQL e política evidence-based atuais |
+| `docs/PLATFORM.md` | Node 24.19.0 / TypeScript 7.x atuais |
+| `docs/PRODUCTION-CONTRACT.md` | contrato `prod:*` atual |
+| `docs/QUALITY.md` | gates CI/Security atuais |
+| `docs/REAL_BETS.md` | corrigido: fallback também preserva `desconhecido != zero` desde #147 |
+| `docs/RELIABILITY.md` | hardening e invariantes atuais |
+| `docs/ROADMAP.md` | corrigido: auditoria integral, backlog e dependências reconciliados |
+| `docs/STRATEGY_LAB.md` | contrato v2 e inferência atuais |
+| `docs/WEB.md` | rollout concluído e migração TypeScript incremental atuais |
+| `docs/design/PROTOTYPE_1_DARK_MODERN.md` | direção visual consolidada; #121 concluída |
+| `docs/tasks/MY_GAMES_V2.md` | registro histórico concluído, sem backlog oculto |
+| `docs/tasks/SENIOR_REVIEW_FINANCIAL_INTEGRITY.md` | corrigido: review concluído e follow-up financeiro absorvido por #147 |
+
+## Gestão futura
+
+- `AGENTS.md` define como agentes de IA devem trabalhar e revisar;
+- README explica como usar/operar e aponta para documentos específicos;
+- ROADMAP contém apenas prioridade/estado/dependência atuais;
+- docs técnicos descrevem contratos presentes, não “milestones” antigos;
+- `docs/tasks/` pode preservar decisões históricas, mas deve marcar explicitamente quando a tarefa estiver concluída;
+- issues concluídas não permanecem abertas como documentação paralela;
+- novos detalhes de execução entram nas issues/PRs, não como listas duplicadas no README.
