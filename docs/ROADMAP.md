@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-09-02**, com #155–#160/#163 já na `main` e comparação de game batches + Agenda/notificações + IA interpretativa extraídas para application use cases e composition root.
+> Baseline revisada em **2026-09-02**, com #155–#160/#163 já na `main` e comparação de game batches + Agenda/notificações + IA interpretativa + Analysis Jobs extraídos para application use cases e composition root.
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -61,10 +61,11 @@ A diretriz permanece:
 - ownership HTTP da geração compatível extraído para controller + `GenerateGamesUseCase` injetado (#157);
 - ownership HTTP do Generator 2.0 extraído para controller + `GenerationV2UseCase`, com portas explícitas para histórico, previews/lotes e planner (#159);
 - leitura, gestão e conferência de game batches extraídas do monólito/controllers concretos para `GameBatchUseCase` + `CheckGameBatchUseCase`, com composição em `server.ts` (#160);
-- PR #163 remove a facade concreta `LotoLabApiServices` de `src/api/services.ts`, preservando somente exports auxiliares de compatibilidade e mantendo a issue #61 aberta para as fronteiras concretas restantes;
+- PR #163 remove a facade concreta `LotoLabApiServices` de `src/api/services.ts`, preservando somente exports auxiliares de compatibilidade;
 - comparação de game batches extraída de `gameComparison.ts` para `CompareGameBatchUseCase`, com portas explícitas e composição em `server.ts`;
 - Agenda/notificações extraídas de `agenda.ts` para `AgendaUseCase`, com portas mínimas para leitura, notificações e refresh e composição concreta em `server.ts`;
-- IA interpretativa extraída de `aiInsights.ts` para `AiInsightsUseCase`, com portas para evidência, persistência e provider e composição de PostgreSQL/OpenAI em `server.ts`.
+- IA interpretativa extraída de `aiInsights.ts` para `AiInsightsUseCase`, com portas para evidência, persistência e provider e composição de PostgreSQL/OpenAI em `server.ts`;
+- Analysis Jobs extraídos de `analysisJobs.ts` para `AnalysisJobsUseCase`, com ports para fila, estratégias e histórico, preservando o lifecycle do manager em `apiStart.ts` e concluindo o composition root HTTP em `server.ts`.
 
 ### Pontos fortes a preservar
 
@@ -86,7 +87,6 @@ A diretriz permanece:
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- #61 continua em execução: `analysisJobs.ts` é a última fronteira HTTP com ownership concreto de infraestrutura/orquestração dependente de persistência; `server.ts` ainda não é composition root completo;
 - frontend ainda possui módulos grandes/imperativos; a fundação TypeScript existe desde #148, mas API client/errors/escaping/lifecycle/state, primitives e decomposição por feature seguem ativos na #60;
 - hotspots algorítmicos continuam grandes (#62);
 - observabilidade segue baseada principalmente em logs/estado persistido, sem métricas/SLOs (#63);
@@ -106,7 +106,7 @@ A API do GitHub foi revalidada em **2026-09-01**: `main.protected = false`, `req
 
 Esta tarefa não precisa de PR de código.
 
-## #61 — Application use cases e controllers finos · P1 · em andamento
+## #61 — Application use cases e controllers finos · P1 · concluída
 
 PRs #106–#119 construíram a base de application use cases. Em 2026-08-31, #155–#160 avançaram a etapa final do strangler:
 
@@ -118,19 +118,14 @@ PRs #106–#119 construíram a base de application use cases. Em 2026-08-31, #15
 - #163 remove a classe `LotoLabApiServices` e o acoplamento de `src/api/services.ts` a `pg`/repositories concretos, mantém no módulo apenas exports auxiliares compatíveis e adiciona guarda arquitetural contra regressão;
 - a comparação de game batches agora passa por `CompareGameBatchUseCase`, deixando `gameComparison.ts` responsável apenas por HTTP/error mapping e movendo a composição concreta para `server.ts`;
 - Agenda/notificações agora passam por `AgendaUseCase`, deixando `agenda.ts` responsável apenas por rota/parse/serialização e movendo repositories + `NotificationService` para `server.ts`;
-- IA interpretativa agora passa por `AiInsightsUseCase`, deixando `aiInsights.ts` responsável por rota/parse/rate-limit/serialização e movendo provider + persistência para `server.ts`.
+- IA interpretativa agora passa por `AiInsightsUseCase`, deixando `aiInsights.ts` responsável por rota/parse/rate-limit/serialização e movendo provider + persistência para `server.ts`;
+- Analysis Jobs agora passam por `AnalysisJobsUseCase`, deixando `analysisJobs.ts` responsável por transporte/error mapping e movendo manager, repositories e validação dependente do histórico para a application/composição.
 
-Após essas extrações, resta uma fronteira HTTP concreta:
+Não resta controller de feature HTTP compondo repositories, managers ou providers concretos. `src/api/server.ts` é o composition root das features HTTP. O lifecycle de processo permanece corretamente separado: `src/cli/apiStart.ts` inicia/recover/draina o mesmo `AnalysisJobManager` singleton e continua dono do scheduler/runtime lock.
 
-- `analysisJobs.ts` resolve manager/repositories e validações dependentes de persistência dentro do controller.
+A revisão de CLI/scheduler não encontrou motivo para mover engines puros ou lifecycle de processo apenas por estética arquitetural; qualquer futura duplicação real deve ser tratada como necessidade nova e comprovada.
 
-Depois dessa última extração, restam:
-
-- confirmar `server.ts` como composition root completo de todas as features HTTP;
-- revisar CLI/scheduler apenas onde houver orquestração duplicada relevante e comprovada; não mover engines puros para application layer por estética arquitetural;
-- reconciliar a documentação final e fechar #61 como `completed` somente quando não houver ownership concreto relevante na borda.
-
-**Regra:** continuar verticalmente, sem misturar decomposição matemática da #62. Cada fatia precisa manter os contratos HTTP e passar CI, Security e E2E aplicável, seguida de auto code review final registrado no SHA verde conforme `AGENTS.md`.
+**Regra preservada:** a conclusão da #61 não inclui decomposição matemática da #62. Contratos HTTP/CLI, workers, cancelamento, gate e recovery permanecem cobertos pelos testes existentes e pelas guardas arquiteturais.
 
 ---
 
@@ -172,7 +167,7 @@ Transformar sinais já existentes em métricas acionáveis:
 - pool PostgreSQL;
 - poucos SLOs + runbooks.
 
-Não introduzir tracing distribuído antes de necessidade demonstrada. O #163 melhora a fronteira de composição, mas não fecha a #61; iniciar #63 deve evitar disputar os mesmos arquivos de arquitetura enquanto houver PR ativo no fluxo.
+Não introduzir tracing distribuído antes de necessidade demonstrada. Com a #61 concluída, #63 pode avançar sem depender de nova migração da fronteira HTTP, desde que não misture observabilidade com refactor algorítmico.
 
 ---
 
@@ -188,7 +183,7 @@ Depois da consolidação principal da #61:
 - absorver nomes transitórios `*-hardening` quando o ownership estiver claro;
 - preservar equivalência matemática por testes.
 
-O #163 remove a facade temporária; comparação de game batches, Agenda/notificações e IA interpretativa já saíram da borda concreta. Permanece uma fronteira HTTP rastreada pela #61, por isso a dependência segue ativa.
+A consolidação da #61 está concluída: facade temporária e ownership concreto dos controllers HTTP foram removidos. A decomposição da #62 pode avançar em fatias próprias sem reabrir a fronteira HTTP.
 
 ## #64 — Arquitetura de informação e jornada pós-redesign
 
@@ -221,7 +216,7 @@ O lifecycle atual e o browser E2E já funcionam como guardrails qualitativos con
 
 Compor as peças já existentes — strategies, jobs, backtests, Lab, previews/seeds, real bets e AI insights — em uma cadeia explícita de proveniência e decisão reproduzível.
 
-A dependência de arquitetura permanece: concluir a consolidação principal da #61 e coordenar com a decomposição algorítmica da #62 antes de criar uma nova camada transversal de proveniência.
+A dependência de arquitetura da #61 está satisfeita. O desenho dessa camada transversal deve agora coordenar principalmente com a decomposição algorítmica da #62 para não criar ownership duplicado.
 
 ---
 
@@ -234,7 +229,7 @@ A dependência de arquitetura permanece: concluir a consolidação principal da 
   ↓
 #64 jornada/arquitetura de informação
 
-#61 application architecture
+#61 application architecture (concluída)
   ├─→ #63 observabilidade
   └─→ #62 hotspots/motores
           ↓
@@ -300,7 +295,7 @@ Os demais documentos foram lidos e mantidos sem churn porque continuam descreven
 | `docs/AGENDA.md` | contrato e application layer atuais de agenda/notificações |
 | `docs/AI.md` | contexto, application layer, provider, persistência e limites metodológicos atuais |
 | `docs/ANALYSES.md` | contrato estatístico/anti-leakage atual |
-| `docs/API.md` | application layer, famílias HTTP e uma fronteira restante da #61 atuais |
+| `docs/API.md` | application layer e composition root HTTP completos atuais |
 | `docs/DATABASE.md` | migrations, tabelas, repositories e invariantes atuais |
 | `docs/DATA_OPERATIONS.md` | bootstrap/sync atuais |
 | `docs/DEPLOYMENT.md` | stack e segurança de produção atuais |
