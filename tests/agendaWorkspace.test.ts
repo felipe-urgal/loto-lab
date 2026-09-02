@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 test("agenda workspace follows Prototype 1 while preserving notification safety contracts", async () => {
-  const [html, workspace, agenda] = await Promise.all([
+  const [html, workspace, agendaBoundary, agenda] = await Promise.all([
     readFile("web/agenda.html", "utf8"),
     readFile("web/agenda-workspace.css", "utf8"),
     readFile("web/agenda.js", "utf8"),
+    readFile("web/src/features/agenda.ts", "utf8"),
   ]);
 
   assert.doesNotMatch(html, /\/assets\/agenda\.css/);
@@ -26,11 +27,18 @@ test("agenda workspace follows Prototype 1 while preserving notification safety 
   assert.match(workspace, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
 
-  assert.match(agenda, /fetch\(`\/api\/v1\/agenda\$\{requestFilter === "unread" \? "\?unread=true" : ""\}`/);
+  assert.equal(agendaBoundary.trim(), 'import "./src/features/agenda.js";');
+  assert.match(agenda, /import \{ api \} from "\.\.\/core\/api\.js"/);
+  assert.match(agenda, /import \{ escapeHtml \} from "\.\.\/shared\/escaping\.js"/);
+  assert.match(agenda, /api<AgendaPayload>\(/);
+  assert.match(agenda, /api\(`\/notifications\/\$\{id\}\/read`, \{ method: "POST" \}\)/);
+  assert.match(agenda, /api\("\/notifications\/read-all", \{ method: "POST" \}\)/);
+  assert.doesNotMatch(agenda, /fetch\(/);
   assert.match(agenda, /const url = new URL\(value, location\.origin\)/);
   assert.match(agenda, /if \(url\.origin !== location\.origin\) return undefined/);
-  assert.match(agenda, /fetch\(`\/api\/v1\/notifications\/\$\{id\}\/read`, \{ method: "POST" \}\)/);
-  assert.match(agenda, /fetch\("\/api\/v1\/notifications\/read-all", \{ method: "POST" \}\)/);
+  assert.match(agenda, /data-notification-id="\$\{escapeHtml\(item\.id\)\}"/);
+  assert.match(agenda, /data-read-notification="\$\{escapeHtml\(item\.id\)\}"/);
+  assert.match(agenda, /Number\.isInteger\(id\)/);
   assert.match(agenda, /new AbortController\(\)/);
   assert.match(agenda, /const token = \+\+loadToken/);
   assert.match(agenda, /button\.setAttribute\("aria-pressed", String\(selected\)\)/);
