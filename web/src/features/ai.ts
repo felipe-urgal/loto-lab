@@ -119,7 +119,7 @@ function renderInsight(record: AiInsightRecord, disclaimer: string | undefined):
       <div class="ai-evidence">
         <div class="ai-evidence-item"><span>Referência</span><strong>${latest ? `#${escapeHtml(latest.number)} · ${escapeHtml(latest.date)}` : "Sem concurso"}</strong></div>
         <div class="ai-evidence-item"><span>Teste histórico</span><strong>${backtest ? `#${escapeHtml(backtest.id)}` : "Não disponível"}</strong></div>
-        <div class="ai-evidence-item"><span>Laboratório</span><strong>${lab ? `${lab.variants.length} variantes · ${lab.rankingBasis === "roi" ? "ROI" : "premiação"}` : "Não disponível"}</strong></div>
+        <div class="ai-evidence-item"><span>Laboratório</span><strong>${lab ? `${escapeHtml(lab.variants.length)} variantes · ${lab.rankingBasis === "roi" ? "ROI" : "premiação"}` : "Não disponível"}</strong></div>
         <div class="ai-evidence-item"><span>Resultado real</span><strong>${escapeHtml(real.checkedBets || 0)} conferida(s) · ROI ${formatPercent(real.roi)}</strong></div>
       </div>
       <div class="ai-disclaimer">${escapeHtml(disclaimer || "")}</div>
