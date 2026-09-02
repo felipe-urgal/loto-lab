@@ -21,6 +21,7 @@ test("AI HTTP ownership delegates to an injected application use case", async ()
   assert.match(application, /interface AiEvidenceReader/);
   assert.match(application, /interface AiInsightStore/);
   assert.match(application, /class AiInsightsUseCase/);
+  assert.match(application, /ensureConfigured\(\): void/);
 
   assert.doesNotMatch(controller, /AiInsightService/);
   assert.doesNotMatch(controller, /OpenAiInterpretationProvider/);
@@ -30,6 +31,7 @@ test("AI HTTP ownership delegates to an injected application use case", async ()
   assert.match(controller, /aiInsights\.status\(/);
   assert.match(controller, /aiInsights\.generate\(/);
   assert.match(controller, /aiInsights\.history\(/);
+  assert.match(controller, /aiInsights\.ensureConfigured\(\);[\s\S]*const body = await readJsonBody/);
 
   assert.match(routes, /aiInsights: AiInsightsUseCase/);
   assert.match(routes, /dependencies\.aiInsights/);
