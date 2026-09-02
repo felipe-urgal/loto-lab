@@ -43,6 +43,7 @@ web/
 │   │   └── viewLifecycle.ts
 │   ├── features/
 │   │   ├── agenda.ts
+│   │   ├── ai.ts
 │   │   └── dataStatus.ts
 │   └── shared/
 │       ├── escaping.ts
@@ -53,7 +54,7 @@ web/
 └── módulos/folhas específicos por feature
 ```
 
-`feature-loader.js` carrega módulos específicos sob demanda. `runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; helpers migrados podem viver em `web/src` e ser reexportados sem forçar uma migração big-bang. O contrato de view (`currentMainView`, evento renderizado e subscribe/unsubscribe) vive em `web/src/core/viewLifecycle.ts`; o loader é o produtor do evento e consumidores legados continuam acessando o contrato pelo runtime. O status operacional do Painel foi a primeira feature com implementação canônica em `web/src/features`; a Agenda é a segunda. `web/data-status.js` e `web/agenda.js` permanecem apenas como boundaries de assets compatíveis e importam o JavaScript emitido das respectivas fontes TypeScript.
+`feature-loader.js` carrega módulos específicos sob demanda. `runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; helpers migrados podem viver em `web/src` e ser reexportados sem forçar uma migração big-bang. O contrato de view (`currentMainView`, evento renderizado e subscribe/unsubscribe) vive em `web/src/core/viewLifecycle.ts`; o loader é o produtor do evento e consumidores legados continuam acessando o contrato pelo runtime. O status operacional do Painel foi a primeira feature com implementação canônica em `web/src/features`, seguido por Agenda e IA. `web/data-status.js`, `web/agenda.js` e `web/ai.js` permanecem apenas como boundaries de assets compatíveis e importam o JavaScript emitido das respectivas fontes TypeScript.
 
 O build `npm run web:build` primeiro prepara `web-dist/`, ignora fontes `.ts` como assets brutos e depois usa o `tsc` com `tsconfig.web.json` para emitir JavaScript em `web-dist/assets/src`. O conjunto web continua alimentando o fingerprint SHA-256 usado para reescrever referências de assets com `?v=<hash>`.
 
@@ -101,7 +102,7 @@ O rollout e a consolidação visual estão concluídos pela #121:
 - #142 — explainability visual do Gerador absorvida no workspace;
 - #143 — auditoria final desktop/mobile de legibilidade, foco, reduced-motion e overflow estrutural.
 
-A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. As fatias seguintes moveram client HTTP, contrato de erro, escaping compartilhado e contrato de lifecycle da view para `web/src`; #177 começou a eliminar lifecycle duplicado nas features, #178 deu ownership TypeScript completo ao status de dados e a Agenda agora segue o mesmo padrão consumindo diretamente o client HTTP e o escaping compartilhados. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
+A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. As fatias seguintes moveram client HTTP, contrato de erro, escaping compartilhado e contrato de lifecycle da view para `web/src`; #177 começou a eliminar lifecycle duplicado nas features, #178 deu ownership TypeScript completo ao status de dados, e Agenda e IA seguem o mesmo padrão consumindo diretamente os helpers compartilhados. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
 
 As folhas adicionais que permanecem têm responsabilidade funcional, estrutural ou de fallback explícita; coexistir com um `*-workspace.css` não torna uma camada automaticamente redundante.
 
@@ -195,7 +196,7 @@ Próximos concursos + notificações. `web/src/features/agenda.ts` é a implemen
 
 ### IA — `/ai`
 
-Interpretação de evidências. `ai-workspace.css` é canônico; `ai.css` foi removido.
+Interpretação de evidências. `web/src/features/ai.ts` é a implementação funcional canônica e consome diretamente o client HTTP, escaping e formatters compartilhados; `web/ai.js` permanece somente como boundary de asset compatível. `ai-workspace.css` é canônico; `ai.css` foi removido.
 
 ## Navegação
 
@@ -253,7 +254,7 @@ O browser E2E transversal do #143 repete a auditoria de legibilidade em desktop/
 - o client HTTP compartilhado aceita apenas rotas relativas sob `/api/v1` e rejeita traversal/URLs absolutas antes de chamar `fetch`;
 - o frontend não deve replicar validação crítica como única defesa — invariantes continuam no backend/PostgreSQL.
 
-A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. A fundação TypeScript/formatters veio em #148; API client, errors, escaping e o contrato compartilhado de lifecycle já foram migrados. Status de dados e Agenda já possuem implementação canônica TypeScript; state/lifecycle interno das demais features, primitives e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
+A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. A fundação TypeScript/formatters veio em #148; API client, errors, escaping e o contrato compartilhado de lifecycle já foram migrados. Status de dados, Agenda e IA já possuem implementação canônica TypeScript; state/lifecycle interno das demais features, primitives e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
 
 ## Trabalho pesado
 
