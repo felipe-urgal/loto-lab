@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-09-02**, com #155–#160/#163/#175 já na `main`, composition root HTTP concluído e a modularização TypeScript do frontend avançando em fatias pequenas, incluindo a migração canônica de Meus Jogos.
+> Baseline revisada em **2026-09-02**, com #155–#160/#163/#175 já na `main`, composition root HTTP concluído e a modularização TypeScript do frontend avançando em fatias pequenas, incluindo as migrações canônicas de Meus Jogos e Análises.
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -89,7 +89,7 @@ A diretriz permanece:
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- frontend ainda possui módulos grandes/imperativos; primitives compartilhadas e várias features canônicas — incluindo Status, Agenda, IA, Estratégias, Execuções, Laboratório e Meus Jogos — já estão em TypeScript, mas state/lifecycle e decomposição das demais features seguem ativos na #60;
+- frontend ainda possui módulos grandes/imperativos; primitives compartilhadas e várias features canônicas — incluindo Status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos e Análises — já estão em TypeScript, mas state/lifecycle e decomposição das demais features seguem ativos na #60;
 - hotspots algorítmicos continuam grandes (#62);
 - observabilidade segue baseada principalmente em logs/estado persistido, sem métricas/SLOs (#63);
 - arquitetura de informação pós-redesign ainda pode reduzir troca de contexto (#64);
@@ -135,7 +135,7 @@ A revisão de CLI/scheduler não encontrou motivo para mover engines puros ou li
 
 ## #60 — Frontend TypeScript, módulos e primitives · P1 · em andamento
 
-A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Agenda, IA, Estratégias, Execuções e Laboratório avançaram em fatias próprias; Meus Jogos agora segue o mesmo padrão e também decompõe o antigo módulo funcional único.
+A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos e Análises avançaram em fatias próprias; Meus Jogos e Análises também começaram a explicitar contratos internos em owners menores.
 
 Entregue:
 
@@ -150,13 +150,14 @@ Entregue:
 - `web/src/core/viewLifecycle.ts` como contrato único de view atual, evento renderizado, emissão e subscribe/unsubscribe; `feature-loader.js` consome o mesmo contrato sem redefinir hash/evento;
 - primitive de toast com ownership em `web/src/shared/toast.ts` e consumo direto pelas features migradas;
 - Status, Agenda, IA, Estratégias, Execuções e Laboratório com implementação funcional canônica em `web/src/features` e boundaries JavaScript compatíveis;
-- Meus Jogos com controller canônico em `web/src/features/myGames.ts`, contratos e responsabilidades de UI decompostos em `web/src/features/myGames/`, `web/my-games-v2.js` reduzido a boundary compatível e campos financeiros opcionais tipados sem coerção de ausência para zero.
+- Meus Jogos com controller canônico em `web/src/features/myGames.ts`, contratos e responsabilidades de UI decompostos em `web/src/features/myGames/`, `web/my-games-v2.js` reduzido a boundary compatível e campos financeiros opcionais tipados sem coerção de ausência para zero;
+- Análises 2.0 com implementação funcional canônica em `web/src/features/analysisV2.ts`, DTOs consumidos pela UI em `web/src/features/analysisV2/types.ts`, consumo direto de API/escaping/lifecycle compartilhados e `web/analysis-v2.js` reduzido a boundary compatível.
 
 Próximas fatias:
 
 - expandir `web/src/{core,design-system,features,shared}` conforme ownership real;
 - state/lifecycle internos das features restantes, eliminando duplicações concretas de hash/cleanup;
-- TypeScript por feature restante;
+- TypeScript por feature restante, com foco nos owners legados ainda ativos como `generation-v2.js` e no shell/app quando a separação puder ser feita sem big-bang;
 - decomposição dos módulos grandes ainda ativos;
 - escaping/`textContent` como padrão seguro;
 - primitives reutilizáveis sem framework obrigatório.
