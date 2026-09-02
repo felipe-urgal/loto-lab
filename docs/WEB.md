@@ -47,6 +47,14 @@ web/
 │   │   ├── dataStatus.ts
 │   │   ├── jobs.ts
 │   │   ├── lab.ts
+│   │   ├── myGames.ts
+│   │   ├── myGames/
+│   │   │   ├── betForm.ts
+│   │   │   ├── comparison.ts
+│   │   │   ├── formatting.ts
+│   │   │   ├── presentation.ts
+│   │   │   ├── support.ts
+│   │   │   └── types.ts
 │   │   └── strategies.ts
 │   └── shared/
 │       ├── escaping.ts
@@ -58,7 +66,9 @@ web/
 └── módulos/folhas específicos por feature
 ```
 
-`feature-loader.js` carrega módulos específicos sob demanda. `runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; helpers migrados vivem em `web/src` e podem ser reexportados sem forçar uma migração big-bang. API, escaping, formatters, lifecycle e a primitive de toast já possuem ownership TypeScript; o runtime não redefine essas implementações. O status operacional do Painel foi a primeira feature com implementação canônica em `web/src/features`, seguido por Agenda, IA, Estratégias, Execuções e Laboratório. `web/data-status.js`, `web/agenda.js`, `web/ai.js`, `web/strategies.js`, `web/jobs.js` e `web/lab.js` permanecem apenas como boundaries de assets compatíveis e importam o JavaScript emitido das respectivas fontes TypeScript.
+`feature-loader.js` carrega módulos específicos sob demanda. `runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; helpers migrados vivem em `web/src` e podem ser reexportados sem forçar uma migração big-bang. API, escaping, formatters, lifecycle e a primitive de toast já possuem ownership TypeScript; o runtime não redefine essas implementações. O status operacional do Painel foi a primeira feature com implementação canônica em `web/src/features`, seguido por Agenda, IA, Estratégias, Execuções, Laboratório e agora Meus Jogos. `web/data-status.js`, `web/agenda.js`, `web/ai.js`, `web/strategies.js`, `web/jobs.js`, `web/lab.js` e `web/my-games-v2.js` permanecem apenas como boundaries de assets compatíveis e importam o JavaScript emitido das respectivas fontes TypeScript.
+
+Meus Jogos também inicia a decomposição de uma feature grande durante a migração: state/lifecycle e orquestração ficam em `web/src/features/myGames.ts`, enquanto tipos, apresentação, formulário de aposta, comparação, formatação e guards possuem ownership separado em `web/src/features/myGames/`. O objetivo é reduzir acoplamento e tornar contratos de dados explícitos sem introduzir framework ou mudar a jornada.
 
 O build `npm run web:build` primeiro prepara `web-dist/`, ignora fontes `.ts` como assets brutos e depois usa o `tsc` com `tsconfig.web.json` para emitir JavaScript em `web-dist/assets/src`. O conjunto web continua alimentando o fingerprint SHA-256 usado para reescrever referências de assets com `?v=<hash>`.
 
@@ -106,7 +116,7 @@ O rollout e a consolidação visual estão concluídos pela #121:
 - #142 — explainability visual do Gerador absorvida no workspace;
 - #143 — auditoria final desktop/mobile de legibilidade, foco, reduced-motion e overflow estrutural.
 
-A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. As fatias seguintes moveram client HTTP, contrato de erro, escaping compartilhado, contrato de lifecycle da view e a primitive de toast para `web/src`; #177 começou a eliminar lifecycle duplicado nas features, #178 deu ownership TypeScript completo ao status de dados, e Agenda, IA, Estratégias, Execuções e Laboratório seguem o mesmo padrão consumindo diretamente os helpers compartilhados. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
+A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. As fatias seguintes moveram client HTTP, contrato de erro, escaping compartilhado, contrato de lifecycle da view e a primitive de toast para `web/src`; #177 começou a eliminar lifecycle duplicado nas features, #178 deu ownership TypeScript completo ao status de dados, e Agenda, IA, Estratégias, Execuções, Laboratório e Meus Jogos seguem o mesmo padrão consumindo diretamente os helpers compartilhados. Em Meus Jogos a migração também decompõe o antigo módulo funcional único em owners menores. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
 
 As folhas adicionais que permanecem têm responsabilidade funcional, estrutural ou de fallback explícita; coexistir com um `*-workspace.css` não torna uma camada automaticamente redundante.
 
@@ -176,6 +186,8 @@ Consolida:
 - financeiro;
 - ocultar/mostrar sem apagar histórico.
 
+`web/src/features/myGames.ts` é o controller funcional canônico e consome diretamente API, lifecycle compartilhado, escaping e toast. A implementação é decomposta em `web/src/features/myGames/` para separar contratos, apresentação, formulário de aposta e comparação; `web/my-games-v2.js` é somente o boundary de asset compatível. O formatter financeiro da feature preserva `null`/ausente como `—`, sem transformar desconhecido em zero.
+
 `my-games-v2.css` permanece como base funcional do módulo principal e `my-games-workspace.css` como apresentação final. `real-bets`/`my-games-management` permanecem apenas no fallback deliberado quando o módulo principal não monta.
 
 ### Testes históricos — `/#backtests`
@@ -233,7 +245,7 @@ Guardrails:
 - `loto-lab:view-rendered` só é emitido depois que o render principal deixa o loading, reduzindo FOUC/layout shift e races de montagem;
 - nome do evento, payload, leitura da view atual e subscribe/unsubscribe são centralizados em `web/src/core/viewLifecycle.ts`; `feature-loader.js` não redefine esse contrato.
 
-O contrato compartilhado de lifecycle já está em TypeScript. O status de dados é a primeira feature a consumir esse core diretamente a partir de `web/src/features`, sem parsing próprio da hash nem listener `hashchange` local. A #60 ainda deve migrar state/lifecycle internos das demais features em fatias pequenas, eliminando duplicações quando houver ganho real de ownership; mover código de pasta sem reduzir ownership ou duplicação não é objetivo.
+O contrato compartilhado de lifecycle já está em TypeScript. Status de dados e as features migradas, incluindo Meus Jogos, consomem esse core diretamente a partir de `web/src/features`. A #60 ainda deve migrar state/lifecycle internos das demais features em fatias pequenas, eliminando duplicações quando houver ganho real de ownership; mover código de pasta sem reduzir ownership ou duplicação não é objetivo.
 
 ## Acessibilidade
 
@@ -259,7 +271,7 @@ O browser E2E transversal do #143 repete a auditoria de legibilidade em desktop/
 - mensagens do toast compartilhado usam `textContent`, nunca `innerHTML`;
 - o frontend não deve replicar validação crítica como única defesa — invariantes continuam no backend/PostgreSQL.
 
-A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. A fundação TypeScript/formatters veio em #148; API client, errors, escaping, toast e o contrato compartilhado de lifecycle já foram migrados. Status de dados, Agenda, IA, Estratégias, Execuções e Laboratório já possuem implementação canônica TypeScript; state/lifecycle interno das demais features, novas primitives justificadas e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
+A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. A fundação TypeScript/formatters veio em #148; API client, errors, escaping, toast e o contrato compartilhado de lifecycle já foram migrados. Status de dados, Agenda, IA, Estratégias, Execuções, Laboratório e Meus Jogos já possuem implementação canônica TypeScript; state/lifecycle interno das demais features, novas primitives justificadas e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
 
 ## Trabalho pesado
 

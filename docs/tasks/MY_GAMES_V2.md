@@ -26,13 +26,17 @@ Transformar **Meus Jogos** em uma tela de gestão com hierarquia progressiva: a 
 
 Principais owners:
 
-- `web/my-games-v2.js` — lifecycle, filtros, busca, expansão, aposta real, resultado e comparação;
+- `web/src/features/myGames.ts` — state/lifecycle e orquestração canônica em TypeScript;
+- `web/src/features/myGames/` — tipos, apresentação, formulário de aposta, comparação, formatação e guards;
+- `web/my-games-v2.js` — boundary compatível que importa o JavaScript emitido;
 - `web/my-games-v2.css` — estrutura funcional;
 - `web/my-games-workspace.css` — apresentação final do Protótipo 1;
 - `web/real-bet-auditability.js` — guardrails de concurso alvo no browser;
 - `src/api/gameBatchManagement.ts` — endpoints de gestão/lifecycle;
 - `src/application/realBets.ts` + `src/realBets/service.ts` — regras de aposta real;
 - repositories PostgreSQL — persistência dos lotes e apostas.
+
+A migração arquitetural posterior à tarefa visual preserva o contrato histórico: o fluxo principal agora consome diretamente API/lifecycle/escaping/toast compartilhados e mantém valores financeiros desconhecidos como ausentes em vez de fabricar zero.
 
 ## Validação consolidada
 
