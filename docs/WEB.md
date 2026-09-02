@@ -39,7 +39,8 @@ web/
 ├── app.js
 ├── src/
 │   ├── core/
-│   │   └── api.ts
+│   │   ├── api.ts
+│   │   └── viewLifecycle.ts
 │   └── shared/
 │       ├── escaping.ts
 │       └── formatters.ts
@@ -49,7 +50,7 @@ web/
 └── módulos/folhas específicos por feature
 ```
 
-`feature-loader.js` carrega módulos específicos sob demanda. `runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; helpers migrados podem viver em `web/src` e ser reexportados sem forçar uma migração big-bang.
+`feature-loader.js` carrega módulos específicos sob demanda. `runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; helpers migrados podem viver em `web/src` e ser reexportados sem forçar uma migração big-bang. O contrato de view (`currentMainView`, evento renderizado e subscribe/unsubscribe) vive em `web/src/core/viewLifecycle.ts`; o loader é o produtor do evento e consumidores legados continuam acessando o contrato pelo runtime.
 
 O build `npm run web:build` primeiro prepara `web-dist/`, ignora fontes `.ts` como assets brutos e depois usa o `tsc` com `tsconfig.web.json` para emitir JavaScript em `web-dist/assets/src`. O conjunto web continua alimentando o fingerprint SHA-256 usado para reescrever referências de assets com `?v=<hash>`.
 
@@ -97,7 +98,7 @@ O rollout e a consolidação visual estão concluídos pela #121:
 - #142 — explainability visual do Gerador absorvida no workspace;
 - #143 — auditoria final desktop/mobile de legibilidade, foco, reduced-motion e overflow estrutural.
 
-A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. A fatia atual também move o client HTTP, o contrato de erro da API e o escaping compartilhado para `web/src`, mantendo `runtime.js` como boundary de compatibilidade. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
+A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. As fatias seguintes moveram client HTTP, contrato de erro, escaping compartilhado e agora o contrato de lifecycle da view para `web/src`, mantendo `runtime.js` como boundary de compatibilidade. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
 
 As folhas adicionais que permanecem têm responsabilidade funcional, estrutural ou de fallback explícita; coexistir com um `*-workspace.css` não torna uma camada automaticamente redundante.
 
@@ -221,9 +222,10 @@ Guardrails:
 - cada feature precisa ser idempotente e tolerar navegação repetida;
 - listeners/observers/timers precisam de cleanup quando a feature deixa de ser dona da view;
 - não usar montagem eager redundante quando o lifecycle já fornece evento de montagem;
-- `loto-lab:view-rendered` só é emitido depois que o render principal deixa o loading, reduzindo FOUC/layout shift e races de montagem.
+- `loto-lab:view-rendered` só é emitido depois que o render principal deixa o loading, reduzindo FOUC/layout shift e races de montagem;
+- nome do evento, payload, leitura da view atual e subscribe/unsubscribe são centralizados em `web/src/core/viewLifecycle.ts`; `feature-loader.js` não redefine esse contrato.
 
-A #60 deve migrar lifecycle/state em fatias pequenas preservando esse contrato; mover código de pasta sem reduzir ownership ou duplicação não é objetivo.
+O contrato compartilhado de lifecycle já está em TypeScript. A #60 ainda deve migrar lifecycle/state internos das features em fatias pequenas, eliminando leituras/cleanup duplicados quando houver ganho real de ownership; mover código de pasta sem reduzir ownership ou duplicação não é objetivo.
 
 ## Acessibilidade
 
@@ -248,7 +250,7 @@ O browser E2E transversal do #143 repete a auditoria de legibilidade em desktop/
 - o client HTTP compartilhado aceita apenas rotas relativas sob `/api/v1` e rejeita traversal/URLs absolutas antes de chamar `fetch`;
 - o frontend não deve replicar validação crítica como única defesa — invariantes continuam no backend/PostgreSQL.
 
-A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. A fundação TypeScript/formatters veio em #148; API client, errors e escaping compartilhado já foram migrados. Lifecycle/state, primitives e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
+A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. A fundação TypeScript/formatters veio em #148; API client, errors, escaping e o contrato compartilhado de lifecycle já foram migrados. State/lifecycle interno por feature, primitives e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
 
 ## Trabalho pesado
 

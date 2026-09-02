@@ -1,4 +1,11 @@
 export { ApiError, API, api } from "./src/core/api.js";
+export {
+  VIEW_RENDERED_EVENT,
+  currentMainView,
+  emitViewRendered,
+  mainViewFromHash,
+  onViewRendered,
+} from "./src/core/viewLifecycle.js";
 export { escapeHtml } from "./src/shared/escaping.js";
 export {
   formatCurrency,
@@ -14,14 +21,4 @@ export function toast(message, type = "info") {
   item.textContent = String(message ?? "");
   root.append(item);
   window.setTimeout(() => item.remove(), 3600);
-}
-
-export function currentMainView() {
-  return location.hash.replace("#", "") || "dashboard";
-}
-
-export function onViewRendered(callback) {
-  const listener = (event) => callback(event.detail || {});
-  window.addEventListener("loto-lab:view-rendered", listener);
-  return () => window.removeEventListener("loto-lab:view-rendered", listener);
 }

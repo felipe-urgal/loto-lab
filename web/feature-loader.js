@@ -1,3 +1,5 @@
+import { currentMainView, emitViewRendered } from "./runtime.js";
+
 const build = document.documentElement.dataset.build || "";
 const moduleLoads = new Map();
 const styleLoads = new Map();
@@ -52,7 +54,7 @@ async function loadStyledModule(name) {
 }
 
 async function ensureViewFeatures() {
-  const view = location.hash.replace("#", "") || "dashboard";
+  const view = currentMainView();
   if (view === "dashboard") {
     // Dashboard scope owns the final presentation, including operational status.
     // Load the scope first so the status module mounts against its canonical CSS.
@@ -119,16 +121,14 @@ function isMainRenderPending() {
 
 async function emitWhenRendered() {
   const token = ++lifecycleToken;
-  const view = location.hash.replace("#", "") || "dashboard";
+  const view = currentMainView();
   const lottery = document.querySelector("#lottery-select")?.value || "mega-sena";
   await ensureViewFeatures();
 
   for (let frame = 0; frame < 120; frame += 1) {
     if (token !== lifecycleToken) return;
     if (!isMainRenderPending()) {
-      window.dispatchEvent(new CustomEvent("loto-lab:view-rendered", {
-        detail: { view, lottery, token },
-      }));
+      emitViewRendered({ view, lottery, token });
       return;
     }
     await new Promise((resolve) => requestAnimationFrame(resolve));
