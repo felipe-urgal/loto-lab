@@ -14,6 +14,12 @@ export function currentMainView(): string {
   return mainViewFromHash(window.location.hash);
 }
 
+export function onMainViewChanged(callback: (view: string) => void): () => void {
+  const listener = () => callback(currentMainView());
+  window.addEventListener("hashchange", listener);
+  return () => window.removeEventListener("hashchange", listener);
+}
+
 export function onViewRendered(callback: (detail: ViewRenderedDetail) => void): () => void {
   const listener = (event: Event) => {
     const detail = event instanceof CustomEvent ? event.detail : undefined;
