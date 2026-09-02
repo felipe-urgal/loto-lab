@@ -28,12 +28,13 @@ test("agenda workspace follows Prototype 1 while preserving notification safety 
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
 
   assert.equal(agendaBoundary.trim(), 'import "./src/features/agenda.js";');
-  assert.match(agenda, /import \{ api \} from "\.\.\/core\/api\.js"/);
+  assert.match(agenda, /import \{ ApiError, api \} from "\.\.\/core\/api\.js"/);
   assert.match(agenda, /import \{ escapeHtml \} from "\.\.\/shared\/escaping\.js"/);
   assert.match(agenda, /api<AgendaPayload>\(/);
   assert.match(agenda, /api\(`\/notifications\/\$\{id\}\/read`, \{ method: "POST" \}\)/);
   assert.match(agenda, /api\("\/notifications\/read-all", \{ method: "POST" \}\)/);
   assert.doesNotMatch(agenda, /fetch\(/);
+  assert.match(agenda, /if \(error instanceof ApiError\) return `HTTP \$\{error\.status\}`/);
   assert.match(agenda, /const url = new URL\(value, location\.origin\)/);
   assert.match(agenda, /if \(url\.origin !== location\.origin\) return undefined/);
   assert.match(agenda, /data-notification-id="\$\{escapeHtml\(item\.id\)\}"/);
