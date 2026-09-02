@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-09-02**, com #155–#160/#163/#175 já na `main`, composition root HTTP concluído e a modularização TypeScript do frontend avançando em fatias pequenas, incluindo as migrações canônicas de Meus Jogos e Análises.
+> Baseline revisada em **2026-09-02**, com #155–#160/#163/#175 já na `main`, composition root HTTP concluído e a modularização TypeScript do frontend avançando em fatias pequenas, incluindo as migrações canônicas de Meus Jogos, Análises e Gerador.
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -89,7 +89,7 @@ A diretriz permanece:
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- frontend ainda possui módulos grandes/imperativos; primitives compartilhadas e várias features canônicas — incluindo Status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos e Análises — já estão em TypeScript, mas state/lifecycle e decomposição das demais features seguem ativos na #60;
+- frontend ainda possui módulos grandes/imperativos; primitives compartilhadas e várias features canônicas — incluindo Status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises e Gerador — já estão em TypeScript, mas state/lifecycle e decomposição do shell/app e de superfícies legadas restantes seguem ativos na #60;
 - hotspots algorítmicos continuam grandes (#62);
 - observabilidade segue baseada principalmente em logs/estado persistido, sem métricas/SLOs (#63);
 - arquitetura de informação pós-redesign ainda pode reduzir troca de contexto (#64);
@@ -135,7 +135,7 @@ A revisão de CLI/scheduler não encontrou motivo para mover engines puros ou li
 
 ## #60 — Frontend TypeScript, módulos e primitives · P1 · em andamento
 
-A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos e Análises avançaram em fatias próprias; Meus Jogos e Análises também começaram a explicitar contratos internos em owners menores.
+A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises e Gerador avançaram em fatias próprias; Meus Jogos, Análises e Gerador também explicitam contratos internos consumidos pela UI em owners menores.
 
 Entregue:
 
@@ -151,13 +151,14 @@ Entregue:
 - primitive de toast com ownership em `web/src/shared/toast.ts` e consumo direto pelas features migradas;
 - Status, Agenda, IA, Estratégias, Execuções e Laboratório com implementação funcional canônica em `web/src/features` e boundaries JavaScript compatíveis;
 - Meus Jogos com controller canônico em `web/src/features/myGames.ts`, contratos e responsabilidades de UI decompostos em `web/src/features/myGames/`, `web/my-games-v2.js` reduzido a boundary compatível e campos financeiros opcionais tipados sem coerção de ausência para zero;
-- Análises 2.0 com implementação funcional canônica em `web/src/features/analysisV2.ts`, DTOs consumidos pela UI em `web/src/features/analysisV2/types.ts`, consumo direto de API/escaping/lifecycle compartilhados e `web/analysis-v2.js` reduzido a boundary compatível.
+- Análises 2.0 com implementação funcional canônica em `web/src/features/analysisV2.ts`, DTOs consumidos pela UI em `web/src/features/analysisV2/types.ts`, consumo direto de API/escaping/lifecycle compartilhados e `web/analysis-v2.js` reduzido a boundary compatível;
+- Generator 2.0 com implementação funcional canônica em `web/src/features/generationV2.ts`, contratos de plano/auditoria/preview/save/estado em `web/src/features/generationV2/types.ts`, consumo direto de API/escaping/lifecycle compartilhados e `web/generation-v2.js` reduzido a boundary compatível.
 
 Próximas fatias:
 
 - expandir `web/src/{core,design-system,features,shared}` conforme ownership real;
-- state/lifecycle internos das features restantes, eliminando duplicações concretas de hash/cleanup;
-- TypeScript por feature restante, com foco nos owners legados ainda ativos como `generation-v2.js` e no shell/app quando a separação puder ser feita sem big-bang;
+- state/lifecycle internos das superfícies legadas restantes, eliminando duplicações concretas de hash/cleanup;
+- avançar o shell/app em fatias pequenas quando a separação puder ser feita sem big-bang;
 - decomposição dos módulos grandes ainda ativos;
 - escaping/`textContent` como padrão seguro;
 - primitives reutilizáveis sem framework obrigatório.
@@ -258,81 +259,3 @@ Um refactor está pronto quando mantém comportamento salvo mudança explicitame
 - ownership;
 - estado explícito;
 - risco operacional.
-
-Mover arquivos sem ganho verificável não é considerado progresso arquitetural.
-
-### Gate mínimo
-
-Backend:
-
-- typecheck/static gates;
-- testes + cobertura;
-- PostgreSQL integration quando aplicável;
-- Compose/imagem/smoke;
-- E2E se a superfície pública mudar.
-
-Frontend:
-
-- typecheck/lint da área TypeScript migrada;
-- desktop e mobile;
-- teclado/foco;
-- loading/empty/error/success;
-- reduced-motion quando houver animação;
-- browser E2E crítico.
-
-Todos os PRs continuam exigindo **auto code review final no SHA verde** antes do squash merge. Agentes de IA devem seguir também o contrato operacional de [`AGENTS.md`](../AGENTS.md).
-
----
-
-# Auditoria integral da documentação · 2026-09-01
-
-Todos os **28 arquivos Markdown** versionados no branch do PR #163 foram revisados contra o estado atual do código, as 8 issues abertas e a `main` em `382f2a1`.
-
-A auditoria confirmou que a maior parte do corpus já estava correta. Foram necessárias três correções materiais nesta rodada:
-
-1. `docs/ROADMAP.md` — substitui a revisão pontual por esta auditoria integral, revalida #52 e reconcilia dependências/status de #60–#66;
-2. `docs/REAL_BETS.md` — remove a dívida falsa sobre o fallback financeiro, corrigida em #147;
-3. `docs/tasks/SENIOR_REVIEW_FINANCIAL_INTEGRITY.md` — registra o follow-up financeiro como absorvido e deixa de usar um review histórico concluído como backlog.
-
-Os demais documentos foram lidos e mantidos sem churn porque continuam descrevendo corretamente contratos presentes.
-
-| Documento | Resultado da auditoria |
-| --- | --- |
-| `AGENTS.md` | contrato de engenharia, PR, CI e auto-review permanece atual |
-| `README.md` | estado, arquitetura, rollout e fundação TypeScript permanecem atuais |
-| `docs/AGENDA.md` | contrato e application layer atuais de agenda/notificações |
-| `docs/AI.md` | contexto, application layer, provider, persistência e limites metodológicos atuais |
-| `docs/ANALYSES.md` | contrato estatístico/anti-leakage atual |
-| `docs/API.md` | application layer e composition root HTTP completos atuais |
-| `docs/DATABASE.md` | migrations, tabelas, repositories e invariantes atuais |
-| `docs/DATA_OPERATIONS.md` | bootstrap/sync atuais |
-| `docs/DEPLOYMENT.md` | stack e segurança de produção atuais |
-| `docs/FINANCIALS.md` | ROI histórico/real e distinção `desconhecido != zero` atuais |
-| `docs/GENERATION.md` | score-v2, portfólio e geração atuais |
-| `docs/LOTOFACIL_READINESS.md` | checklist operacional atual |
-| `docs/MENTAL_MODEL.md` | arquitetura backend/frontend e North Star atuais |
-| `docs/METHODOLOGY.md` | score-v2, validação e Lab atuais |
-| `docs/MY_GAMES.md` | My Games 2.0, lifecycle, conferência e comparação atuais |
-| `docs/OPERATIONS.md` | reparo financeiro, agenda, notificações e status `partial` atuais |
-| `docs/PERFORMANCE.md` | lazy loading, workers, PostgreSQL e política evidence-based atuais |
-| `docs/PLATFORM.md` | Node 24.19.0 / TypeScript 7.x atuais |
-| `docs/PRODUCTION-CONTRACT.md` | contrato `prod:*` atual |
-| `docs/QUALITY.md` | gates CI/Security atuais |
-| `docs/REAL_BETS.md` | corrigido: fallback também preserva `desconhecido != zero` desde #147 |
-| `docs/RELIABILITY.md` | hardening e invariantes atuais |
-| `docs/ROADMAP.md` | corrigido: auditoria integral, backlog e dependências reconciliados |
-| `docs/STRATEGY_LAB.md` | contrato v2 e inferência atuais |
-| `docs/WEB.md` | rollout concluído e migração TypeScript incremental atuais |
-| `docs/design/PROTOTYPE_1_DARK_MODERN.md` | direção visual consolidada; #121 concluída |
-| `docs/tasks/MY_GAMES_V2.md` | registro histórico concluído, sem backlog oculto |
-| `docs/tasks/SENIOR_REVIEW_FINANCIAL_INTEGRITY.md` | corrigido: review concluído e follow-up financeiro absorvido por #147 |
-
-## Gestão futura
-
-- `AGENTS.md` define como agentes de IA devem trabalhar e revisar;
-- README explica como usar/operar e aponta para documentos específicos;
-- ROADMAP contém apenas prioridade/estado/dependência atuais;
-- docs técnicos descrevem contratos presentes, não “milestones” antigos;
-- `docs/tasks/` pode preservar decisões históricas, mas deve marcar explicitamente quando a tarefa estiver concluída;
-- issues concluídas não permanecem abertas como documentação paralela;
-- novos detalhes de execução entram nas issues/PRs, não como listas duplicadas no README.
