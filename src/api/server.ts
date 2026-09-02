@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import { createApiRequestHandler, type ApiServerOptions } from "./app.js";
 import { runAdvancedAnalysisInWorker } from "../analysis/advancedWorkerClient.js";
 import type { AiInterpretationProvider } from "../ai/types.js";
+import { AgendaUseCase } from "../application/agenda.js";
 import { AnalyzeAdvancedLotteryUseCase } from "../application/analyzeAdvancedLottery.js";
 import { AnalyzeLotteryUseCase } from "../application/analyzeLottery.js";
 import { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
@@ -23,14 +24,17 @@ import { RunStrategyLabUseCase } from "../application/runStrategyLab.js";
 import { StrategyCatalogUseCase } from "../application/strategyCatalog.js";
 import type { ContestSource } from "../data/source.js";
 import { runGenerationPlanInWorker } from "../generator/planningWorkerClient.js";
+import { NotificationService } from "../notifications/service.js";
 import { logEvent } from "../observability/log.js";
 import {
   OperationAlreadyRunningError as LegacyOperationAlreadyRunningError,
   runOperationalSync,
 } from "../operations/sync.js";
+import { PostgresAgendaRepository } from "../persistence/agendaRepository.js";
 import { PostgresBacktestRepository } from "../persistence/backtestRepository.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import { PostgresGameRepository } from "../persistence/gameRepository.js";
+import { PostgresNotificationRepository } from "../persistence/notificationRepository.js";
 import { PostgresOperationRepository } from "../persistence/operationRepository.js";
 import { PostgresRealBetRepository } from "../persistence/realBetRepository.js";
 import { PostgresStrategyRepository } from "../persistence/strategyRepository.js";
@@ -57,7 +61,14 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const contests = new PostgresContestRepository(options.pool);
   const games = new PostgresGameRepository(options.pool);
   const backtests = new PostgresBacktestRepository(options.pool);
+  const agendaRepository = new PostgresAgendaRepository(options.pool);
+  const notificationRepository = new PostgresNotificationRepository(options.pool);
   const featureRouteDependencies = {
+    agenda: new AgendaUseCase(
+      agendaRepository,
+      notificationRepository,
+      new NotificationService(options.pool),
+    ),
     analyzeAdvancedLottery: new AnalyzeAdvancedLotteryUseCase(
       contests,
       runAdvancedAnalysisInWorker,
