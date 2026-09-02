@@ -72,8 +72,8 @@ function signed(value: unknown, suffix = ""): string {
 
 function formatDate(value?: string | null): string {
   if (!value) return "—";
-  const [, month, day] = String(value).slice(0, 10).split("-");
-  return `${day}/${month}/${String(value).slice(0, 4)}`;
+  const [year, month, day] = String(value).slice(0, 10).split("-");
+  return `${day}/${month}/${year}`;
 }
 
 function evidenceCopy(level: string): string {
@@ -449,7 +449,8 @@ function bindTabInteractions(): void {
   root.querySelector("[data-a2-compare]")?.addEventListener("click", compareNumbers);
   root.querySelector("[data-a2-pair-check]")?.addEventListener("click", pairCheck);
   root.querySelector<HTMLSelectElement>("[data-a2-validation-window]")?.addEventListener("change", (event) => {
-    const select = event.currentTarget;
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
     const period = currentData?.advanced.validation.periods.find((candidate) => candidate.window === Number(select.value));
     const target = root.querySelector<HTMLElement>("[data-a2-validation-cards]");
     if (period && target) target.innerHTML = validationCards(period);
