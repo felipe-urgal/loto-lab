@@ -74,8 +74,10 @@ test("AI workspace and provider status are served without exposing credentials",
   assert.match(typedSource, /token !== insightRequestToken \|\| lotterySelect\.value !== requestedLottery/);
   assert.match(typedSource, /insightRequestToken \+= 1/);
   assert.match(typedSource, /<span>Teste histórico<\/span>/);
-  assert.match(typedSource, /o registro #\$\{record\.id\} foi reutilizado sem nova chamada ao provedor/);
-  assert.match(typedSource, /Registro #\$\{record\.id\} criado sem alterar qualquer cálculo ou jogo/);
+  assert.match(typedSource, /data-insight-id="\$\{escapeHtml\(item\.id\)\}"/);
+  assert.match(typedSource, /o registro #\$\{escapeHtml\(record\.id\)\} foi reutilizado sem nova chamada ao provedor/);
+  assert.match(typedSource, /Registro #\$\{escapeHtml\(record\.id\)\} criado sem alterar qualquer cálculo ou jogo/);
+  assert.doesNotMatch(typedSource, /data-insight-id="\$\{item\.id\}"/);
   assert.doesNotMatch(typedSource, /<span>Backtest<\/span>/);
   assert.doesNotMatch(typedSource, /o snapshot #\$\{record\.id\}/);
   assert.doesNotMatch(typedSource, /nova chamada ao provider/);
