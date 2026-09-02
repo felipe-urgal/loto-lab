@@ -10,9 +10,11 @@ O princípio da tela é separar claramente três coisas que não devem ser confu
 
 ## Ownership atual da interface
 
-A experiência principal é implementada por `web/my-games-v2.js` e `web/my-games-v2.css`, com a apresentação final do Protótipo 1 em `web/my-games-workspace.css`.
+A experiência principal tem implementação canônica em TypeScript. `web/src/features/myGames.ts` concentra state/lifecycle e orquestração; os contratos, apresentação, formulário de aposta e comparação ficam decompostos em `web/src/features/myGames/`. `web/my-games-v2.js` permanece apenas como boundary compatível que importa o JavaScript emitido. A base funcional continua em `web/my-games-v2.css` e a apresentação final do Protótipo 1 em `web/my-games-workspace.css`.
 
-A tela carrega os lotes e apostas reais em paralelo e mantém o estado de filtro, busca e lote expandido no próprio módulo.
+O controller consome diretamente o client HTTP, o lifecycle compartilhado, escaping e toast de `web/src`, sem depender de `web/runtime.js`. A tela carrega os lotes e apostas reais em paralelo e mantém o estado de filtro, busca e lote expandido no próprio controller tipado.
+
+Os campos financeiros opcionais são representados explicitamente como ausentes/`null`: custo, prêmio ou resultado desconhecido não são convertidos em zero para apresentação. A comparação também escapa texto derivado da API antes de inseri-lo em markup dinâmico.
 
 Se o módulo 2.0 não puder carregar, o `feature-loader` ainda possui um fallback funcional para as camadas anteriores. O contrato de produto, porém, é o fluxo 2.0 descrito neste documento.
 
