@@ -1,10 +1,10 @@
 import type { Contest, LotteryId } from "../domain/types.js";
-import type { StrategyLabExperiment } from "../lab/strategyLab.js";
 import { MAX_BACKTEST_ROUNDS } from "./runBacktest.js";
+import { validateStrategyLabExecution } from "./runStrategyLab.js";
 import {
-  validateStrategyLabExecution,
-  type StrategyLabRunRequest,
-} from "./runStrategyLab.js";
+  parseStrategyLabOptions,
+  StrategyLabInputError,
+} from "./strategyLabInput.js";
 
 export type AnalysisJobKind = "backtest" | "strategy-lab";
 export type AnalysisJobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
@@ -150,58 +150,18 @@ function validateRange(startContest: number | undefined, endContest: number | un
   }
 }
 
-function parseStrategyLabExperiment(raw: unknown): StrategyLabExperiment {
-  if (raw === undefined || raw === null || raw === "") return "fixed-core";
-  if (raw === "fixed-core" || raw === "external-rules" || raw === "score-model") return raw;
-  throw new AnalysisJobInputError("experiment must be fixed-core, external-rules or score-model");
-}
-
-function parseStrategyLabInput(values: Record<string, unknown>, lottery: LotteryId): StrategyLabRunRequest {
-  const experiment = parseStrategyLabExperiment(values.experiment);
-  if (experiment === "external-rules" && lottery !== "mega-sena") {
-    throw new AnalysisJobInputError("external-rules experiment is available only for Mega-Sena");
+function parseQueuedStrategyLabOptions(
+  values: Record<string, unknown>,
+  lottery: LotteryId,
+) {
+  try {
+    return parseStrategyLabOptions(values, lottery);
+  } catch (error) {
+    if (error instanceof StrategyLabInputError) {
+      throw new AnalysisJobInputError(error.message);
+    }
+    throw error;
   }
-
-  const gameCount = parsePositiveInt(values.gameCount, "gameCount", {
-    min: 1,
-    max: 10,
-    defaultValue: lottery === "mega-sena" ? 2 : 4,
-  });
-  const warmupContests = parsePositiveInt(values.warmupContests, "warmupContests", {
-    min: 1,
-    max: 500,
-    defaultValue: 20,
-  });
-  const lookbackContests = parsePositiveInt(values.lookbackContests, "lookbackContests", {
-    min: 10,
-    max: 500,
-    defaultValue: 200,
-  });
-  const bucketSize = parsePositiveInt(values.bucketSize, "bucketSize", {
-    min: 5,
-    max: 100,
-    defaultValue: 25,
-  });
-  const randomSamples = parsePositiveInt(values.randomSamples, "randomSamples", {
-    min: 10,
-    max: 500,
-    defaultValue: experiment === "external-rules" ? 250 : 100,
-  });
-  const startContest = parseOptionalPositiveInt(values.startContest, "startContest");
-  const endContest = parseOptionalPositiveInt(values.endContest, "endContest");
-  validateRange(startContest, endContest);
-
-  return {
-    lottery,
-    experiment,
-    gameCount,
-    warmupContests,
-    lookbackContests,
-    bucketSize,
-    randomSamples,
-    ...(startContest !== undefined ? { startContest } : {}),
-    ...(endContest !== undefined ? { endContest } : {}),
-  };
 }
 
 export class AnalysisJobsUseCase {
@@ -308,7 +268,7 @@ export class AnalysisJobsUseCase {
     lottery: LotteryId,
     strategy: { version?: AnalysisJobStrategyVersion },
   ): Promise<Record<string, unknown>> {
-    const labInput = parseStrategyLabInput({ ...config, ...values }, lottery);
+    const labInput = parseQueuedStrategyLabOptions({ ...config, ...values }, lottery);
     const contests = await this.history.list({ lottery, order: "asc" });
     const budget = validateStrategyLabExecution(contests, labInput);
 
