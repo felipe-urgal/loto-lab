@@ -60,6 +60,11 @@ function requiredElement<T extends Element>(selector: string): T {
   return element;
 }
 
+function requirePayload<T>(value: T | null): T {
+  if (value === null) throw new Error("Resposta vazia da API.");
+  return value;
+}
+
 const lotterySelect = requiredElement<HTMLSelectElement>("#ai-lottery");
 const focusSelect = requiredElement<HTMLSelectElement>("#ai-focus");
 const forceInput = document.querySelector<HTMLInputElement>("#ai-force");
@@ -129,7 +134,7 @@ function setApiStatusCopy(copy: string): void {
 
 async function loadStatus(): Promise<void> {
   try {
-    status = await api<AiStatus>("/ai/status");
+    status = requirePayload(await api<AiStatus>("/ai/status"));
     apiStatus.className = "status-row is-ok";
     setApiStatusCopy(status.configured ? "IA configurada" : "IA não configurada");
     if (status.configured) {
@@ -184,7 +189,9 @@ async function loadHistory(): Promise<void> {
   historyRoot.innerHTML =
     '<div class="loading-state"><span class="spinner"></span><span>Carregando histórico...</span></div>';
   try {
-    const data = await api<AiHistoryResponse>(`/ai/insights/${requestedLottery}?limit=10`);
+    const data = requirePayload(
+      await api<AiHistoryResponse>(`/ai/insights/${requestedLottery}?limit=10`),
+    );
     if (token !== historyLoadToken || lotterySelect.value !== requestedLottery) return;
     historyItems = data.items || [];
     renderHistory();
@@ -206,14 +213,16 @@ form.addEventListener("submit", async (event) => {
   message.innerHTML =
     '<div class="loading-state"><span class="spinner"></span><span>Interpretando evidências calculadas...</span></div>';
   try {
-    const record = await api<AiInsightRecord>("/ai/insights", {
-      method: "POST",
-      body: JSON.stringify({
-        lottery: requestedLottery,
-        focus: focusSelect.value,
-        force: Boolean(forceInput?.checked),
+    const record = requirePayload(
+      await api<AiInsightRecord>("/ai/insights", {
+        method: "POST",
+        body: JSON.stringify({
+          lottery: requestedLottery,
+          focus: focusSelect.value,
+          force: Boolean(forceInput?.checked),
+        }),
       }),
-    });
+    );
     if (token !== insightRequestToken || lotterySelect.value !== requestedLottery) return;
     renderInsight(record, record.disclaimer);
     message.className = "panel ai-message";
