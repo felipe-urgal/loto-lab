@@ -180,6 +180,10 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Erro desconhecido";
 }
 
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
 function isLotteryId(value: string | null): value is LotteryId {
   return value !== null && Object.hasOwn(lotteries, value);
 }
@@ -351,14 +355,14 @@ function renderHistoryStatus(): void {
     return;
   }
 
-  const contestCount = Number(item.contestCount);
-  const missingContestCount = Number(item.missingContestCount);
-  const complete = missingContestCount === 0 && contestCount >= 30;
+  const contestCount = finiteNumber(item.contestCount);
+  const missingContestCount = finiteNumber(item.missingContestCount);
+  const complete = missingContestCount === 0 && (contestCount ?? 0) >= 30;
   historyStatus.className = `lab-history-status ${complete ? "is-ok" : "is-warning"}`;
   const strong = document.createElement("strong");
-  strong.textContent = `${Number.isFinite(contestCount) ? contestCount.toLocaleString("pt-BR") : "—"} concursos`;
+  strong.textContent = `${contestCount === undefined ? "—" : contestCount.toLocaleString("pt-BR")} concursos`;
   const detail = document.createTextNode(
-    `${Number.isFinite(missingContestCount) ? missingContestCount : "—"} lacuna(s) · ${formatPercent(Number(item.financialCoverage))} com rateio`,
+    `${missingContestCount === undefined ? "—" : missingContestCount} lacuna(s) · ${formatPercent(item.financialCoverage)} com rateio`,
   );
   historyStatus.replaceChildren(strong, document.createElement("br"), detail);
 }
