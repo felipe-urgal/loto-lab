@@ -2,6 +2,24 @@
 
 A Agenda consolida próximos concursos oficiais e notificações persistidas. Ela é alimentada pela mesma sincronização operacional que mantém concursos e apostas reais atualizados.
 
+## Arquitetura
+
+A borda HTTP da Agenda segue o fluxo:
+
+```text
+HTTP controller
+  ↓
+AgendaUseCase
+  ↓
+AgendaReader / AgendaNotificationStore / AgendaNotificationRefresher
+  ↓
+PostgreSQL / NotificationService
+```
+
+`src/api/agenda.ts` cuida apenas de rota, parse do filtro/ID, CORS e serialização/error mapping. O refresh antes da leitura, a composição da visão `{ agenda, notifications, unreadCount }` e as ações de leitura pertencem ao `AgendaUseCase`.
+
+As dependências concretas são ligadas em `src/api/server.ts`. `NotificationService` continua compartilhado com a sincronização operacional e é injetado na Agenda somente pelo contrato mínimo de refresh; esta extração não altera o fluxo interno de Operações.
+
 ## Fonte da agenda
 
 Para cada loteria, a sincronização lê da CAIXA e persiste em `lottery_agenda`, quando disponíveis:
