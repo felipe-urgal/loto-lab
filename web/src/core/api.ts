@@ -1,5 +1,7 @@
 export const API = "/api/v1";
 
+const API_PATH_PATTERN = /^\/[A-Za-z0-9/_?&=:%+,.~-]*$/;
+
 type ApiErrorDetails = {
   message?: string;
   code?: string;
@@ -28,6 +30,29 @@ function requestHeaders(options: RequestInit): HeadersInit | undefined {
   return headers;
 }
 
+function safeApiPath(path: string): string {
+  if (!API_PATH_PATTERN.test(path) || path.startsWith("//")) {
+    throw new TypeError("API path must be a relative /api/v1 route");
+  }
+
+  const pathname = path.split("?", 1)[0];
+  let decodedPathname: string;
+  try {
+    decodedPathname = decodeURIComponent(pathname);
+  } catch {
+    throw new TypeError("API path contains invalid percent encoding");
+  }
+
+  const hasTraversal = decodedPathname
+    .split("/")
+    .some((segment) => segment === "." || segment === "..");
+  if (hasTraversal || /%2e/i.test(decodedPathname)) {
+    throw new TypeError("API path traversal is not allowed");
+  }
+
+  return path;
+}
+
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
@@ -41,7 +66,8 @@ export class ApiError extends Error {
 }
 
 export async function api<T = unknown>(path: string, options: RequestInit = {}): Promise<T | null> {
-  const response = await fetch(`${API}${path}`, {
+  const requestPath = safeApiPath(path);
+  const response = await fetch(`${API}${requestPath}`, {
     ...options,
     headers: requestHeaders(options),
   });
