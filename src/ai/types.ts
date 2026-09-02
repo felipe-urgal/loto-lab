@@ -118,6 +118,16 @@ export interface AiInterpretationRequest {
   evidence: AiEvidenceContext;
 }
 
+export class AiInterpretationError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+  }
+}
+
 export interface AiInterpretationProvider {
   readonly name: string;
   isConfigured(): boolean;
