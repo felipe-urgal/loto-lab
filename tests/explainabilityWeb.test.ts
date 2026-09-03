@@ -8,38 +8,50 @@ async function source(path: string): Promise<string> {
 }
 
 test("Generator explainability layer exposes the five-step flow and methodology guardrails", async () => {
-  const javascript = await source("web/generation-explainability.js");
+  const explainability = await source("web/src/features/generationV2/explainability.ts");
+  const enhancements = await source("web/src/features/generationV2/enhancements.ts");
   const boundary = await source("web/generation-v2.js");
   const generator = await source("web/src/features/generationV2.ts");
   const workspace = await source("web/generation-workspace.css");
   const loader = await source("web/feature-loader.js");
 
-  assert.match(loader, /loadModule\("generation-explainability"\)/);
-  assert.doesNotMatch(loader, /loadStyledModule\("generation-explainability"\)/);
+  assert.doesNotMatch(loader, /loadModule\("generation-explainability"\)/);
+  assert.doesNotMatch(loader, /loadModule\("generation-readiness"\)/);
   assert.doesNotMatch(loader, /generation-diversity/);
-  assert.match(javascript, /Análise/);
-  assert.match(javascript, /Núcleo fixo/);
-  assert.match(javascript, /Variáveis/);
-  assert.match(javascript, /Restrições/);
-  assert.match(javascript, /Auditoria/);
-  assert.match(javascript, /Isto não é previsão/);
-  assert.match(javascript, /Pontuação v2/);
-  assert.match(javascript, /topo da classificação/);
-  assert.match(javascript, /Selecionadas por pontuação \+ diversidade/);
-  assert.match(javascript, /Semente, histórico e assinatura/);
-  assert.match(javascript, /regra de proteção ampla/);
-  assert.match(javascript, /Por que este lote foi aceito/);
-  assert.match(javascript, /Validar hipótese no Laboratório/);
-  assert.doesNotMatch(javascript, /\bScore v2\b/);
-  assert.doesNotMatch(javascript, /\bscore\b/);
-  assert.doesNotMatch(javascript, /topo do ranking/);
-  assert.doesNotMatch(javascript, /\bguardrail\b/);
-  assert.doesNotMatch(javascript, /Seed, histórico e fingerprint/);
+  assert.match(explainability, /Análise/);
+  assert.match(explainability, /Núcleo fixo/);
+  assert.match(explainability, /Variáveis/);
+  assert.match(explainability, /Restrições/);
+  assert.match(explainability, /Auditoria/);
+  assert.match(explainability, /Isto não é previsão/);
+  assert.match(explainability, /Pontuação v2/);
+  assert.match(explainability, /topo da classificação/);
+  assert.match(explainability, /Selecionadas por pontuação \+ diversidade/);
+  assert.match(explainability, /Semente, histórico e assinatura/);
+  assert.match(explainability, /regra de proteção ampla/);
+  assert.match(explainability, /Por que este lote foi aceito/);
+  assert.match(explainability, /Validar hipótese no Laboratório/);
+  assert.doesNotMatch(explainability, /\bScore v2\b/);
+  assert.doesNotMatch(explainability, /\bscore\b/);
+  assert.doesNotMatch(explainability, /topo do ranking/);
+  assert.doesNotMatch(explainability, /\bguardrail\b/);
+  assert.doesNotMatch(explainability, /Seed, histórico e fingerprint/);
 
-  assert.equal(boundary, 'import "./src/features/generationV2.js";\n');
+  assert.equal(
+    boundary,
+    'import "./src/features/generationV2.js";\nimport "./src/features/generationV2/enhancements.js";\n',
+  );
+  assert.match(enhancements, /installGenerationReadiness/);
+  assert.match(enhancements, /installGenerationExplainability/);
+  assert.match(enhancements, /onViewRendered/);
+  assert.match(enhancements, /onMainViewChanged/);
+  assert.doesNotMatch(enhancements, /location\.hash/);
+  assert.doesNotMatch(enhancements, /addEventListener\("hashchange"/);
   assert.match(generator, /generationMode: "diversified"/);
   assert.match(generator, /generatorOptions\.seed/);
   await assert.rejects(source("web/generation-diversity.js"), /ENOENT/);
+  await assert.rejects(source("web/generation-explainability.js"), /ENOENT/);
+  await assert.rejects(source("web/generation-readiness.js"), /ENOENT/);
   await assert.rejects(source("web/generation-explainability.css"), /ENOENT/);
 
   assert.match(workspace, /g2-explain-stepper/);
