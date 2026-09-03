@@ -193,7 +193,8 @@ test("refinement layers own their Portuguese analysis vocabulary while preservin
 
 test("real-bet flow remains owned by My Games while dashboard summary belongs to dashboard scope", async () => {
   const realBets = await source("web/real-bets.js");
-  const dashboard = await source("web/dashboard-scope.js");
+  const dashboardBoundary = await source("web/dashboard-scope.js");
+  const dashboard = await source("web/src/features/dashboardScope.ts");
 
   assert.match(realBets, /separado dos lotes apenas gerados e dos testes históricos/);
   assert.doesNotMatch(realBets, /não inclui backtests/);
@@ -204,7 +205,9 @@ test("real-bet flow remains owned by My Games while dashboard summary belongs to
   assert.doesNotMatch(realBets, /real-performance-section/);
   assert.doesNotMatch(realBets, /refineDashboard/);
 
+  assert.equal(dashboardBoundary, 'import "./src/features/dashboardScope.js";\n');
   assert.match(dashboard, /function realStatusCard/);
   assert.match(dashboard, /Apostas reais/);
   assert.match(dashboard, /Resultado real/);
+  assert.match(dashboard, /knownNumber\(real\.netResult\)/);
 });
