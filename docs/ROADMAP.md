@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-09-03**, com #155–#160/#163/#175 já na `main`, composition root HTTP concluído e a modularização TypeScript do frontend avançando em fatias pequenas, incluindo as migrações canônicas de Meus Jogos, Análises, Gerador e Testes históricos, a retirada do fallback funcional legado de Backtests e a absorção das camadas de readiness/explainability do Gerador em owners TypeScript internos.
+> Baseline revisada em **2026-09-03**, com #155–#160/#163/#175 já na `main`, composition root HTTP concluído e a modularização TypeScript do frontend avançando em fatias pequenas, incluindo as migrações canônicas de Painel, Meus Jogos, Análises, Gerador e Testes históricos, a retirada do fallback funcional legado de Backtests e a absorção das camadas de readiness/explainability do Gerador em owners TypeScript internos.
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -89,7 +89,7 @@ A diretriz permanece:
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- frontend ainda possui módulos grandes/imperativos; primitives compartilhadas e várias features canônicas — incluindo Status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos — já estão em TypeScript, mas state/lifecycle e decomposição do shell/app e de superfícies legadas restantes seguem ativos na #60;
+- frontend ainda possui módulos grandes/imperativos; primitives compartilhadas e várias features canônicas — incluindo Status, Dashboard Scope, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos — já estão em TypeScript, mas state/lifecycle e decomposição do shell/app e de superfícies legadas restantes seguem ativos na #60;
 - hotspots algorítmicos continuam grandes (#62);
 - observabilidade segue baseada principalmente em logs/estado persistido, sem métricas/SLOs (#63);
 - arquitetura de informação pós-redesign ainda pode reduzir troca de contexto (#64);
@@ -135,7 +135,7 @@ A revisão de CLI/scheduler não encontrou motivo para mover engines puros ou li
 
 ## #60 — Frontend TypeScript, módulos e primitives · P1 · em andamento
 
-A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos avançaram em fatias próprias; Meus Jogos, Análises e Gerador também explicitam contratos internos consumidos pela UI em owners menores. No Gerador, readiness e explainability agora também possuem ownership TypeScript interno e lifecycle coordenado sem listeners/hash parsing paralelos.
+A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Dashboard Scope, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos avançaram em fatias próprias; Painel, Meus Jogos, Análises e Gerador também explicitam contratos internos consumidos pela UI em owners menores. No Gerador, readiness e explainability possuem ownership TypeScript interno e lifecycle coordenado sem listeners/hash parsing paralelos. O Dashboard Scope também usa lifecycle/API compartilhados e separa a semântica financeira do owner de apresentação.
 
 Entregue:
 
@@ -150,6 +150,7 @@ Entregue:
 - `web/src/core/viewLifecycle.ts` como contrato único de view atual, evento renderizado, emissão e subscribe/unsubscribe; `feature-loader.js` consome o mesmo contrato sem redefinir hash/evento;
 - primitive de toast com ownership em `web/src/shared/toast.ts` e consumo direto pelas features migradas;
 - Status, Agenda, IA, Estratégias, Execuções e Laboratório com implementação funcional canônica em `web/src/features` e boundaries JavaScript compatíveis;
+- Dashboard Scope com owner canônico em `web/src/features/dashboardScope.ts`, contratos e semântica financeira decompostos em `web/src/features/dashboardScope/`, consumo direto de API/escaping/formatters/toast/lifecycle, cancelamento de leituras stale ao perder a view e `web/dashboard-scope.js` reduzido a boundary compatível; custo/prêmio/resultado ausente não é convertido para zero e o ROI agregado fica indisponível quando os componentes financeiros necessários não são conhecidos;
 - Meus Jogos com controller canônico em `web/src/features/myGames.ts`, contratos e responsabilidades de UI decompostos em `web/src/features/myGames/`, `web/my-games-v2.js` reduzido a boundary compatível e campos financeiros opcionais tipados sem coerção de ausência para zero;
 - Análises 2.0 com implementação funcional canônica em `web/src/features/analysisV2.ts`, DTOs consumidos pela UI em `web/src/features/analysisV2/types.ts`, consumo direto de API/escaping/lifecycle compartilhados e `web/analysis-v2.js` reduzido a boundary compatível;
 - Generator 2.0 com implementação funcional canônica em `web/src/features/generationV2.ts`, contratos de plano/auditoria/preview/save/estado em `web/src/features/generationV2/types.ts`, consumo direto de API/escaping/lifecycle compartilhados e `web/generation-v2.js` reduzido a boundary compatível;
