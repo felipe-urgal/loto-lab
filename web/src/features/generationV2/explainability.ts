@@ -119,11 +119,20 @@ function decoratePreview(shell: HTMLElement): void {
 
     const reason = document.createElement("div");
     reason.className = "g2-game-reason";
-    reason.innerHTML = "<strong>Como ler este jogo</strong><p></p>";
-    const copy = reason.querySelector<HTMLParagraphElement>("p");
-    if (copy) {
-      copy.textContent = `Núcleo: ${fixed.join(" · ") || "sem núcleo"}. Variáveis: ${variable.join(" · ") || "—"}. ${meta.join(" · ")}.`;
-    }
+    reason.innerHTML = "<strong>Como ler este jogo</strong>";
+
+    const copy = document.createElement("p");
+    const fixedLabel = document.createElement("b");
+    fixedLabel.textContent = "Núcleo:";
+    const variableLabel = document.createElement("b");
+    variableLabel.textContent = "Variáveis:";
+    copy.append(
+      fixedLabel,
+      ` ${fixed.join(" · ") || "sem núcleo"}. `,
+      variableLabel,
+      ` ${variable.join(" · ") || "—"}. ${meta.join(" · ")}.`,
+    );
+    reason.append(copy);
     gameCard.append(reason);
   });
 
