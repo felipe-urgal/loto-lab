@@ -48,6 +48,10 @@ web/
 │   │   ├── analysisV2/
 │   │   │   └── types.ts
 │   │   ├── backtests.ts
+│   │   ├── dashboardScope.ts
+│   │   ├── dashboardScope/
+│   │   │   ├── financial.ts
+│   │   │   └── types.ts
 │   │   ├── dataStatus.ts
 │   │   ├── generationV2.ts
 │   │   ├── generationV2/
@@ -76,9 +80,9 @@ web/
 └── módulos/folhas específicos por feature
 ```
 
-`feature-loader.js` carrega módulos específicos sob demanda. `runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; helpers migrados vivem em `web/src` e podem ser reexportados sem forçar uma migração big-bang. API, escaping, formatters, lifecycle e a primitive de toast já possuem ownership TypeScript; o runtime não redefine essas implementações. O status operacional do Painel foi a primeira feature com implementação canônica em `web/src/features`, seguido por Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos. `web/data-status.js`, `web/agenda.js`, `web/ai.js`, `web/strategies.js`, `web/jobs.js`, `web/lab.js`, `web/my-games-v2.js`, `web/analysis-v2.js`, `web/generation-v2.js` e `web/backtests.js` permanecem apenas como boundaries de assets compatíveis e importam o JavaScript emitido das respectivas fontes TypeScript.
+`feature-loader.js` carrega módulos específicos sob demanda. `runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; helpers migrados vivem em `web/src` e podem ser reexportados sem forçar uma migração big-bang. API, escaping, formatters, lifecycle e a primitive de toast já possuem ownership TypeScript; o runtime não redefine essas implementações. O status operacional e o escopo do Painel possuem implementação canônica em `web/src/features`, seguido por Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos. `web/dashboard-scope.js`, `web/data-status.js`, `web/agenda.js`, `web/ai.js`, `web/strategies.js`, `web/jobs.js`, `web/lab.js`, `web/my-games-v2.js`, `web/analysis-v2.js`, `web/generation-v2.js` e `web/backtests.js` permanecem apenas como boundaries de assets compatíveis e importam o JavaScript emitido das respectivas fontes TypeScript.
 
-Meus Jogos inicia a decomposição de uma feature grande durante a migração: state/lifecycle e orquestração ficam em `web/src/features/myGames.ts`, enquanto tipos, apresentação, formulário de aposta, comparação, formatação e guards possuem ownership separado em `web/src/features/myGames/`. Análises e Gerador seguem a mesma direção incremental: `web/src/features/analysisV2.ts` e `web/src/features/generationV2.ts` concentram a orquestração funcional de suas superfícies; `analysisV2/types.ts` e `generationV2/types.ts` tornam explícitos os contratos consumidos pela UI. No Gerador, readiness e explainability também têm owners internos tipados em `generationV2/readiness.ts` e `generationV2/explainability.ts`, coordenados por `generationV2/enhancements.ts` com o lifecycle compartilhado; os antigos `web/generation-readiness.js` e `web/generation-explainability.js` foram removidos. Testes históricos usa `web/src/features/backtests.ts` como owner funcional único da view, consumindo o mesmo client HTTP, lifecycle, escaping, formatters e toast compartilhados. `web/app.js` preserva apenas o handoff mínimo do shell para a view e não contém mais formulário, execução ou histórico de Backtests; `refinements.js` também não possui regra específica para essa superfície. API, escaping e lifecycle vêm diretamente do core/shared TypeScript. O objetivo é reduzir acoplamento e duplicação sem introduzir framework nem mudar a jornada.
+O escopo do Painel usa `web/src/features/dashboardScope.ts` como owner da orquestração e separa contratos/semântica financeira em `dashboardScope/types.ts` e `dashboardScope/financial.ts`. A feature consome diretamente API, escaping, formatters, toast e lifecycle compartilhados; não mantém parsing próprio da hash. Cargas de leitura são abortadas quando o owner perde a view, e valores financeiros ausentes permanecem desconhecidos em vez de virarem zero por coerção. Meus Jogos inicia a decomposição de uma feature grande durante a migração: state/lifecycle e orquestração ficam em `web/src/features/myGames.ts`, enquanto tipos, apresentação, formulário de aposta, comparação, formatação e guards possuem ownership separado em `web/src/features/myGames/`. Análises e Gerador seguem a mesma direção incremental: `web/src/features/analysisV2.ts` e `web/src/features/generationV2.ts` concentram a orquestração funcional de suas superfícies; `analysisV2/types.ts` e `generationV2/types.ts` tornam explícitos os contratos consumidos pela UI. No Gerador, readiness e explainability também têm owners internos tipados em `generationV2/readiness.ts` e `generationV2/explainability.ts`, coordenados por `generationV2/enhancements.ts` com o lifecycle compartilhado; os antigos `web/generation-readiness.js` e `web/generation-explainability.js` foram removidos. Testes históricos usa `web/src/features/backtests.ts` como owner funcional único da view, consumindo o mesmo client HTTP, lifecycle, escaping, formatters e toast compartilhados. `web/app.js` preserva apenas o handoff mínimo do shell para a view e não contém mais formulário, execução ou histórico de Backtests; `refinements.js` também não possui regra específica para essa superfície. API, escaping e lifecycle vêm diretamente do core/shared TypeScript. O objetivo é reduzir acoplamento e duplicação sem introduzir framework nem mudar a jornada.
 
 O build `npm run web:build` primeiro prepara `web-dist/`, ignora fontes `.ts` como assets brutos e depois usa o `tsc` com `tsconfig.web.json` para emitir JavaScript em `web-dist/assets/src`. O conjunto web continua alimentando o fingerprint SHA-256 usado para reescrever referências de assets com `?v=<hash>`.
 
@@ -126,7 +130,7 @@ O rollout e a consolidação visual estão concluídos pela #121:
 - #142 — explainability visual do Gerador absorvida no workspace;
 - #143 — auditoria final desktop/mobile de legibilidade, foco, reduced-motion e overflow estrutural.
 
-A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. As fatias seguintes moveram client HTTP, contrato de erro, escaping compartilhado, contrato de lifecycle da view e a primitive de toast para `web/src`; #177 começou a eliminar lifecycle duplicado nas features, #178 deu ownership TypeScript completo ao status de dados, e Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos seguem o mesmo padrão consumindo diretamente os helpers compartilhados. Em Meus Jogos, Análises e Gerador a migração também explicita owners menores para contratos e responsabilidades internas. O Gerador já absorveu readiness/explainability em módulos TypeScript internos e eliminou os listeners/hash parsing duplicados dessas camadas. Backtests já concluiu também a retirada do fallback funcional duplicado de `app.js`/`refinements.js`. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
+A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. As fatias seguintes moveram client HTTP, contrato de erro, escaping compartilhado, contrato de lifecycle da view e a primitive de toast para `web/src`; #177 começou a eliminar lifecycle duplicado nas features, #178 deu ownership TypeScript completo ao status de dados, e o escopo do Painel, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos seguem o mesmo padrão consumindo diretamente os helpers compartilhados. Em Painel, Meus Jogos, Análises e Gerador a migração também explicita owners menores para contratos e responsabilidades internas. O Gerador já absorveu readiness/explainability em módulos TypeScript internos e eliminou os listeners/hash parsing duplicados dessas camadas. Backtests já concluiu também a retirada do fallback funcional duplicado de `app.js`/`refinements.js`. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
 
 As folhas adicionais que permanecem têm responsabilidade funcional, estrutural ou de fallback explícita; coexistir com um `*-workspace.css` não torna uma camada automaticamente redundante.
 
@@ -167,7 +171,9 @@ Prioriza:
 3. desempenho e conferência financeira;
 4. atividade recente.
 
-No escopo **Todas**, agregações financeiras usam custo/resultados corretos em vez de média ingênua de percentuais.
+`web/src/features/dashboardScope.ts` é o owner canônico dos modos **Todas** e loteria focada. `web/dashboard-scope.js` é somente boundary compatível. Contratos consumidos pela UI ficam em `dashboardScope/types.ts`; agregação/tons financeiros ficam em `dashboardScope/financial.ts`. O owner usa lifecycle/API compartilhados, cancela leituras stale ao perder a view e não transforma custo, prêmio ou resultado ausente em zero.
+
+No escopo **Todas**, agregações financeiras usam custo/resultados conhecidos em vez de média ingênua de percentuais. Se a base financeira necessária estiver incompleta, o agregado permanece `—`/indisponível em vez de fabricar um ROI.
 
 ### Análises — `/#analysis`
 
@@ -216,11 +222,11 @@ Compara hipóteses e estratégias com evidência, benchmark e progressive disclo
 
 ### Estratégias — `/strategies`
 
-Catálogo/versionamento com workspace próprio. `web/src/features/strategies.ts` é a implementação funcional canônica e consome diretamente client HTTP, escaping, formatters e toast compartilhados; `web/strategies.js` permanece somente como boundary de asset compatível. Após #137 a superfície também não depende mais do antigo `experiments.css`.
+Catálogo/versionamento com workspace próprio. `web/src/features/strategies.ts` é a implementação funcional canônica e consome diretamente client HTTP, escaping, formatters e toast compartilhados; `web/strategies.js` permanece somente como boundary compatível. Após #137 a superfície também não depende mais do antigo `experiments.css`.
 
 ### Execuções — `/jobs`
 
-Fila persistente, estados e ações operacionais. `web/src/features/jobs.ts` é a implementação funcional canônica e consome diretamente client HTTP, escaping, formatters e toast compartilhados; `web/jobs.js` permanece somente como boundary de asset compatível. Polling, cancelamento, stale-response guards e seleção de versões históricas continuam preservados. Também não depende mais de `experiments.css` após #137.
+Fila persistente, estados e ações operacionais. `web/src/features/jobs.ts` é a implementação funcional canônica e consome diretamente client HTTP, escaping, formatters e toast compartilhados; `web/jobs.js` permanece somente como boundary compatível. Polling, cancelamento, stale-response guards e seleção de versões históricas continuam preservados. Também não depende mais de `experiments.css` após #137.
 
 ### Agenda — `/agenda`
 
@@ -228,7 +234,7 @@ Próximos concursos + notificações. `web/src/features/agenda.ts` é a implemen
 
 ### IA — `/ai`
 
-Interpretação de evidências. `web/src/features/ai.ts` é a implementação funcional canônica e consome diretamente o client HTTP, escaping e formatters compartilhados; `web/ai.js` permanece somente como boundary de asset compatível. `ai-workspace.css` é canônico; `ai.css` foi removido.
+Interpretação de evidências. `web/src/features/ai.ts` é a implementação funcional canônica e consome diretamente o client HTTP, escaping e formatters compartilhados; `web/ai.js` permanece somente como boundary compatível. `ai-workspace.css` é canônico; `ai.css` foi removido.
 
 ## Navegação
 
@@ -261,7 +267,7 @@ Guardrails:
 - `loto-lab:view-rendered` só é emitido depois que o render principal deixa o loading; handoffs marcados com `data-feature-owned` não bloqueiam essa emissão porque o owner lazy precisa receber o evento para substituir o marcador;
 - nome do evento, payload, leitura da view atual e subscribe/unsubscribe são centralizados em `web/src/core/viewLifecycle.ts`; `feature-loader.js` não redefine esse contrato.
 
-O contrato compartilhado de lifecycle já está em TypeScript. Status de dados e as features migradas, incluindo Meus Jogos, Análises, Gerador e Testes históricos, consomem esse core diretamente a partir de `web/src/features`. Análises, Gerador e Backtests deixaram de manter parsing próprio da hash e usam `currentMainView`/`onMainViewChanged` para cleanup de navegação. As camadas internas de readiness/explainability do Gerador também não registram hashchange nem conhecem a hash: `generationV2/enhancements.ts` concentra a espera pelo workspace e o cleanup dos observers. Backtests também não depende mais de `refinements.js` nem de uma segunda implementação em `app.js`. A #60 ainda deve migrar state/lifecycle internos do shell/app e de superfícies legadas restantes em fatias pequenas, eliminando duplicações quando houver ganho real de ownership; mover código de pasta sem reduzir ownership ou duplicação não é objetivo.
+O contrato compartilhado de lifecycle já está em TypeScript. Status de dados e as features migradas, incluindo o escopo do Painel, Meus Jogos, Análises, Gerador e Testes históricos, consomem esse core diretamente a partir de `web/src/features`. Dashboard Scope, Análises, Gerador e Backtests não mantêm parsing próprio da hash e usam `currentMainView`/`onMainViewChanged` para navegação/cleanup; o Painel também aborta leituras pendentes quando perde ownership. As camadas internas de readiness/explainability do Gerador também não registram hashchange nem conhecem a hash: `generationV2/enhancements.ts` concentra a espera pelo workspace e o cleanup dos observers. Backtests também não depende mais de `refinements.js` nem de uma segunda implementação em `app.js`. A #60 ainda deve migrar state/lifecycle internos do shell/app e de superfícies legadas restantes em fatias pequenas, eliminando duplicações quando houver ganho real de ownership; mover código de pasta sem reduzir ownership ou duplicação não é objetivo.
 
 ## Acessibilidade
 
@@ -287,7 +293,7 @@ O browser E2E transversal do #143 repete a auditoria de legibilidade em desktop/
 - mensagens do toast compartilhado usam `textContent`, nunca `innerHTML`;
 - o frontend não deve replicar validação crítica como única defesa — invariantes continuam no backend/PostgreSQL.
 
-A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. A fundação TypeScript/formatters veio em #148; API client, errors, escaping, toast e o contrato compartilhado de lifecycle já foram migrados. Status de dados, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos já possuem implementação canônica TypeScript; no Gerador, readiness/explainability também estão tipadas e o texto derivado do DOM usado no motivo de cada jogo é aplicado com `textContent`, sem reinterpolação dinâmica em `innerHTML`. Backtests já removeu também o fallback funcional duplicado. State/lifecycle do shell/app, novas primitives justificadas e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
+A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. A fundação TypeScript/formatters veio em #148; API client, errors, escaping, toast e o contrato compartilhado de lifecycle já foram migrados. Status de dados, Dashboard Scope, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos já possuem implementação canônica TypeScript; no Painel, custo/prêmio/resultado ausente não é transformado em zero e agregados financeiros incompletos permanecem indisponíveis. No Gerador, readiness/explainability também estão tipadas e o texto derivado do DOM usado no motivo de cada jogo é aplicado com `textContent`, sem reinterpolação dinâmica em `innerHTML`. Backtests já removeu também o fallback funcional duplicado. State/lifecycle do shell/app, novas primitives justificadas e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
 
 ## Trabalho pesado
 

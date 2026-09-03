@@ -17,26 +17,33 @@ test("dashboard operational controls are served by the web process", async (t) =
   assert.ok(address && typeof address !== "string");
   const baseUrl = `http://127.0.0.1:${(address as AddressInfo).port}`;
 
-  const [statusBoundaryResponse, typedStatusResponse, dashboardResponse] = await Promise.all([
+  const [statusBoundaryResponse, typedStatusResponse, dashboardBoundaryResponse, typedDashboardResponse] = await Promise.all([
     fetch(`${baseUrl}/assets/data-status.js`),
     fetch(`${baseUrl}/assets/src/features/dataStatus.js`),
     fetch(`${baseUrl}/assets/dashboard-scope.js`),
+    fetch(`${baseUrl}/assets/src/features/dashboardScope.js`),
   ]);
   assert.equal(statusBoundaryResponse.status, 200);
   assert.equal(typedStatusResponse.status, 200);
-  assert.equal(dashboardResponse.status, 200);
+  assert.equal(dashboardBoundaryResponse.status, 200);
+  assert.equal(typedDashboardResponse.status, 200);
 
-  const [statusBoundarySource, statusSource, dashboardSource] = await Promise.all([
+  const [statusBoundarySource, statusSource, dashboardBoundarySource, dashboardSource] = await Promise.all([
     statusBoundaryResponse.text(),
     typedStatusResponse.text(),
-    dashboardResponse.text(),
+    dashboardBoundaryResponse.text(),
+    typedDashboardResponse.text(),
   ]);
 
   assert.match(statusBoundarySource, /\.\/src\/features\/dataStatus\.js/);
   assert.match(statusSource, /api\("\/operations\/status"\)/);
   assert.doesNotMatch(statusSource, /fetch\("\/api\/v1\/operations\/status"/);
   assert.doesNotMatch(statusSource, /Sincronizar agora/);
+
+  assert.match(dashboardBoundarySource, /\.\/src\/features\/dashboardScope\.js/);
   assert.match(dashboardSource, /api\("\/operations\/sync", \{ method: "POST" \}\)/);
   assert.match(dashboardSource, /Atualizar dados/);
   assert.match(dashboardSource, /loto-lab:data-synced/);
+  assert.match(dashboardSource, /currentMainView\(\)/);
+  assert.doesNotMatch(dashboardSource, /location\.hash\.replace/);
 });
