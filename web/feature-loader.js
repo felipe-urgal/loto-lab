@@ -72,15 +72,15 @@ async function ensureViewFeatures() {
     return;
   }
 
-  await loadStyledModule("refinements");
-
   if (view === "backtests") {
-    // The TypeScript owner mounts only with its final workspace CSS. If either
-    // optional asset fails, app.js + refinements remain the functional fallback.
+    // Backtests is now typed-only functional ownership. app.js provides only a
+    // shell handoff marker; failure to load the canonical assets is surfaced
+    // explicitly instead of reviving duplicated legacy behavior.
     const styleReady = await loadStyle("backtests-workspace");
-    if (styleReady) await loadModule("backtests");
-    return;
+    return styleReady ? loadModule("backtests") : false;
   }
+
+  await loadStyledModule("refinements");
 
   if (view === "generate") {
     // Generator 2.0 owns the advanced workspace. The basic generator rendered
@@ -117,18 +117,31 @@ async function ensureViewFeatures() {
 
 function isMainRenderPending() {
   const content = document.querySelector("#content");
-  return Boolean(content?.querySelector(":scope > .loading-state"));
+  return Boolean(content?.querySelector(":scope > .loading-state:not([data-feature-owned])"));
+}
+
+function renderFeatureLoadError(view) {
+  const content = document.querySelector("#content");
+  if (!content || currentMainView() !== view) return;
+  content.innerHTML = '<div class="error-state"><span class="error-code">FEATURE_LOAD_ERROR</span><strong>Não foi possível carregar Testes históricos</strong><p>Os arquivos da funcionalidade não ficaram disponíveis. Tente carregar a tela novamente.</p><button class="button" type="button" data-feature-retry>Tentar novamente</button></div>';
+  content.querySelector("[data-feature-retry]")?.addEventListener("click", () => {
+    document.querySelector("#refresh-view")?.click();
+  });
 }
 
 async function emitWhenRendered() {
   const token = ++lifecycleToken;
   const view = currentMainView();
   const lottery = document.querySelector("#lottery-select")?.value || "mega-sena";
-  await ensureViewFeatures();
+  const featuresReady = await ensureViewFeatures();
 
   for (let frame = 0; frame < 120; frame += 1) {
     if (token !== lifecycleToken) return;
     if (!isMainRenderPending()) {
+      if (featuresReady === false) {
+        renderFeatureLoadError(view);
+        return;
+      }
       emitViewRendered({ view, lottery, token });
       return;
     }
