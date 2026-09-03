@@ -75,9 +75,10 @@ async function ensureViewFeatures() {
   await loadStyledModule("refinements");
 
   if (view === "backtests") {
-    // Backtests keep app.js + refinements as functional owners; Prototype 1
-    // only supplies the final, view-scoped presentation layer.
-    await loadStyle("backtests-workspace");
+    // The TypeScript owner mounts only with its final workspace CSS. If either
+    // optional asset fails, app.js + refinements remain the functional fallback.
+    const styleReady = await loadStyle("backtests-workspace");
+    if (styleReady) await loadModule("backtests");
     return;
   }
 
