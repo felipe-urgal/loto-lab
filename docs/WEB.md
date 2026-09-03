@@ -75,7 +75,7 @@ web/
 
 `feature-loader.js` carrega módulos específicos sob demanda. `runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; helpers migrados vivem em `web/src` e podem ser reexportados sem forçar uma migração big-bang. API, escaping, formatters, lifecycle e a primitive de toast já possuem ownership TypeScript; o runtime não redefine essas implementações. O status operacional do Painel foi a primeira feature com implementação canônica em `web/src/features`, seguido por Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos. `web/data-status.js`, `web/agenda.js`, `web/ai.js`, `web/strategies.js`, `web/jobs.js`, `web/lab.js`, `web/my-games-v2.js`, `web/analysis-v2.js`, `web/generation-v2.js` e `web/backtests.js` permanecem apenas como boundaries de assets compatíveis e importam o JavaScript emitido das respectivas fontes TypeScript.
 
-Meus Jogos inicia a decomposição de uma feature grande durante a migração: state/lifecycle e orquestração ficam em `web/src/features/myGames.ts`, enquanto tipos, apresentação, formulário de aposta, comparação, formatação e guards possuem ownership separado em `web/src/features/myGames/`. Análises e Gerador seguem a mesma direção incremental: `web/src/features/analysisV2.ts` e `web/src/features/generationV2.ts` concentram a orquestração de suas superfícies, enquanto `analysisV2/types.ts` e `generationV2/types.ts` tornam explícitos os contratos consumidos pela UI. Testes históricos usa `web/src/features/backtests.ts` como owner canônico da view, consumindo o mesmo client HTTP, lifecycle, escaping, formatters e toast compartilhados. API, escaping e lifecycle vêm diretamente do core/shared TypeScript. O objetivo é reduzir acoplamento e duplicação sem introduzir framework nem mudar a jornada.
+Meus Jogos inicia a decomposição de uma feature grande durante a migração: state/lifecycle e orquestração ficam em `web/src/features/myGames.ts`, enquanto tipos, apresentação, formulário de aposta, comparação, formatação e guards possuem ownership separado em `web/src/features/myGames/`. Análises e Gerador seguem a mesma direção incremental: `web/src/features/analysisV2.ts` e `web/src/features/generationV2.ts` concentram a orquestração de suas superfícies, enquanto `analysisV2/types.ts` e `generationV2/types.ts` tornam explícitos os contratos consumidos pela UI. Testes históricos usa `web/src/features/backtests.ts` como owner funcional único da view, consumindo o mesmo client HTTP, lifecycle, escaping, formatters e toast compartilhados. `web/app.js` preserva apenas o handoff mínimo do shell para a view e não contém mais formulário, execução ou histórico de Backtests; `refinements.js` também não possui regra específica para essa superfície. API, escaping e lifecycle vêm diretamente do core/shared TypeScript. O objetivo é reduzir acoplamento e duplicação sem introduzir framework nem mudar a jornada.
 
 O build `npm run web:build` primeiro prepara `web-dist/`, ignora fontes `.ts` como assets brutos e depois usa o `tsc` com `tsconfig.web.json` para emitir JavaScript em `web-dist/assets/src`. O conjunto web continua alimentando o fingerprint SHA-256 usado para reescrever referências de assets com `?v=<hash>`.
 
@@ -123,7 +123,7 @@ O rollout e a consolidação visual estão concluídos pela #121:
 - #142 — explainability visual do Gerador absorvida no workspace;
 - #143 — auditoria final desktop/mobile de legibilidade, foco, reduced-motion e overflow estrutural.
 
-A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. As fatias seguintes moveram client HTTP, contrato de erro, escaping compartilhado, contrato de lifecycle da view e a primitive de toast para `web/src`; #177 começou a eliminar lifecycle duplicado nas features, #178 deu ownership TypeScript completo ao status de dados, e Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos seguem o mesmo padrão consumindo diretamente os helpers compartilhados. Em Meus Jogos, Análises e Gerador a migração também explicita owners menores para contratos e responsabilidades internas. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
+A modularização arquitetural começou em #148 com a fundação TypeScript e os formatters compartilhados. As fatias seguintes moveram client HTTP, contrato de erro, escaping compartilhado, contrato de lifecycle da view e a primitive de toast para `web/src`; #177 começou a eliminar lifecycle duplicado nas features, #178 deu ownership TypeScript completo ao status de dados, e Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos seguem o mesmo padrão consumindo diretamente os helpers compartilhados. Em Meus Jogos, Análises e Gerador a migração também explicita owners menores para contratos e responsabilidades internas. Backtests já concluiu também a retirada do fallback funcional duplicado de `app.js`/`refinements.js`. Isso não altera o estado da #121 nem reabre trabalho visual concluído.
 
 As folhas adicionais que permanecem têm responsabilidade funcional, estrutural ou de fallback explícita; coexistir com um `*-workspace.css` não torna uma camada automaticamente redundante.
 
@@ -203,9 +203,9 @@ Consolida:
 
 ### Testes históricos — `/#backtests`
 
-`web/src/features/backtests.ts` é a implementação funcional canônica do formulário, execução e histórico persistido. A feature consome `api`, lifecycle, escaping, formatters e toast compartilhados, aborta requests ao perder ownership da view e rejeita respostas stale quando view/loteria mudam durante a carga. O padrão de últimos 100 concursos antes aplicado por `refinements.js` também pertence ao owner tipado.
+`web/src/features/backtests.ts` é a implementação funcional canônica e única do formulário, execução e histórico persistido. A feature consome `api`, lifecycle, escaping, formatters e toast compartilhados, aborta requests ao perder ownership da view e rejeita respostas stale quando view/loteria mudam durante a carga. O padrão de últimos 100 concursos também pertence integralmente ao owner tipado.
 
-`web/backtests.js` é somente o boundary de asset compatível. Nesta primeira fatia, a implementação existente em `web/app.js` + `refinements.js` permanece deliberadamente como fallback funcional caso CSS ou módulo lazy falhem; ela não é mais o caminho canônico quando os assets de Backtests carregam. Execução, worker, limites HTTP e contratos financeiros/metodológicos do backend não mudam.
+`web/backtests.js` é somente o boundary de asset compatível. `web/app.js` não mantém mais uma segunda implementação da feature: ao entrar em `/#backtests`, o shell deixa apenas um loading marker com `data-feature-owned="backtests"`, permitindo que `feature-loader.js` aguarde o render base sem criar um ciclo de espera. O loader carrega `backtests-workspace.css` antes de `backtests.js`, não carrega `refinements.js` para essa view e em caso de falha de asset mostra um estado explícito `FEATURE_LOAD_ERROR` com retry. Não há fallback funcional legado para reintroduzir comportamento divergente. Execução, worker, limites HTTP e contratos financeiros/metodológicos do backend não mudam.
 
 ### Laboratório — `/lab`
 
@@ -250,15 +250,15 @@ O shell e o app base carregam primeiro. Features são montadas por view.
 Guardrails:
 
 - Promises de asset são reutilizadas para evitar downloads/imports duplicados;
-- a tentativa de CSS ocorre antes do módulo funcional;
-- falha de stylesheet não deve impedir o JS funcional;
+- a tentativa de CSS ocorre antes do módulo funcional quando a superfície depende do workspace final;
+- features que ainda possuem fallback podem degradar para a implementação anterior; owners tipados exclusivos, como Backtests, exibem erro/retry explícito quando CSS ou módulo obrigatório falha;
 - cada feature precisa ser idempotente e tolerar navegação repetida;
 - listeners/observers/timers precisam de cleanup quando a feature deixa de ser dona da view;
 - não usar montagem eager redundante quando o lifecycle já fornece evento de montagem;
-- `loto-lab:view-rendered` só é emitido depois que o render principal deixa o loading, reduzindo FOUC/layout shift e races de montagem;
+- `loto-lab:view-rendered` só é emitido depois que o render principal deixa o loading; handoffs marcados com `data-feature-owned` não bloqueiam essa emissão porque o owner lazy precisa receber o evento para substituir o marcador;
 - nome do evento, payload, leitura da view atual e subscribe/unsubscribe são centralizados em `web/src/core/viewLifecycle.ts`; `feature-loader.js` não redefine esse contrato.
 
-O contrato compartilhado de lifecycle já está em TypeScript. Status de dados e as features migradas, incluindo Meus Jogos, Análises, Gerador e Testes históricos, consomem esse core diretamente a partir de `web/src/features`. Análises, Gerador e Backtests deixaram de manter parsing próprio da hash e usam `currentMainView`/`onMainViewChanged` para cleanup de navegação. A #60 ainda deve migrar state/lifecycle internos do shell/app e de superfícies legadas restantes em fatias pequenas, eliminando duplicações quando houver ganho real de ownership; mover código de pasta sem reduzir ownership ou duplicação não é objetivo.
+O contrato compartilhado de lifecycle já está em TypeScript. Status de dados e as features migradas, incluindo Meus Jogos, Análises, Gerador e Testes históricos, consomem esse core diretamente a partir de `web/src/features`. Análises, Gerador e Backtests deixaram de manter parsing próprio da hash e usam `currentMainView`/`onMainViewChanged` para cleanup de navegação. Backtests também não depende mais de `refinements.js` nem de uma segunda implementação em `app.js`. A #60 ainda deve migrar state/lifecycle internos do shell/app e de superfícies legadas restantes em fatias pequenas, eliminando duplicações quando houver ganho real de ownership; mover código de pasta sem reduzir ownership ou duplicação não é objetivo.
 
 ## Acessibilidade
 
@@ -284,7 +284,7 @@ O browser E2E transversal do #143 repete a auditoria de legibilidade em desktop/
 - mensagens do toast compartilhado usam `textContent`, nunca `innerHTML`;
 - o frontend não deve replicar validação crítica como única defesa — invariantes continuam no backend/PostgreSQL.
 
-A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. A fundação TypeScript/formatters veio em #148; API client, errors, escaping, toast e o contrato compartilhado de lifecycle já foram migrados. Status de dados, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos já possuem implementação canônica TypeScript; state/lifecycle do shell/app, novas primitives justificadas e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
+A evolução para TypeScript/primitives compartilhadas é rastreada pela #60. A fundação TypeScript/formatters veio em #148; API client, errors, escaping, toast e o contrato compartilhado de lifecycle já foram migrados. Status de dados, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos já possuem implementação canônica TypeScript; Backtests já removeu também o fallback funcional duplicado. State/lifecycle do shell/app, novas primitives justificadas e decomposição dos módulos grandes continuam no escopo restante. Mudanças de jornada pertencem à #64.
 
 ## Trabalho pesado
 
