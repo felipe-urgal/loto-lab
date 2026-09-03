@@ -237,29 +237,11 @@ async function refineGames() {
   }
 }
 
-function refineBacktests() {
-  const form = root?.querySelector("#backtest-form");
-  if (!form || form.dataset.uiRefined === "true") return;
-  form.dataset.uiRefined = "true";
-
-  const start = form.querySelector("#bt-start");
-  const end = form.querySelector("#bt-end");
-  const endNumber = Number(end?.value);
-  if (start && !start.value && Number.isInteger(endNumber) && endNumber > 0) {
-    start.value = String(Math.max(1, endNumber - 99));
-    const note = document.createElement("div");
-    note.className = "backtest-default-note";
-    note.textContent = "Padrão: últimos 100 concursos. Limpe este campo para testar todo o histórico disponível.";
-    start.parentElement.append(note);
-  }
-}
-
 async function refine() {
   const view = currentView();
   if (view === "analysis") await refineAnalysis();
   else if (view === "generate") refineGenerate();
   else if (view === "games") await refineGames();
-  else if (view === "backtests") refineBacktests();
 }
 
 function scheduleRefine() {

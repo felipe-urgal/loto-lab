@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import type { Pool } from "pg";
 import { createLotoLabServer } from "../src/api/server.js";
 
-test("UI refinement assets are lazy-loaded for the main app and served for strategy lab", async (t) => {
+test("UI refinement assets are lazy-loaded and typed Backtests bypasses legacy refinements", async (t) => {
   const server = createLotoLabServer({ pool: {} as Pool });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -29,6 +29,9 @@ test("UI refinement assets are lazy-loaded for the main app and served for strat
   assert.match(loaderSource, /loadStyledModule\("refinements"\)/);
   assert.match(loaderSource, /await loadStyle\(name\)/);
   assert.match(loaderSource, /return loadModule\(name\)/);
+  assert.match(loaderSource, /if \(view === "backtests"\)/);
+  assert.match(loaderSource, /loadStyle\("backtests-workspace"\)/);
+  assert.match(loaderSource, /loadModule\("backtests"\)/);
   assert.doesNotMatch(loaderSource, /generation-diversity/);
 
   const app = await fetch(`${baseUrl}/assets/app.js`);
@@ -36,13 +39,26 @@ test("UI refinement assets are lazy-loaded for the main app and served for strat
   const appSource = await app.text();
   assert.match(appSource, /new AbortController\(\)/);
   assert.match(appSource, /isCurrentRender/);
+  assert.match(appSource, /data-feature-owned="backtests"/);
+  assert.doesNotMatch(appSource, /async function renderBacktests/);
 
   const mainRefinements = await fetch(`${baseUrl}/assets/refinements.js`);
   assert.equal(mainRefinements.status, 200);
   const mainSource = await mainRefinements.text();
   assert.match(mainSource, /Como a pontuação é calculada/);
   assert.match(mainSource, /Aguardando resultado do concurso/);
-  assert.match(mainSource, /últimos 100 concursos/i);
+  assert.doesNotMatch(mainSource, /últimos 100 concursos/i);
+  assert.doesNotMatch(mainSource, /refineBacktests/);
+
+  const backtestsBoundary = await fetch(`${baseUrl}/assets/backtests.js`);
+  assert.equal(backtestsBoundary.status, 200);
+  assert.match(await backtestsBoundary.text(), /src\/features\/backtests\.js/);
+
+  const backtests = await fetch(`${baseUrl}/assets/src/features/backtests.js`);
+  assert.equal(backtests.status, 200);
+  const backtestsSource = await backtests.text();
+  assert.match(backtestsSource, /últimos 100 concursos/i);
+  assert.match(backtestsSource, /backtests\/run/);
 
   const legacyGenerationDiversity = await fetch(`${baseUrl}/assets/generation-diversity.js`);
   assert.equal(legacyGenerationDiversity.status, 404);

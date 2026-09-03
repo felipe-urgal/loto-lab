@@ -73,6 +73,8 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.doesNotMatch(loaderSource, /loadStyledModule\("generation-diversity"\)/);
   assert.match(loaderSource, /my-games-v2/);
   assert.match(loaderSource, /my-games-management/);
+  assert.match(loaderSource, /backtests-workspace/);
+  assert.match(loaderSource, /loadModule\("backtests"\)/);
   assert.match(loaderSource, /styleLoads/);
   assert.match(loaderSource, /loadStyledModule/);
   assert.match(loaderSource, /addEventListener\("load"/);
@@ -86,7 +88,18 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   const source = await javascript.text();
   assert.match(source, /\/api\/v1/);
   assert.match(source, /games\/generate/);
-  assert.match(source, /backtests\/run/);
+  assert.match(source, /data-feature-owned="backtests"/);
+  assert.doesNotMatch(source, /backtests\/run/);
+
+  const backtestsBoundary = await fetch(`${baseUrl}/assets/backtests.js`);
+  assert.equal(backtestsBoundary.status, 200);
+  assert.match(await backtestsBoundary.text(), /src\/features\/backtests\.js/);
+
+  const typedBacktests = await fetch(`${baseUrl}/assets/src/features/backtests.js`);
+  assert.equal(typedBacktests.status, 200);
+  const typedBacktestsSource = await typedBacktests.text();
+  assert.match(typedBacktestsSource, /backtests\/run/);
+  assert.match(typedBacktestsSource, /currentMainView/);
 
   const invalidVersion = await fetch(`${baseUrl}/assets/app.js?v=stale-build`);
   assert.equal(invalidVersion.status, 200);
@@ -106,6 +119,8 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
     "lab.js",
     "data-status.js",
     "src/features/dataStatus.js",
+    "backtests.js",
+    "src/features/backtests.js",
     "styles.css",
     "refinements.css",
     "lab-workspace.css",

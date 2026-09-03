@@ -106,22 +106,27 @@ test("Generator 2.0 owns its conditioned reference copy in Portuguese", async ()
   assert.doesNotMatch(generator, /Os baselines abaixo são condicionados/);
 });
 
-test("core app owns dashboard, analyses and historical-test copy in Portuguese", async () => {
-  const app = await source("web/app.js");
+test("canonical owners keep dashboard, analyses and historical-test copy in Portuguese", async () => {
+  const [app, backtests] = await Promise.all([
+    source("web/app.js"),
+    source("web/src/features/backtests.ts"),
+  ]);
 
   assert.match(app, /dashboard: \["Painel"/);
   assert.match(app, /backtests: \["Testes históricos"/);
   assert.match(app, /Frequências, pontuação e classificação por horizonte/);
   assert.match(app, /Resumo do último teste histórico salvo/);
   assert.match(app, /Dezenas com maior pontuação/);
-  assert.match(app, /Executar teste histórico/);
-  assert.match(app, /Teste histórico concluído/);
+  assert.match(backtests, /Executar teste histórico/);
+  assert.match(backtests, /Teste histórico concluído/);
 
   assert.doesNotMatch(app, /dashboard: \["Dashboard"/);
   assert.doesNotMatch(app, /backtests: \["Backtests"/);
   assert.doesNotMatch(app, /Resumo do último backtest persistido/);
-  assert.doesNotMatch(app, />Executar backtest</);
+  assert.doesNotMatch(backtests, />Executar backtest</);
   assert.doesNotMatch(app, />Score</);
+  assert.doesNotMatch(app, /Executar teste histórico/);
+  assert.doesNotMatch(app, /Teste histórico concluído/);
 });
 
 test("strategy lab owns its visible vocabulary in Portuguese while preserving internal contracts", async () => {
