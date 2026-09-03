@@ -1,20 +1,10 @@
-const explainabilityRoot = document.querySelector("#content");
-let explainabilityObserver;
-
-function currentGenerationView() {
-  return location.hash.replace("#", "") === "generate";
-}
-
-function numberText(values) {
-  return (values || []).map((value) => String(value).padStart(2, "0")).join(" · ") || "—";
-}
-
-function explanationCard(title, copy, tone = "neutral") {
+function explanationCard(title: string, copy: string, tone = "neutral"): string {
   return `<article class="g2-explain-card is-${tone}"><strong>${title}</strong><p>${copy}</p></article>`;
 }
 
-function installStepper(shell) {
+function installStepper(shell: HTMLElement): void {
   if (shell.querySelector("[data-g2-explain-stepper]")) return;
+
   const stepper = document.createElement("section");
   stepper.className = "g2-explain-stepper";
   stepper.dataset.g2ExplainStepper = "true";
@@ -32,8 +22,9 @@ function installStepper(shell) {
   shell.insertBefore(stepper, shell.firstChild);
 }
 
-function installEducation(shell) {
+function installEducation(shell: HTMLElement): void {
   if (shell.querySelector("[data-g2-education]")) return;
+
   const education = document.createElement("section");
   education.className = "g2-education-grid";
   education.dataset.g2Education = "true";
@@ -44,9 +35,10 @@ function installEducation(shell) {
   shell.append(education);
 }
 
-function installWhyPanel(shell) {
-  const side = shell.querySelector(".g2-side");
+function installWhyPanel(shell: HTMLElement): void {
+  const side = shell.querySelector<HTMLElement>(".g2-side");
   if (!side || side.querySelector("[data-g2-why]")) return;
+
   const panel = document.createElement("section");
   panel.className = "panel g2-card g2-why";
   panel.dataset.g2Why = "true";
@@ -63,20 +55,20 @@ function installWhyPanel(shell) {
   side.prepend(panel);
 }
 
-function repeatedCount(gameCard) {
-  const row = [...gameCard.querySelectorAll(".g2-game-meta span")]
+function repeatedCount(gameCard: Element): number | null {
+  const row = [...gameCard.querySelectorAll<HTMLElement>(".g2-game-meta span")]
     .find((node) => node.textContent?.trim().startsWith("Repetidas"));
-  const value = Number(row?.querySelector("strong")?.textContent);
+  const value = Number(row?.querySelector<HTMLElement>("strong")?.textContent);
   return Number.isInteger(value) ? value : null;
 }
 
-function installLotofacilReadiness(preview) {
-  if (document.querySelector("#lottery-select")?.value !== "lotofacil") return;
+function installLotofacilReadiness(preview: HTMLElement): void {
+  if (document.querySelector<HTMLSelectElement>("#lottery-select")?.value !== "lotofacil") return;
   if (preview.querySelector("[data-g2-lotofacil-readiness]")) return;
 
-  const repeated = [...preview.querySelectorAll(".g2-game")]
+  const repeated = [...preview.querySelectorAll<HTMLElement>(".g2-game")]
     .map(repeatedCount)
-    .filter((value) => value !== null);
+    .filter((value): value is number => value !== null);
   if (repeated.length === 0) return;
 
   const acceptable = repeated.filter((value) => value >= 7 && value <= 11).length;
@@ -93,32 +85,54 @@ function installLotofacilReadiness(preview) {
       <div><strong>Repetidas por jogo</strong><span>${repeated.join(" · ")}</span></div>
       <div><strong>${allAcceptable ? "Perfil padrão respeitado" : "Perfil padrão alterado"}</strong><span>${allAcceptable ? "O lote permanece dentro do perfil documentado." : "Um filtro explícito pode ter sobrescrito a regra de proteção padrão; revise antes de salvar."}</span></div>
     </div>`;
-  const actions = preview.querySelector(".g2-result-actions");
+
+  const actions = preview.querySelector<HTMLElement>(".g2-result-actions");
   if (actions) actions.before(panel);
   else preview.append(panel);
 }
 
-function decoratePreview(shell) {
-  const preview = shell.querySelector(".g2-preview");
+function decoratePreview(shell: HTMLElement): void {
+  const preview = shell.querySelector<HTMLElement>(".g2-preview");
   if (!preview || preview.dataset.explainabilityReady === "true") return;
   preview.dataset.explainabilityReady = "true";
 
-  const auditGrid = preview.querySelector(".g2-audit-grid");
+  const auditGrid = preview.querySelector<HTMLElement>(".g2-audit-grid");
   if (auditGrid) {
     const title = document.createElement("div");
     title.className = "g2-preview-explain-title";
-    title.innerHTML = `<strong>Auditoria do lote</strong><span>Leia o conjunto como um portfólio: núcleo, amplitude e sobreposição importam mais do que um cartão isolado.</span>`;
+    title.innerHTML = "<strong>Auditoria do lote</strong><span>Leia o conjunto como um portfólio: núcleo, amplitude e sobreposição importam mais do que um cartão isolado.</span>";
     auditGrid.before(title);
   }
 
-  preview.querySelectorAll(".g2-game").forEach((gameCard) => {
+  preview.querySelectorAll<HTMLElement>(".g2-game").forEach((gameCard) => {
     if (gameCard.querySelector(".g2-game-reason")) return;
-    const fixed = [...gameCard.querySelectorAll(".ball.is-fixed")].map((node) => node.textContent?.trim()).filter(Boolean);
-    const variable = [...gameCard.querySelectorAll(".ball:not(.is-fixed)")].map((node) => node.textContent?.trim()).filter(Boolean);
-    const meta = [...gameCard.querySelectorAll(".g2-game-meta span")].map((node) => node.textContent?.replace(/\s+/g, " ").trim()).filter(Boolean);
+
+    const fixed = [...gameCard.querySelectorAll<HTMLElement>(".ball.is-fixed")]
+      .map((node) => node.textContent?.trim())
+      .filter((value): value is string => Boolean(value));
+    const variable = [...gameCard.querySelectorAll<HTMLElement>(".ball:not(.is-fixed)")]
+      .map((node) => node.textContent?.trim())
+      .filter((value): value is string => Boolean(value));
+    const meta = [...gameCard.querySelectorAll<HTMLElement>(".g2-game-meta span")]
+      .map((node) => node.textContent?.replace(/\s+/g, " ").trim())
+      .filter((value): value is string => Boolean(value));
+
     const reason = document.createElement("div");
     reason.className = "g2-game-reason";
-    reason.innerHTML = `<strong>Como ler este jogo</strong><p><b>Núcleo:</b> ${fixed.join(" · ") || "sem núcleo"}. <b>Variáveis:</b> ${variable.join(" · ") || "—"}. ${meta.join(" · ")}.</p>`;
+    reason.innerHTML = "<strong>Como ler este jogo</strong>";
+
+    const copy = document.createElement("p");
+    const fixedLabel = document.createElement("b");
+    fixedLabel.textContent = "Núcleo:";
+    const variableLabel = document.createElement("b");
+    variableLabel.textContent = "Variáveis:";
+    copy.append(
+      fixedLabel,
+      ` ${fixed.join(" · ") || "sem núcleo"}. `,
+      variableLabel,
+      ` ${variable.join(" · ") || "—"}. ${meta.join(" · ")}.`,
+    );
+    reason.append(copy);
     gameCard.append(reason);
   });
 
@@ -137,33 +151,20 @@ function decoratePreview(shell) {
   preview.append(rationale);
 }
 
-function enhanceGeneration() {
-  if (!currentGenerationView() || !explainabilityRoot) return;
-  const shell = explainabilityRoot.querySelector(".g2-shell");
-  if (!shell) return;
-  const principle = shell.querySelector(".g2-principle");
+export function installGenerationExplainability(shell: HTMLElement): () => void {
+  const principle = shell.querySelector<HTMLElement>(".g2-principle");
   if (principle) {
-    principle.innerHTML = `<strong>Gerar Jogos</strong><span>O sistema compõe jogos com metodologia, cobertura e diversificação controlada. Não é previsão: cada etapa abaixo mostra como o lote foi construído e o que ela significa.</span>`;
+    principle.innerHTML = "<strong>Gerar Jogos</strong><span>O sistema compõe jogos com metodologia, cobertura e diversificação controlada. Não é previsão: cada etapa abaixo mostra como o lote foi construído e o que ela significa.</span>";
   }
+
   installStepper(shell);
   installWhyPanel(shell);
   installEducation(shell);
   decoratePreview(shell);
 
-  explainabilityObserver?.disconnect();
-  explainabilityObserver = new MutationObserver(() => decoratePreview(shell));
-  const result = shell.querySelector("[data-g2-result]");
-  if (result) explainabilityObserver.observe(result, { childList: true, subtree: true });
+  const observer = new MutationObserver(() => decoratePreview(shell));
+  const result = shell.querySelector<HTMLElement>("[data-g2-result]");
+  if (result) observer.observe(result, { childList: true, subtree: true });
+
+  return () => observer.disconnect();
 }
-
-window.addEventListener("loto-lab:view-rendered", (event) => {
-  if (event.detail?.view !== "generate") {
-    explainabilityObserver?.disconnect();
-    return;
-  }
-  requestAnimationFrame(() => requestAnimationFrame(enhanceGeneration));
-});
-
-window.addEventListener("hashchange", () => {
-  if (!currentGenerationView()) explainabilityObserver?.disconnect();
-});

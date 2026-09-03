@@ -83,14 +83,11 @@ async function ensureViewFeatures() {
   await loadStyledModule("refinements");
 
   if (view === "generate") {
-    // Generator 2.0 owns the advanced workspace. The basic generator rendered
-    // by app.js remains the fallback when this optional module cannot mount.
+    // Generator 2.0 owns the advanced workspace. Its boundary imports the
+    // functional owner plus typed readiness/explainability enhancements under
+    // one shared lifecycle instead of loading independent legacy modules.
     await loadStyledModule("generation-v2");
-    // Readiness keeps derived local defaults aligned with the latest conditioned plan.
-    await loadModule("generation-readiness");
-    // Explainability remains additive JS; its presentation is owned by the final workspace.
-    await loadModule("generation-explainability");
-    // Prototype 1 owns the final presentation after both functional layers exist.
+    // Prototype 1 owns the final presentation after the functional layers exist.
     await loadStyle("generation-workspace");
   } else if (view === "games") {
     // My Games 2.0 owns the clean management surface. If it cannot load, keep

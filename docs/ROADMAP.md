@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-09-03**, com #155–#160/#163/#175 já na `main`, composition root HTTP concluído e a modularização TypeScript do frontend avançando em fatias pequenas, incluindo as migrações canônicas de Meus Jogos, Análises, Gerador e Testes históricos e a retirada do fallback funcional legado de Backtests.
+> Baseline revisada em **2026-09-03**, com #155–#160/#163/#175 já na `main`, composition root HTTP concluído e a modularização TypeScript do frontend avançando em fatias pequenas, incluindo as migrações canônicas de Meus Jogos, Análises, Gerador e Testes históricos, a retirada do fallback funcional legado de Backtests e a absorção das camadas de readiness/explainability do Gerador em owners TypeScript internos.
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -135,7 +135,7 @@ A revisão de CLI/scheduler não encontrou motivo para mover engines puros ou li
 
 ## #60 — Frontend TypeScript, módulos e primitives · P1 · em andamento
 
-A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos avançaram em fatias próprias; Meus Jogos, Análises e Gerador também explicitam contratos internos consumidos pela UI em owners menores.
+A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos avançaram em fatias próprias; Meus Jogos, Análises e Gerador também explicitam contratos internos consumidos pela UI em owners menores. No Gerador, readiness e explainability agora também possuem ownership TypeScript interno e lifecycle coordenado sem listeners/hash parsing paralelos.
 
 Entregue:
 
@@ -153,6 +153,9 @@ Entregue:
 - Meus Jogos com controller canônico em `web/src/features/myGames.ts`, contratos e responsabilidades de UI decompostos em `web/src/features/myGames/`, `web/my-games-v2.js` reduzido a boundary compatível e campos financeiros opcionais tipados sem coerção de ausência para zero;
 - Análises 2.0 com implementação funcional canônica em `web/src/features/analysisV2.ts`, DTOs consumidos pela UI em `web/src/features/analysisV2/types.ts`, consumo direto de API/escaping/lifecycle compartilhados e `web/analysis-v2.js` reduzido a boundary compatível;
 - Generator 2.0 com implementação funcional canônica em `web/src/features/generationV2.ts`, contratos de plano/auditoria/preview/save/estado em `web/src/features/generationV2/types.ts`, consumo direto de API/escaping/lifecycle compartilhados e `web/generation-v2.js` reduzido a boundary compatível;
+- readiness de soma condicionada migrada de `web/generation-readiness.js` para `web/src/features/generationV2/readiness.ts`, preservando customização explícita do usuário e atualização via handlers do owner funcional;
+- explainability/auditoria visual migrada de `web/generation-explainability.js` para `web/src/features/generationV2/explainability.ts`, preservando o fluxo de cinco etapas, guardrails de Lotofácil e textos anti-previsão; conteúdo derivado do DOM usado no motivo de cada jogo passa por `textContent`;
+- `web/src/features/generationV2/enhancements.ts` coordena montagem/cleanup das duas camadas via lifecycle compartilhado; `feature-loader.js` deixa de carregá-las como módulos JS independentes e os dois assets legados são removidos;
 - Testes históricos com implementação funcional canônica em `web/src/features/backtests.ts`, `web/backtests.js` reduzido a boundary, consumo direto de API/lifecycle/escaping/formatters/toast compartilhados, abort/stale-response guard e preservação do padrão de últimos 100 concursos;
 - fallback funcional duplicado de Testes históricos removido de `web/app.js` + `refinements.js`; o app base mantém apenas um handoff de shell e `feature-loader.js` trata falha de asset do owner tipado com erro/retry explícito, sem restaurar implementação paralela.
 
