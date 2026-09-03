@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-09-02**, com #155–#160/#163/#175 já na `main`, composition root HTTP concluído e a modularização TypeScript do frontend avançando em fatias pequenas, incluindo as migrações canônicas de Meus Jogos, Análises e Gerador.
+> Baseline revisada em **2026-09-03**, com #155–#160/#163/#175 já na `main`, composition root HTTP concluído e a modularização TypeScript do frontend avançando em fatias pequenas, incluindo as migrações canônicas de Meus Jogos, Análises, Gerador e Testes históricos.
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -89,7 +89,8 @@ A diretriz permanece:
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- frontend ainda possui módulos grandes/imperativos; primitives compartilhadas e várias features canônicas — incluindo Status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises e Gerador — já estão em TypeScript, mas state/lifecycle e decomposição do shell/app e de superfícies legadas restantes seguem ativos na #60;
+- frontend ainda possui módulos grandes/imperativos; primitives compartilhadas e várias features canônicas — incluindo Status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos — já estão em TypeScript, mas state/lifecycle e decomposição do shell/app e de superfícies legadas restantes seguem ativos na #60;
+- o fallback funcional de Testes históricos ainda existe em `web/app.js` + `refinements.js` durante a estabilização do owner tipado; removê-lo exige uma fatia própria com regressão/E2E verde, sem big-bang;
 - hotspots algorítmicos continuam grandes (#62);
 - observabilidade segue baseada principalmente em logs/estado persistido, sem métricas/SLOs (#63);
 - arquitetura de informação pós-redesign ainda pode reduzir troca de contexto (#64);
@@ -135,7 +136,7 @@ A revisão de CLI/scheduler não encontrou motivo para mover engines puros ou li
 
 ## #60 — Frontend TypeScript, módulos e primitives · P1 · em andamento
 
-A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises e Gerador avançaram em fatias próprias; Meus Jogos, Análises e Gerador também explicitam contratos internos consumidos pela UI em owners menores.
+A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos avançaram em fatias próprias; Meus Jogos, Análises e Gerador também explicitam contratos internos consumidos pela UI em owners menores.
 
 Entregue:
 
@@ -152,11 +153,13 @@ Entregue:
 - Status, Agenda, IA, Estratégias, Execuções e Laboratório com implementação funcional canônica em `web/src/features` e boundaries JavaScript compatíveis;
 - Meus Jogos com controller canônico em `web/src/features/myGames.ts`, contratos e responsabilidades de UI decompostos em `web/src/features/myGames/`, `web/my-games-v2.js` reduzido a boundary compatível e campos financeiros opcionais tipados sem coerção de ausência para zero;
 - Análises 2.0 com implementação funcional canônica em `web/src/features/analysisV2.ts`, DTOs consumidos pela UI em `web/src/features/analysisV2/types.ts`, consumo direto de API/escaping/lifecycle compartilhados e `web/analysis-v2.js` reduzido a boundary compatível;
-- Generator 2.0 com implementação funcional canônica em `web/src/features/generationV2.ts`, contratos de plano/auditoria/preview/save/estado em `web/src/features/generationV2/types.ts`, consumo direto de API/escaping/lifecycle compartilhados e `web/generation-v2.js` reduzido a boundary compatível.
+- Generator 2.0 com implementação funcional canônica em `web/src/features/generationV2.ts`, contratos de plano/auditoria/preview/save/estado em `web/src/features/generationV2/types.ts`, consumo direto de API/escaping/lifecycle compartilhados e `web/generation-v2.js` reduzido a boundary compatível;
+- Testes históricos com implementação funcional canônica em `web/src/features/backtests.ts`, `web/backtests.js` reduzido a boundary, consumo direto de API/lifecycle/escaping/formatters/toast compartilhados, abort/stale-response guard e preservação do padrão de últimos 100 concursos. `web/app.js` + `refinements.js` permanecem fallback funcional deliberado nesta primeira fatia.
 
 Próximas fatias:
 
 - expandir `web/src/{core,design-system,features,shared}` conforme ownership real;
+- remover o fallback duplicado de Testes históricos somente após estabilização/regressão verde do owner tipado;
 - state/lifecycle internos das superfícies legadas restantes, eliminando duplicações concretas de hash/cleanup;
 - avançar o shell/app em fatias pequenas quando a separação puder ser feita sem big-bang;
 - decomposição dos módulos grandes ainda ativos;
