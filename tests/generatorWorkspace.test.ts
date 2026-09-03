@@ -3,24 +3,27 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 test("generator workspace follows Prototype 1 while preserving audited generation", async () => {
-  const [loader, workspace, boundary, generator, types, explainability] = await Promise.all([
+  const [loader, workspace, boundary, generator, types, explainability, enhancements] = await Promise.all([
     readFile("web/feature-loader.js", "utf8"),
     readFile("web/generation-workspace.css", "utf8"),
     readFile("web/generation-v2.js", "utf8"),
     readFile("web/src/features/generationV2.ts", "utf8"),
     readFile("web/src/features/generationV2/types.ts", "utf8"),
-    readFile("web/generation-explainability.js", "utf8"),
+    readFile("web/src/features/generationV2/explainability.ts", "utf8"),
+    readFile("web/src/features/generationV2/enhancements.ts", "utf8"),
   ]);
 
   const generatorLayer = loader.indexOf('loadStyledModule("generation-v2")');
-  const explainabilityLayer = loader.indexOf('loadModule("generation-explainability")');
   const workspaceLayer = loader.indexOf('loadStyle("generation-workspace")');
   assert.ok(generatorLayer >= 0, "Generator 2.0 must remain the functional owner");
-  assert.ok(explainabilityLayer > generatorLayer, "explainability must remain additive");
-  assert.ok(workspaceLayer > explainabilityLayer, "Prototype 1 must be the final generator style layer");
+  assert.ok(workspaceLayer > generatorLayer, "Prototype 1 must remain the final generator style layer");
+  assert.doesNotMatch(loader, /loadModule\("generation-explainability"\)/);
+  assert.doesNotMatch(loader, /loadModule\("generation-readiness"\)/);
   assert.doesNotMatch(loader, /loadStyledModule\("generation-explainability"\)/);
   assert.doesNotMatch(loader, /loadStyle\("generation-explainability"\)/);
   assert.doesNotMatch(loader, /generation-diversity/);
+  await assert.rejects(readFile("web/generation-explainability.js", "utf8"), /ENOENT/);
+  await assert.rejects(readFile("web/generation-readiness.js", "utf8"), /ENOENT/);
   await assert.rejects(readFile("web/generation-explainability.css", "utf8"), /ENOENT/);
   await assert.rejects(readFile("web/generation-diversity.js", "utf8"), /ENOENT/);
   await assert.rejects(readFile("web/generation-diversity.css", "utf8"), /ENOENT/);
@@ -37,7 +40,10 @@ test("generator workspace follows Prototype 1 while preserving audited generatio
   assert.match(workspace, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
 
-  assert.equal(boundary, 'import "./src/features/generationV2.js";\n');
+  assert.equal(
+    boundary,
+    'import "./src/features/generationV2.js";\nimport "./src/features/generationV2/enhancements.js";\n',
+  );
   assert.match(generator, /from "\.\.\/core\/api\.js"/);
   assert.match(generator, /from "\.\.\/core\/viewLifecycle\.js"/);
   assert.match(generator, /from "\.\.\/shared\/escaping\.js"/);
@@ -52,6 +58,9 @@ test("generator workspace follows Prototype 1 while preserving audited generatio
   assert.match(generator, /includeSeed \? state\.preview\?\.generatorOptions\.seed/);
   assert.match(generator, /Se o histórico mudar, o save é recusado/);
   assert.match(explainability, /Isto não é previsão/);
-  assert.match(explainability, /loto-lab:view-rendered/);
   assert.match(explainability, /data-g2-explain-stepper/);
+  assert.match(enhancements, /onViewRendered/);
+  assert.match(enhancements, /onMainViewChanged/);
+  assert.doesNotMatch(enhancements, /location\.hash/);
+  assert.doesNotMatch(enhancements, /addEventListener\("hashchange"/);
 });
