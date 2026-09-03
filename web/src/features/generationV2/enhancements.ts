@@ -23,26 +23,38 @@ function scheduleEnhancements(detail: ViewRenderedDetail): void {
   const token = ++lifecycleToken;
   if (!root || detail.view !== "generate" || currentMainView() !== "generate") return;
 
-  let frame = 0;
-  const waitForWorkspace = (): void => {
+  let mountedShell: HTMLElement | null = null;
+  let cleanupLayers: (() => void) | null = null;
+
+  const mountCurrentShell = (): void => {
     if (token !== lifecycleToken || currentMainView() !== "generate") return;
 
     const shell = root.querySelector<HTMLElement>(".g2-shell");
-    if (shell) {
-      const cleanupReadiness = installGenerationReadiness(shell);
-      const cleanupExplainability = installGenerationExplainability(shell);
-      cleanupCurrent = () => {
-        cleanupExplainability();
-        cleanupReadiness();
-      };
-      return;
-    }
+    if (!shell || shell === mountedShell) return;
 
-    frame += 1;
-    if (frame < 120) requestAnimationFrame(waitForWorkspace);
+    cleanupLayers?.();
+    mountedShell = shell;
+    const cleanupReadiness = installGenerationReadiness(shell);
+    const cleanupExplainability = installGenerationExplainability(shell);
+    cleanupLayers = () => {
+      cleanupExplainability();
+      cleanupReadiness();
+    };
   };
 
-  requestAnimationFrame(waitForWorkspace);
+  // The owner can replace an existing workspace after an async plan refresh.
+  // Watch only direct root replacements so enhancements follow the new shell
+  // without observing the high-volume mutations inside the workspace itself.
+  const rootObserver = new MutationObserver(mountCurrentShell);
+  rootObserver.observe(root, { childList: true });
+  mountCurrentShell();
+
+  cleanupCurrent = () => {
+    rootObserver.disconnect();
+    cleanupLayers?.();
+    cleanupLayers = null;
+    mountedShell = null;
+  };
 }
 
 onViewRendered((detail) => {
