@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-test("historical-test workspace has typed canonical ownership with a functional legacy fallback", async () => {
+test("historical-test workspace has typed-only canonical ownership without legacy fallback", async () => {
   const [loader, workspace, boundary, source, app, refinements] = await Promise.all([
     readFile("web/feature-loader.js", "utf8"),
     readFile("web/backtests-workspace.css", "utf8"),
@@ -12,15 +12,20 @@ test("historical-test workspace has typed canonical ownership with a functional 
     readFile("web/refinements.js", "utf8"),
   ]);
 
-  const refinementsLoad = loader.indexOf('loadStyledModule("refinements")');
   const backtestsBranch = loader.indexOf('if (view === "backtests")');
+  const refinementsLoad = loader.indexOf('loadStyledModule("refinements")');
   const workspaceLoad = loader.indexOf('loadStyle("backtests-workspace")');
   const moduleLoad = loader.indexOf('loadModule("backtests")');
-  assert.ok(refinementsLoad >= 0, "shared refinements must remain available as fallback");
-  assert.ok(backtestsBranch > refinementsLoad, "historical-test view must preserve its fallback before typed ownership");
+  assert.ok(backtestsBranch >= 0, "historical-test view must have an explicit typed-only loader branch");
   assert.ok(workspaceLoad > backtestsBranch, "Prototype 1 must load before the typed historical-test owner");
   assert.ok(moduleLoad > workspaceLoad, "typed historical-test owner must mount only after its workspace CSS");
-  assert.match(loader, /const styleReady = await loadStyle\("backtests-workspace"\);[\s\S]*if \(styleReady\) await loadModule\("backtests"\)/);
+  assert.ok(refinementsLoad > backtestsBranch, "Backtests must bypass generic legacy refinements");
+  assert.match(loader, /const styleReady = await loadStyle\("backtests-workspace"\);[\s\S]*return styleReady \? loadModule\("backtests"\) : false;/);
+  assert.match(loader, /\.loading-state:not\(\[data-feature-owned\]\)/);
+  assert.match(loader, /featuresReady === false[\s\S]*renderFeatureLoadError\(view\)/);
+  assert.match(loader, /FEATURE_LOAD_ERROR/);
+  assert.match(loader, /data-feature-retry/);
+  assert.match(loader, /#refresh-view/);
 
   assert.equal(boundary, 'import "./src/features/backtests.js";\n');
   assert.match(source, /from "\.\.\/core\/api\.js"/);
@@ -54,10 +59,12 @@ test("historical-test workspace has typed canonical ownership with a functional 
   assert.match(workspace, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
 
-  // The current slice keeps the pre-TypeScript implementation as an explicit
-  // functional fallback. A later #60 slice may remove it after the typed owner
-  // has proven stable, but it must not become canonical again.
-  assert.match(app, /api\(`\/backtests\/\$\{render\.lottery\}\?limit=20`/);
-  assert.match(app, /api\("\/backtests\/run", \{ method: "POST"/);
-  assert.match(refinements, /function refineBacktests\(\)/);
+  assert.match(app, /render\.view === "backtests"[\s\S]*data-feature-owned="backtests"/);
+  assert.doesNotMatch(app, /async function renderBacktests/);
+  assert.doesNotMatch(app, /function backtestRow/);
+  assert.doesNotMatch(app, /async function handleBacktest/);
+  assert.doesNotMatch(app, /api\(`\/backtests\/\$\{render\.lottery\}\?limit=20`/);
+  assert.doesNotMatch(app, /api\("\/backtests\/run", \{ method: "POST"/);
+  assert.doesNotMatch(refinements, /function refineBacktests\(\)/);
+  assert.doesNotMatch(refinements, /view === "backtests"/);
 });
