@@ -3,12 +3,43 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 test("dashboard scope keeps comparison mode separate from the active lottery", async () => {
-  const [scopeSource, loaderSource, statusSource, scopeCss] = await Promise.all([
+  const [
+    boundary,
+    scopeSource,
+    financialSource,
+    typesSource,
+    loaderSource,
+    statusSource,
+    scopeCss,
+  ] = await Promise.all([
     readFile("web/dashboard-scope.js", "utf8"),
+    readFile("web/src/features/dashboardScope.ts", "utf8"),
+    readFile("web/src/features/dashboardScope/financial.ts", "utf8"),
+    readFile("web/src/features/dashboardScope/types.ts", "utf8"),
     readFile("web/feature-loader.js", "utf8"),
     readFile("web/src/features/dataStatus.ts", "utf8"),
     readFile("web/dashboard-scope.css", "utf8"),
   ]);
+
+  assert.equal(boundary, 'import "./src/features/dashboardScope.js";\n');
+  assert.match(scopeSource, /from "\.\.\/core\/api\.js"/);
+  assert.match(scopeSource, /from "\.\.\/core\/viewLifecycle\.js"/);
+  assert.match(scopeSource, /from "\.\.\/shared\/escaping\.js"/);
+  assert.match(scopeSource, /from "\.\.\/shared\/formatters\.js"/);
+  assert.match(scopeSource, /from "\.\.\/shared\/toast\.js"/);
+  assert.doesNotMatch(scopeSource, /from "\.\/runtime\.js"/);
+  assert.doesNotMatch(scopeSource, /location\.hash\.replace/);
+  assert.doesNotMatch(scopeSource, /addEventListener\("hashchange"/);
+  assert.match(scopeSource, /currentMainView\(\)/);
+  assert.match(scopeSource, /onMainViewChanged/);
+  assert.match(scopeSource, /onViewRendered/);
+  assert.match(scopeSource, /loadController\?\.abort\(\)/);
+  assert.match(scopeSource, /controller\.signal\.aborted/);
+
+  assert.match(typesSource, /export type DashboardScope = "all" \| LotteryId/);
+  assert.match(typesSource, /export type RealBetSummaryDto/);
+  assert.match(typesSource, /checkedCost\?: unknown/);
+  assert.match(typesSource, /netResult\?: unknown/);
 
   assert.match(scopeSource, /loto-lab:dashboard-scope/);
   assert.match(scopeSource, /option\.value = "all"/);
@@ -45,9 +76,15 @@ test("dashboard scope keeps comparison mode separate from the active lottery", a
   assert.match(scopeSource, /function focusedMetrics/);
   assert.match(scopeSource, /function allMetrics/);
   assert.match(scopeSource, /function realStatusCard/);
-  assert.match(scopeSource, /summary\.checkedCost/);
-  assert.match(scopeSource, /checkedCost > 0 \? netResult \/ checkedCost : undefined/);
-  assert.doesNotMatch(scopeSource, /actualCost > 0 \? netResult \/ actualCost/);
+  assert.match(financialSource, /knownNumber\(summary\.checkedCost\)/);
+  assert.match(financialSource, /knownNumber\(summary\.netResult\)/);
+  assert.match(financialSource, /costs\.every/);
+  assert.match(financialSource, /results\.every/);
+  assert.match(financialSource, /checkedCost > 0/);
+  assert.doesNotMatch(scopeSource, /netResult \|\| 0/);
+  assert.doesNotMatch(scopeSource, /actualCost \|\| 0/);
+  assert.doesNotMatch(scopeSource, /totalPrizeValue \|\| 0/);
+  assert.match(scopeSource, /Custo conferido indisponível/);
   assert.match(scopeSource, /custo conferido/);
   assert.match(scopeSource, /dashboard-metrics-grid/);
   assert.match(scopeSource, /dashboard-overview-grid/);
