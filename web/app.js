@@ -22,7 +22,6 @@ const ICONS = {
   history: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>',
   refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.4-2.5L20 11"/><path d="M4 13l2.5 4.5A7 7 0 0 0 18 15"/></svg>',
   arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 18 6-6-6-6"/></svg>',
-  play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m8 5 11 7-11 7V5Z"/></svg>',
 };
 
 const state = {
@@ -367,67 +366,6 @@ async function handleCheckBatch(event) {
   }
 }
 
-async function renderBacktests(render) {
-  const data = await api(`/backtests/${render.lottery}?limit=20`, { signal: render.signal });
-  const runs = data.items || [];
-  const latest = await safeApi(`/contests/${render.lottery}/latest`, { signal: render.signal });
-  if (!isCurrentRender(render)) return;
-
-  content.innerHTML = `<div class="stack">
-    <section><div class="section-head"><div><h2>Executar teste histórico</h2><p>Cada concurso é simulado usando somente o histórico disponível antes dele.</p></div></div><form class="panel form-panel" id="backtest-form"><div class="form-grid">
-      <div class="field"><label for="bt-games">Jogos por concurso</label><input id="bt-games" name="gameCount" type="number" min="1" max="10" value="${LOTTERIES[render.lottery].defaultGames}" /></div>
-      <div class="field"><label for="bt-warmup">Aquecimento</label><input id="bt-warmup" name="warmupContests" type="number" min="1" max="500" value="20" /></div>
-      <div class="field" ${render.lottery !== "lotofacil" ? 'style="display:none"' : ""}><label for="bt-fixed">Núcleo fixo</label><select id="bt-fixed" name="fixedCount"><option value="8">8 dezenas</option><option value="9">9 dezenas</option><option value="10">10 dezenas</option></select></div>
-      <div class="field"><label for="bt-start">Concurso inicial</label><input id="bt-start" name="startContest" type="number" min="1" placeholder="Opcional" /></div>
-      <div class="field"><label for="bt-end">Concurso final</label><input id="bt-end" name="endContest" type="number" min="1" value="${latest?.number || ""}" placeholder="Opcional" /></div>
-    </div><div class="form-actions"><div><label class="checkbox"><input type="checkbox" name="persist" checked /> Salvar execução</label><div class="form-note">Cada execução HTTP é limitada a 500 concursos para proteger a aplicação.</div></div><button class="button primary" type="submit"><span class="button-icon" data-icon="play"></span>Executar teste histórico</button></div></form></section>
-    <section id="backtest-result"></section>
-    <section><div class="section-head"><div><h2>Execuções recentes</h2><p>Histórico persistido para ${lotteryLabel(render.lottery)}.</p></div></div><div class="panel list">${runs.length ? runs.map(backtestRow).join("") : emptyState("Nenhum teste histórico salvo", "Execute a primeira simulação para criar seu histórico.")}</div></section>
-  </div>`;
-  installIcons(content);
-  content.querySelector("#backtest-form").addEventListener("submit", handleBacktest);
-}
-
-function backtestRow(run) {
-  const summary = run.summary || {};
-  const roi = summary.roi;
-  return `<div class="list-row"><div class="list-row-main"><strong>Teste histórico #${run.id}</strong><p>${run.roundCount} concurso(s) · ${summary.totalGames ?? "—"} jogo(s) · ${formatDateTime(run.createdAt)}</p></div><div class="list-row-value"><strong class="${typeof roi === "number" && roi >= 0 ? "positive" : ""}">${formatPercent(roi)}</strong><small>ROI · cobertura ${formatPercent(summary.financialCoverage)}</small></div></div>`;
-}
-
-async function handleBacktest(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const button = form.querySelector("button[type=submit]");
-  const output = content.querySelector("#backtest-result");
-  const data = new FormData(form);
-  const body = {
-    lottery: state.lottery,
-    gameCount: Number(data.get("gameCount")),
-    warmupContests: Number(data.get("warmupContests")),
-    persist: data.get("persist") === "on",
-  };
-  if (data.get("startContest")) body.startContest = Number(data.get("startContest"));
-  if (data.get("endContest")) body.endContest = Number(data.get("endContest"));
-  if (state.lottery === "lotofacil") body.fixedCount = Number(data.get("fixedCount"));
-
-  button.disabled = true;
-  button.innerHTML = '<span class="spinner" style="width:14px;height:14px"></span>Executando...';
-  output.innerHTML = '<div class="loading-state" style="min-height:120px"><span class="spinner"></span><span>Simulando concursos históricos...</span></div>';
-  try {
-    const result = await api("/backtests/run", { method: "POST", body: JSON.stringify(body) });
-    const summary = result.summary || {};
-    output.innerHTML = `<div class="section-head"><div><h2>Resultado ${result.id ? `· #${result.id}` : ""}</h2><p>${result.roundCount} concurso(s) simulados.</p></div></div><div class="grid cols-4">${metric("ROI", formatPercent(summary.roi), "resultado sobre o custo coberto", typeof summary.roi === "number" ? (summary.roi >= 0 ? "positive" : "negative") : "")}${metric("Custo", formatCurrency(summary.financialCost), "custo com rateio disponível")}${metric("Prêmios", formatCurrency(summary.totalPrizeValue), "retorno bruto conhecido")}${metric("Cobertura", formatPercent(summary.financialCoverage), `${summary.totalGames ?? "—"} jogos simulados`)}</div>`;
-    toast("Teste histórico concluído.");
-  } catch (error) {
-    output.innerHTML = `<div class="error-state" style="min-height:140px"><span class="error-code">${escapeHtml(error.code)}</span><strong>Falha no teste histórico</strong><p>${escapeHtml(error.message)}</p></div>`;
-    toast(error.message, "error");
-  } finally {
-    button.disabled = false;
-    button.innerHTML = '<span class="button-icon" data-icon="play"></span>Executar teste histórico';
-    installIcons(button);
-  }
-}
-
 async function renderCurrentView() {
   state.renderController?.abort();
   const controller = new AbortController();
@@ -447,7 +385,9 @@ async function renderCurrentView() {
     else if (render.view === "analysis") await renderAnalysis(render);
     else if (render.view === "generate") await renderGenerate(render);
     else if (render.view === "games") await renderGames(render);
-    else if (render.view === "backtests") await renderBacktests(render);
+    else if (render.view === "backtests") {
+      content.innerHTML = '<div class="loading-state" data-feature-owned="backtests"><span class="spinner"></span><span>Carregando Testes históricos...</span></div>';
+    }
   } catch (error) {
     if (error?.name !== "AbortError" && isCurrentRender(render)) errorState(error);
   } finally {
