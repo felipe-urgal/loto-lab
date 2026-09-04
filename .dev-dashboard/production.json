@@ -5,7 +5,7 @@
     "strategy": "command",
     "provider": "docker-compose",
     "branch": "main",
-    "documentation": "docs/PRODUCTION-CONTRACT.md",
+    "documentation": "docs/PRODUCTION.md",
     "commands": {
       "status": "prod:status",
       "check": "prod:check",
