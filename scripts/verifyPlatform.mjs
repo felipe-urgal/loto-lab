@@ -112,10 +112,9 @@ const requiredWorkflowSnippets = [
   ["permissions mínimos", "permissions:\n  contents: read"],
   ["grupo de concorrência", "group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"],
   ["cancelamento apenas de PR superseded", "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"],
-  ["timeout global do job", "    timeout-minutes: 15"],
-  ["timeout dos testes", "      - name: Run tests with coverage\n        timeout-minutes: 5"],
-  ["timeout do build da imagem", "      - name: Build production image\n        timeout-minutes: 5"],
-  ["timeout do E2E", "      - name: Run real-browser E2E\n        timeout-minutes: 5"],
+  ["timeout global do job", "    timeout-minutes: 10"],
+  ["checks estáticos", "      - name: Static checks\n        run: npm run lint"],
+  ["testes", "      - name: Tests\n        run: npm test"],
 ];
 for (const [label, snippet] of requiredWorkflowSnippets) {
   if (!workflow.includes(snippet)) fail(`CI perdeu ${label}`);
@@ -123,9 +122,10 @@ for (const [label, snippet] of requiredWorkflowSnippets) {
 
 const requiredSecurityWorkflowSnippets = [
   ["permissions mínimas", "permissions:\n  contents: read"],
+  ["execução semanal", "  schedule:\n    - cron: \"17 6 * * 1\""],
+  ["execução manual", "  workflow_dispatch:"],
+  ["audit de dependências de produção", "        run: npm run audit:prod"],
   ["CodeQL com security-events", "      security-events: write"],
-  ["dependency review high", "          fail-on-severity: high"],
-  ["dependency review runtime", "          fail-on-scopes: runtime"],
   ["Trivy fixável como bloqueio", "          ignore-unfixed: true\n          exit-code: 1"],
   ["Trivy v0.70.0 explícito", "          version: v0.70.0"],
   ["Syft v1.42.3 explícito", "          syft-version: v1.42.3"],
@@ -133,6 +133,10 @@ const requiredSecurityWorkflowSnippets = [
 ];
 for (const [label, snippet] of requiredSecurityWorkflowSnippets) {
   if (!securityWorkflow.includes(snippet)) fail(`Security workflow perdeu ${label}`);
+}
+
+if (securityWorkflow.includes("pull_request:")) {
+  fail("Security workflow voltou a rodar em pull_request");
 }
 
 const securityActions = [...securityWorkflow.matchAll(/uses:\s*([^\s@]+)@([^\s#]+)/g)];
