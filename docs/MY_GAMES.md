@@ -10,13 +10,15 @@ O princípio da tela é separar claramente três coisas que não devem ser confu
 
 ## Ownership atual da interface
 
-A experiência principal tem implementação canônica em TypeScript. `web/src/features/myGames.ts` concentra state/lifecycle e orquestração; os contratos, apresentação, formulário de aposta e comparação ficam decompostos em `web/src/features/myGames/`. `web/my-games-v2.js` permanece apenas como boundary compatível que importa o JavaScript emitido. A base funcional continua em `web/my-games-v2.css` e a apresentação final do Protótipo 1 em `web/my-games-workspace.css`.
+A experiência principal tem implementação canônica em TypeScript. `web/src/features/myGames.ts` concentra state/lifecycle e orquestração; os contratos, apresentação, formulário de aposta, comparação, formatação e auditabilidade ficam decompostos em `web/src/features/myGames/`. `web/my-games-v2.js` permanece apenas como boundary compatível que importa o JavaScript emitido. A base funcional continua em `web/my-games-v2.css` e a apresentação final do Protótipo 1 em `web/my-games-workspace.css`.
 
 O controller consome diretamente o client HTTP, o lifecycle compartilhado, escaping e toast de `web/src`, sem depender de `web/runtime.js`. A tela carrega os lotes e apostas reais em paralelo e mantém o estado de filtro, busca e lote expandido no próprio controller tipado.
 
 Os campos financeiros opcionais são representados explicitamente como ausentes/`null`: custo, prêmio ou resultado desconhecido não são convertidos em zero para apresentação. A comparação também escapa texto derivado da API antes de inseri-lo em markup dinâmico.
 
-Se o módulo 2.0 não puder carregar, o `feature-loader` ainda possui um fallback funcional para as camadas anteriores. O contrato de produto, porém, é o fluxo 2.0 descrito neste documento.
+**Meus Jogos não possui mais fallback funcional legado.** O `feature-loader` carrega apenas os assets canônicos da feature; se eles falharem, a tela apresenta um estado explícito e retryable em vez de reviver `real-bets.js` ou `my-games-management.js`.
+
+A auditabilidade do concurso alvo também pertence ao owner TypeScript, em `web/src/features/myGames/auditability.ts`. Quando um lote possui `targetContestNumber`, o campo fica somente leitura, com `min`/`max` fixados no alvo, `aria-readonly` e proteção de submit contra alteração do DOM. Não há `MutationObserver` nem listeners globais para manter essa regra.
 
 ## Estados visíveis
 
@@ -81,7 +83,7 @@ Um lote com aposta real **pode ser ocultado**. A ação é organizacional e não
 
 A aposta só é criada por ação explícita do usuário. No formulário é possível selecionar quais jogos do lote foram efetivamente apostados e informar o custo real.
 
-Quando o lote possui `targetContestNumber`, a aposta deve usar exatamente esse concurso. O backend também recusa registrar como aposta real um concurso cujo resultado oficial já esteja conhecido, protegendo o KPI contra hindsight.
+Quando o lote possui `targetContestNumber`, a aposta deve usar exatamente esse concurso. A interface fixa esse alvo e bloqueia tamper no submit; o backend continua sendo a autoridade final e também recusa divergências. O backend ainda recusa registrar como aposta real um concurso cujo resultado oficial já esteja conhecido, protegendo o KPI contra hindsight.
 
 Detalhes em [`REAL_BETS.md`](REAL_BETS.md).
 

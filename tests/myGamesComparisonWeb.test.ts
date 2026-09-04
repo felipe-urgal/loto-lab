@@ -3,14 +3,14 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 
-const [boundary, presentation, comparison, formatting, fallbackSource] = await Promise.all([
+const [boundary, presentation, comparison, formatting, betForm] = await Promise.all([
   readFile(resolve(process.cwd(), "web/my-games-v2.js"), "utf8"),
   readFile(resolve(process.cwd(), "web/src/features/myGames/presentation.ts"), "utf8"),
   readFile(resolve(process.cwd(), "web/src/features/myGames/comparison.ts"), "utf8"),
   readFile(resolve(process.cwd(), "web/src/features/myGames/formatting.ts"), "utf8"),
-  readFile(resolve(process.cwd(), "web/real-bets.js"), "utf8"),
+  readFile(resolve(process.cwd(), "web/src/features/myGames/betForm.ts"), "utf8"),
 ]);
-const source = [presentation, comparison, formatting].join("\n");
+const source = [presentation, comparison, formatting, betForm].join("\n");
 
 test("My Games keeps exploratory comparison separate from real financial accounting", () => {
   assert.equal(boundary.trim(), 'import "./src/features/myGames.js";');
@@ -31,11 +31,6 @@ test("checked bets preserve unavailable financial data instead of inventing zero
   assert.match(source, /item\.prizeValue === undefined \|\| item\.prizeValue === null \? "—"/);
   assert.match(formatting, /typeof value === "number" && Number\.isFinite\(value\)/);
   assert.doesNotMatch(formatting, /Number\(value\)/);
-
-  assert.match(fallbackSource, /formatCurrency\(bet\.totalPrizeValue\)/);
-  assert.match(fallbackSource, /formatCurrency\(bet\.netResult\)/);
-  assert.match(fallbackSource, /bet\.status === "checked" \? bet\.netResult : undefined/);
-  assert.doesNotMatch(fallbackSource, /formatCurrency\(bet\.totalPrizeValue \|\| 0\)/);
-  assert.doesNotMatch(fallbackSource, /formatCurrency\(bet\.netResult \|\| 0\)/);
-  assert.doesNotMatch(fallbackSource, /bet\.status === "checked" \? \(bet\.netResult \|\| 0\) : undefined/);
+  assert.match(betForm, /api\("\/real-bets"/);
+  assert.doesNotMatch(betForm, /actualCost\s*\|\|\s*0/);
 });

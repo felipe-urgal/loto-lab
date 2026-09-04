@@ -71,6 +71,8 @@ Ao criar:
 
 Comparações retrospectivas pertencem a Testes históricos/Laboratório/Meus Jogos, nunca ao KPI de apostas reais.
 
+Na interface **Meus Jogos**, esse contrato é reforçado pelo owner TypeScript em `web/src/features/myGames/auditability.ts`: o concurso alvo fica somente leitura e o submit bloqueia alteração do DOM antes de chamar a API. Esse guardrail do browser é defesa em profundidade; a validação do backend permanece autoritativa.
+
 ## Ocultar lote não remove aposta
 
 A organização de **Meus Jogos** é independente da trilha financeira.
@@ -103,7 +105,7 @@ O sistema diferencia:
 - **atingiu faixa premiada, mas o rateio necessário não está armazenado** → prêmio desconhecido;
 - **Mês da Sorte acertado sem tier financeiro disponível** → total desconhecido.
 
-Por isso dado ausente não vira `R$ 0,00` e não entra artificialmente no ROI. Esse contrato também vale para o fallback `web/real-bets.js`: desde #147, os formatters compartilhados exibem `—` para valores ausentes ou inválidos, preservando **desconhecido != zero**. A evolução ou remoção futura do fallback continua sendo trabalho arquitetural da #60, mas não existe mais uma dívida financeira aberta nesse ponto.
+Por isso dado ausente não vira `R$ 0,00` e não entra artificialmente no ROI. Esse contrato vale também para o owner TypeScript de **Meus Jogos**: os formatters compartilhados exibem `—` para valores ausentes ou inválidos, preservando **desconhecido != zero**. Os antigos assets funcionais `web/real-bets.js` e `web/my-games-management.js` foram removidos após a consolidação do fluxo canônico.
 
 ## Reparação de rateios
 

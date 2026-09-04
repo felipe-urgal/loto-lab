@@ -28,21 +28,25 @@ Principais owners:
 
 - `web/src/features/myGames.ts` — state/lifecycle e orquestração canônica em TypeScript;
 - `web/src/features/myGames/` — tipos, apresentação, formulário de aposta, comparação, formatação e guards;
+- `web/src/features/myGames/auditability.ts` — lock do concurso alvo e proteção de submit contra tamper, sem observer/listeners globais;
 - `web/my-games-v2.js` — boundary compatível que importa o JavaScript emitido;
 - `web/my-games-v2.css` — estrutura funcional;
 - `web/my-games-workspace.css` — apresentação final do Protótipo 1;
-- `web/real-bet-auditability.js` — guardrails de concurso alvo no browser;
 - `src/api/gameBatchManagement.ts` — endpoints de gestão/lifecycle;
 - `src/application/realBets.ts` + `src/realBets/service.ts` — regras de aposta real;
 - repositories PostgreSQL — persistência dos lotes e apostas.
 
 A migração arquitetural posterior à tarefa visual preserva o contrato histórico: o fluxo principal agora consome diretamente API/lifecycle/escaping/toast compartilhados e mantém valores financeiros desconhecidos como ausentes em vez de fabricar zero.
 
+Desde a consolidação de ownership tipado da #60, `games` não carrega mais refinements ou fallbacks funcionais antes do módulo canônico. Falha de `my-games-v2`/CSS resulta em estado explícito com retry, e os assets órfãos `real-bets.*`, `my-games-management.*` e `real-bet-auditability.js` foram removidos.
+
 ## Validação consolidada
 
 O fluxo protegido pela suíte/E2E cobre a navegação da feature em desktop/mobile e os contratos de auditabilidade.
 
 A regressão de lifecycle descoberta posteriormente — montagem inicial duplicada do módulo — também foi eliminada: a montagem inicial é disparada pelo evento oficial `loto-lab:view-rendered`, evitando substituir uma tela pronta por novo loading devido a duas montagens concorrentes.
+
+Os testes de ownership verificam adicionalmente que o loader não referencia os fallbacks removidos, que os assets legados permanecem ausentes e que o guard TypeScript mantém o concurso alvo somente leitura, com limite exato e proteção de submit em capture.
 
 ## Não usar como backlog
 
