@@ -2,6 +2,8 @@
 
 Este documento descreve os guardrails compartilhados pelo Loto Lab para evitar divergência entre interfaces, resultados financeiros incorretos, hindsight acidental e falhas operacionais silenciosas.
 
+O procedimento operacional de produção está em [`PRODUCTION.md`](PRODUCTION.md).
+
 ## Contrato único de análises
 
 O Laboratório interativo e a fila de `Execuções` usam o mesmo parser e o mesmo orçamento de `StrategyLabOptions`.
@@ -193,6 +195,12 @@ O sync usa advisory lock próprio para impedir duas sincronizações concorrente
 
 `SyncAllDetails` registra reparos financeiros, quantas apostas tiveram o financeiro finalmente resolvido e quantas apostas já conferidas tiveram ROI revisado por correção oficial.
 
+A operação manual canônica continua:
+
+```bash
+npm run ops:sync
+```
+
 ## Logs estruturados
 
 Eventos operacionais são emitidos como JSON, incluindo quando aplicável:
@@ -210,17 +218,19 @@ Correções oficiais que alteram apostas reais também emitem `real_bet_financia
 
 O volume Docker é persistência local, não backup.
 
-`npm run ops:backup` grava primeiro um arquivo `.partial-<pid>`. Somente depois de `pg_dump` terminar com sucesso o arquivo é publicado atomicamente no nome final `.dump`. Falhas removem o parcial, evitando que um dump truncado pareça válido.
+`npm run prod:backup` grava primeiro um arquivo `.partial-<pid>`. Somente depois de `pg_dump` terminar com sucesso o arquivo é publicado atomicamente no nome final `.dump`. Falhas removem o parcial, evitando que um dump truncado pareça válido.
 
 Backups importantes devem ser copiados para armazenamento fora do host da aplicação e ter retenção periódica definida pelo ambiente de operação.
 
 Um backup só deve ser considerado confiável depois do restore check:
 
 ```bash
-npm run ops:restore-check -- backups/loto-lab-AAAA-MM-DD.dump
+npm run prod:restore-check -- backups/loto-lab-AAAA-MM-DD.dump
 ```
 
 O comando restaura em banco temporário, verifica tabelas essenciais e remove o banco de teste sem alterar o principal.
+
+Não existem aliases paralelos `ops:backup` ou `ops:restore-check`; operações de infraestrutura de produção ficam no namespace `prod:*`.
 
 ## Supply chain e builds reproduzíveis
 
@@ -230,12 +240,16 @@ Deploys devem preferir `LOTO_LAB_IMAGE_TAG` derivado do commit/release em vez de
 
 ## CI e proteção do `main`
 
-O CI cobre:
+O CI funcional atual executa:
 
-- TypeScript e testes PostgreSQL;
-- configuração do Compose;
-- build e smoke da imagem de produção;
-- autenticação HTTP Basic real na imagem;
-- browser real para fluxos principais e páginas operacionais.
+```text
+npm ci
+-> PostgreSQL efêmero
+-> npm run check
+```
 
-O repositório deve configurar `main` com proteção/ruleset para exigir PR e o check `CI / test`, bloquear force-push e remoção da branch. Esse controle é configuração administrativa do GitHub e não é substituído pelo arquivo de workflow.
+O gate cobre contrato de produção versionado, formatação/higiene, plataforma/TypeScript, build e testes funcionais.
+
+E2E, coverage, auditoria de dependências e operações de produção permanecem direcionados por risco/escopo. O workflow de Security roda semanalmente/manualmente com audit, CodeQL, SBOM e Trivy.
+
+A `main` ainda não possui branch protection obrigatória (#52). Até a configuração administrativa ser aplicada, PR, CI aplicável, auto-review final e squash merge continuam disciplina operacional obrigatória conforme `AGENTS.md`.
