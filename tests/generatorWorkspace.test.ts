@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 test("generator workspace follows Prototype 1 while preserving audited generation", async () => {
   const [loader, workspace, boundary, generator, types, explainability, enhancements] = await Promise.all([
-    readFile("web/feature-loader.js", "utf8"),
+    readFile("web/src/core/featureLoader.ts", "utf8"),
     readFile("web/generation-workspace.css", "utf8"),
     readFile("web/generation-v2.js", "utf8"),
     readFile("web/src/features/generationV2.ts", "utf8"),
