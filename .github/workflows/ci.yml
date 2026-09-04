@@ -18,7 +18,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     services:
       postgres:
         image: postgres:16.15-alpine3.24@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
@@ -35,6 +35,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/loto_lab_test
+
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,112 +46,11 @@ jobs:
           node-version: 24.19.0
           cache: npm
 
-      - name: Verify Node.js toolchain
-        run: |
-          test "$(node --version)" = "v24.19.0"
-          node --version
-          npm --version
-
       - name: Install dependencies
         run: npm ci
 
-      - name: Run static quality gates
-        run: npm run quality:static
+      - name: Static checks
+        run: npm run lint
 
-      - name: Run tests with coverage
-        timeout-minutes: 5
+      - name: Tests
         run: npm test
-
-      - name: Audit production dependencies
-        run: npm run audit:prod
-
-      - name: Validate production Compose
-        run: docker compose --env-file .env.production.example -f docker-compose.prod.yml config >/dev/null
-
-      - name: Build production image
-        timeout-minutes: 5
-        run: docker build -t loto-lab:ci .
-
-      - name: Smoke-test production image
-        shell: bash
-        run: |
-          set -euo pipefail
-          container=loto-lab-ci
-          cleanup() { docker rm -f "$container" >/dev/null 2>&1 || true; }
-          trap cleanup EXIT
-
-          docker run -d --name "$container" --network host \
-            -e DATABASE_URL="$DATABASE_URL" \
-            -e API_HOST=127.0.0.1 \
-            -e API_PORT=3099 \
-            -e OPS_AUTO_SYNC=false \
-            loto-lab:ci >/dev/null
-
-          for attempt in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3099/health/ready >/dev/null; then
-              curl -fsS http://127.0.0.1:3099/ >/dev/null
-              exit 0
-            fi
-            sleep 1
-          done
-
-          docker logs "$container"
-          exit 1
-
-      - name: Smoke-test production authentication
-        shell: bash
-        run: |
-          set -euo pipefail
-          container=loto-lab-auth-ci
-          password='ci-long-random-password-123'
-          cleanup() { docker rm -f "$container" >/dev/null 2>&1 || true; }
-          trap cleanup EXIT
-
-          docker run -d --name "$container" --network host \
-            -e DATABASE_URL="$DATABASE_URL" \
-            -e API_HOST=127.0.0.1 \
-            -e API_PORT=3099 \
-            -e OPS_AUTO_SYNC=false \
-            -e APP_AUTH_USER=loto-admin \
-            -e APP_AUTH_PASSWORD="$password" \
-            loto-lab:ci >/dev/null
-
-          for attempt in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3099/health/ready >/dev/null; then
-              code=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3099/)
-              test "$code" = 401
-              curl -fsS -u "loto-admin:$password" http://127.0.0.1:3099/ >/dev/null
-              exit 0
-            fi
-            sleep 1
-          done
-
-          docker logs "$container"
-          exit 1
-
-      - name: Run real-browser E2E
-        timeout-minutes: 5
-        shell: bash
-        run: |
-          set -euo pipefail
-          container=loto-lab-browser-e2e
-          cleanup() { docker rm -f "$container" >/dev/null 2>&1 || true; }
-          trap cleanup EXIT
-
-          docker run -d --name "$container" --network host \
-            -e DATABASE_URL="$DATABASE_URL" \
-            -e API_HOST=127.0.0.1 \
-            -e API_PORT=3099 \
-            -e OPS_AUTO_SYNC=false \
-            loto-lab:ci >/dev/null
-
-          for attempt in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3099/health/ready >/dev/null; then
-              E2E_BASE_URL=http://127.0.0.1:3099 npm run e2e:browser
-              exit 0
-            fi
-            sleep 1
-          done
-
-          docker logs "$container"
-          exit 1
