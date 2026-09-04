@@ -64,7 +64,7 @@ pré-review do diff
         ↓
 abrir PR
         ↓
-CI + Security + E2E quando aplicável
+CI + checks direcionados aplicáveis
         ↓
 se falhar: investigar log e corrigir causa
         ↓
@@ -107,6 +107,13 @@ Se `main` avançou:
 - revalide o diff final contra a `main` atual.
 
 ### 3. Leia antes de alterar
+
+Comece por:
+
+- `README.md`;
+- `docs/DEVELOPMENT.md` para setup, execução local e gate antes do PR;
+- `docs/PRODUCTION.md` quando houver deploy, backup, restore, Compose ou operação real;
+- documentos do domínio alterado.
 
 Mapeie:
 
@@ -157,35 +164,29 @@ Antes de publicar:
 
 Nunca mergeie um SHA vermelho, incompleto ou desatualizado.
 
-Comandos locais de referência:
+Gate local canônico:
 
 ```bash
 npm ci
-npm run quality:static
-npm test
-npm run audit:prod
+npm run check
 ```
 
-Quando a UI/rota pública for afetada:
+`npm run check` cobre contrato de produção versionado, higiene textual, baseline de plataforma/TypeScript, build e testes funcionais.
+
+Checks direcionados entram conforme risco/escopo:
 
 ```bash
-E2E_BASE_URL=http://127.0.0.1:5200 npm run e2e:browser
+E2E_BASE_URL=http://127.0.0.1:5200 npm run test:e2e
+npm run coverage
+npm run audit:prod
+npm run prod:check
 ```
 
-O pipeline do GitHub também protege:
+O CI funcional executa `npm run check` com PostgreSQL efêmero.
 
-- typecheck/lint/higiene de texto;
-- cobertura;
-- PostgreSQL integration;
-- Compose;
-- build da imagem;
-- smoke;
-- HTTP Basic/auth;
-- browser E2E;
-- CodeQL;
-- Dependency Review;
-- SBOM;
-- scan de vulnerabilidades do container.
+O workflow de Security atual é semanal/manual e cobre audit de dependências, CodeQL, SBOM e Trivy. Ele não é automaticamente um gate de todo PR.
+
+E2E e coverage também não são custo fixo de todo PR; devem ser executados quando protegem o risco real da mudança.
 
 ### Quando um gate falhar
 
@@ -197,7 +198,7 @@ Não faça retry cego.
 4. corrija a fonte adequada;
 5. não reintroduza código legado apenas para satisfazer teste antigo;
 6. não afrouxe E2E/coverage para “deixar verde”;
-7. gere novo SHA e revalide tudo.
+7. gere novo SHA e revalide os gates aplicáveis.
 
 ## Auto code review final — obrigatório
 
@@ -278,7 +279,7 @@ Revise o patch publicado inteiro como se fosse um reviewer independente.
 2. corrija na branch;
 3. adicione/ajuste teste de regressão quando apropriado;
 4. gere novo SHA;
-5. rode novamente CI/Security/E2E;
+5. rode novamente os gates aplicáveis;
 6. repita o auto-review final.
 
 Só o SHA revisado e verde pode ser mergeado.
@@ -291,7 +292,7 @@ Antes do merge, registre no PR um comentário/review indicando:
 - escopo do review;
 - principais riscos conferidos;
 - eventuais achados corrigidos;
-- confirmação de CI/Security/E2E verdes;
+- confirmação dos gates aplicáveis verdes;
 - ausência de threads bloqueantes.
 
 O autor não pode aprovar o próprio PR no GitHub; use **COMMENT** para registrar o auto-review.
@@ -382,11 +383,15 @@ Documentação faz parte do Definition of Done quando comportamento, arquitetura
 Fontes principais:
 
 - `README.md` — entrada do projeto;
+- `docs/DEVELOPMENT.md` — setup, execução local e gate antes do PR;
+- `docs/PRODUCTION.md` — preflight, backup, deploy e verify;
 - `docs/ROADMAP.md` — prioridade e estado real;
 - `docs/API.md` — HTTP;
 - `docs/WEB.md` — frontend;
+- `docs/DATABASE.md` — PostgreSQL e migrations;
+- `docs/TESTING.md` — testes, coverage e E2E;
 - `docs/RELIABILITY.md` — hardening;
-- `docs/QUALITY.md` — gates;
+- `docs/QUALITY.md` — gates e supply chain;
 - `docs/design/PROTOTYPE_1_DARK_MODERN.md` — direção visual.
 
 Não deixe README/roadmap descrevendo código que já foi removido ou tarefas já concluídas.
@@ -410,7 +415,8 @@ Não use issue fechada como backlog escondido.
 A `main` ainda não possui branch protection obrigatória (#52). Até essa configuração administrativa ser aplicada, o agente deve tratar as regras deste arquivo como **proteção manual obrigatória**:
 
 - sempre PR;
-- CI/Security verdes;
+- CI funcional verde;
+- checks direcionados relevantes verdes quando aplicáveis;
 - auto-review final;
 - squash merge;
 - nunca force-push/deletar `main`.
