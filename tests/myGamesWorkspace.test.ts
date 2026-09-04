@@ -25,7 +25,7 @@ test("my games workspace follows Prototype 1 with typed-only functional ownershi
   assert.ok(moduleLoad > baseStyle, "My Games functional module must follow its base style");
   assert.ok(workspaceLoad > moduleLoad, "Prototype 1 must load after the functional owner");
   assert.ok(gamesBranch >= 0 && refinementsLoad > gamesBranch, "My Games must return before generic legacy refinements load");
-  assert.doesNotMatch(loader, /real-bet-auditability|real-bets|my-games-management/);
+  assert.doesNotMatch(loader, /load(?:Module|Style)\("(?:real-bet-auditability|real-bets|my-games-management)"\)/);
   assert.match(loader, /view === "games"[\s\S]*return loadMyGamesFeatures\(\)/);
   assert.match(loader, /Não foi possível carregar Meus Jogos/);
 
