@@ -29,7 +29,7 @@ Em 2026-09-02, após #155–#160/#163 e as extrações finais #167–#170:
 - #163 removeu a facade concreta `LotoLabApiServices` de `src/api/services.ts`, que preserva somente exports auxiliares compatíveis;
 - #167–#170 extraíram comparação de game batches, Agenda/notificações, IA interpretativa e Analysis Jobs para application use cases, concluindo a #61; não resta controller de feature HTTP compondo repositories, managers ou providers concretos, e `src/api/server.ts` é o composition root das features HTTP;
 - o lifecycle de processo permanece deliberadamente em `src/cli/apiStart.ts`, que inicia/recover/draina o mesmo `AnalysisJobManager` singleton e continua dono do scheduler/runtime lock;
-- CI e Security validam testes, cobertura, PostgreSQL, Compose, imagem, autenticação, navegador real, CodeQL, dependency review, SBOM e vulnerabilidades de container;
+- o CI funcional usa `npm run check`; coverage/E2E/audit permanecem direcionados por risco, e o workflow de Security roda semanalmente/manualmente com audit, CodeQL, SBOM e Trivy;
 - a `main` **ainda não possui branch protection obrigatória**; isso permanece bloqueado na #52 por configuração administrativa do GitHub.
 
 O backlog atualizado está em [`docs/ROADMAP.md`](docs/ROADMAP.md).
@@ -134,7 +134,7 @@ O build também:
 - reescreve URLs com `?v=<hash>`;
 - mantém HTML sem cache permanente;
 - usa lazy loading por feature;
-- executa E2E em Chrome/Chromium real.
+- executa E2E em Chrome/Chromium real quando `test:e2e` é chamado.
 
 `web/runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; os formatters compartilhados já vivem em `web/src/shared/formatters.ts` e são reexportados pelo runtime. A migração seguinte deve expandir essa base em fatias pequenas, sem big-bang.
 
@@ -156,7 +156,7 @@ PostgreSQL é a fonte de verdade operacional. Migrations são forward-only, poss
 - npm;
 - Docker;
 - Docker Compose v2;
-- Chrome ou Chromium para E2E local.
+- Chrome ou Chromium somente para E2E local.
 
 Com `nvm`:
 
@@ -167,23 +167,28 @@ node --version
 
 A versão esperada é `v24.19.0`.
 
-## Quick start local
+## Desenvolvimento local
+
+A receita canônica está em [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+
+Quickstart:
 
 ```bash
-git clone https://github.com/felipe-urgal/loto-lab.git
-cd loto-lab
 npm ci
 cp .env.example .env
-docker compose up -d postgres
-npm run db:migrate
-npm run db:bootstrap
-npm run api:start
+npm run dev
 ```
 
 Abra:
 
 ```text
 http://127.0.0.1:5200
+```
+
+Para carregar o histórico completo na primeira execução, em outro terminal:
+
+```bash
+npm run db:bootstrap
 ```
 
 Portas padrão:
@@ -195,7 +200,9 @@ Portas padrão:
 | App produção | `127.0.0.1:5200` por padrão | `app:3000` |
 | PostgreSQL produção | não exposto | `postgres:5432` |
 
-## Banco e dados
+## Banco, dataset e dados
+
+PostgreSQL é a fonte de verdade operacional.
 
 Comandos principais:
 
@@ -208,13 +215,23 @@ npm run db:sync -- lotofacil
 npm run db:sync -- dia-de-sorte
 ```
 
-O bootstrap é idempotente/retomável. A sincronização operacional das três loterias e apostas pendentes usa:
+A sincronização operacional das três loterias e apostas pendentes usa:
 
 ```bash
 npm run ops:sync
 ```
 
 Com `OPS_AUTO_SYNC=true`, o scheduler roda junto da API.
+
+O dataset JSON offline usa namespace próprio:
+
+```bash
+npm run dataset:sync -- mega-sena
+npm run dataset:refresh -- mega-sena 1 100
+npm run db:import-dataset -- data/contests.json
+```
+
+Detalhes em [`docs/DATABASE.md`](docs/DATABASE.md) e [`docs/DATA_OPERATIONS.md`](docs/DATA_OPERATIONS.md).
 
 ## API
 
@@ -243,44 +260,50 @@ Detalhes em [`docs/API.md`](docs/API.md).
 
 ## Testes e qualidade
 
-Gate local recomendado:
+Gate obrigatório antes do PR:
 
 ```bash
-npm ci
 npm run check
+```
+
+`npm run check` cobre contrato de produção versionado, higiene textual, baseline de plataforma/TypeScript, build e testes funcionais.
+
+Checks direcionados:
+
+```bash
+E2E_BASE_URL=http://127.0.0.1:5200 npm run test:e2e
+npm run coverage
 npm run audit:prod
 ```
 
-`npm run check` cobre plataforma, typecheck (backend + `web/src`), higiene de texto, lint, build e testes com thresholds de cobertura.
+Coverage e E2E não são custo fixo de todo PR. O workflow de Security atual é semanal/manual e executa audit, CodeQL, SBOM e Trivy.
 
-E2E completo:
-
-```bash
-E2E_BASE_URL=http://127.0.0.1:5200 npm run e2e:browser
-```
-
-O CI também valida Compose, build/smoke da imagem, autenticação HTTP Basic e browser real. O workflow de Security roda CodeQL, Dependency Review, Trivy e gera SBOM.
+Detalhes em [`docs/TESTING.md`](docs/TESTING.md) e [`docs/QUALITY.md`](docs/QUALITY.md).
 
 ## Produção
 
-Prepare:
+A receita canônica está em [`docs/PRODUCTION.md`](docs/PRODUCTION.md).
+
+Fluxo resumido:
 
 ```bash
 cp .env.production.example .env.production
+npm run prod:check
 npm run prod:config
-npm run prod:up
+npm run prod:backup
+npm run prod:deploy
+npm run prod:verify
 ```
 
-Por padrão a aplicação fica publicada apenas em `127.0.0.1:5200`, adequada para um reverse proxy HTTPS no mesmo host. PostgreSQL não publica porta em produção.
+Por padrão a aplicação fica publicada somente em `127.0.0.1:5200`, adequada para reverse proxy HTTPS no mesmo host. PostgreSQL não publica porta em produção.
 
-Backup e restore check:
+Restore check:
 
 ```bash
-npm run ops:backup
-npm run ops:restore-check -- backups/loto-lab-AAAA-MM-DD.dump
+npm run prod:restore-check -- backups/loto-lab-AAAA-MM-DD.dump
 ```
 
-Detalhes em [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) e [`docs/RELIABILITY.md`](docs/RELIABILITY.md).
+Detalhes técnicos em [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md), [`docs/RELIABILITY.md`](docs/RELIABILITY.md) e [`docs/PRODUCTION-CONTRACT.md`](docs/PRODUCTION-CONTRACT.md).
 
 ## Segurança operacional
 
@@ -316,14 +339,22 @@ Leia [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md), [`docs/FINANCIALS.md`](docs/F
 
 ## Fluxo de desenvolvimento
 
-- branch por mudança;
-- PR pequeno e revisável;
-- CI/Security + E2E no SHA final;
-- auto code review final antes do merge;
-- squash merge;
-- não enfraquecer teste/E2E para fazer um PR ficar verde.
+```text
+issue
+-> branch curta
+-> implementação + testes
+-> npm run dev
+-> npm run check
+-> test:e2e quando o risco justificar
+-> PR
+-> CI funcional + Security quando aplicável
+-> auto code review no SHA final
+-> squash merge
+```
 
-**Agentes de IA e automações de desenvolvimento devem ler e seguir [`AGENTS.md`](AGENTS.md) antes de alterar o repositório.** O arquivo formaliza postura Fullstack Sênior, fila de PRs, investigação de gates, padrões frontend/backend/banco e o auto code review final obrigatório no SHA verde.
+Não enfraqueça teste/E2E para fazer um PR ficar verde.
+
+**Agentes de IA e automações de desenvolvimento devem ler e seguir [`AGENTS.md`](AGENTS.md) antes de alterar o repositório.**
 
 A proteção obrigatória da `main` ainda precisa ser configurada administrativamente (#52).
 
@@ -332,6 +363,8 @@ A proteção obrigatória da `main` ainda precisa ser configurada administrativa
 | Documento | Assunto |
 | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | contrato operacional para agentes de IA e fluxo de PR/review |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | setup, execução local e gate antes do PR |
+| [`docs/PRODUCTION.md`](docs/PRODUCTION.md) | preflight, backup, deploy e verify de produção |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | prioridades e issues ativas |
 | [`docs/MENTAL_MODEL.md`](docs/MENTAL_MODEL.md) | mapa conceitual e arquitetural |
 | [`docs/WEB.md`](docs/WEB.md) | frontend, navegação e lifecycle |
@@ -340,9 +373,11 @@ A proteção obrigatória da `main` ainda precisa ser configurada administrativa
 | [`docs/DATA_OPERATIONS.md`](docs/DATA_OPERATIONS.md) | bootstrap e manutenção do histórico |
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | scheduler e sync operacional |
 | [`docs/RELIABILITY.md`](docs/RELIABILITY.md) | hardening e guardrails |
-| [`docs/QUALITY.md`](docs/QUALITY.md) | CI, cobertura e supply chain |
+| [`docs/TESTING.md`](docs/TESTING.md) | testes funcionais, coverage e E2E |
+| [`docs/QUALITY.md`](docs/QUALITY.md) | CI, gates e supply chain |
 | [`docs/PLATFORM.md`](docs/PLATFORM.md) | baseline Node/TypeScript |
-| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | produção e restore |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | topologia e detalhes de produção |
+| [`docs/PRODUCTION-CONTRACT.md`](docs/PRODUCTION-CONTRACT.md) | contrato consumido pelo Dev Dashboard |
 | [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | build, workers e profiling |
 | [`docs/ANALYSES.md`](docs/ANALYSES.md) | Análises 2.0 |
 | [`docs/GENERATION.md`](docs/GENERATION.md) | geração e score-v2 |
