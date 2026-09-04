@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 test("analysis workspace follows Prototype 1 without changing statistical contracts", async () => {
   const [loader, workspace, boundary, analysis] = await Promise.all([
-    readFile("web/feature-loader.js", "utf8"),
+    readFile("web/src/core/featureLoader.ts", "utf8"),
     readFile("web/analysis-workspace.css", "utf8"),
     readFile("web/analysis-v2.js", "utf8"),
     readFile("web/src/features/analysisV2.ts", "utf8"),
