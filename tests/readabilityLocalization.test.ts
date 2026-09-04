@@ -191,19 +191,22 @@ test("refinement layers own their Portuguese analysis vocabulary while preservin
   assert.doesNotMatch(labRefinements, /métrica de ranking não variou/);
 });
 
-test("real-bet flow remains owned by My Games while dashboard summary belongs to dashboard scope", async () => {
-  const realBets = await source("web/real-bets.js");
+test("real-bet flow remains owned by typed My Games while dashboard summary belongs to dashboard scope", async () => {
+  const controller = await source("web/src/features/myGames.ts");
+  const presentation = await source("web/src/features/myGames/presentation.ts");
+  const betForm = await source("web/src/features/myGames/betForm.ts");
   const dashboardBoundary = await source("web/dashboard-scope.js");
   const dashboard = await source("web/src/features/dashboardScope.ts");
+  const myGames = [controller, presentation, betForm].join("\n");
 
-  assert.match(realBets, /separado dos lotes apenas gerados e dos testes históricos/);
-  assert.doesNotMatch(realBets, /não inclui backtests/);
-  assert.doesNotMatch(realBets, /lotes apenas gerados e dos backtests/);
-  assert.match(realBets, /\/real-bets\/\$\{lottery\}/);
-  assert.match(realBets, /api\("\/real-bets"/);
-  assert.match(realBets, /currentView\(\) === "games"/);
-  assert.doesNotMatch(realBets, /real-performance-section/);
-  assert.doesNotMatch(realBets, /refineDashboard/);
+  assert.match(controller, /api<RealBetResponse>\(`\/real-bets\/\$\{lottery\}\?limit=200`/);
+  assert.match(betForm, /api\("\/real-bets"/);
+  assert.match(controller, /currentMainView\(\) !== "games"/);
+  assert.match(presentation, /Resultado da aposta/);
+  assert.match(presentation, /Custo real/);
+  assert.match(presentation, /somente gerado/);
+  assert.doesNotMatch(myGames, /real-performance-section/);
+  assert.doesNotMatch(myGames, /refineDashboard/);
 
   assert.equal(dashboardBoundary, 'import "./src/features/dashboardScope.js";\n');
   assert.match(dashboard, /function realStatusCard/);
