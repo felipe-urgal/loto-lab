@@ -1,6 +1,6 @@
 # Feature loader tipado (#194)
 
-Status: **em revisão**.
+Status: **concluído na #197**.
 
 ## Objetivo
 
@@ -18,9 +18,10 @@ Mover o ownership funcional do carregamento lazy das features para TypeScript se
 
 A remoção do fallback funcional legado de Meus Jogos é acompanhada separadamente pela #195. A migração da camada de auditabilidade de aposta real é acompanhada pela #196.
 
-## Validação esperada
+## Validação
 
-- `npm run check`;
-- browser E2E relevante;
-- CI/Security verdes;
-- auto-review final no SHA exato antes do merge.
+- `npm run quality:static` verde;
+- `npm test` com 271/271 testes verdes;
+- Security verde (Dependency Review, CodeQL e Container/SBOM);
+- browser E2E e demais gates de produção validados pelo CI final;
+- auto-review final registrado no SHA exato antes do squash merge.
