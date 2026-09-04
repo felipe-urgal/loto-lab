@@ -75,8 +75,10 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.match(loaderSource, /import\(asset/);
   assert.match(loaderSource, /generation-v2/);
   assert.doesNotMatch(loaderSource, /loadStyledModule\("generation-diversity"\)/);
-  assert.match(loaderSource, /my-games-v2/);
-  assert.match(loaderSource, /my-games-management/);
+  assert.match(loaderSource, /loadModule\("my-games-v2"\)/);
+  assert.match(loaderSource, /loadStyle\("my-games-workspace"\)/);
+  assert.match(loaderSource, /view === "games"/);
+  assert.match(loaderSource, /return loadMyGamesFeatures\(\)/);
   assert.match(loaderSource, /backtests-workspace/);
   assert.match(loaderSource, /loadModule\("backtests"\)/);
   assert.match(loaderSource, /styleLoads/);
@@ -114,12 +116,14 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.match(unversionedJavascript.headers.get("cache-control") ?? "", /max-age=300/);
 
   for (const asset of [
-    "real-bets.js",
     "generation-v2.js",
     "generation-v2.css",
     "my-games-v2.js",
     "my-games-v2.css",
-    "my-games-management.js",
+    "my-games-workspace.css",
+    "src/features/myGames.js",
+    "src/features/myGames/betForm.js",
+    "src/features/myGames/auditability.js",
     "lab.js",
     "data-status.js",
     "src/core/featureLoader.js",
@@ -145,7 +149,16 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.match(typedDataStatusSource, /currentMainView/);
   assert.doesNotMatch(typedDataStatusSource, /location\.hash/);
 
-  for (const removedAsset of ["lab.css", "lab-v2.css", "data-status.css"]) {
+  for (const removedAsset of [
+    "lab.css",
+    "lab-v2.css",
+    "data-status.css",
+    "real-bet-auditability.js",
+    "real-bets.js",
+    "real-bets.css",
+    "my-games-management.js",
+    "my-games-management.css",
+  ]) {
     const response = await fetch(`${baseUrl}/assets/${removedAsset}`);
     assert.equal(response.status, 404, removedAsset);
   }
