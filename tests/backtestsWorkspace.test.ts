@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 test("historical-test workspace has typed-only canonical ownership without legacy fallback", async () => {
   const [loader, workspace, boundary, source, app, refinements] = await Promise.all([
-    readFile("web/feature-loader.js", "utf8"),
+    readFile("web/src/core/featureLoader.ts", "utf8"),
     readFile("web/backtests-workspace.css", "utf8"),
     readFile("web/backtests.js", "utf8"),
     readFile("web/src/features/backtests.ts", "utf8"),

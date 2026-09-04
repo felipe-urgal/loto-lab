@@ -26,7 +26,7 @@ test("Analyses 2.0 is lazy-loaded, typed, independently degradable and exposes t
     readFile("web/src/features/analysisV2/types.ts", "utf8"),
     readFile("web/analysis-v2.css", "utf8"),
     readFile("web/analysis-workspace.css", "utf8"),
-    readFile("web/feature-loader.js", "utf8"),
+    readFile("web/src/core/featureLoader.ts", "utf8"),
     readFile("src/api/analysis.ts", "utf8"),
     readFile("src/application/analyzeLottery.ts", "utf8"),
     readFile("src/application/analyzeAdvancedLottery.ts", "utf8"),

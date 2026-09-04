@@ -23,7 +23,11 @@ test("UI refinement assets are lazy-loaded and typed Backtests bypasses legacy r
   assert.doesNotMatch(html, /<script[^>]+refinements\.js/);
   assert.match(html, /feature-loader\.js/);
 
-  const loader = await fetch(`${baseUrl}/assets/feature-loader.js`);
+  const loaderBoundary = await fetch(`${baseUrl}/assets/feature-loader.js`);
+  assert.equal(loaderBoundary.status, 200);
+  assert.match(await loaderBoundary.text(), /src\/core\/featureLoader\.js/);
+
+  const loader = await fetch(`${baseUrl}/assets/src/core/featureLoader.js`);
   assert.equal(loader.status, 200);
   const loaderSource = await loader.text();
   assert.match(loaderSource, /loadStyledModule\("refinements"\)/);

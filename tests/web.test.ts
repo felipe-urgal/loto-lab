@@ -65,9 +65,13 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.match(shellSource, /data-agenda-nav-badge/);
   assert.doesNotMatch(shellSource, /role="menu"/);
 
-  const loader = await fetch(`${baseUrl}/assets/feature-loader.js`);
-  assert.equal(loader.status, 200);
-  const loaderSource = await loader.text();
+  const loaderBoundary = await fetch(`${baseUrl}/assets/feature-loader.js`);
+  assert.equal(loaderBoundary.status, 200);
+  assert.match(await loaderBoundary.text(), /src\/core\/featureLoader\.js/);
+
+  const typedLoader = await fetch(`${baseUrl}/assets/src/core/featureLoader.js`);
+  assert.equal(typedLoader.status, 200);
+  const loaderSource = await typedLoader.text();
   assert.match(loaderSource, /import\(asset/);
   assert.match(loaderSource, /generation-v2/);
   assert.doesNotMatch(loaderSource, /loadStyledModule\("generation-diversity"\)/);
@@ -118,6 +122,7 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
     "my-games-management.js",
     "lab.js",
     "data-status.js",
+    "src/core/featureLoader.js",
     "src/features/dataStatus.js",
     "backtests.js",
     "src/features/backtests.js",

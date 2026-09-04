@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 test("my games workspace follows Prototype 1 while preserving real-bet auditability", async () => {
   const [loader, workspace, boundary, controller, presentation, comparison, formatting, betForm, auditability] = await Promise.all([
-    readFile("web/feature-loader.js", "utf8"),
+    readFile("web/src/core/featureLoader.ts", "utf8"),
     readFile("web/my-games-workspace.css", "utf8"),
     readFile("web/my-games-v2.js", "utf8"),
     readFile("web/src/features/myGames.ts", "utf8"),

@@ -16,7 +16,7 @@ test("dashboard scope keeps comparison mode separate from the active lottery", a
     readFile("web/src/features/dashboardScope.ts", "utf8"),
     readFile("web/src/features/dashboardScope/financial.ts", "utf8"),
     readFile("web/src/features/dashboardScope/types.ts", "utf8"),
-    readFile("web/feature-loader.js", "utf8"),
+    readFile("web/src/core/featureLoader.ts", "utf8"),
     readFile("web/src/features/dataStatus.ts", "utf8"),
     readFile("web/dashboard-scope.css", "utf8"),
   ]);
