@@ -65,12 +65,13 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
     return response.text();
   };
 
-  const [app, shell, refinements, realBets, management, agenda, strategies, jobs, foundation] = await Promise.all([
+  const [app, shell, refinements, myGames, presentation, auditability, agenda, strategies, jobs, foundation] = await Promise.all([
     fetchSource("app.js"),
     fetchSource("shell.js"),
     fetchSource("refinements.js"),
-    fetchSource("real-bets.js"),
-    fetchSource("my-games-management.js"),
+    fetchSource("src/features/myGames.js"),
+    fetchSource("src/features/myGames/presentation.js"),
+    fetchSource("src/features/myGames/auditability.js"),
     fetchSource("src/features/agenda.js"),
     fetchSource("src/features/strategies.js"),
     fetchSource("src/features/jobs.js"),
@@ -93,16 +94,17 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
   assert.match(refinements, /latestCache\.delete/);
   assert.match(refinements, /loto-lab:data-synced/);
 
-  assert.doesNotMatch(realBets, /real-performance-section/);
-  assert.doesNotMatch(realBets, /refineDashboard/);
-  assert.match(realBets, /currentView\(\) === "games"/);
-  assert.match(realBets, /data-real-bet-error/);
-  assert.match(realBets, /refresh-view/);
-
-  assert.match(management, /managementCache\?\.promise/);
-  assert.match(management, /\.sort\(\)\.join\("\|"\)/);
-  assert.match(management, /aria-pressed/);
-  assert.match(management, /aria-expanded/);
+  assert.match(myGames, /requestToken/);
+  assert.match(myGames, /token !== ui\.requestToken/);
+  assert.match(myGames, /currentMainView\(\) !== "games"/);
+  assert.match(myGames, /refresh-view/);
+  assert.match(myGames, /loto-lab:data-synced/);
+  assert.match(presentation, /aria-pressed=/);
+  assert.match(presentation, /aria-expanded=/);
+  assert.match(auditability, /readOnly = true/);
+  assert.match(auditability, /auditTargetContest/);
+  assert.match(auditability, /stopImmediatePropagation\(\)/);
+  assert.doesNotMatch(auditability, /MutationObserver|document\.addEventListener/);
 
   assert.match(agenda, /new AbortController\(\)/);
   assert.match(agenda, /loadToken/);
