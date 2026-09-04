@@ -22,27 +22,37 @@ O TypeScript foi migrado para a linha 7.x em PR dedicado e permanece desacoplado
 
 ## Verificação automática
 
-`npm test` executa primeiro:
+O gate canônico é:
+
+```bash
+npm run check
+```
+
+Dentro dele, `quality:static` executa `lint`; `lint`, por sua vez, começa por:
 
 ```bash
 npm run platform:verify
 ```
 
-O guard falha antes da compilação se detectar divergência entre:
+O guard falha antes dos checks TypeScript se detectar divergência entre:
 
 - `.nvmrc` e `.node-version`;
 - versão exata do Node e `engines.node`;
 - major do Node e `@types/node`;
 - `package.json` e `package-lock.json` para TypeScript e `@types/node`;
 - Node configurado no CI;
+- presença de `npm run check` como gate canônico do workflow funcional;
+- baseline do workflow de Security;
 - imagens Node usadas pelo Dockerfile;
 - baseline documentada neste arquivo e requisito de Node no README.
+
+`npm test` permanece focado em build + comportamento funcional e não repete a verificação de plataforma.
 
 A intenção é transformar a baseline em contrato verificável, evitando que uma atualização de toolchain deixe runtime, documentação ou produção silenciosamente desalinhados.
 
 ## Política de atualização
 
-Atualizações patch/minor dentro da linha Node 24 podem ser tratadas pelo Dependabot, desde que todas as referências exatas sejam atualizadas juntas e o pipeline completo fique verde.
+Atualizações patch/minor dentro da linha Node 24 podem ser tratadas pelo Dependabot, desde que todas as referências exatas sejam atualizadas juntas e o gate aplicável fique verde.
 
 Mudanças para uma nova major de Node devem ser coordenadas entre CI, Docker, `engines`, `.nvmrc`, `.node-version`, `@types/node`, documentação e o guard de plataforma.
 

@@ -2,12 +2,14 @@
 
 O Loto Lab possui uma stack Docker de produção separada do ambiente local de desenvolvimento.
 
+A sequência operacional canônica está em [`PRODUCTION.md`](PRODUCTION.md). Este documento aprofunda topologia, configuração e exposição de rede.
+
 Arquivos principais:
 
 - `Dockerfile` — imagem multi-stage da aplicação;
 - `docker-compose.prod.yml` — aplicação + PostgreSQL persistente;
 - `.env.production.example` — template de configuração;
-- `docker-compose.yml` — compose local de desenvolvimento.
+- `docker-compose.yml` — Compose local de desenvolvimento.
 
 ## Princípios
 
@@ -19,8 +21,8 @@ Arquivos principais:
 - migrations são aplicadas automaticamente no startup;
 - o scheduler operacional continua sincronizando concursos e reconciliando apostas;
 - toda a UI/API, exceto healthchecks, exige autenticação HTTP Basic em produção;
-- endpoints caros possuem limites e rate limiting para reduzir risco de indisponibilidade;
-- segredos ficam somente em `.env.production`, que não deve ser commitado.
+- endpoints caros possuem limites e rate limiting;
+- secrets ficam somente em `.env.production`, nunca no Git.
 
 ## Requisitos do host
 
@@ -29,7 +31,7 @@ Arquivos principais:
 - Git para atualizar o código;
 - espaço persistente suficiente para o volume PostgreSQL.
 
-Node/npm no host são opcionais se os comandos Docker Compose forem executados diretamente. Os atalhos `npm run prod:*` exigem npm no host.
+Node/npm no host são necessários apenas quando os atalhos `npm run prod:*` forem usados.
 
 ## Primeira configuração
 
@@ -37,14 +39,14 @@ Node/npm no host são opcionais se os comandos Docker Compose forem executados d
 cp .env.production.example .env.production
 ```
 
-Gere segredos diferentes e longos para PostgreSQL e para o acesso ao Loto Lab, por exemplo:
+Gere secrets diferentes e longos para PostgreSQL e acesso à aplicação, por exemplo:
 
 ```bash
 openssl rand -hex 32
 openssl rand -hex 32
 ```
 
-Edite `.env.production` e substitua:
+Preencha pelo menos:
 
 ```env
 APP_AUTH_USER=loto-admin
@@ -52,28 +54,26 @@ APP_AUTH_PASSWORD=...
 POSTGRES_PASSWORD=...
 ```
 
-`APP_AUTH_PASSWORD` deve possuir pelo menos 12 caracteres. O Compose de produção não inicia sem usuário/senha da aplicação e senha do PostgreSQL.
+`APP_AUTH_PASSWORD` deve possuir pelo menos 12 caracteres.
 
-Ao abrir o Loto Lab no navegador, o próprio navegador solicitará as credenciais HTTP Basic. Use HTTPS sempre que esse acesso passar por uma rede não confiável.
-
-Se houver um domínio público, configure também:
+Se houver domínio público:
 
 ```env
 PUBLIC_ORIGIN=https://loto.exemplo.com
 ```
 
-A integração da OpenAI é opcional:
+A integração OpenAI é opcional:
 
 ```env
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.6-luna
 ```
 
-Sem chave ou sem billing da API, somente a geração de interpretações de IA fica indisponível. Chamadas de interpretação possuem timeout e rate limiting no servidor para limitar consumo acidental ou abusivo.
+Sem chave/billing, apenas novas interpretações de IA ficam indisponíveis.
 
-## Portas e exposição de rede
+## Portas e exposição
 
-A aplicação escuta internamente em `3000` no container. A porta publicada no host é configurada por `APP_PORT` e o template atual usa:
+A aplicação escuta em `3000` no container. O template atual publica:
 
 ```env
 APP_BIND=127.0.0.1
@@ -81,15 +81,15 @@ APP_PORT=5200
 PUBLIC_ORIGIN=http://localhost:5200
 ```
 
-Com esses valores, o mapeamento é:
+Mapeamento:
 
 ```text
 127.0.0.1:5200 -> app:3000
 ```
 
-Isso deixa a aplicação acessível apenas no próprio servidor e é o modo recomendado quando Caddy, Nginx, Traefik ou outro reverse proxy termina HTTPS no mesmo host.
+Esse é o modo recomendado quando um reverse proxy termina HTTPS no mesmo host.
 
-O PostgreSQL permanece somente na rede Docker em `postgres:5432` e não publica porta no host em produção.
+O PostgreSQL permanece somente na rede Docker em `postgres:5432`.
 
 Para exposição direta, altere deliberadamente para:
 
@@ -97,41 +97,60 @@ Para exposição direta, altere deliberadamente para:
 APP_BIND=0.0.0.0
 ```
 
-Nesse caso configure firewall e TLS adequadamente. Se `APP_BIND` não for loopback, `PUBLIC_ORIGIN` deve usar `https://`, salvo a exceção local/emergencial explicitamente habilitada por `ALLOW_INSECURE_PUBLIC_HTTP=true`.
+Nesse caso configure firewall e TLS adequadamente. Se `APP_BIND` não for loopback, `PUBLIC_ORIGIN` deve usar `https://`, salvo exceção local/emergencial explícita por `ALLOW_INSECURE_PUBLIC_HTTP=true`.
 
-Não exponha PostgreSQL na internet.
+## Validar antes do deploy
 
-## Validar configuração
+Preflight seguro, sem secrets reais:
 
-Com npm:
+```bash
+npm run prod:check
+```
+
+Validação da configuração operacional real:
 
 ```bash
 npm run prod:config
 ```
 
-Ou diretamente:
+`prod:config` usa `docker compose config --quiet` e não imprime a configuração resolvida.
+
+## Backup
+
+Antes de atualizar produção:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml config
+npm run prod:backup
 ```
 
-Faça essa validação antes de cada primeira subida após mudança de configuração.
+O comando cria dump PostgreSQL conforme o contrato de reliability.
 
-## Subir a stack
+Valide backups periodicamente:
 
 ```bash
-npm run prod:up
+npm run prod:restore-check -- backups/loto-lab-AAAA-MM-DD.dump
 ```
 
-Equivalente a:
+Não existe mais alias paralelo `ops:backup`/`ops:restore-check`.
+
+## Deploy
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build --wait --wait-timeout 120
+npm run prod:deploy
 ```
 
-O comando só retorna sucesso depois que os healthchecks do Compose ficarem saudáveis, limitado a 120 segundos. Assim, `prod:deploy` não conclui antes do PostgreSQL e da aplicação estarem prontos.
+Equivale a:
 
-A ordem de startup é:
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml \
+  up -d --build --wait --wait-timeout 120
+```
+
+Não existe `prod:up` como segundo nome para a mesma operação.
+
+O comando só retorna sucesso depois que os healthchecks ficam saudáveis ou o timeout expira.
+
+Ordem de startup:
 
 1. PostgreSQL inicia;
 2. healthcheck do PostgreSQL fica saudável;
@@ -140,15 +159,18 @@ A ordem de startup é:
 5. API começa a responder;
 6. scheduler operacional inicia e executa a sincronização inicial.
 
-Em uma base vazia, a primeira sincronização pode levar mais tempo porque precisa preencher o histórico faltante.
+Em base vazia, a primeira sincronização pode levar mais tempo devido ao histórico faltante.
 
 ## Verificar saúde
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml ps
+npm run prod:status
+npm run prod:verify
 ```
 
-Com o bind/porta padrão:
+`prod:verify` executa readiness dentro do container da aplicação.
+
+Com bind/porta padrão, também é possível verificar externamente:
 
 ```bash
 curl -f http://127.0.0.1:5200/health/ready
@@ -160,9 +182,9 @@ Resposta esperada:
 {"status":"ok","database":"ready"}
 ```
 
-Os endpoints `/health`, `/health/live` e `/health/ready` não exigem autenticação para permitir healthchecks do Docker/reverse proxy. Todo o restante exige credenciais quando `APP_AUTH_USER` e `APP_AUTH_PASSWORD` estão configurados.
+Os endpoints `/health`, `/health/live` e `/health/ready` não exigem autenticação. O restante exige credenciais quando configuradas.
 
-Para validar uma rota protegida via terminal:
+Para uma rota protegida:
 
 ```bash
 curl -u "$APP_AUTH_USER:$APP_AUTH_PASSWORD" http://127.0.0.1:5200/api/v1/lotteries
@@ -170,15 +192,15 @@ curl -u "$APP_AUTH_USER:$APP_AUTH_PASSWORD" http://127.0.0.1:5200/api/v1/lotteri
 
 ## Limites operacionais HTTP
 
-Para evitar que uma chamada web monopolize CPU/memória:
+Para evitar monopolização de CPU/memória:
 
-- geração de jogos aceita no máximo 10 jogos por chamada;
-- testes históricos via HTTP aceitam no máximo 10 jogos por concurso e 500 concursos por execução;
-- Laboratório aceita no máximo 10 jogos, 500 concursos de aquecimento/janela histórica e bloco máximo de 100;
-- geração, testes históricos, Laboratório, IA e sincronização manual possuem rate limiting em memória;
-- testes históricos persistidos guardam apenas o artefato compacto de cada rodada; o resumo completo continua preservado.
+- geração aceita no máximo 10 jogos por chamada;
+- testes históricos via HTTP aceitam no máximo 10 jogos por concurso e 500 concursos;
+- Laboratório aceita no máximo 10 jogos, 500 concursos e bloco máximo de 100;
+- geração, backtests, Laboratório, IA e sync manual possuem rate limiting em memória;
+- backtests persistidos guardam apenas o artefato compacto de cada rodada.
 
-Testes históricos maiores devem ser segmentados por intervalo de concursos. O limite web não altera os cálculos determinísticos do core.
+Testes maiores devem ser segmentados por intervalo.
 
 ## Logs
 
@@ -194,59 +216,30 @@ docker compose --env-file .env.production -f docker-compose.prod.yml logs -f
 
 ## Atualização de versão
 
-Antes de atualizar, faça backup do banco.
+Fluxo recomendado:
 
-Depois:
-
-```bash
-git pull
-npm run prod:config
-npm run prod:up
+```text
+backup
+-> atualizar checkout para a revisão desejada
+-> prod:check
+-> prod:config
+-> prod:deploy
+-> prod:verify
 ```
 
-`up -d --build --wait --wait-timeout 120` reconstrói a imagem, recria a aplicação quando necessário e só retorna sucesso quando os serviços ficam saudáveis. O volume PostgreSQL é preservado.
+Migrations são forward-only. Por isso backup antes de mudanças de schema faz parte do procedimento.
 
-As migrations são forward-only. Por isso o backup antes de mudanças de schema é parte do procedimento de atualização.
+## Restore real
 
-## Backup do PostgreSQL
-
-Crie um diretório fora do repositório para backups e execute:
-
-```bash
-mkdir -p backups
-
-docker compose --env-file .env.production -f docker-compose.prod.yml \
-  exec -T postgres sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
-  > "backups/loto-lab-$(date +%Y%m%d-%H%M%S).dump"
-```
-
-Valide que o arquivo foi criado e possui tamanho maior que zero.
-
-Backups devem ser copiados para armazenamento fora do servidor quando o Loto Lab for usado como serviço contínuo.
-
-## Restore
-
-Restore é destrutivo para o estado atual do banco. Pare a aplicação primeiro:
+Restore real é destrutivo para o estado atual do banco. Pare a aplicação primeiro:
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.prod.yml stop app
 ```
 
-Restaure o dump desejado:
+Restaure o dump selecionado conforme o procedimento em [`RELIABILITY.md`](RELIABILITY.md). Depois suba a aplicação e confirme readiness/smoke.
 
-```bash
-cat backups/loto-lab-YYYYMMDD-HHMMSS.dump | \
-  docker compose --env-file .env.production -f docker-compose.prod.yml \
-  exec -T postgres sh -lc 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists'
-```
-
-Suba a aplicação novamente:
-
-```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d app
-```
-
-Confirme `/health/ready` e o Painel antes de considerar o restore concluído.
+`prod:restore-check` **não** executa esse restore destrutivo: ele restaura em banco temporário para validar o backup.
 
 ## Parar a stack
 
@@ -254,9 +247,9 @@ Confirme `/health/ready` e o Painel antes de considerar o restore concluído.
 npm run prod:down
 ```
 
-Esse comando remove os containers e a rede, mas **não remove o volume do PostgreSQL**.
+Esse comando remove containers/rede, mas não o volume PostgreSQL.
 
-Não use `docker compose down -v` em produção salvo quando a intenção for realmente apagar os dados persistidos.
+Não use `docker compose down -v` em produção salvo quando a intenção for apagar os dados persistidos.
 
 ## Scheduler operacional
 
@@ -268,13 +261,13 @@ OPS_INTERVAL_MINUTES=30
 OPS_STALE_AFTER_MINUTES=180
 ```
 
-A aplicação usa advisory lock no PostgreSQL para impedir duas sincronizações simultâneas. O botão do Painel, scheduler e comandos manuais compartilham a mesma trava.
+A aplicação usa advisory lock PostgreSQL para impedir sincronizações simultâneas. Painel, scheduler e `npm run ops:sync` compartilham a mesma trava.
 
-No encerramento por `SIGINT`/`SIGTERM`, a aplicação para de aceitar novas conexões, aguarda uma sincronização operacional já iniciada terminar e só então encerra o pool do PostgreSQL.
+No `SIGINT`/`SIGTERM`, a aplicação deixa de aceitar novas conexões, drena trabalhos e encerra o pool de forma controlada.
 
 ## Reverse proxy e HTTPS
 
-O compose não escolhe um provedor de TLS. Em produção pública, coloque um reverse proxy na frente de `127.0.0.1:5200` e use HTTPS.
+O Compose não escolhe provider TLS. Em produção pública, use reverse proxy na frente de `127.0.0.1:5200` e HTTPS.
 
 Depois ajuste:
 
@@ -282,21 +275,24 @@ Depois ajuste:
 PUBLIC_ORIGIN=https://seu-dominio
 ```
 
-O Loto Lab envia CSP, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` e políticas same-origin nos assets web. O reverse proxy deve adicionar HSTS quando HTTPS estiver estabilizado.
+O Loto Lab envia CSP, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` e políticas same-origin. O proxy deve adicionar HSTS quando HTTPS estiver estabilizado.
 
-Não coloque `OPENAI_API_KEY`, senha do PostgreSQL ou qualquer outro segredo no frontend ou repositório. As credenciais HTTP Basic podem ficar no `.env.production` ou ser substituídas posteriormente por um provedor de autenticação mais completo.
+Secrets nunca entram no frontend ou repositório.
 
-## CI
+## CI e Security
 
-O CI valida produção em múltiplos níveis:
+O CI funcional atual valida:
 
-1. quality gates estáticos e suíte TypeScript/PostgreSQL;
-2. `docker compose config` da stack de produção;
-3. build da imagem e smoke test real do container contra PostgreSQL;
-4. autenticação da imagem de produção;
-5. E2E em navegador real;
-6. checks de Security, incluindo dependency review, CodeQL, SBOM e vulnerabilidades da imagem.
+```text
+npm ci
+-> PostgreSQL efêmero
+-> npm run check
+```
 
-A imagem de runtime é construída com `tsconfig.build.json`, contendo somente o código necessário para execução.
+`npm run check` cobre contrato de produção versionado, formatação/higiene, plataforma/TypeScript, build e testes funcionais.
 
-Assim uma alteração só fica verde quando o artefato que será executado em produção também consegue iniciar e responder pelos fluxos protegidos esperados.
+E2E, coverage, auditoria de dependências e verificações operacionais são direcionados por risco/escopo.
+
+O workflow de Security atual roda semanalmente/manualmente e cobre audit, CodeQL, build da imagem, SBOM e Trivy.
+
+Detalhes em [`QUALITY.md`](QUALITY.md).

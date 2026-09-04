@@ -1,6 +1,6 @@
 # Persistência PostgreSQL
 
-PostgreSQL é a fonte de verdade operacional do Loto Lab. A API e o frontend usam repositories PostgreSQL; arquivos JSON permanecem apenas como caminho legado de importação/desenvolvimento.
+PostgreSQL é a fonte de verdade operacional do Loto Lab. A API e o frontend usam repositories PostgreSQL; arquivos JSON permanecem apenas como dataset offline/legado para importação, desenvolvimento e ferramentas específicas.
 
 ## Configuração local
 
@@ -16,6 +16,8 @@ npm run db:migrate
 ```
 
 O container escuta em `5432`, publicado como `5434` no host local.
+
+O fluxo canônico de desenvolvimento está em [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
 ## Migrations
 
@@ -146,19 +148,48 @@ Invariantes importantes são protegidos em profundidade:
 
 O pool não deve ser criado por request.
 
-## Importação e bootstrap
+## Dataset offline e importação
 
-Importação JSON legado:
+Os comandos que escrevem no JSON offline usam o namespace `dataset:*`:
 
 ```bash
-npm run db:import-json -- data/contests.json
+npm run dataset:sync -- mega-sena
+npm run dataset:refresh -- mega-sena 1 100
 ```
+
+Por padrão eles operam sobre:
+
+```text
+data/contests.json
+```
+
+Importar esse dataset para PostgreSQL:
+
+```bash
+npm run db:import-dataset -- data/contests.json
+```
+
+O nome explicita a direção da operação: **dataset offline → banco PostgreSQL**.
+
+## Bootstrap e sync PostgreSQL
 
 Carga histórica recomendada:
 
 ```bash
 npm run db:bootstrap
 npm run db:status
+```
+
+Sincronização direta do banco:
+
+```bash
+npm run db:sync -- mega-sena
+```
+
+Sincronização operacional das três loterias + reconciliação de apostas:
+
+```bash
+npm run ops:sync
 ```
 
 Detalhes em [`DATA_OPERATIONS.md`](DATA_OPERATIONS.md).
@@ -173,7 +204,9 @@ app -> postgres:5432
 
 A porta do banco não é publicada no host de produção.
 
-Backup/restore: [`DEPLOYMENT.md`](DEPLOYMENT.md) e [`RELIABILITY.md`](RELIABILITY.md).
+Procedimento operacional: [`PRODUCTION.md`](PRODUCTION.md).
+
+Detalhes de topologia/restore: [`DEPLOYMENT.md`](DEPLOYMENT.md) e [`RELIABILITY.md`](RELIABILITY.md).
 
 ## Testes
 

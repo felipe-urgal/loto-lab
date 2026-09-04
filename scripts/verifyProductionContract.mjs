@@ -13,9 +13,10 @@ const scripts = packageJson.scripts ?? {};
 const prodConfig = scripts['prod:config'];
 const prodConfigCheck = scripts['prod:config:check'];
 const prodCheck = scripts['prod:check'];
-const prodUp = scripts['prod:up'];
+const prodBackup = scripts['prod:backup'];
 const prodDeploy = scripts['prod:deploy'];
 const prodVerify = scripts['prod:verify'];
+const prodRestoreCheck = scripts['prod:restore-check'];
 
 function extractComposeService(source, serviceName) {
   const lines = source.split(/\r?\n/);
@@ -42,6 +43,12 @@ const expectedProdConfigCheck =
   'docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet';
 const expectedProdCheck =
   'npm run prod:config:check && npm run quality:static && npm run build:prod';
+const expectedProdBackup =
+  'node --env-file-if-exists=.env.production scripts/backupPostgres.mjs';
+const expectedProdDeploy =
+  'docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build --wait --wait-timeout 120';
+const expectedProdRestoreCheck =
+  'node --env-file-if-exists=.env.production scripts/verifyBackup.mjs';
 
 assert.equal(
   prodConfig,
@@ -63,12 +70,28 @@ assert.ok(
   'prod:check não pode voltar a carregar .env.production real',
 );
 
-assert.equal(typeof prodUp, 'string', 'package.json precisa declarar prod:up');
-assert.equal(prodDeploy, 'npm run prod:up', 'prod:deploy deve continuar delegando para prod:up');
-assert.equal(typeof prodVerify, 'string', 'package.json precisa declarar prod:verify');
-assert.match(prodUp, /\bup\s+-d\s+--build\b/, 'prod:up deve reconstruir e subir a stack em background');
-assert.match(prodUp, /(?:^|\s)--wait(?:\s|$)/, 'prod:up precisa aguardar os healthchecks do Compose');
-assert.match(prodUp, /(?:^|\s)--wait-timeout\s+\d+(?:\s|$)/, 'prod:up precisa usar timeout bounded ao aguardar healthchecks');
+assert.equal(prodBackup, expectedProdBackup, 'prod:backup deve ser a operação canônica de backup');
+assert.equal(prodDeploy, expectedProdDeploy, 'prod:deploy deve executar diretamente o deploy canônico');
+assert.equal(
+  prodRestoreCheck,
+  expectedProdRestoreCheck,
+  'prod:restore-check deve ser a operação canônica de validação de restore',
+);
+assert.equal(scripts['prod:up'], undefined, 'prod:up não deve duplicar prod:deploy');
+assert.equal(scripts['ops:backup'], undefined, 'ops:backup não deve duplicar prod:backup');
+assert.equal(
+  scripts['ops:restore-check'],
+  undefined,
+  'ops:restore-check não deve duplicar prod:restore-check',
+);
+
+assert.match(prodDeploy, /\bup\s+-d\s+--build\b/, 'prod:deploy deve reconstruir e subir a stack em background');
+assert.match(prodDeploy, /(?:^|\s)--wait(?:\s|$)/, 'prod:deploy precisa aguardar os healthchecks do Compose');
+assert.match(
+  prodDeploy,
+  /(?:^|\s)--wait-timeout\s+\d+(?:\s|$)/,
+  'prod:deploy precisa usar timeout bounded ao aguardar healthchecks',
+);
 
 const postgresService = extractComposeService(composeSource, 'postgres');
 const appService = extractComposeService(composeSource, 'app');
@@ -87,5 +110,5 @@ assert.equal(
 );
 
 console.log(
-  'Contrato de produção validado: check usa configuração segura, deploy aguarda healthchecks e verify permanece somente leitura.',
+  'Contrato de produção validado: check usa configuração segura, comandos canônicos não possuem aliases duplicados, deploy aguarda healthchecks e verify permanece somente leitura.',
 );

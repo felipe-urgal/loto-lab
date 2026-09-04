@@ -113,8 +113,7 @@ const requiredWorkflowSnippets = [
   ["grupo de concorrência", "group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"],
   ["cancelamento apenas de PR superseded", "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"],
   ["timeout global do job", "    timeout-minutes: 10"],
-  ["checks estáticos", "      - name: Static checks\n        run: npm run lint"],
-  ["testes", "      - name: Tests\n        run: npm test"],
+  ["gate canônico", "      - name: Quality gate\n        run: npm run check"],
 ];
 for (const [label, snippet] of requiredWorkflowSnippets) {
   if (!workflow.includes(snippet)) fail(`CI perdeu ${label}`);

@@ -1,8 +1,8 @@
 # Qualidade e gates de engenharia
 
-Este documento registra os checks que precisam continuar verdes para proteger o baseline técnico do Loto Lab sem misturar regras de qualidade com a lógica estatística ou financeira do produto.
+Este documento detalha os checks que protegem o baseline técnico do Loto Lab. A receita operacional do dia a dia fica em [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
-## Gate local recomendado
+## Gate canônico
 
 Antes de abrir ou atualizar um PR:
 
@@ -13,142 +13,216 @@ npm run check
 
 `npm run check` executa:
 
-1. baseline de plataforma (`Node.js`, `@types/node`, TypeScript, CI, Docker e documentação);
-2. typecheck TypeScript;
-3. higiene determinística de arquivos de texto;
-4. lint baseado no compilador TypeScript;
-5. build;
-6. suíte completa com cobertura mínima.
-
-A auditoria de dependências usa acesso ao registry e fica separada:
-
-```bash
-npm run audit:prod
+```text
+quality:static
+-> build
+-> test:run
 ```
+
+`quality:static` executa:
+
+```text
+production:contract:verify
+-> format:check
+-> lint
+```
+
+`lint` inclui:
+
+- `platform:verify`;
+- TypeScript backend com `--noEmit --noUnusedLocals --noUnusedParameters --noFallthroughCasesInSwitch`;
+- TypeScript frontend com os mesmos guardrails.
+
+O script `typecheck` permanece disponível isoladamente. Ele não é repetido dentro de `quality:static` porque `lint` já executa os dois projetos TypeScript com regras mais estritas.
+
+A suíte funcional roda sem instrumentação obrigatória de coverage, conforme a decisão do PR #201.
 
 ## Typecheck e lint
 
-O typecheck usa o `tsconfig.json` sem emitir arquivos.
+O typecheck isolado usa:
 
-O lint é deliberadamente enxuto e sem dependências adicionais. Ele usa o compilador TypeScript com:
+```bash
+npm run typecheck
+```
 
-- `noUnusedLocals`;
-- `noUnusedParameters`;
-- `noFallthroughCasesInSwitch`.
+O lint é deliberadamente enxuto e baseado no compilador TypeScript, sem adicionar um linter de estilo completo. O objetivo é bloquear problemas estáticos objetivos com baixo custo de manutenção.
 
-Isso não pretende substituir um linter de estilo completo. O objetivo atual é bloquear problemas estáticos objetivos com o menor custo de manutenção possível.
+`platform:verify` também protege:
+
+- versão exata de Node em local/CI/Docker;
+- alinhamento de `@types/node` e TypeScript;
+- lockfile;
+- permissões/concurrency/timeout do CI;
+- existência do gate canônico `npm run check` no workflow;
+- baseline do workflow de Security;
+- documentação de plataforma.
 
 ## Higiene de texto
 
-`npm run format:check` verifica os arquivos de texto versionados e falha em caso de:
+```bash
+npm run format:check
+```
+
+Verifica arquivos versionados e falha em caso de:
 
 - BOM UTF-8;
 - CRLF/CR em vez de LF;
-- espaços ou tabs no fim de linhas.
+- espaços ou tabs no fim das linhas.
 
-Esse gate é uma verificação determinística de formato textual, não um formatter opinativo como Prettier.
+Não é um formatter opinativo como Prettier. Arquivos legados sem newline final podem ser normalizados gradualmente quando tocados, sem churn em massa.
 
-O repositório possui alguns arquivos legados sem newline final. O gate não força uma normalização em massa desses arquivos para evitar churn sem relação com comportamento; arquivos tocados podem ser normalizados gradualmente.
+## Isolamento PostgreSQL
 
-## Isolamento da suíte PostgreSQL
+A suíte inclui testes unitários, integração, API e persistência. Suítes PostgreSQL usam database temporário exclusivo por arquivo integrado.
 
-A suíte inclui testes unitários, de integração, API e persistência. As suítes que dependem de PostgreSQL não compartilham mais tabelas, sequences ou fixtures globais entre arquivos.
+O helper `tests/helpers/postgres.ts`:
 
-O helper `tests/helpers/postgres.ts` cria um database temporário exclusivo para cada suíte integrada, preservando a configuração base de conexão e executando migrations por padrão. O cleanup encerra o pool antes de remover o database; se uma conexão vazar, o helper força a remoção para não deixar resíduo, mas propaga a falha original para que o leak continue visível no CI.
+- cria database temporário isolado;
+- aplica migrations reais por padrão;
+- encerra o pool antes do cleanup;
+- força remoção do database se houver leak de conexão, preservando a falha original.
 
-O isolamento por database foi escolhido em vez de apenas `search_path`/schema porque o Loto Lab também exerce advisory locks reais em migrations, runtime e operações. Isso fornece uma fronteira consistente para dados e locks durante testes concorrentes.
+O isolamento por database é intencional porque o Loto Lab também exerce advisory locks reais em migrations, runtime e operações.
 
-Os arquivos de teste rodam com concorrência deliberadamente limitada:
+Os testes compilados rodam com:
 
 ```text
 --test-concurrency=2
 ```
 
-O valor `2` é intencional. Ele remove a serialização global que existia por causa do banco compartilhado sem assumir que mais paralelismo sempre será melhor para PostgreSQL, worker threads ou o runner de CI. Qualquer aumento futuro deve ser medido no pipeline completo e manter estabilidade antes de ser adotado.
+Aumentar concorrência exige medição do pipeline completo e estabilidade comprovada.
 
-Testes puramente unitários continuam sem depender de PostgreSQL. Suítes integradas devem usar o helper comum em vez de introduzir `TRUNCATE` global, fixtures compartilhadas ou schemas manuais.
+## Coverage
 
-## Cobertura
+Coverage é diagnóstico, não meta percentual nem gate obrigatório:
 
-A cobertura usa o runner nativo do Node.js 24 e é executada sobre a suíte completa compilada.
+```bash
+npm run coverage
+```
 
-Baseline observado ao introduzir o gate:
+O comando usa o runner nativo do Node.js 24 sobre a suíte compilada e não aplica thresholds globais.
 
-| Métrica | Observado | Mínimo |
-| --- | ---: | ---: |
-| Linhas | 79,50% | 78% |
-| Branches | 76,36% | 75% |
-| Funções | 86,75% | 85% |
+Use coverage para identificar lacunas relevantes em comportamento e invariantes, não para criar testes artificiais que apenas defendem porcentagem.
 
-Os mínimos foram definidos logo abaixo do baseline real para detectar regressões sem transformar o primeiro rollout em uma meta arbitrária de cobertura.
+Detalhes em [`TESTING.md`](TESTING.md).
 
-O relatório nativo considera os módulos carregados pela suíte. Portanto, o percentual é um guardrail de regressão sobre código exercitado, não uma prova de cobertura de todo arquivo existente no repositório.
+## E2E
 
-Para elevar um threshold, primeiro aumente testes relevantes e depois ajuste o piso em PR dedicado ou junto da mudança que comprovadamente melhorou o baseline.
+Browser E2E é direcionado por risco/escopo:
+
+```bash
+E2E_BASE_URL=http://127.0.0.1:5200 npm run test:e2e
+```
+
+Execute quando a mudança afetar fluxos browser-first, navegação, autenticação, estados críticos ou regressão visual/operacional relevante.
+
+E2E não é custo fixo de todo PR no pipeline atual.
 
 ## Auditoria de dependências
 
-O CI executa:
+A auditoria de dependências de produção permanece disponível:
 
 ```bash
+npm run audit:prod
+```
+
+Ela usa:
+
+```text
 npm audit --omit=dev --audit-level=high
 ```
 
-O gate cobre dependências de produção e falha para vulnerabilidades `high` ou `critical`. Dependências de desenvolvimento continuam visíveis no `npm ci`/Dependabot, mas não bloqueiam produção por esse gate específico.
+Execute quando a mudança tocar dependências/runtime, antes de release relevante ou quando houver alerta de segurança.
 
-## Governança do workflow
+## CI funcional
 
-O workflow funcional usa permissões mínimas explícitas para o `GITHUB_TOKEN`:
+`.github/workflows/ci.yml` roda em PRs e pushes para `main`.
 
-```yaml
-permissions:
-  contents: read
+Fluxo:
+
+```text
+checkout
+-> Node 24.19.0
+-> npm ci
+-> PostgreSQL efêmero
+-> npm run check
 ```
 
-Novas permissões só devem ser concedidas no workflow ou job que realmente precisar delas. Scanners que necessitem publicar resultados de segurança permanecem separados do CI funcional, para que o job principal continue read-only.
+O job mantém:
 
-Runs de um mesmo PR compartilham um grupo de concorrência e uma atualização mais nova cancela a anterior. Pushes para `main` **não** são cancelados: cada merge continua recebendo sua validação completa mesmo quando outro commit chega em seguida.
+- `contents: read`;
+- concurrency por PR/ref;
+- cancelamento somente de PR superseded;
+- timeout global de 10 minutos;
+- Actions pinadas por SHA;
+- PostgreSQL pinado por digest.
 
-O job funcional possui timeout global de 15 minutos. Os passos mais caros e sujeitos a espera externa — testes com cobertura, build da imagem e E2E real — possuem timeout próprio de 5 minutos. Os smoke tests também mantêm loops de readiness explicitamente limitados.
+O objetivo é que local e CI consumam a mesma interface obrigatória em vez de manter listas paralelas de lint/build/test.
 
-`actions/checkout` e `actions/setup-node` permanecem pinadas por SHA, e as imagens usadas pelo Dockerfile/serviço PostgreSQL permanecem pinadas por digest. O label do runner hospedado pelo GitHub (`ubuntu-latest`) não oferece pinning por digest; por isso a reprodutibilidade do projeto é garantida nos componentes controláveis (toolchain, Actions, dependências e containers) e validada pelos gates de plataforma.
+## Security workflow
 
-`scripts/verifyPlatform.mjs` protege esse baseline e falha se permissões mínimas, política de concorrência ou timeouts críticos forem removidos do workflow principal.
+`.github/workflows/security.yml` é separado do CI funcional e atualmente roda:
 
-## Segurança e supply chain
+- semanalmente;
+- manualmente por `workflow_dispatch`.
 
-`.github/workflows/security.yml` roda em PRs para `main`, pushes em `main` e semanalmente. Ele é separado do CI funcional para isolar permissões e distinguir regressão funcional de sinal de segurança.
+Ele não é hoje um gate automático de todo PR.
 
-O workflow possui três frentes:
+Frentes atuais:
 
-1. **CodeQL** para JavaScript/TypeScript com queries `security-and-quality`. Somente esse job recebe `security-events: write`; o restante permanece `contents: read`.
-2. **Dependency Review** somente em PRs. Novas dependências de runtime com vulnerabilidade `high` ou `critical` bloqueiam o PR; dependências de desenvolvimento continuam observáveis, mas não entram nesse bloqueio específico.
-3. **Container + SBOM**. A imagem de produção é construída, recebe SBOM SPDX JSON com retenção de 14 dias e é analisada por Trivy.
+1. `npm run audit:prod`;
+2. CodeQL JavaScript/TypeScript com `security-and-quality`;
+3. build da imagem de produção;
+4. SBOM SPDX JSON via Syft;
+5. Trivy para vulnerabilidades HIGH/CRITICAL.
 
-A política de severidade do container é intencionalmente acionável:
+Política do Trivy:
 
-- todo achado `HIGH` ou `CRITICAL`, inclusive sem correção disponível, aparece no relatório do workflow;
-- achados `HIGH` ou `CRITICAL` com correção disponível bloqueiam o workflow;
-- achados sem correção não são silenciosamente ignorados, mas também não tornam o branch permanentemente impossível de liberar.
+- todos os HIGH/CRITICAL são reportados;
+- HIGH/CRITICAL com correção disponível bloqueiam o workflow;
+- achados sem correção permanecem visíveis sem tornar o branch permanentemente impossível de liberar.
 
-`npm audit` continua bloqueando vulnerabilidades `high`/`critical` de dependências de produção. Dependency Review bloqueia novas vulnerabilidades equivalentes no momento em que entram no PR. O Trivy cobre o artefato containerizado, incluindo pacotes do sistema operacional que não aparecem no lockfile npm.
+CodeQL é o único job com `security-events: write`; o restante permanece `contents: read`.
 
-CodeQL publica alertas no GitHub Code Scanning. Um alerta não deve ser suprimido apenas para deixar o check verde: falsos positivos precisam ser triados no próprio alerta ou em mudança explicitamente documentada. Da mesma forma, qualquer futura exceção de Trivy deve ser específica para o CVE/advisory, incluir justificativa e data de revisão; não existe allowlist genérica por pacote ou severidade.
+## Checks de produção
 
-As Actions do workflow de segurança são pinadas por SHA completo. As versões das ferramentas baixadas internamente também são explícitas (`Trivy v0.70.0` e `Syft v1.42.3`). Atualizações dessas versões devem ser feitas em PR próprio ou claramente destacadas em um PR de manutenção, para que o diff de supply chain seja revisável.
+Preflight de produção é separado do gate de PR:
 
-O gate estático de plataforma verifica que `security.yml` mantém Actions pinadas por SHA, permissões mínimas, política de severidade, versões explícitas dos scanners e geração de SBOM sem escrita no dependency snapshot.
+```bash
+npm run prod:check
+```
 
-## CI
+Ele valida o Compose usando `.env.production.example`, executa os checks estáticos e faz `build:prod`, sem carregar secrets reais nem alterar a stack ativa.
 
-Em PRs e pushes para `main`, a ordem principal é:
+O procedimento completo está em [`PRODUCTION.md`](PRODUCTION.md).
 
-1. instalar dependências com `npm ci`;
-2. executar gates estáticos;
-3. build + testes com concorrência limitada e thresholds de cobertura;
-4. auditar dependências de produção;
-5. validar Compose;
-6. construir a imagem de produção;
-7. executar smoke tests, autenticação e E2E real em navegador.
+## Regra para falhas
 
-A suíte com cobertura roda uma única vez no CI. Isso evita duplicar aproximadamente a mesma execução apenas para gerar o relatório de cobertura.
+Não faça retry cego nem enfraqueça checks para obter verde.
+
+1. abra o log;
+2. identifique a causa raiz;
+3. diferencie bug, contrato stale, teste incorreto e infraestrutura;
+4. corrija a fonte adequada;
+5. gere novo SHA;
+6. reexecute os gates aplicáveis;
+7. repita o auto code review final.
+
+## Resumo
+
+Sempre obrigatório antes do PR:
+
+```bash
+npm run check
+```
+
+Direcionados por risco/escopo:
+
+```bash
+npm run test:e2e
+npm run coverage
+npm run audit:prod
+npm run prod:check
+```
+
+Uma validação só deve virar custo fixo de todo PR quando proteger um contrato material que justifique esse custo.
