@@ -55,6 +55,14 @@ async function loadStyledModule(name: string): Promise<boolean> {
   return loadModule(name);
 }
 
+async function loadMyGamesFeatures(): Promise<boolean> {
+  const baseStyleReady = await loadStyle("my-games-v2");
+  if (!baseStyleReady) return false;
+  const moduleReady = await loadModule("my-games-v2");
+  if (!moduleReady) return false;
+  return loadStyle("my-games-workspace");
+}
+
 async function ensureViewFeatures(): Promise<boolean | undefined> {
   const view = currentMainView();
   if (view === "dashboard") {
@@ -82,8 +90,13 @@ async function ensureViewFeatures(): Promise<boolean | undefined> {
     return styleReady ? loadModule("backtests") : false;
   }
 
-  await loadStyledModule("refinements");
+  if (view === "games") {
+    // My Games is typed-only functional ownership. A canonical asset failure is
+    // explicit and retryable; legacy real-bets/management code is never revived.
+    return loadMyGamesFeatures();
+  }
 
+  await loadStyledModule("refinements");
   if (view === "generate") {
     // Generator 2.0 owns the advanced workspace. Its boundary imports the
     // functional owner plus typed readiness/explainability enhancements under
@@ -91,26 +104,6 @@ async function ensureViewFeatures(): Promise<boolean | undefined> {
     await loadStyledModule("generation-v2");
     // Prototype 1 owns the final presentation after the functional layers exist.
     await loadStyle("generation-workspace");
-  } else if (view === "games") {
-    // My Games 2.0 owns the clean management surface. If it cannot load, keep
-    // the previous refinements as a functional fallback instead of breaking the view.
-    const styleReady = await loadStyle("my-games-v2");
-    const moduleReady = styleReady ? await loadModule("my-games-v2") : false;
-    if (moduleReady) {
-      await loadModule("real-bet-auditability");
-      // Prototype 1 owns final presentation only after the functional and
-      // auditability layers are mounted.
-      await loadStyle("my-games-workspace");
-    } else {
-      await Promise.all([
-        loadStyle("real-bets"),
-        loadStyle("my-games-management"),
-      ]);
-      await Promise.all([
-        loadModule("real-bets"),
-        loadModule("my-games-management"),
-      ]);
-    }
   }
 }
 
@@ -119,10 +112,16 @@ function isMainRenderPending(): boolean {
   return Boolean(content?.querySelector(":scope > .loading-state:not([data-feature-owned])"));
 }
 
+function featureLoadTitle(view: string): string {
+  if (view === "games") return "Não foi possível carregar Meus Jogos";
+  if (view === "backtests") return "Não foi possível carregar Testes históricos";
+  return "Não foi possível carregar esta funcionalidade";
+}
+
 function renderFeatureLoadError(view: string): void {
   const content = document.querySelector<HTMLElement>("#content");
   if (!content || currentMainView() !== view) return;
-  content.innerHTML = '<div class="error-state"><span class="error-code">FEATURE_LOAD_ERROR</span><strong>Não foi possível carregar Testes históricos</strong><p>Os arquivos da funcionalidade não ficaram disponíveis. Tente carregar a tela novamente.</p><button class="button" type="button" data-feature-retry>Tentar novamente</button></div>';
+  content.innerHTML = `<div class="error-state"><span class="error-code">FEATURE_LOAD_ERROR</span><strong>${featureLoadTitle(view)}</strong><p>Os arquivos da funcionalidade não ficaram disponíveis. Tente carregar a tela novamente.</p><button class="button" type="button" data-feature-retry>Tentar novamente</button></div>`;
   content.querySelector<HTMLButtonElement>("[data-feature-retry]")?.addEventListener("click", () => {
     document.querySelector<HTMLElement>("#refresh-view")?.click();
   });
