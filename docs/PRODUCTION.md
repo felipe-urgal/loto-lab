@@ -102,6 +102,14 @@ PostgreSQL
 -> scheduler operacional
 ```
 
+### Graceful shutdown do container
+
+A aplicação possui um deadline interno configurável por `OPS_SHUTDOWN_TIMEOUT_SECONDS`. O valor padrão é `25s` e o parser aceita no máximo `120s` para drenar HTTP, scheduler e analysis jobs antes de liberar lock e pool do PostgreSQL.
+
+O serviço `app` em `docker-compose.prod.yml` declara `stop_grace_period: 130s`. Essa margem é proposital: o Docker precisa manter o processo vivo por **mais tempo que o maior deadline aceito pela aplicação**, evitando enviar `SIGKILL` enquanto o próprio shutdown ainda está dentro do contrato.
+
+Não existe uma segunda variável de ambiente para esse grace period. Manter o limite do container fixo acima do máximo aceito pela aplicação evita duas configurações acopladas que poderiam divergir em produção. Se o limite máximo de `OPS_SHUTDOWN_TIMEOUT_SECONDS` mudar no código, o `production:contract:verify` falha até que a relação seja revisada explicitamente.
+
 ## 5. Verify
 
 Depois do deploy:

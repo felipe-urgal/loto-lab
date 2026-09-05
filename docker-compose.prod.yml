@@ -30,6 +30,7 @@ services:
       dockerfile: Dockerfile
     image: loto-lab:${LOTO_LAB_IMAGE_TAG:-latest}
     restart: unless-stopped
+    stop_grace_period: 130s
     depends_on:
       postgres:
         condition: service_healthy
