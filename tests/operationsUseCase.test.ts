@@ -124,11 +124,26 @@ test("OperationsUseCase exposes partial and running sync states without inventin
     partial: false,
     running: true,
   });
+
+  const invertedRun: OperationRunSnapshot = {
+    id: 12,
+    operation: "sync-all",
+    status: "success",
+    details: {},
+    startedAt: "2026-08-30T11:10:00.000Z",
+    finishedAt: "2026-08-30T11:09:00.000Z",
+  };
+  const inverted = new OperationsUseCase(history(invertedRun), async () => invertedRun, () => now);
+  assert.deepEqual((await inverted.status(config)).sync, {
+    status: "success",
+    partial: false,
+    running: false,
+  });
 });
 
 test("OperationsUseCase delegates synchronization and preserves the application error contract", async () => {
   const completed: OperationRunSnapshot = {
-    id: 12,
+    id: 13,
     operation: "sync-all",
     status: "success",
     details: { successfulLotteries: 3 },
