@@ -23,9 +23,8 @@ export function isMainView(value: string): value is MainView {
   return mainViews.has(value);
 }
 
-export function mainViewFromHash(hash: string): MainView {
-  const requested = hash.replace(/^#/, "");
-  return isMainView(requested) ? requested : "dashboard";
+export function mainViewFromHash(hash: string): string {
+  return hash.replace(/^#/, "") || "dashboard";
 }
 
 export function isLotteryId(value: string | null | undefined): value is LotteryId {
