@@ -18,6 +18,11 @@ export interface AnalysisJobRecord {
   finishedAt?: string;
 }
 
+export interface AnalysisJobMetricsSnapshot {
+  counts: Record<AnalysisJobStatus, number>;
+  oldestQueuedAgeSeconds: number | null;
+}
+
 interface AnalysisJobRow {
   id: string;
   kind: AnalysisJobKind;
@@ -30,6 +35,15 @@ interface AnalysisJobRow {
   created_at: Date;
   started_at: Date | null;
   finished_at: Date | null;
+}
+
+interface AnalysisJobMetricsRow {
+  queued: number;
+  running: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+  oldest_queued_age_seconds: string | number | null;
 }
 
 function mapRow(row: AnalysisJobRow): AnalysisJobRecord {
@@ -45,6 +59,23 @@ function mapRow(row: AnalysisJobRow): AnalysisJobRecord {
     createdAt: row.created_at.toISOString(),
     ...(row.started_at ? { startedAt: row.started_at.toISOString() } : {}),
     ...(row.finished_at ? { finishedAt: row.finished_at.toISOString() } : {}),
+  };
+}
+
+function mapMetricsRow(row: AnalysisJobMetricsRow): AnalysisJobMetricsSnapshot {
+  const oldestQueuedAgeSeconds = row.oldest_queued_age_seconds === null
+    ? null
+    : Math.max(0, Number(row.oldest_queued_age_seconds));
+
+  return {
+    counts: {
+      queued: row.queued,
+      running: row.running,
+      completed: row.completed,
+      failed: row.failed,
+      cancelled: row.cancelled,
+    },
+    oldestQueuedAgeSeconds,
   };
 }
 
@@ -88,6 +119,26 @@ export class PostgresAnalysisJobRepository {
       [limit, lottery ?? null],
     );
     return result.rows.map(mapRow);
+  }
+
+  async metricsSnapshot(): Promise<AnalysisJobMetricsSnapshot> {
+    const result = await this.pool.query<AnalysisJobMetricsRow>(
+      `
+        SELECT
+          (COUNT(*) FILTER (WHERE status = 'queued'))::int AS queued,
+          (COUNT(*) FILTER (WHERE status = 'running'))::int AS running,
+          (COUNT(*) FILTER (WHERE status = 'completed'))::int AS completed,
+          (COUNT(*) FILTER (WHERE status = 'failed'))::int AS failed,
+          (COUNT(*) FILTER (WHERE status = 'cancelled'))::int AS cancelled,
+          EXTRACT(
+            EPOCH FROM (
+              NOW() - MIN(created_at) FILTER (WHERE status = 'queued')
+            )
+          ) AS oldest_queued_age_seconds
+        FROM analysis_jobs
+      `,
+    );
+    return mapMetricsRow(result.rows[0]!);
   }
 
   async latestCompleted(kind: AnalysisJobKind, lottery: LotteryId): Promise<AnalysisJobRecord | undefined> {
