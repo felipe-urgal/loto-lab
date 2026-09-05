@@ -124,6 +124,19 @@ Para acompanhamento:
 npm run prod:logs
 ```
 
+### Retenção de logs dos containers
+
+O compose de produção usa o driver Docker `local` para `app` e `postgres`, com rotação explícita:
+
+```text
+max-size: 10m
+max-file: 5
+```
+
+Isso limita o crescimento local de logs por container sem introduzir uma stack externa de logging. A política é um guardrail de disco, não um sistema de retenção histórica ou auditoria de longo prazo; eventos que precisam sobreviver ao ciclo de vida do container devem continuar persistidos nas fontes de verdade próprias do domínio (por exemplo, `operation_runs`, jobs e revisões financeiras).
+
+`npm run production:contract:verify` valida a presença dessa política para impedir remoção acidental em mudanças futuras do compose.
+
 ## Operações adicionais
 
 Parar a stack sem remover o volume PostgreSQL:
