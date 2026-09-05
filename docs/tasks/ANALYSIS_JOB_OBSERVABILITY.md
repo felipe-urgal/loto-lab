@@ -2,6 +2,8 @@
 
 Issue: #63
 
+Status: entregue via PR #212 (`6f2fb32`); a #63 permanece aberta para sinais operacionais e SLOs adicionais baseados em evidência.
+
 ## Objetivo da fatia
 
 Medir a saúde operacional da fila de análises usando o PostgreSQL como fonte de verdade, sem introduzir labels de alta cardinalidade e sem misturar o snapshot persistido com a baseline HTTP process-local.

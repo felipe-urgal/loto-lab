@@ -2,7 +2,7 @@
 
 Issue: #64
 
-Status: protótipo de decisão antes de implementação multissuperfície.
+Status: decisão entregue via PR #210 (`f0433b2`); o Protótipo A foi adotado e a implementação funcional permanece pendente na #64.
 
 ## Objetivo
 

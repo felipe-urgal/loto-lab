@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-09-05**, com #155–#160/#163/#175 e as fatias #204–#208 já na `main`, composition root HTTP concluído, shell com ownership TypeScript, primeira baseline de métricas HTTP e decomposições pequenas de planejamento/Strategy Lab integradas.
+> Baseline revisada em **2026-09-05**, com as fatias #204–#214 já na `main`, composition root HTTP concluído, shell e primitives compartilhadas com ownership TypeScript, métricas HTTP + Analysis Jobs e novas decomposições pequenas do planejamento/Strategy Lab integradas.
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -72,7 +72,12 @@ A diretriz permanece:
 - shell global com ownership funcional em `web/src/core/shell.ts` e `web/shell.js` reduzido a boundary compatível (#205);
 - primeira baseline HTTP process-local com famílias de rota de cardinalidade fixa, error rates e p50/p95/p99 atrás da autenticação (#206);
 - matemática do espaço de geração extraída de `generator/planning.ts` para owner próprio, preservando equivalência (#207);
-- reporting/séries do Strategy Lab extraídos para owner próprio, preservando experimento e inferência no módulo canônico (#208).
+- reporting/séries do Strategy Lab extraídos para owner próprio, preservando experimento e inferência no módulo canônico (#208);
+- direção de arquitetura de informação consolidada no Protótipo A, preservando deep links/owners e definindo rollout contextual incremental (#210);
+- grace period do container alinhado ao deadline máximo de shutdown da aplicação e protegido pelo Production Contract (#211);
+- snapshot persistido de saúde da fila de Analysis Jobs adicionado ao endpoint operacional sem labels de alta cardinalidade (#212);
+- validações estruturais de seleção/ranges extraídas de `generator/planning.ts` para `planningConstraints.ts`, preservando matemática e anti-leakage (#213);
+- `web/app.js` passou a consumir API, escaping, formatters e toast dos owners TypeScript compartilhados, removendo as cópias locais (#214).
 
 ### Pontos fortes a preservar
 
@@ -94,11 +99,11 @@ A diretriz permanece:
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- frontend ainda possui módulos grandes/imperativos; primitives compartilhadas, features canônicas e o shell já possuem ownership TypeScript, mas state/lifecycle internos, `app` e superfícies legadas restantes seguem ativos na #60;
-- hotspots algorítmicos continuam grandes apesar das extrações de espaço do gerador e reporting do Strategy Lab (#62);
-- observabilidade já possui baseline HTTP process-local; métricas de jobs/sync/dependências/pool, SLOs e runbooks seguem ativos na #63;
-- arquitetura de informação pós-redesign ainda pode reduzir troca de contexto (#64);
-- retenção local de logs está bounded; otimizações operacionais e Web Vitals ainda precisam de baseline antes/depois quando houver evidência (#65);
+- frontend ainda possui módulos grandes/imperativos; primitives compartilhadas, features canônicas, shell e o próprio `app.js` já consomem owners TypeScript onde há ownership consolidado, mas state/lifecycle internos e superfícies legadas restantes seguem ativos na #60;
+- hotspots algorítmicos continuam grandes apesar das extrações de espaço e validações do gerador e reporting do Strategy Lab (#62);
+- observabilidade já possui baseline HTTP process-local e saúde persistida de Analysis Jobs; sync/dependências/pool, SLOs e runbooks seguem ativos na #63;
+- a direção pós-redesign já foi decidida no Protótipo A; links contextuais, retorno por `jobId` e proveniência entre superfícies ainda precisam ser implementados (#64);
+- retenção local de logs está bounded e o shutdown do container cobre o deadline máximo da aplicação; otimizações operacionais e Web Vitals ainda precisam de baseline antes/depois quando houver evidência (#65);
 - o fluxo hipótese → evidência → decisão ainda não é uma entidade explícita (#66).
 
 ---
@@ -140,7 +145,7 @@ A revisão de CLI/scheduler não encontrou motivo para mover engines puros ou li
 
 ## #60 — Frontend TypeScript, módulos e primitives · P1 · em andamento
 
-A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Dashboard Scope, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos avançaram em fatias próprias; Painel, Meus Jogos, Análises e Gerador também explicitam contratos internos consumidos pela UI em owners menores. No Gerador, readiness e explainability possuem ownership TypeScript interno e lifecycle coordenado sem listeners/hash parsing paralelos. O Dashboard Scope também usa lifecycle/API compartilhados e separa a semântica financeira do owner de apresentação. A #205 moveu também o shell global para `web/src/core/shell.ts`, mantendo `web/shell.js` apenas como boundary de asset.
+A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Dashboard Scope, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos avançaram em fatias próprias; Painel, Meus Jogos, Análises e Gerador também explicitam contratos internos consumidos pela UI em owners menores. No Gerador, readiness e explainability possuem ownership TypeScript interno e lifecycle coordenado sem listeners/hash parsing paralelos. O Dashboard Scope também usa lifecycle/API compartilhados e separa a semântica financeira do owner de apresentação. A #205 moveu também o shell global para `web/src/core/shell.ts`, mantendo `web/shell.js` apenas como boundary de asset. A #214 eliminou as cópias locais de API, escaping, formatters e toast de `web/app.js`, que agora consome diretamente os owners canônicos já emitidos pelo build TypeScript.
 
 Entregue:
 
@@ -164,7 +169,8 @@ Entregue:
 - `web/src/features/generationV2/enhancements.ts` coordena montagem/cleanup das duas camadas via lifecycle compartilhado; `feature-loader.js` deixa de carregá-las como módulos JS independentes e os dois assets legados são removidos;
 - Testes históricos com implementação funcional canônica em `web/src/features/backtests.ts`, `web/backtests.js` reduzido a boundary, consumo direto de API/lifecycle/escaping/formatters/toast compartilhados, abort/stale-response guard e preservação do padrão de últimos 100 concursos;
 - fallback funcional duplicado de Testes históricos removido de `web/app.js` + `refinements.js`; o app base mantém apenas um handoff de shell e `feature-loader.js` trata falha de asset do owner tipado com erro/retry explícito, sem restaurar implementação paralela;
-- shell global com owner canônico em `web/src/core/shell.ts`, boundary fino em `web/shell.js` e contratos de navegação/hash/teclado/mobile preservados (#205).
+- shell global com owner canônico em `web/src/core/shell.ts`, boundary fino em `web/shell.js` e contratos de navegação/hash/teclado/mobile preservados (#205);
+- `web/app.js` consome `api`, escaping, formatters e toast dos owners TypeScript compartilhados e não redefine mais essas primitives; `safeApi` permanece como política local de degradação graciosa (#214).
 
 Próximas fatias:
 
@@ -179,15 +185,14 @@ O trabalho deve continuar sobre as fontes canônicas consolidadas, sem reabrir a
 
 ## #63 — Métricas e SLOs operacionais · P1
 
-A primeira fatia foi entregue em #206: o processo Node mede requests, 4xx/5xx e latência p50/p95/p99 por famílias fixas de rota, com amostra bounded e endpoint operacional autenticado. A baseline é process-local e não é apresentada como SLO final nem como retenção histórica.
+A baseline HTTP foi entregue em #206: o processo Node mede requests, 4xx/5xx e latência p50/p95/p99 por famílias fixas de rota, com amostra bounded e endpoint operacional autenticado. A #212 acrescentou ao mesmo endpoint um snapshot persistido de `analysis_jobs`, com contagens fixas por estado e idade da fila mais antiga, sem dimensões de alta cardinalidade. A baseline HTTP continua process-local e nenhum desses sinais é apresentado como SLO final ou retenção histórica.
 
 Próximas fatias:
 
-- jobs por estado/idade;
 - sync e `partial`;
 - CAIXA/OpenAI;
 - pool PostgreSQL;
-- poucos SLOs + runbooks.
+- poucos SLOs + runbooks baseados nos sinais observados.
 
 Não introduzir tracing distribuído antes de necessidade demonstrada. Com a #61 concluída, #63 pode avançar sem depender de nova migração da fronteira HTTP, desde que não misture observabilidade com refactor algorítmico.
 
@@ -208,30 +213,32 @@ Depois da consolidação principal da #61:
 Já entregue em fatias pequenas:
 
 - #207 extrai baseline condicional, combinação/DP e espaços algorítmicos para `generator/planningSpace.ts`, preservando `planning.ts` como orchestrator;
-- #208 extrai séries e montagem de variantes para `lab/strategyLabReporting.ts`, preservando experimento, benchmark e inferência em `strategyLab.ts`.
+- #208 extrai séries e montagem de variantes para `lab/strategyLabReporting.ts`, preservando experimento, benchmark e inferência em `strategyLab.ts`;
+- #213 extrai validação de seleção manual e ranges estruturais para `generator/planningConstraints.ts`, preservando mensagens, matemática, metodologia e anti-leakage.
 
 A consolidação da #61 está concluída: facade temporária e ownership concreto dos controllers HTTP foram removidos. A decomposição da #62 pode avançar em fatias próprias sem reabrir a fronteira HTTP.
 
 ## #64 — Arquitetura de informação e jornada pós-redesign
 
-O visual já foi unificado e consolidado. O próximo passo é decidir, com protótipos e tarefas reais:
-
-- Testes históricos contextualizados no Laboratório;
-- Execuções contextualizadas nos trabalhos de origem;
-- IA integrada às evidências quando reduzir troca de contexto;
-- percepção coerente entre hash routes e páginas dedicadas.
+A decisão de arquitetura foi entregue em #210. O **Protótipo A — contexto sem remoção de rotas** é a direção adotada: reduzir troca de contexto por links/proveniência sem fundir controllers, remover deep links ou transformar histórico em previsão.
 
 Jornada alvo: `Entender → Experimentar → Aplicar → Acompanhar → Operar`.
 
+Próximas fatias:
+
+- links contextuais usando as rotas atuais, sem estado cruzado obrigatório;
+- `jobId` como retorno operacional com contrato único e deep link seguro;
+- proveniência entre experimento/evidência para Laboratório ↔ Backtests/IA quando os dados já existirem;
+- somente depois disso, revisar agrupamento da navegação global com evidência de uso.
+
 ## #65 — Runtime/Docker/performance baseada em evidência
 
-O baseline de hardening já é forte. A #204 adicionou retenção local bounded para logs de `app` e `postgres` (`local`, `10m` × `5`) e um guard no contrato de produção. Isso é proteção de disco, não retenção histórica.
+O baseline de hardening já é forte. A #204 adicionou retenção local bounded para logs de `app` e `postgres` (`local`, `10m` × `5`) e um guard no contrato de produção. A #211 declarou `stop_grace_period: 130s` para o app e protege no Production Contract que essa janela permaneça maior que o máximo de 120s aceito pelo shutdown interno. São guardrails operacionais, não tuning de performance.
 
 Restam decisões medidas:
 
 - Web Vitals/LCP/INP/CLS quando houver ambiente e medição representativa;
 - redes/egress;
-- `stop_grace_period`;
 - limites CPU/memória;
 - cache de análise;
 - índices PostgreSQL só após profiling;
