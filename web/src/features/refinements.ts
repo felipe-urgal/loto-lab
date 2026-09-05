@@ -82,8 +82,9 @@ async function refineAnalysis(): Promise<void> {
     return;
   }
   table.dataset.analysisRefined = "true";
+  const analysis = data;
 
-  const topByScore = new Set([...data.numbers]
+  const topByScore = new Set([...analysis.numbers]
     .sort((a, b) => b.score - a.score || a.number - b.number)
     .slice(0, 5)
     .map((row) => row.number));
@@ -118,7 +119,7 @@ async function refineAnalysis(): Promise<void> {
     </div>
     <details class="score-explainer">
       <summary>Como a pontuação é calculada?</summary>
-      <p>Pesos atuais: ano ${(data.weights.year * 100).toFixed(0)}%, últimos 20 ${(data.weights.recent20 * 100).toFixed(0)}%, mês ${(data.weights.month * 100).toFixed(0)}%, histórico ${(data.weights.historical * 100).toFixed(0)}% e últimos 10 ${(data.weights.recent10 * 100).toFixed(0)}%. Cada componente é normalizado antes da combinação.</p>
+      <p>Pesos atuais: ano ${(analysis.weights.year * 100).toFixed(0)}%, últimos 20 ${(analysis.weights.recent20 * 100).toFixed(0)}%, mês ${(analysis.weights.month * 100).toFixed(0)}%, histórico ${(analysis.weights.historical * 100).toFixed(0)}% e últimos 10 ${(analysis.weights.recent10 * 100).toFixed(0)}%. Cada componente é normalizado antes da combinação.</p>
     </details>
     <div class="methodology-note"><strong>Leitura correta:</strong> “forte”, “intermediária” e “fria” são posições relativas na classificação. Frequência histórica não aumenta a probabilidade individual de uma dezena no próximo sorteio.</div>`;
   tableWrap.parentElement.insertBefore(refinement, tableWrap);
@@ -127,15 +128,18 @@ async function refineAnalysis(): Promise<void> {
   const filter = refinement.querySelector<HTMLSelectElement>("[data-analysis-filter]");
   const sort = refinement.querySelector<HTMLSelectElement>("[data-analysis-sort]");
   if (!tbody || !filter || !sort) return;
+  const tableBody = tbody;
+  const filterSelect = filter;
+  const sortSelect = sort;
 
   function renderRows(): void {
-    const filterValue = filter.value;
-    const sortKey = sort.value as AnalysisSortKey;
-    const rows = [...data.numbers]
+    const filterValue = filterSelect.value;
+    const sortKey = sortSelect.value as AnalysisSortKey;
+    const rows = [...analysis.numbers]
       .filter((row) => filterValue === "all" || row.tier === filterValue)
       .sort((a, b) => b[sortKey] - a[sortKey] || b.score - a.score || a.number - b.number);
 
-    tbody.innerHTML = rows.map((row) => `
+    tableBody.innerHTML = rows.map((row) => `
       <tr class="${topByScore.has(row.number) ? "is-top-five" : ""}">
         <td><strong>${String(row.number).padStart(2, "0")}</strong></td>
         <td><span class="badge ${tierBadgeClass(row.tier)}">${tierLabel(row.tier)}</span></td>
@@ -144,8 +148,8 @@ async function refineAnalysis(): Promise<void> {
       </tr>`).join("");
   }
 
-  filter.addEventListener("change", renderRows);
-  sort.addEventListener("change", renderRows);
+  filterSelect.addEventListener("change", renderRows);
+  sortSelect.addEventListener("change", renderRows);
   renderRows();
 }
 
@@ -221,11 +225,12 @@ async function refineGames(): Promise<void> {
   const lottery = currentLottery();
   const latest = await getLatest(lottery);
   if (!latest || currentMainView() !== "games" || currentLottery() !== lottery) return;
+  const latestNumber = latest.number;
 
   const sectionCopy = root?.querySelector<HTMLElement>(".section-head p");
   if (sectionCopy && !sectionCopy.dataset.latestAdded) {
     sectionCopy.dataset.latestAdded = "true";
-    sectionCopy.textContent += ` Último resultado na base: #${latest.number}.`;
+    sectionCopy.textContent += ` Último resultado na base: #${latestNumber}.`;
   }
 
   for (const card of cards) {
@@ -235,6 +240,8 @@ async function refineGames(): Promise<void> {
     const button = card.querySelector<HTMLButtonElement>("[data-check-batch]");
     const copy = card.querySelector<HTMLElement>(".batch-head-copy");
     if (!input || !button || !copy) continue;
+    const contestInput = input;
+    const checkButton = button;
 
     const badge = document.createElement("span");
     badge.className = "batch-pending";
@@ -243,16 +250,16 @@ async function refineGames(): Promise<void> {
     copy.append(badge);
 
     function updatePending(): void {
-      const value = Number(input.value);
-      const pending = Number.isInteger(value) && value > latest.number;
+      const value = Number(contestInput.value);
+      const pending = Number.isInteger(value) && value > latestNumber;
       card.classList.toggle("is-pending", pending);
       badge.hidden = !pending;
     }
 
-    input.addEventListener("input", updatePending);
-    button.addEventListener("click", (event) => {
-      const value = Number(input.value);
-      if (!Number.isInteger(value) || value <= latest.number) return;
+    contestInput.addEventListener("input", updatePending);
+    checkButton.addEventListener("click", (event) => {
+      const value = Number(contestInput.value);
+      if (!Number.isInteger(value) || value <= latestNumber) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       const resultTarget = root?.querySelector<HTMLElement>("#check-result");
