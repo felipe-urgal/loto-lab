@@ -89,7 +89,11 @@ test("UI refinement assets are lazy-loaded and typed Backtests bypasses legacy r
   assert.match(labHtml, /lab-refinements\.js/);
   assert.match(labHtml, /refinements\.css/);
 
-  const labRefinements = await fetch(`${baseUrl}/assets/lab-refinements.js`);
+  const labRefinementsBoundary = await fetch(`${baseUrl}/assets/lab-refinements.js`);
+  assert.equal(labRefinementsBoundary.status, 200);
+  assert.match(await labRefinementsBoundary.text(), /src\/features\/labRefinements\.js/);
+
+  const labRefinements = await fetch(`${baseUrl}/assets/src/features/labRefinements.js`);
   assert.equal(labRefinements.status, 200);
   const labSource = await labRefinements.text();
   assert.match(labSource, /Empate em/);

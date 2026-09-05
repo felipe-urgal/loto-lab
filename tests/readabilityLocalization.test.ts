@@ -168,7 +168,8 @@ test("strategy lab owns its visible vocabulary in Portuguese while preserving in
 test("refinement layers own their Portuguese analysis vocabulary while preserving score contracts", async () => {
   const refinementsBoundary = await source("web/refinements.js");
   const refinements = await source("web/src/features/refinements.ts");
-  const labRefinements = await source("web/lab-refinements.js");
+  const labRefinementsBoundary = await source("web/lab-refinements.js");
+  const labRefinements = await source("web/src/features/labRefinements.ts");
 
   assert.equal(refinementsBoundary.trim(), 'import "./src/features/refinements.js";');
   for (const copy of [
@@ -188,7 +189,8 @@ test("refinement layers own their Portuguese analysis vocabulary while preservin
   assert.doesNotMatch(refinements, /Como o score é calculado/);
   assert.doesNotMatch(refinements, /posições relativas no ranking/);
 
-  assert.match(labRefinements, /const ranking = document\.querySelector\("#lab-ranking"\)/);
+  assert.equal(labRefinementsBoundary.trim(), 'import "./src/features/labRefinements.js";');
+  assert.match(labRefinements, /document\.querySelector<HTMLElement>\("#lab-ranking"\)/);
   assert.match(labRefinements, /métrica de classificação não variou/);
   assert.doesNotMatch(labRefinements, /métrica de ranking não variou/);
 });
