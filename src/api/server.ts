@@ -36,6 +36,7 @@ import {
   recordHttpRequest,
 } from "../observability/httpMetrics.js";
 import { logEvent } from "../observability/log.js";
+import { postgresPoolMetricsSnapshot } from "../observability/postgresPoolMetrics.js";
 import {
   OperationAlreadyRunningError as LegacyOperationAlreadyRunningError,
   runOperationalSync,
@@ -185,6 +186,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
         sendJson(response, 200, {
           ...httpMetricsSnapshot(),
           analysisJobs: await analysisJobRepository.metricsSnapshot(),
+          postgres: postgresPoolMetricsSnapshot(options.pool),
         }, corsOrigin);
         return;
       }
