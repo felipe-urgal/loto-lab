@@ -30,6 +30,7 @@ import { StrategyCatalogUseCase } from "../application/strategyCatalog.js";
 import type { ContestSource } from "../data/source.js";
 import { runGenerationPlanInWorker } from "../generator/planningWorkerClient.js";
 import { NotificationService } from "../notifications/service.js";
+import { caixaMetricsSnapshot } from "../observability/caixaMetrics.js";
 import {
   classifyHttpRoute,
   httpMetricsSnapshot,
@@ -187,6 +188,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
           ...httpMetricsSnapshot(),
           analysisJobs: await analysisJobRepository.metricsSnapshot(),
           postgres: postgresPoolMetricsSnapshot(options.pool),
+          caixa: caixaMetricsSnapshot(),
         }, corsOrigin);
         return;
       }
