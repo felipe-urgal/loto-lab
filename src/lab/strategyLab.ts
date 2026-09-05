@@ -23,7 +23,6 @@ import {
 } from "./randomControl.js";
 import {
   buildStrategyLabVariant,
-  type StrategyLabPoint,
   type StrategyLabVariant,
 } from "./strategyLabReporting.js";
 
