@@ -37,6 +37,12 @@ test("OperationsUseCase reports a fresh successful operation from an application
     stale: false,
     ageMinutes: 30,
     latest,
+    sync: {
+      status: "success",
+      partial: false,
+      running: false,
+      durationMs: 600_000,
+    },
   });
 });
 
@@ -51,7 +57,13 @@ test("OperationsUseCase marks missing, failed and old runs as stale", async () =
   const missing = new OperationsUseCase(history(), async () => {
     throw new Error("not used");
   }, () => now);
-  assert.equal((await missing.status(config)).stale, true);
+  const missingStatus = await missing.status(config);
+  assert.equal(missingStatus.stale, true);
+  assert.deepEqual(missingStatus.sync, {
+    status: "unknown",
+    partial: false,
+    running: false,
+  });
 
   const failedRun: OperationRunSnapshot = {
     id: 8,
@@ -64,6 +76,7 @@ test("OperationsUseCase marks missing, failed and old runs as stale", async () =
   const failedStatus = await failed.status(config);
   assert.equal(failedStatus.stale, true);
   assert.equal(failedStatus.ageMinutes, 10);
+  assert.equal(failedStatus.sync.status, "failed");
 
   const oldRun: OperationRunSnapshot = {
     ...failedRun,
@@ -75,9 +88,62 @@ test("OperationsUseCase marks missing, failed and old runs as stale", async () =
   assert.equal((await old.status(config)).stale, true);
 });
 
+test("OperationsUseCase exposes partial and running sync states without inventing duration", async () => {
+  const now = Date.parse("2026-08-30T12:00:00.000Z");
+  const config = {
+    autoSyncEnabled: true,
+    intervalMinutes: 30,
+    staleAfterMinutes: 180,
+  };
+  const partialRun: OperationRunSnapshot = {
+    id: 10,
+    operation: "sync-all",
+    status: "partial",
+    details: { successfulLotteries: 2 },
+    startedAt: "2026-08-30T11:00:00.000Z",
+    finishedAt: "2026-08-30T11:02:30.000Z",
+  };
+  const partial = new OperationsUseCase(history(partialRun), async () => partialRun, () => now);
+  assert.deepEqual((await partial.status(config)).sync, {
+    status: "partial",
+    partial: true,
+    running: false,
+    durationMs: 150_000,
+  });
+
+  const runningRun: OperationRunSnapshot = {
+    id: 11,
+    operation: "sync-all",
+    status: "running",
+    details: {},
+    startedAt: "2026-08-30T11:59:00.000Z",
+  };
+  const running = new OperationsUseCase(history(runningRun), async () => runningRun, () => now);
+  assert.deepEqual((await running.status(config)).sync, {
+    status: "running",
+    partial: false,
+    running: true,
+  });
+
+  const invertedRun: OperationRunSnapshot = {
+    id: 12,
+    operation: "sync-all",
+    status: "success",
+    details: {},
+    startedAt: "2026-08-30T11:10:00.000Z",
+    finishedAt: "2026-08-30T11:09:00.000Z",
+  };
+  const inverted = new OperationsUseCase(history(invertedRun), async () => invertedRun, () => now);
+  assert.deepEqual((await inverted.status(config)).sync, {
+    status: "success",
+    partial: false,
+    running: false,
+  });
+});
+
 test("OperationsUseCase delegates synchronization and preserves the application error contract", async () => {
   const completed: OperationRunSnapshot = {
-    id: 10,
+    id: 13,
     operation: "sync-all",
     status: "success",
     details: { successfulLotteries: 3 },
