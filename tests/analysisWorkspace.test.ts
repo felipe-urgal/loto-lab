@@ -19,7 +19,10 @@ test("analysis workspace follows Prototype 1 without changing statistical contra
   assert.doesNotMatch(loader, /loadStyle\("analysis-v2-hardening"\)/);
   await assert.rejects(readFile("web/analysis-v2-hardening.css", "utf8"), /ENOENT/);
 
-  assert.equal(boundary, 'import "./src/features/analysisV2.js";\n');
+  assert.equal(
+    boundary,
+    'import "./src/features/analysisV2.js";\nimport "./src/features/analysisV2/journey.js";\n',
+  );
   assert.match(analysis, /currentMainView/);
   assert.match(analysis, /onMainViewChanged/);
   assert.doesNotMatch(analysis, /runtime\.js/);
