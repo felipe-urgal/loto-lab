@@ -30,6 +30,11 @@ import { StrategyCatalogUseCase } from "../application/strategyCatalog.js";
 import type { ContestSource } from "../data/source.js";
 import { runGenerationPlanInWorker } from "../generator/planningWorkerClient.js";
 import { NotificationService } from "../notifications/service.js";
+import {
+  classifyHttpRoute,
+  httpMetricsSnapshot,
+  recordHttpRequest,
+} from "../observability/httpMetrics.js";
 import { logEvent } from "../observability/log.js";
 import {
   OperationAlreadyRunningError as LegacyOperationAlreadyRunningError,
@@ -48,7 +53,11 @@ import { RealBetService } from "../realBets/service.js";
 import { serveFeatureRoutes } from "./routes.js";
 import { serveWebAsset } from "./web.js";
 import { loadAppAuthConfig, requireAppAuthentication } from "./auth.js";
-import { requireSameOriginMutation, resolveMutationExpectedOrigin } from "./http.js";
+import {
+  requireSameOriginMutation,
+  resolveMutationExpectedOrigin,
+  sendJson,
+} from "./http.js";
 import { expensiveAnalysisGate } from "./workGate.js";
 import { runBacktestInWorker, runStrategyLabInWorker } from "./workerClient.js";
 
@@ -135,16 +144,24 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
     ),
   };
   const auth = loadAppAuthConfig();
+  const corsOrigin = options.corsOrigin ?? process.env.API_CORS_ORIGIN ?? "http://localhost:5173";
   const configuredOrigin = options.corsOrigin
     ?? process.env.API_CORS_ORIGIN
     ?? process.env.PUBLIC_ORIGIN;
 
   return createServer(async (request, response) => {
     const requestId = randomUUID();
+    const metricsStartedAt = performance.now();
+    const metricsUrl = new URL(request.url ?? "/", "http://localhost");
+    const routeFamily = classifyHttpRoute(metricsUrl.pathname);
+    response.once("finish", () => {
+      recordHttpRequest(routeFamily, response.statusCode, performance.now() - metricsStartedAt);
+    });
     response.setHeader("X-Request-Id", requestId);
+
     try {
       const method = request.method ?? "GET";
-      const url = new URL(request.url ?? "/", "http://localhost");
+      const url = metricsUrl;
 
       if (!isHealthPath(url.pathname) && !requireAppAuthentication(request, response, auth)) {
         return;
@@ -159,6 +176,11 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
           expectedOrigin,
           fetchSite: request.headers["sec-fetch-site"],
         });
+        return;
+      }
+
+      if (method === "GET" && url.pathname === "/api/v1/ops/metrics") {
+        sendJson(response, 200, httpMetricsSnapshot(), corsOrigin);
         return;
       }
 
