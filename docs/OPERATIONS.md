@@ -132,7 +132,10 @@ Retorna:
 - limite de desatualização;
 - idade da última execução;
 - último `operation_run`;
-- indicador `stale`.
+- indicador `stale`;
+- snapshot `sync` de baixa cardinalidade derivado do mesmo `operation_run`, com `status`, `partial`, `running` e `durationMs` quando existe início/fim válidos.
+
+`sync.status` usa apenas o conjunto fechado `running | success | partial | failed | abandoned | unknown`. `durationMs` não é inventado para uma execução ainda aberta ou timestamps inválidos. Não existe contador paralelo em memória: PostgreSQL continua sendo a fonte de verdade operacional.
 
 O estado é considerado desatualizado quando não existe execução válida recente ou quando a última execução terminou como `failed`/`abandoned`.
 
