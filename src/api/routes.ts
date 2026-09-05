@@ -15,6 +15,7 @@ import type { GenerateGamesUseCase } from "../application/generateGames.js";
 import type { GenerationV2UseCase } from "../application/generationV2.js";
 import type { OperationsUseCase } from "../application/operations.js";
 import type { RealBetUseCase } from "../application/realBets.js";
+import type { ResearchHypothesesUseCase } from "../application/researchHypotheses.js";
 import type { RunStrategyLabUseCase } from "../application/runStrategyLab.js";
 import type { StrategyCatalogUseCase } from "../application/strategyCatalog.js";
 import { serveAnalysis } from "./analysis.js";
@@ -27,6 +28,7 @@ import { serveGeneration } from "./generation.js";
 import { serveGenerationV2 } from "./generationV2.js";
 import { serveStrategyLab } from "./strategyLab.js";
 import { serveRealBets } from "./realBets.js";
+import { serveResearchHypotheses } from "./researchHypotheses.js";
 import { serveAiInsights } from "./aiInsights.js";
 import { serveOperations } from "./operations.js";
 import { serveAgenda } from "./agenda.js";
@@ -52,6 +54,7 @@ export interface FeatureRouteDependencies {
   generationV2: GenerationV2UseCase;
   operations: OperationsUseCase;
   realBets: RealBetUseCase;
+  researchHypotheses: ResearchHypothesesUseCase;
   strategyCatalog: StrategyCatalogUseCase;
   runStrategyLab: RunStrategyLabUseCase;
 }
@@ -110,6 +113,8 @@ const featureRoutes: FeatureRouteHandler[] = [
     serveGameComparison(request, response, options, dependencies.compareGameBatch),
   (request, response, options, dependencies) =>
     serveAiInsights(request, response, options, dependencies.aiInsights),
+  (request, response, options, dependencies) =>
+    serveResearchHypotheses(request, response, options, dependencies.researchHypotheses),
   (request, response, options, dependencies) =>
     serveOperations(request, response, options, dependencies.operations),
   (request, response, options, dependencies) =>

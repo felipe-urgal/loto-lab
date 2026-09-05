@@ -23,8 +23,13 @@ const LEGACY_MIGRATIONS = [
   "011_real_bet_financial_revisions.sql",
 ] as const;
 
+const CURRENT_UPGRADE_MIGRATIONS = [
+  "012_domain_contract_alignment.sql",
+  "013_research_hypotheses.sql",
+] as const;
+
 test(
-  "migrations upgrade an existing 001-011 database to 012 without data loss and keep checksum drift fatal",
+  "migrations upgrade an existing 001-011 database through current migrations without data loss and keep checksum drift fatal",
   { skip: !databaseUrl },
   async (t) => {
     const database = await createIsolatedPostgresDatabase({
@@ -81,7 +86,7 @@ test(
     assert.ok(beforeChecksums.rows.every((row) => row.checksum_sha256.length === 64));
 
     const upgrade = await runMigrations(pool);
-    assert.deepEqual(upgrade.applied, ["012_domain_contract_alignment.sql"]);
+    assert.deepEqual(upgrade.applied, [...CURRENT_UPGRADE_MIGRATIONS]);
     assert.deepEqual(upgrade.skipped, [...LEGACY_MIGRATIONS]);
 
     const preservedStrategy = await strategies.findById(strategy.id);
@@ -136,10 +141,18 @@ test(
     const idempotent = await runMigrations(pool);
     assert.deepEqual(idempotent.applied, []);
     assert.ok(idempotent.skipped.includes("001_initial.sql"));
-    assert.ok(idempotent.skipped.includes("012_domain_contract_alignment.sql"));
+    for (const migration of CURRENT_UPGRADE_MIGRATIONS) {
+      assert.ok(idempotent.skipped.includes(migration));
+    }
 
     const afterChecksums = await pool.query<{ name: string; checksum_sha256: string }>(
-      "SELECT name, checksum_sha256 FROM schema_migrations WHERE name <> '012_domain_contract_alignment.sql' ORDER BY name",
+      `
+        SELECT name, checksum_sha256
+        FROM schema_migrations
+        WHERE name <> ALL($1::text[])
+        ORDER BY name
+      `,
+      [[...CURRENT_UPGRADE_MIGRATIONS]],
     );
     assert.deepEqual(afterChecksums.rows, beforeChecksums.rows);
 
