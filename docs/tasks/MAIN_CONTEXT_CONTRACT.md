@@ -15,15 +15,16 @@ Centralizar em TypeScript a identidade das views principais e das loterias usada
 - `MAIN_VIEWS` e `MainView`;
 - `LOTTERY_IDS` e `LotteryId`;
 - `isMainView`;
-- `mainViewFromHash` com fallback canônico para `dashboard`;
+- `mainViewFromHash`, preservando a semântica histórica de remover `#` e usar `dashboard` somente quando o hash está vazio;
 - `isLotteryId`.
 
-`web/src/core/shell.ts` consome o owner para validar hash e storage. `web/src/core/viewLifecycle.ts` consome o mesmo owner e mantém `mainViewFromHash` reexportado para compatibilidade de imports existentes.
+`web/src/core/shell.ts` consome o owner para validar hash e storage. O shell continua responsável por normalizar uma view desconhecida para `dashboard`. `web/src/core/viewLifecycle.ts` consome o mesmo owner e mantém `mainViewFromHash` reexportado para compatibilidade de imports existentes.
 
 ## Guardrails
 
 - não muda rotas ou ordem de navegação;
-- hash inválido continua normalizado para `dashboard`;
+- hash desconhecido continua normalizado pelo shell para `dashboard`;
+- o helper público `mainViewFromHash` não ganha validação nova incidentalmente;
 - lottery ID inválido continua removido do storage pelo shell;
 - nenhuma renderização de feature é movida nesta fatia;
 - `web/app.js` permanece no escopo incremental da #60, sem big-bang.
