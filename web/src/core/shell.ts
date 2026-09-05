@@ -1,7 +1,9 @@
+import { isLotteryId, isMainView, type MainView } from "./mainContext.js";
+
 interface NavigationItem {
   key: string;
   label: string;
-  view?: string;
+  view?: MainView;
   href?: string;
   extra?: boolean;
 }
@@ -36,10 +38,8 @@ const ITEMS: NavigationItem[] = [
 const nav = document.querySelector<HTMLElement>("[data-shell-nav]");
 const isMainApp = location.pathname === "/" || location.pathname === "/index.html";
 const configuredActive = document.body.dataset.activeNav || "dashboard";
-const mainViews = new Set(ITEMS.flatMap((item) => item.view ? [item.view] : []));
-const lotteries = new Set(["mega-sena", "lotofacil", "dia-de-sorte"]);
 const storedLottery = localStorage.getItem("loto-lab:lottery");
-if (storedLottery && !lotteries.has(storedLottery)) localStorage.removeItem("loto-lab:lottery");
+if (storedLottery && !isLotteryId(storedLottery)) localStorage.removeItem("loto-lab:lottery");
 
 function requestedMainView(): string {
   return location.hash.replace("#", "");
@@ -48,7 +48,7 @@ function requestedMainView(): string {
 function normalizeMainHash(): boolean {
   if (!isMainApp) return true;
   const requested = requestedMainView();
-  if (requested && mainViews.has(requested)) return true;
+  if (requested && isMainView(requested)) return true;
   location.hash = "dashboard";
   return false;
 }
@@ -56,7 +56,7 @@ function normalizeMainHash(): boolean {
 function currentKey(): string {
   if (isMainApp) {
     const requested = requestedMainView();
-    return mainViews.has(requested) ? requested : "dashboard";
+    return isMainView(requested) ? requested : "dashboard";
   }
   return configuredActive;
 }

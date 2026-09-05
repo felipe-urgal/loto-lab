@@ -1,3 +1,7 @@
+import { mainViewFromHash } from "./mainContext.js";
+
+export { mainViewFromHash } from "./mainContext.js";
+
 export const VIEW_RENDERED_EVENT = "loto-lab:view-rendered";
 
 export type ViewRenderedDetail = {
@@ -5,10 +9,6 @@ export type ViewRenderedDetail = {
   lottery?: string;
   token?: number;
 };
-
-export function mainViewFromHash(hash: string): string {
-  return hash.replace(/^#/, "") || "dashboard";
-}
 
 export function currentMainView(): string {
   return mainViewFromHash(window.location.hash);
