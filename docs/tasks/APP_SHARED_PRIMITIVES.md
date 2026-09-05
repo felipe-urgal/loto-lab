@@ -2,6 +2,8 @@
 
 Issue: #60
 
+Status: entregue via PR #214 (`badde03`); a #60 permanece aberta para as próximas fatias incrementais.
+
 ## Objetivo da fatia
 
 Reduzir duplicação no entrypoint legado sem fazer uma migração big-bang das views que ainda vivem em `web/app.js`.
