@@ -166,9 +166,11 @@ test("strategy lab owns its visible vocabulary in Portuguese while preserving in
 });
 
 test("refinement layers own their Portuguese analysis vocabulary while preserving score contracts", async () => {
-  const refinements = await source("web/refinements.js");
+  const refinementsBoundary = await source("web/refinements.js");
+  const refinements = await source("web/src/features/refinements.ts");
   const labRefinements = await source("web/lab-refinements.js");
 
+  assert.equal(refinementsBoundary.trim(), 'import "./src/features/refinements.js";');
   for (const copy of [
     "Explorar classificação",
     '<option value="score">Pontuação</option>',
