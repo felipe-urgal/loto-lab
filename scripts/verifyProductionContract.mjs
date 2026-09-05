@@ -80,6 +80,23 @@ function assertShutdownGrace(serviceSource, applicationSource) {
   );
 }
 
+function assertNetworkIsolation(postgresService, appService, compose) {
+  assert.match(
+    compose,
+    /^  data:\s*\n    internal: true\s*$/m,
+    'Rede de dados precisa ser interna para não oferecer egress ao PostgreSQL',
+  );
+  assert.match(
+    compose,
+    /^  egress:\s*\n    internal: false\s*$/m,
+    'Rede de egress da aplicação precisa permanecer explícita',
+  );
+  assert.match(postgresService, /^      - data\s*$/m, 'PostgreSQL precisa usar a rede interna de dados');
+  assert.doesNotMatch(postgresService, /^      - egress\s*$/m, 'PostgreSQL não pode participar da rede de egress');
+  assert.match(appService, /^      - data\s*$/m, 'Aplicação precisa alcançar PostgreSQL pela rede de dados');
+  assert.match(appService, /^      - egress\s*$/m, 'Aplicação precisa manter egress para dependências externas');
+}
+
 const expectedProdConfig =
   'docker compose --env-file .env.production -f docker-compose.prod.yml config --quiet';
 const expectedProdConfigCheck =
@@ -145,6 +162,7 @@ assert.match(appService, /\/health\/ready/, 'Healthcheck da aplicação precisa 
 assertBoundedLocalLogging(postgresService, 'PostgreSQL');
 assertBoundedLocalLogging(appService, 'Aplicação');
 assertShutdownGrace(appService, apiStartSource);
+assertNetworkIsolation(postgresService, appService, composeSource);
 
 const expectedProdVerify =
   'docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app node -e "fetch(\'http://127.0.0.1:3000/health/ready\',{signal:AbortSignal.timeout(5000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"';
@@ -156,5 +174,5 @@ assert.equal(
 );
 
 console.log(
-  'Contrato de produção validado: check usa configuração segura, comandos canônicos não possuem aliases duplicados, deploy aguarda healthchecks, logs possuem retenção bounded, shutdown do container cobre o deadline máximo da aplicação e verify permanece somente leitura.',
+  'Contrato de produção validado: check usa configuração segura, comandos canônicos não possuem aliases duplicados, deploy aguarda healthchecks, logs possuem retenção bounded, shutdown do container cobre o deadline máximo da aplicação, PostgreSQL fica isolado em rede interna e verify permanece somente leitura.',
 );
