@@ -119,6 +119,23 @@ O payload de `SyncAllDetails` registra, entre outros dados:
 
 ## API
 
+### Métricas operacionais
+
+```http
+GET /api/v1/ops/metrics
+```
+
+O endpoint autenticado agrega sinais de cardinalidade fixa do processo atual e do PostgreSQL:
+
+- requests, taxas 4xx/5xx e latências HTTP por família estável de rota;
+- snapshot persistido da fila de Analysis Jobs;
+- `postgres.totalConnections`;
+- `postgres.idleConnections`;
+- `postgres.activeConnections`;
+- `postgres.waitingRequests`.
+
+As contagens do PostgreSQL são lidas diretamente do `pg.Pool` já usado pela aplicação. Elas não carregam SQL, query, loteria, request ID ou outro identificador como label e não criam uma segunda fonte de verdade. Nesta etapa não existe threshold de saturação nem SLO derivado desses números: a baseline deve ser observada antes de qualquer tuning de tamanho do pool, timeout, índice ou concorrência.
+
 ### Estado operacional
 
 ```http
