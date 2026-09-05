@@ -96,10 +96,14 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.match(javascript.headers.get("content-type") ?? "", /^text\/javascript/);
   assert.match(javascript.headers.get("cache-control") ?? "", /immutable/);
   const source = await javascript.text();
-  assert.match(source, /\/api\/v1/);
+  assert.match(source, /\.\/src\/core\/api\.js/);
   assert.match(source, /games\/generate/);
   assert.match(source, /data-feature-owned="backtests"/);
   assert.doesNotMatch(source, /backtests\/run/);
+
+  const typedApi = await fetch(`${baseUrl}/assets/src/core/api.js`);
+  assert.equal(typedApi.status, 200);
+  assert.match(await typedApi.text(), /\/api\/v1/);
 
   const backtestsBoundary = await fetch(`${baseUrl}/assets/backtests.js`);
   assert.equal(backtestsBoundary.status, 200);
