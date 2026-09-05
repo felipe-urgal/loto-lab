@@ -184,6 +184,20 @@ A otimização de performance não altera a função objetivo final do portfóli
 - preservação de uma alternativa disjunta com score local um pouco menor;
 - diversidade efetiva em lotes de Mega-Sena, Lotofácil e Dia de Sorte.
 
+## Ownership do planejamento
+
+`src/generator/planning.ts` continua sendo o orquestrador do plano: escopo histórico/anti-leakage, metodologia, tiers, baselines, espaços do algoritmo e auditoria permanecem ali ou em owners já extraídos.
+
+As regras de entrada estrutural têm owner próprio em `src/generator/planningConstraints.ts`:
+
+- normalização/validação de dezenas fixadas e excluídas;
+- faixa válida das dezenas por loteria;
+- duplicidade e interseção `fixada × excluída`;
+- quantidade máxima de fixadas e viabilidade após exclusões;
+- ranges `odd`, `repeated` e `sum`, incluindo os limites específicos da loteria.
+
+`planning.ts` delega essas regras por `validateGenerationSelection()` e `validateGenerationConstraints()`. O objetivo da separação é ownership coeso, não alterar matemática: mensagens públicas de erro, limites por loteria, anti-leakage, score e espaço combinatório permanecem equivalentes. Um teste arquitetural impede que essas validações voltem a ser redefinidas no orquestrador.
+
 ## Auditoria do lote
 
 O `GenerationBatchAudit` informa:
