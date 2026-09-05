@@ -328,12 +328,21 @@ function renderJobMeta(job: AnalysisJob): string {
     ${job.finishedAt ? `<span>fim ${escapeHtml(formatDateTime(job.finishedAt))}</span>` : ""}`;
 }
 
+function ownerAction(job: AnalysisJob): string {
+  return job.kind === "backtest"
+    ? '<a class="button compact" href="/#backtests">Abrir Testes históricos</a>'
+    : '<a class="button compact" href="/lab">Abrir Laboratório</a>';
+}
+
 function renderJobCard(job: AnalysisJob): string {
   const id = escapeHtml(job.id);
   const canCancel = job.status === "queued" || job.status === "running";
   const kindLabel = job.kind === "backtest" ? "Teste histórico" : "Laboratório";
   const lotteryLabel = labels[job.lottery] ?? job.lottery;
   const statusLabel = statusLabels[job.status] ?? job.status;
+  const cancelAction = canCancel
+    ? `<button class="button compact danger" type="button" data-cancel-job="${id}">Cancelar</button>`
+    : "";
   return `
     <article class="panel experiment-card" data-job-id="${id}">
       <div class="experiment-card-head">
@@ -342,7 +351,7 @@ function renderJobCard(job: AnalysisJob): string {
       </div>
       <div class="experiment-meta">${renderJobMeta(job)}</div>
       ${jobResult(job)}
-      ${canCancel ? `<div class="experiment-card-actions"><button class="button compact danger" type="button" data-cancel-job="${id}">Cancelar</button></div>` : ""}
+      <div class="experiment-card-actions">${ownerAction(job)}${cancelAction}</div>
     </article>`;
 }
 
