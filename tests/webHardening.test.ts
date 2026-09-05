@@ -65,11 +65,12 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
     return response.text();
   };
 
-  const [app, shellBoundary, shell, refinements, myGames, presentation, auditability, agenda, strategies, jobs, foundation] = await Promise.all([
+  const [app, shellBoundary, shell, refinementsBoundary, refinements, myGames, presentation, auditability, agenda, strategies, jobs, foundation] = await Promise.all([
     fetchSource("app.js"),
     fetchSource("shell.js"),
     fetchSource("src/core/shell.js"),
     fetchSource("refinements.js"),
+    fetchSource("src/features/refinements.js"),
     fetchSource("src/features/myGames.js"),
     fetchSource("src/features/myGames/presentation.js"),
     fetchSource("src/features/myGames/auditability.js"),
@@ -92,6 +93,7 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
   assert.match(shell, /localStorage\.removeItem\("loto-lab:lottery"\)/);
   assert.match(shell, /matchMedia\("\(max-width: 680px\)"\)/);
 
+  assert.match(refinementsBoundary, /src\/features\/refinements\.js/);
   assert.match(refinements, /analysisRefined === "loading"/);
   assert.match(refinements, /latestCache\.delete/);
   assert.match(refinements, /loto-lab:data-synced/);
