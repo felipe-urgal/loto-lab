@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-09-05**, com as fatias #204–#214 já na `main`, composition root HTTP concluído, shell e primitives compartilhadas com ownership TypeScript, métricas HTTP + Analysis Jobs e novas decomposições pequenas do planejamento/Strategy Lab integradas.
+> Baseline revisada em **2026-09-05**, com as fatias #204–#214 e #216–#220 já na `main`, composition root HTTP concluído, frontend TypeScript avançando por owners canônicos, observabilidade operacional cobrindo HTTP/Analysis Jobs/sync e novos guardrails de produção/jornada integrados.
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -77,7 +77,11 @@ A diretriz permanece:
 - grace period do container alinhado ao deadline máximo de shutdown da aplicação e protegido pelo Production Contract (#211);
 - snapshot persistido de saúde da fila de Analysis Jobs adicionado ao endpoint operacional sem labels de alta cardinalidade (#212);
 - validações estruturais de seleção/ranges extraídas de `generator/planning.ts` para `planningConstraints.ts`, preservando matemática e anti-leakage (#213);
-- `web/app.js` passou a consumir API, escaping, formatters e toast dos owners TypeScript compartilhados, removendo as cópias locais (#214).
+- `web/app.js` passou a consumir API, escaping, formatters e toast dos owners TypeScript compartilhados, removendo as cópias locais (#214);
+- PostgreSQL de produção passou a participar somente da rede interna `data`, enquanto `app` usa `data` + `egress`, com regressão protegida pelo Production Contract (#216);
+- status operacional passou a expor snapshot de sync derivado de `operation_runs`, com `status`, `partial`, `running` e duração somente quando temporalmente válida (#217);
+- refinements do Laboratório e refinements globais migraram para owners TypeScript, mantendo `web/lab-refinements.js` e `web/refinements.js` apenas como boundaries compatíveis (#218/#219);
+- primeira fatia funcional do Protótipo A adicionou o CTA contextual Laboratório → Testes históricos sem estado cruzado, prefill ou promoção automática de estratégia (#220).
 
 ### Pontos fortes a preservar
 
@@ -99,11 +103,11 @@ A diretriz permanece:
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- frontend ainda possui módulos grandes/imperativos; primitives compartilhadas, features canônicas, shell e o próprio `app.js` já consomem owners TypeScript onde há ownership consolidado, mas state/lifecycle internos e superfícies legadas restantes seguem ativos na #60;
+- frontend ainda possui módulos grandes/imperativos; primitives compartilhadas, features canônicas, shell, `app.js` e os refinements globais/Lab já consomem owners TypeScript onde há ownership consolidado, mas state/lifecycle internos e superfícies legadas restantes seguem ativos na #60;
 - hotspots algorítmicos continuam grandes apesar das extrações de espaço e validações do gerador e reporting do Strategy Lab (#62);
-- observabilidade já possui baseline HTTP process-local e saúde persistida de Analysis Jobs; sync/dependências/pool, SLOs e runbooks seguem ativos na #63;
-- a direção pós-redesign já foi decidida no Protótipo A; links contextuais, retorno por `jobId` e proveniência entre superfícies ainda precisam ser implementados (#64);
-- retenção local de logs está bounded e o shutdown do container cobre o deadline máximo da aplicação; otimizações operacionais e Web Vitals ainda precisam de baseline antes/depois quando houver evidência (#65);
+- observabilidade já possui baseline HTTP process-local, saúde persistida de Analysis Jobs e snapshot de sync com estados/duração; dependências externas, pool PostgreSQL, SLOs e runbooks seguem ativos na #63;
+- a direção pós-redesign já foi decidida no Protótipo A e o primeiro link contextual Laboratório → Backtests está entregue; outros links úteis, retorno por `jobId` e proveniência entre superfícies seguem ativos na #64;
+- retenção local de logs está bounded, o shutdown do container cobre o deadline máximo da aplicação e PostgreSQL não compartilha a rede de egress; otimizações operacionais e Web Vitals ainda precisam de baseline antes/depois quando houver evidência (#65);
 - o fluxo hipótese → evidência → decisão ainda não é uma entidade explícita (#66).
 
 ---
@@ -145,7 +149,7 @@ A revisão de CLI/scheduler não encontrou motivo para mover engines puros ou li
 
 ## #60 — Frontend TypeScript, módulos e primitives · P1 · em andamento
 
-A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Dashboard Scope, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos avançaram em fatias próprias; Painel, Meus Jogos, Análises e Gerador também explicitam contratos internos consumidos pela UI em owners menores. No Gerador, readiness e explainability possuem ownership TypeScript interno e lifecycle coordenado sem listeners/hash parsing paralelos. O Dashboard Scope também usa lifecycle/API compartilhados e separa a semântica financeira do owner de apresentação. A #205 moveu também o shell global para `web/src/core/shell.ts`, mantendo `web/shell.js` apenas como boundary de asset. A #214 eliminou as cópias locais de API, escaping, formatters e toast de `web/app.js`, que agora consome diretamente os owners canônicos já emitidos pelo build TypeScript.
+A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Dashboard Scope, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos avançaram em fatias próprias; Painel, Meus Jogos, Análises e Gerador também explicitam contratos internos consumidos pela UI em owners menores. No Gerador, readiness e explainability possuem ownership TypeScript interno e lifecycle coordenado sem listeners/hash parsing paralelos. O Dashboard Scope também usa lifecycle/API compartilhados e separa a semântica financeira do owner de apresentação. A #205 moveu também o shell global para `web/src/core/shell.ts`, mantendo `web/shell.js` apenas como boundary de asset. A #214 eliminou as cópias locais de API, escaping, formatters e toast de `web/app.js`, que agora consome diretamente os owners canônicos já emitidos pelo build TypeScript. As #218/#219 moveram também os refinements do Laboratório e os refinements globais para owners TypeScript, mantendo os arquivos JavaScript públicos somente como boundaries de asset.
 
 Entregue:
 
@@ -170,7 +174,9 @@ Entregue:
 - Testes históricos com implementação funcional canônica em `web/src/features/backtests.ts`, `web/backtests.js` reduzido a boundary, consumo direto de API/lifecycle/escaping/formatters/toast compartilhados, abort/stale-response guard e preservação do padrão de últimos 100 concursos;
 - fallback funcional duplicado de Testes históricos removido de `web/app.js` + `refinements.js`; o app base mantém apenas um handoff de shell e `feature-loader.js` trata falha de asset do owner tipado com erro/retry explícito, sem restaurar implementação paralela;
 - shell global com owner canônico em `web/src/core/shell.ts`, boundary fino em `web/shell.js` e contratos de navegação/hash/teclado/mobile preservados (#205);
-- `web/app.js` consome `api`, escaping, formatters e toast dos owners TypeScript compartilhados e não redefine mais essas primitives; `safeApi` permanece como política local de degradação graciosa (#214).
+- `web/app.js` consome `api`, escaping, formatters e toast dos owners TypeScript compartilhados e não redefine mais essas primitives; `safeApi` permanece como política local de degradação graciosa (#214);
+- refinements globais possuem owner em `web/src/features/refinements.ts`, consomem API/lifecycle/escaping compartilhados e deixam `web/refinements.js` como boundary mínimo, preservando guards de cache/resposta stale e comportamento de Análises/Gerador/Meus Jogos (#219);
+- refinements do Laboratório possuem owner em `web/src/features/labRefinements.ts`, com `web/lab-refinements.js` como boundary mínimo e contratos de desempate, auto-métrica e eixo preservados (#218).
 
 Próximas fatias:
 
@@ -185,11 +191,10 @@ O trabalho deve continuar sobre as fontes canônicas consolidadas, sem reabrir a
 
 ## #63 — Métricas e SLOs operacionais · P1
 
-A baseline HTTP foi entregue em #206: o processo Node mede requests, 4xx/5xx e latência p50/p95/p99 por famílias fixas de rota, com amostra bounded e endpoint operacional autenticado. A #212 acrescentou ao mesmo endpoint um snapshot persistido de `analysis_jobs`, com contagens fixas por estado e idade da fila mais antiga, sem dimensões de alta cardinalidade. A baseline HTTP continua process-local e nenhum desses sinais é apresentado como SLO final ou retenção histórica.
+A baseline HTTP foi entregue em #206: o processo Node mede requests, 4xx/5xx e latência p50/p95/p99 por famílias fixas de rota, com amostra bounded e endpoint operacional autenticado. A #212 acrescentou ao mesmo endpoint um snapshot persistido de `analysis_jobs`, com contagens fixas por estado e idade da fila mais antiga, sem dimensões de alta cardinalidade. A #217 acrescentou ao status operacional um snapshot de sync derivado do mesmo `operation_run` persistido, com conjunto fechado de estados, flags `partial`/`running` e `durationMs` somente quando início/fim são parseáveis e temporalmente válidos. Não existe uma segunda fonte de verdade em memória. A baseline HTTP continua process-local e nenhum desses sinais é apresentado como SLO final ou retenção histórica.
 
 Próximas fatias:
 
-- sync e `partial`;
 - CAIXA/OpenAI;
 - pool PostgreSQL;
 - poucos SLOs + runbooks baseados nos sinais observados.
@@ -224,21 +229,22 @@ A decisão de arquitetura foi entregue em #210. O **Protótipo A — contexto se
 
 Jornada alvo: `Entender → Experimentar → Aplicar → Acompanhar → Operar`.
 
+A #220 entregou a primeira fatia funcional dessa direção: resultados visíveis do Laboratório oferecem `Testar historicamente` para a rota canônica `/#backtests`, sem query/hash state adicional, prefill de formulário, duplicação de controller ou promoção automática da estratégia melhor ranqueada.
+
 Próximas fatias:
 
-- links contextuais usando as rotas atuais, sem estado cruzado obrigatório;
+- ampliar links contextuais somente onde as rotas/owners atuais ofereçam transição útil sem estado cruzado obrigatório;
 - `jobId` como retorno operacional com contrato único e deep link seguro;
 - proveniência entre experimento/evidência para Laboratório ↔ Backtests/IA quando os dados já existirem;
 - somente depois disso, revisar agrupamento da navegação global com evidência de uso.
 
 ## #65 — Runtime/Docker/performance baseada em evidência
 
-O baseline de hardening já é forte. A #204 adicionou retenção local bounded para logs de `app` e `postgres` (`local`, `10m` × `5`) e um guard no contrato de produção. A #211 declarou `stop_grace_period: 130s` para o app e protege no Production Contract que essa janela permaneça maior que o máximo de 120s aceito pelo shutdown interno. São guardrails operacionais, não tuning de performance.
+O baseline de hardening já é forte. A #204 adicionou retenção local bounded para logs de `app` e `postgres` (`local`, `10m` × `5`) e um guard no contrato de produção. A #211 declarou `stop_grace_period: 130s` para o app e protege no Production Contract que essa janela permaneça maior que o máximo de 120s aceito pelo shutdown interno. A #216 separou a topologia de produção em uma rede `data` interna, compartilhada por `app` e PostgreSQL, e uma rede `egress` disponível apenas ao `app`; o Production Contract impede regressão dessa separação. São guardrails operacionais, não tuning de performance.
 
 Restam decisões medidas:
 
 - Web Vitals/LCP/INP/CLS quando houver ambiente e medição representativa;
-- redes/egress;
 - limites CPU/memória;
 - cache de análise;
 - índices PostgreSQL só após profiling;
