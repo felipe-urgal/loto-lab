@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline revisada em **2026-09-03**, com #155–#160/#163/#175 já na `main`, composition root HTTP concluído e a modularização TypeScript do frontend avançando em fatias pequenas, incluindo as migrações canônicas de Painel, Meus Jogos, Análises, Gerador e Testes históricos, a retirada do fallback funcional legado de Backtests e a absorção das camadas de readiness/explainability do Gerador em owners TypeScript internos.
+> Baseline revisada em **2026-09-05**, com #155–#160/#163/#175 e as fatias #204–#208 já na `main`, composition root HTTP concluído, shell com ownership TypeScript, primeira baseline de métricas HTTP e decomposições pequenas de planejamento/Strategy Lab integradas.
 >
 > Este documento é a fonte de verdade para prioridade, dependências e estado das issues estruturais. Detalhes de implementação pertencem às próprias issues/PRs.
 
@@ -67,7 +67,12 @@ A diretriz permanece:
 - comparação de game batches extraída de `gameComparison.ts` para `CompareGameBatchUseCase`, com portas explícitas e composição em `server.ts`;
 - Agenda/notificações extraídas de `agenda.ts` para `AgendaUseCase`, com portas mínimas para leitura, notificações e refresh e composição concreta em `server.ts`;
 - IA interpretativa extraída de `aiInsights.ts` para `AiInsightsUseCase`, com portas para evidência, persistência e provider e composição de PostgreSQL/OpenAI em `server.ts`;
-- Analysis Jobs extraídos de `analysisJobs.ts` para `AnalysisJobsUseCase`, com ports para fila, estratégias e histórico, preservando o lifecycle do manager em `apiStart.ts` e concluindo o composition root HTTP em `server.ts`.
+- Analysis Jobs extraídos de `analysisJobs.ts` para `AnalysisJobsUseCase`, com ports para fila, estratégias e histórico, preservando o lifecycle do manager em `apiStart.ts` e concluindo o composition root HTTP em `server.ts`;
+- retenção local de logs dos containers limitada por rotação Docker e protegida pelo contrato de produção (#204);
+- shell global com ownership funcional em `web/src/core/shell.ts` e `web/shell.js` reduzido a boundary compatível (#205);
+- primeira baseline HTTP process-local com famílias de rota de cardinalidade fixa, error rates e p50/p95/p99 atrás da autenticação (#206);
+- matemática do espaço de geração extraída de `generator/planning.ts` para owner próprio, preservando equivalência (#207);
+- reporting/séries do Strategy Lab extraídos para owner próprio, preservando experimento e inferência no módulo canônico (#208).
 
 ### Pontos fortes a preservar
 
@@ -89,11 +94,11 @@ A diretriz permanece:
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- frontend ainda possui módulos grandes/imperativos; primitives compartilhadas e várias features canônicas — incluindo Status, Dashboard Scope, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos — já estão em TypeScript, mas state/lifecycle e decomposição do shell/app e de superfícies legadas restantes seguem ativos na #60;
-- hotspots algorítmicos continuam grandes (#62);
-- observabilidade segue baseada principalmente em logs/estado persistido, sem métricas/SLOs (#63);
+- frontend ainda possui módulos grandes/imperativos; primitives compartilhadas, features canônicas e o shell já possuem ownership TypeScript, mas state/lifecycle internos, `app` e superfícies legadas restantes seguem ativos na #60;
+- hotspots algorítmicos continuam grandes apesar das extrações de espaço do gerador e reporting do Strategy Lab (#62);
+- observabilidade já possui baseline HTTP process-local; métricas de jobs/sync/dependências/pool, SLOs e runbooks seguem ativos na #63;
 - arquitetura de informação pós-redesign ainda pode reduzir troca de contexto (#64);
-- otimizações operacionais e Web Vitals precisam de baseline antes/depois quando houver evidência (#65);
+- retenção local de logs está bounded; otimizações operacionais e Web Vitals ainda precisam de baseline antes/depois quando houver evidência (#65);
 - o fluxo hipótese → evidência → decisão ainda não é uma entidade explícita (#66).
 
 ---
@@ -135,7 +140,7 @@ A revisão de CLI/scheduler não encontrou motivo para mover engines puros ou li
 
 ## #60 — Frontend TypeScript, módulos e primitives · P1 · em andamento
 
-A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Dashboard Scope, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos avançaram em fatias próprias; Painel, Meus Jogos, Análises e Gerador também explicitam contratos internos consumidos pela UI em owners menores. No Gerador, readiness e explainability possuem ownership TypeScript interno e lifecycle coordenado sem listeners/hash parsing paralelos. O Dashboard Scope também usa lifecycle/API compartilhados e separa a semântica financeira do owner de apresentação.
+A consolidação visual da #121 foi concluída. O fallback financeiro foi alinhado ao contrato `desconhecido != zero` em #147, a fundação arquitetural TypeScript começou em #148 e a documentação canônica desse estado foi reconciliada em #149. O #175 moveu o client HTTP, `ApiError` e escaping compartilhado para TypeScript. Desde então, lifecycle/toast compartilhados e as features Status, Dashboard Scope, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos avançaram em fatias próprias; Painel, Meus Jogos, Análises e Gerador também explicitam contratos internos consumidos pela UI em owners menores. No Gerador, readiness e explainability possuem ownership TypeScript interno e lifecycle coordenado sem listeners/hash parsing paralelos. O Dashboard Scope também usa lifecycle/API compartilhados e separa a semântica financeira do owner de apresentação. A #205 moveu também o shell global para `web/src/core/shell.ts`, mantendo `web/shell.js` apenas como boundary de asset.
 
 Entregue:
 
@@ -158,13 +163,14 @@ Entregue:
 - explainability/auditoria visual migrada de `web/generation-explainability.js` para `web/src/features/generationV2/explainability.ts`, preservando o fluxo de cinco etapas, guardrails de Lotofácil e textos anti-previsão; conteúdo derivado do DOM usado no motivo de cada jogo passa por `textContent`;
 - `web/src/features/generationV2/enhancements.ts` coordena montagem/cleanup das duas camadas via lifecycle compartilhado; `feature-loader.js` deixa de carregá-las como módulos JS independentes e os dois assets legados são removidos;
 - Testes históricos com implementação funcional canônica em `web/src/features/backtests.ts`, `web/backtests.js` reduzido a boundary, consumo direto de API/lifecycle/escaping/formatters/toast compartilhados, abort/stale-response guard e preservação do padrão de últimos 100 concursos;
-- fallback funcional duplicado de Testes históricos removido de `web/app.js` + `refinements.js`; o app base mantém apenas um handoff de shell e `feature-loader.js` trata falha de asset do owner tipado com erro/retry explícito, sem restaurar implementação paralela.
+- fallback funcional duplicado de Testes históricos removido de `web/app.js` + `refinements.js`; o app base mantém apenas um handoff de shell e `feature-loader.js` trata falha de asset do owner tipado com erro/retry explícito, sem restaurar implementação paralela;
+- shell global com owner canônico em `web/src/core/shell.ts`, boundary fino em `web/shell.js` e contratos de navegação/hash/teclado/mobile preservados (#205).
 
 Próximas fatias:
 
 - expandir `web/src/{core,design-system,features,shared}` conforme ownership real;
 - state/lifecycle internos das superfícies legadas restantes, eliminando duplicações concretas de hash/cleanup;
-- avançar o shell/app em fatias pequenas quando a separação puder ser feita sem big-bang;
+- avançar `app` e módulos grandes restantes em fatias pequenas, sem big-bang;
 - decomposição dos módulos grandes ainda ativos;
 - escaping/`textContent` como padrão seguro;
 - primitives reutilizáveis sem framework obrigatório.
@@ -173,9 +179,10 @@ O trabalho deve continuar sobre as fontes canônicas consolidadas, sem reabrir a
 
 ## #63 — Métricas e SLOs operacionais · P1
 
-Transformar sinais já existentes em métricas acionáveis:
+A primeira fatia foi entregue em #206: o processo Node mede requests, 4xx/5xx e latência p50/p95/p99 por famílias fixas de rota, com amostra bounded e endpoint operacional autenticado. A baseline é process-local e não é apresentada como SLO final nem como retenção histórica.
 
-- latência/erros HTTP;
+Próximas fatias:
+
 - jobs por estado/idade;
 - sync e `partial`;
 - CAIXA/OpenAI;
@@ -193,10 +200,15 @@ Não introduzir tracing distribuído antes de necessidade demonstrada. Com a #61
 Depois da consolidação principal da #61:
 
 - registry por loteria quando houver contrato comum real;
-- decompor `analysis/advanced.ts` e `generator/planning.ts`;
-- separar Strategy Lab por experimento/inferência/reporting;
+- decompor `analysis/advanced.ts` e fronteiras restantes de `generator/planning.ts`;
+- separar Strategy Lab por experimento/benchmark/inferência quando houver owner coeso adicional;
 - absorver nomes transitórios `*-hardening` quando o ownership estiver claro;
 - preservar equivalência matemática por testes.
+
+Já entregue em fatias pequenas:
+
+- #207 extrai baseline condicional, combinação/DP e espaços algorítmicos para `generator/planningSpace.ts`, preservando `planning.ts` como orchestrator;
+- #208 extrai séries e montagem de variantes para `lab/strategyLabReporting.ts`, preservando experimento, benchmark e inferência em `strategyLab.ts`.
 
 A consolidação da #61 está concluída: facade temporária e ownership concreto dos controllers HTTP foram removidos. A decomposição da #62 pode avançar em fatias próprias sem reabrir a fronteira HTTP.
 
@@ -213,12 +225,13 @@ Jornada alvo: `Entender → Experimentar → Aplicar → Acompanhar → Operar`.
 
 ## #65 — Runtime/Docker/performance baseada em evidência
 
-O baseline de hardening já é forte. Restam decisões medidas:
+O baseline de hardening já é forte. A #204 adicionou retenção local bounded para logs de `app` e `postgres` (`local`, `10m` × `5`) e um guard no contrato de produção. Isso é proteção de disco, não retenção histórica.
+
+Restam decisões medidas:
 
 - Web Vitals/LCP/INP/CLS quando houver ambiente e medição representativa;
 - redes/egress;
 - `stop_grace_period`;
-- logs/retenção;
 - limites CPU/memória;
 - cache de análise;
 - índices PostgreSQL só após profiling;
