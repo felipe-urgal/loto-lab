@@ -57,6 +57,14 @@ O lint é deliberadamente enxuto e baseado no compilador TypeScript, sem adicion
 - baseline do workflow de Security;
 - documentação de plataforma.
 
+## Guards arquiteturais do frontend
+
+A migração incremental para `web/src` possui um invariant explícito: superfícies já migradas não podem recuperar implementação funcional paralela nos arquivos JavaScript públicos usados apenas como boundaries de asset.
+
+`tests/webTypedBoundaries.test.ts` mantém a lista das features declaradas como migradas em `WEB.md` e exige que cada boundary contenha somente imports side-effect para JavaScript emitido. O guard permite mais de um import quando a feature possui owners internos legítimos, mas bloqueia declaração de função/classe/estado, listener, DOM ou `fetch` próprio no boundary.
+
+`runtime.js` e `app.js` não entram nessa regra global porque ainda possuem contratos distintos e explícitos. Exceções legítimas devem ser tratadas pelo ownership real do arquivo, não usadas para enfraquecer boundaries que já foram concluídos.
+
 ## Higiene de texto
 
 ```bash
