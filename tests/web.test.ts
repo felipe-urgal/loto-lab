@@ -52,9 +52,13 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
     assert.match(source, /\/assets\/shell\.js/);
   }
 
-  const shell = await fetch(`${baseUrl}/assets/shell.js`);
-  assert.equal(shell.status, 200);
-  const shellSource = await shell.text();
+  const shellBoundary = await fetch(`${baseUrl}/assets/shell.js`);
+  assert.equal(shellBoundary.status, 200);
+  assert.match(await shellBoundary.text(), /\.\/src\/core\/shell\.js/);
+
+  const typedShell = await fetch(`${baseUrl}/assets/src/core/shell.js`);
+  assert.equal(typedShell.status, 200);
+  const shellSource = await typedShell.text();
   assert.match(shellSource, /nav-more/);
   assert.match(shellSource, /Testes históricos/);
   assert.match(shellSource, /Laboratório/);
@@ -126,6 +130,7 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
     "src/features/myGames/auditability.js",
     "lab.js",
     "data-status.js",
+    "src/core/shell.js",
     "src/core/featureLoader.js",
     "src/features/dataStatus.js",
     "backtests.js",
