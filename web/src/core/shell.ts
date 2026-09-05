@@ -1,9 +1,9 @@
-import { isLotteryId, isMainView } from "./mainContext.js";
+import { isLotteryId, isMainView, type MainView } from "./mainContext.js";
 
 interface NavigationItem {
   key: string;
   label: string;
-  view?: string;
+  view?: MainView;
   href?: string;
   extra?: boolean;
 }
