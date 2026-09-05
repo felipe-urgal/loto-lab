@@ -48,8 +48,10 @@ export class OperationAlreadyRunningError extends Error {
 function syncObservability(latest?: OperationRunSnapshot<unknown>): OperationalSyncObservabilitySnapshot {
   const startedAt = latest ? Date.parse(latest.startedAt) : Number.NaN;
   const finishedAt = latest?.finishedAt ? Date.parse(latest.finishedAt) : Number.NaN;
-  const durationMs = Number.isFinite(startedAt) && Number.isFinite(finishedAt)
-    ? Math.max(0, finishedAt - startedAt)
+  const durationMs = Number.isFinite(startedAt)
+    && Number.isFinite(finishedAt)
+    && finishedAt >= startedAt
+    ? finishedAt - startedAt
     : undefined;
 
   return {
