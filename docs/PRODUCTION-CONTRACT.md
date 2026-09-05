@@ -51,6 +51,17 @@ Não há `sleep` arbitrário. `prod:verify` continua separado e somente leitura.
 
 `production:contract:verify` protege esse comportamento contra regressão e também garante que os aliases removidos não voltem a duplicar a interface pública.
 
+## Rede de dados e egress
+
+A topologia de produção separa explicitamente dois papéis:
+
+- `data` é uma rede Docker `internal: true`, compartilhada apenas por `app` e `postgres` para o tráfego de banco;
+- `egress` é a rede da aplicação para dependências externas, como CAIXA e OpenAI quando configurado.
+
+O PostgreSQL participa somente de `data` e não possui interface na rede de egress. A aplicação participa das duas redes: alcança o banco pelo hostname `postgres` na rede interna e preserva saída para as integrações externas sem conceder essa capacidade ao serviço de dados.
+
+`production:contract:verify` protege essa topologia para impedir que o PostgreSQL volte a compartilhar a rede de egress por acidente.
+
 ## Separação entre check e operação real
 
 Existem duas validações de Compose com papéis diferentes:

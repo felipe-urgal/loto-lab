@@ -22,7 +22,7 @@ services:
         max-size: "10m"
         max-file: "5"
     networks:
-      - backend
+      - data
 
   app:
     build:
@@ -75,10 +75,13 @@ services:
     tmpfs:
       - /tmp
     networks:
-      - backend
+      - data
+      - egress
 
 networks:
-  backend:
+  data:
+    internal: true
+  egress:
     internal: false
 
 volumes:

@@ -46,7 +46,11 @@ test("UI refinement assets are lazy-loaded and typed Backtests bypasses legacy r
   assert.match(appSource, /data-feature-owned="backtests"/);
   assert.doesNotMatch(appSource, /async function renderBacktests/);
 
-  const mainRefinements = await fetch(`${baseUrl}/assets/refinements.js`);
+  const mainRefinementsBoundary = await fetch(`${baseUrl}/assets/refinements.js`);
+  assert.equal(mainRefinementsBoundary.status, 200);
+  assert.match(await mainRefinementsBoundary.text(), /src\/features\/refinements\.js/);
+
+  const mainRefinements = await fetch(`${baseUrl}/assets/src/features/refinements.js`);
   assert.equal(mainRefinements.status, 200);
   const mainSource = await mainRefinements.text();
   assert.match(mainSource, /Como a pontuação é calculada/);
