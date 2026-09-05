@@ -1,4 +1,7 @@
-const API = "/api/v1";
+import { api } from "./src/core/api.js";
+import { escapeHtml } from "./src/shared/escaping.js";
+import { formatCurrency, formatDateTime, formatPercent } from "./src/shared/formatters.js";
+import { toast } from "./src/shared/toast.js";
 
 const LOTTERIES = {
   "mega-sena": { label: "Mega-Sena", defaultGames: 2, drawSize: 6 },
@@ -46,30 +49,6 @@ function installIcons(root = document) {
   });
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-async function api(path, options = {}) {
-  const response = await fetch(`${API}${path}`, {
-    ...options,
-    headers: options.body ? { "Content-Type": "application/json", ...(options.headers || {}) } : options.headers,
-  });
-  const payload = response.status === 204 ? null : await response.json().catch(() => null);
-  if (!response.ok) {
-    const message = payload?.error?.message || `Erro HTTP ${response.status}`;
-    const error = new Error(message);
-    error.code = payload?.error?.code || "HTTP_ERROR";
-    throw error;
-  }
-  return payload;
-}
-
 async function safeApi(path, options = {}) {
   try { return await api(path, options); } catch (error) {
     if (error?.name === "AbortError") throw error;
@@ -83,26 +62,11 @@ function formatDate(value) {
   return `${day}/${month}/${year}`;
 }
 
-function formatDateTime(value) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
-}
-
-function formatCurrency(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
-
 function sumKnownMoney(items, field) {
   if (!items.every((item) => typeof item[field] === "number" && Number.isFinite(item[field]))) {
     return undefined;
   }
   return items.reduce((sum, item) => sum + item[field], 0);
-}
-
-function formatPercent(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
-  return `${(value * 100).toFixed(1).replace(".", ",")}%`;
 }
 
 function number(value) { return String(value).padStart(2, "0"); }
@@ -121,15 +85,6 @@ function compactNumbers(game) {
   return game.numbers.map((value) =>
     `<span class="compact-number ${fixed.has(value) ? "is-fixed" : ""}">${number(value)}</span>`,
   ).join("");
-}
-
-function toast(message, type = "info") {
-  const root = document.querySelector("#toast-root");
-  const item = document.createElement("div");
-  item.className = `toast ${type === "error" ? "error" : ""}`;
-  item.textContent = message;
-  root.append(item);
-  window.setTimeout(() => item.remove(), 3600);
 }
 
 function loading() {
