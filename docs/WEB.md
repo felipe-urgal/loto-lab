@@ -221,6 +221,8 @@ Consolida:
 
 Compara hipóteses e estratégias com evidência, benchmark e progressive disclosure. `web/src/features/lab.ts` é a implementação funcional canônica e consome diretamente client HTTP, escaping e formatters compartilhados; `web/lab.js` permanece somente como boundary de asset compatível. O frontend preserva os contratos de benchmark, resolução Monte Carlo, AUC e walk-forward, e evita renderizar uma resposta antiga quando loteria ou experimento mudam durante a execução. `lab-workspace.css` é a folha canônica desde a consolidação #136.
 
+Como primeira fatia funcional da jornada definida na #64, resultados visíveis do Laboratório oferecem o CTA nativo **Testar historicamente** para `/#backtests`. O link apenas preserva contexto de tarefa: não copia nem pré-preenche o formulário de Backtests, não cria query/hash state ad-hoc e não promove automaticamente a estratégia melhor ranqueada. Backtests continua sendo o owner exclusivo do teste histórico e sua rota permanece diretamente acessível.
+
 ### Estratégias — `/strategies`
 
 Catálogo/versionamento com workspace próprio. `web/src/features/strategies.ts` é a implementação funcional canônica e consome diretamente client HTTP, escaping, formatters e toast compartilhados; `web/strategies.js` permanece somente como boundary compatível. Após #137 a superfície também não depende mais do antigo `experiments.css`.
