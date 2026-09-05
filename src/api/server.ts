@@ -42,6 +42,7 @@ import {
 } from "../operations/sync.js";
 import { PostgresAgendaRepository } from "../persistence/agendaRepository.js";
 import { PostgresAiInsightRepository } from "../persistence/aiInsightRepository.js";
+import { PostgresAnalysisJobRepository } from "../persistence/analysisJobRepository.js";
 import { PostgresBacktestRepository } from "../persistence/backtestRepository.js";
 import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import { PostgresGameRepository } from "../persistence/gameRepository.js";
@@ -77,6 +78,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const games = new PostgresGameRepository(options.pool);
   const backtests = new PostgresBacktestRepository(options.pool);
   const strategies = new PostgresStrategyRepository(options.pool);
+  const analysisJobRepository = new PostgresAnalysisJobRepository(options.pool);
   const agendaRepository = new PostgresAgendaRepository(options.pool);
   const notificationRepository = new PostgresNotificationRepository(options.pool);
   const aiProvider = options.aiProvider ?? new OpenAiInterpretationProvider();
@@ -180,7 +182,10 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
       }
 
       if (method === "GET" && url.pathname === "/api/v1/ops/metrics") {
-        sendJson(response, 200, httpMetricsSnapshot(), corsOrigin);
+        sendJson(response, 200, {
+          ...httpMetricsSnapshot(),
+          analysisJobs: await analysisJobRepository.metricsSnapshot(),
+        }, corsOrigin);
         return;
       }
 
