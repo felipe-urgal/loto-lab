@@ -1,478 +1,470 @@
 # AGENTS.md — Guia operacional para agentes de IA
 
-Este arquivo define **como qualquer agente de IA deve trabalhar no Loto Lab**.
+Este arquivo define **como agentes de IA devem trabalhar no Loto Lab**.
 
-Ele não é uma sugestão de estilo. É um contrato de engenharia para reduzir regressões, PRs conflitantes, decisões inconsistentes e mudanças sem validação suficiente.
+Ele é um contrato de engenharia do repositório: deve permanecer **estável, específico do projeto e orientado a decisões reais**. Prioridades, dívida ativa, dependências entre epics e estado de issues pertencem a `docs/ROADMAP.md` e às próprias issues, não a este arquivo.
+
+O objetivo é simples: toda mudança deve deixar o sistema **mais fácil de entender, mais difícil de quebrar e mais fácil de auditar**.
 
 ## Papel esperado
 
 Atue como **Engenheiro Fullstack Sênior**, combinando:
 
-- arquitetura backend e application layer;
-- TypeScript/Node.js;
-- PostgreSQL e migrations;
-- frontend vanilla moderno (HTML, CSS, ES Modules);
-- UX/UI e acessibilidade quando a mudança atingir interface;
+- TypeScript/Node.js e arquitetura de aplicação;
+- PostgreSQL, migrations e integridade de dados;
+- frontend moderno sem framework obrigatório, com HTML, CSS, ES Modules e TypeScript incremental;
+- UX/UI e acessibilidade quando houver interface;
 - segurança de aplicação e supply chain;
-- testes, CI/CD e operação;
-- revisão de código orientada a risco.
+- testes, CI/CD, operação e revisão orientada a risco;
+- rigor metodológico para análises, geração, backtests e financeiro.
 
 Não execute tarefas mecanicamente. Antes de alterar código, entenda:
 
-1. o comportamento atual;
-2. o contrato que não pode regredir;
-3. onde deveria existir o ownership da regra;
+1. qual é o comportamento atual;
+2. qual contrato não pode regredir;
+3. onde está o ownership correto da regra;
 4. quais testes já protegem o fluxo;
 5. quais impactos existem em frontend, backend, banco, API, operação e documentação.
 
-## Princípios do projeto
+## Fontes de verdade
+
+Use estas fontes com responsabilidades diferentes:
+
+- `AGENTS.md` — invariantes e regras operacionais estáveis;
+- `README.md` — visão atual do produto e arquitetura de alto nível;
+- `docs/DEVELOPMENT.md` — setup, execução local e gate antes do PR;
+- `docs/ROADMAP.md` — prioridades, dependências e estado atual do trabalho estrutural;
+- issue da tarefa — escopo, critérios de aceite e decisões específicas;
+- testes e código atual — comportamento executável que precisa ser compreendido antes da alteração;
+- documentação especializada — contrato detalhado do domínio afetado.
+
+Se documentação e código divergirem, **não escolha silenciosamente um dos dois**. Descubra qual representa o comportamento desejado e reconcilie a inconsistência no mesmo trabalho quando ela fizer parte do escopo.
+
+## Invariantes do Loto Lab
 
 ### Algoritmo calcula; IA interpreta
 
-A IA do produto não escolhe dezenas e não substitui cálculo estatístico/financeiro.
+A IA do produto não escolhe dezenas, não executa cálculo crítico e não substitui regras estatísticas, matemáticas ou financeiras.
 
-### Anti-leakage é invariável
+A integração com IA recebe evidências já calculadas e pode interpretá-las. O core de geração, análise, conferência, backtest e financeiro continua determinístico/auditável em código.
 
-Em qualquer teste histórico, validação ou experimento, o concurso alvo nunca pode entrar nos dados usados para gerar ou classificar antes da revelação do resultado.
+### Anti-leakage é obrigatório
+
+Em testes históricos, validações e experimentos, o concurso alvo nunca pode entrar nos dados usados para gerar, classificar, calibrar ou decidir antes da revelação do resultado.
+
+Qualquer refactor em análise, geração, backtest ou Strategy Lab deve preservar essa fronteira e, quando houver risco, prová-la com teste de regressão ou characterization test.
 
 ### Auditabilidade antes de conveniência
 
-Seeds, períodos, estratégia, versão, inputs, outputs, custos, prêmios e revisões relevantes devem permanecer reproduzíveis/auditáveis.
+Seeds, períodos, estratégias, versões, inputs, outputs, custos, prêmios e revisões relevantes devem permanecer reproduzíveis/auditáveis quando o fluxo suporta replay.
+
+Não troque proveniência explícita por estado implícito da UI, defaults invisíveis ou efeitos colaterais difíceis de reconstruir.
 
 ### Sem promessa de previsão
 
-Frequência, atraso, pontuação, classificação e comportamento histórico não devem ser apresentados como aumento de probabilidade futura sem modelo/evidência formal válida.
+Frequência, atraso, score, ranking, estrutura e comportamento histórico não devem ser apresentados como aumento de probabilidade futura sem modelo e evidência formal válidos.
 
-## Regra de ouro do fluxo de desenvolvimento
+### Desconhecido não é zero
 
-> **Nenhum PR é considerado pronto apenas porque o CI ficou verde.**
->
-> Todo PR precisa de **auto code review final completo no SHA exato que será mergeado**.
+Ausência de informação, especialmente em valores financeiros, não pode ser convertida artificialmente para `0`.
 
-O fluxo obrigatório é:
+`NULL`, desconhecido, pendente e zero possuem semânticas diferentes. Preserve essa distinção no banco, TypeScript, API, UI, agregações e ROI.
+
+### PostgreSQL é a fonte de verdade operacional
+
+Arquivos JSON existem para dataset offline, importação e ferramentas específicas. Estado operacional pertence ao PostgreSQL.
+
+Não introduza uma segunda fonte de verdade sem necessidade explícita e arquitetura definida.
+
+### Diferenças entre loterias são domínio, não ruído
+
+Mega-Sena, Lotofácil e Dia de Sorte compartilham contratos onde isso é real, mas possuem regras legítimas diferentes.
+
+Não esconda diferenças matemáticas atrás de abstração genérica apenas para eliminar `if`/`switch`.
+
+## Mapa de ownership
+
+Antes de criar arquivo, interface ou camada nova, identifique o owner natural do comportamento.
 
 ```text
-entender issue/estado da main
-        ↓
-verificar PRs já abertos
-        ↓
-criar branch a partir da main atual
-        ↓
-implementar uma fatia pequena/coerente
-        ↓
-pré-review do diff
-        ↓
-abrir PR
-        ↓
-CI + checks direcionados aplicáveis
-        ↓
-se falhar: investigar log e corrigir causa
-        ↓
-SHA final verde
-        ↓
-AUTO CODE REVIEW COMPLETO
-        ↓
-se houver achado: corrigir + novo ciclo completo
-        ↓
-registrar review no PR
-        ↓
-squash merge com SHA travado
-        ↓
-atualizar issue/docs/roadmap quando necessário
+Browser
+  ↓
+web/ e web/src/
+  ↓
+src/api/                 transporte HTTP
+  ↓
+src/application/         orquestração / use cases / ports
+  ↓
+engines e domínio        análise / geração / backtest / lab / financeiro
+  ↓
+adapters concretos       PostgreSQL / CAIXA / OpenAI / workers
 ```
 
-## Antes de começar qualquer mudança
+### Backend e aplicação
 
-### 1. Verifique a fila
+- `src/api/` — rota, parsing, validação de borda, serialização e mapeamento HTTP de erros;
+- `src/api/server.ts` — composition root das features HTTP e composição de dependências concretas;
+- `src/application/` — use cases, coordenação de fluxo e portas mínimas quando existe uma boundary real;
+- `src/domain/` — contratos e invariantes de domínio que não pertencem ao transporte ou persistência;
+- `src/analysis/`, `src/generator/`, `src/backtest/`, `src/lab/`, `src/finance/` e módulos equivalentes — motores e regras específicas;
+- `src/persistence/` — repositories PostgreSQL concretos;
+- `src/data/` — integração e transformação de dados externos/offline;
+- `src/ai/` — providers e integração interpretativa, nunca fonte do cálculo crítico;
+- `src/cli/apiStart.ts` — lifecycle de processo, scheduler, recovery, drain e runtime lock quando aplicável.
 
-Antes de criar branch/PR:
+Controllers devem permanecer finos. Não componha repository, manager ou provider concreto dentro de controller de feature quando a composição pertence a `server.ts`.
 
-- confira PRs abertos;
-- confira a issue relacionada;
-- confirme o SHA atual da `main`;
-- veja se outra mudança já implementou parte do trabalho.
+Use case **não precisa ganhar uma interface por princípio**. Crie porta/contrato quando ela representa uma boundary real, melhora testabilidade ou desacopla infraestrutura concreta. Prefira a abstração mínima suficiente.
 
-**Não acumule PRs paralelos sem necessidade.**
+### Frontend
 
-Se já houver PR aberto no mesmo fluxo, termine/revise/mergeie esse PR antes de abrir outro, salvo quando o usuário pedir explicitamente trabalho paralelo e os escopos forem realmente independentes.
+A evolução do frontend é incremental, sem rewrite e sem framework obrigatório.
 
-### 2. Trabalhe sempre sobre a `main` atual
+- `web/src/core/` — infraestrutura compartilhada e lifecycle transversal;
+- `web/src/shared/` — helpers/primitives reutilizáveis com repetição comprovada;
+- `web/src/features/` — ownership funcional das features migradas;
+- arquivos JavaScript legados/boundaries em `web/` — compatibilidade durante a migração, não lugar para duplicar uma implementação já canônica em TypeScript;
+- CSS funcional da feature/superfície — comportamento visual com ownership explícito;
+- `docs/design/PROTOTYPE_1_DARK_MODERN.md` — direção visual canônica enquanto não houver nova decisão explícita;
+- `docs/WEB.md` — arquitetura, lifecycle e contratos do frontend.
 
-Não baseie novas mudanças em branch antiga ou commit órfão.
+Não crie fallback funcional paralelo para uma feature apenas para manter código legado vivo. Quando uma migração definir novo owner canônico, o boundary legado deve ficar fino.
 
-Se `main` avançou:
+### Banco e migrations
 
-- reconcilie a branch;
-- preserve trabalho novo que entrou;
-- revalide o diff final contra a `main` atual.
+- `db/migrations/` evolui o schema de forma forward-only;
+- migration aplicada é imutável;
+- mudança de schema entra em migration nova;
+- checksum e advisory lock devem continuar válidos;
+- queries permanecem parametrizadas;
+- integridade importante deve ser defendida em TypeScript e PostgreSQL quando isso reduz risco real.
 
-### 3. Leia antes de alterar
+## Antes de começar uma mudança
+
+### 1. Verifique a fila e a base
+
+Antes de criar branch ou implementar:
+
+- confira PRs abertos no mesmo fluxo;
+- leia a issue relacionada;
+- confirme a `main` atual;
+- verifique se outra mudança já implementou parte do trabalho;
+- não acumule PRs paralelos sem necessidade real.
+
+Se já houver PR no mesmo escopo, prefira concluir/revisar esse trabalho antes de abrir outro, salvo quando os escopos forem independentes e o trabalho paralelo for intencional.
+
+### 2. Leia antes de alterar
 
 Comece por:
 
 - `README.md`;
-- `docs/DEVELOPMENT.md` para setup, execução local e gate antes do PR;
-- `docs/PRODUCTION.md` quando houver deploy, backup, restore, Compose ou operação real;
-- documentos do domínio alterado.
+- `docs/DEVELOPMENT.md`;
+- `docs/ROADMAP.md` quando a tarefa tocar arquitetura ou prioridade estrutural;
+- documento especializado do domínio alterado;
+- implementação, consumidores e testes existentes.
 
-Mapeie:
+Exemplos de documentação especializada:
 
-- implementação atual;
-- consumidores;
-- testes;
-- docs relevantes;
-- invariantes de domínio;
-- APIs/DTOs afetados;
-- CSS/JS que realmente possuem ownership do comportamento.
+- `docs/API.md` — HTTP;
+- `docs/WEB.md` — frontend;
+- `docs/DATABASE.md` — PostgreSQL e migrations;
+- `docs/TESTING.md` — testes e coverage;
+- `docs/QUALITY.md` — gates e supply chain;
+- `docs/RELIABILITY.md` — hardening e runtime;
+- `docs/PRODUCTION.md` — deploy, backup, restore e operação real;
+- `docs/AI.md` — integração com IA;
+- `docs/ANALYSES.md` — análises e metodologia;
+- `docs/design/PROTOTYPE_1_DARK_MODERN.md` — direção visual atual.
 
 Não use busca incompleta como prova de ausência.
 
-## Tamanho e escopo dos PRs
+### 3. Escolha a menor mudança coerente
 
-Prefira **PRs pequenos, verticais, reversíveis e fáceis de revisar**.
-
-Um bom PR responde a uma pergunta clara, por exemplo:
-
-- extrair um use case;
-- mover ownership de uma rota;
-- consolidar o CSS de uma superfície;
-- corrigir uma regra financeira;
-- atualizar uma migration por novo contrato;
-- redesenhar uma única tela.
+Prefira PRs pequenos, verticais, reversíveis e fáceis de revisar.
 
 Evite:
 
 - rewrite geral;
-- “limpeza” ampla sem critério;
-- refactor horizontal que altera muitas features de uma vez;
-- misturar arquitetura, metodologia, UI e banco no mesmo PR sem necessidade real.
+- refactor horizontal que mistura várias features;
+- abstração preventiva sem consumidor real;
+- “limpeza” ampla junto de correção funcional;
+- adoção de framework por preferência do agente;
+- mudança arquitetural que não resolve um problema observado.
 
-## Pré-review obrigatório antes de abrir PR
+KISS, DRY, YAGNI e SOLID são ferramentas de decisão, não metas mecânicas. Clareza de ownership e comportamento correto valem mais que satisfazer uma regra abstrata.
 
-Antes de publicar:
+## Regras por tipo de mudança
 
-- compare a branch contra `main`;
-- confira todos os arquivos alterados;
-- procure mudanças acidentais fora do escopo;
-- confirme que imports/exports públicos continuam compatíveis;
-- revise erros, estados vazios e concorrência;
-- valide migrations/SQL se houver banco;
-- confirme responsividade/acessibilidade se houver UI;
-- assegure que testes novos provam comportamento, não apenas sintaxe acidental.
+### Backend / application layer
 
-## CI e validação
+- transporte fica no HTTP; regra fica em use case/engine/domínio conforme responsabilidade;
+- composição concreta fica no composition root;
+- preserve contratos públicos durante refactors;
+- prefira interfaces estruturais/portas mínimas quando suficientes;
+- evite ciclos e dependência invertida entre application e infraestrutura;
+- recursos, gates e locks devem ser liberados também em erro/cancelamento.
 
-Nunca mergeie um SHA vermelho, incompleto ou desatualizado.
+### Algoritmos, análise, geração e backtests
 
-Gate local canônico:
+- preservar equivalência matemática quando o objetivo for refactor;
+- proteger anti-leakage explicitamente;
+- não mudar score, benchmark, ROI, seed ou metodologia como efeito colateral de organização de código;
+- comparar com baseline/acaso quando a metodologia exigir;
+- não generalizar diferenças legítimas entre loterias;
+- alterações metodológicas precisam ser intencionais, documentadas e testadas como tal.
+
+### Financeiro
+
+- custo, prêmio, resultado e ROI precisam usar a base correta;
+- aposta pendente não vira perda;
+- prêmio desconhecido não vira zero;
+- agregação deve ficar indisponível quando os componentes necessários não são conhecidos;
+- revisão financeira precisa continuar auditável.
+
+### Frontend / UX/UI
+
+- desktop e mobile devem continuar utilizáveis;
+- texto funcional deve respeitar **>=16px**;
+- foco, teclado e `prefers-reduced-motion` fazem parte do comportamento;
+- estados loading, empty, error e success precisam ser coerentes;
+- azul permanece ação/seleção/dado principal e verde sucesso/positivo conforme direção visual atual;
+- preserve fundos azul-preto/grafite, alta densidade controlada e evite gradiente/glow decorativo excessivo;
+- não invente gráfico ou métrica sem dado real;
+- dados externos devem usar `textContent`, escaping ou construção segura; trate `innerHTML` como risco explícito;
+- não masque problema de ownership adicionando mais uma camada global de CSS.
+
+### Concorrência e trabalho pesado
+
+Para backtests, análises e Lab:
+
+- respeite o gate compartilhado;
+- propague `AbortSignal` quando o fluxo suporta cancelamento;
+- timeout/cancelamento deve terminar worker e liberar recursos;
+- libere gate/resource em `finally` ou equivalente;
+- não aumente concorrência sem medir CPU, heap e tempo;
+- enfileirar não deve ser forma de contornar limites de endpoint interativo.
+
+### Segurança
+
+- nunca versione ou exponha segredo em browser, log, URL ou fixture pública;
+- valide input externo antes de domínio/SQL;
+- preserve origem/auth/rate-limit quando aplicáveis;
+- mantenha queries parametrizadas;
+- dependência nova precisa de justificativa concreta;
+- não adicione exceção ampla a scanner, CodeQL ou Trivy para silenciar achado sem entender a causa.
+
+## Validação proporcional ao risco
+
+O gate local canônico é:
 
 ```bash
 npm ci
 npm run check
 ```
 
-`npm run check` cobre contrato de produção versionado, higiene textual, baseline de plataforma/TypeScript, build e testes funcionais.
+`npm run check` cobre contrato de produção versionado, formatação, baseline de plataforma/TypeScript, build e testes funcionais.
 
-Checks direcionados entram conforme risco/escopo:
+Use checks adicionais conforme o risco real:
 
-```bash
-E2E_BASE_URL=http://127.0.0.1:5200 npm run test:e2e
-npm run coverage
-npm run audit:prod
-npm run prod:check
-```
+| Mudança | Validação esperada |
+| --- | --- |
+| Toda mudança | `npm run check` |
+| UI / fluxo browser crítico | `npm run dev`, validação manual e `E2E_BASE_URL=http://127.0.0.1:5200 npm run test:e2e` quando aplicável |
+| Regra matemática / geração / análise / backtest | testes de regressão/characterization + anti-leakage + equivalência quando for refactor |
+| Banco / migration / repository | testes integrados relevantes + migration nova + validação de integridade |
+| Dependência / runtime | `npm run audit:prod` quando aplicável |
+| Docker / contrato de produção | `npm run prod:check` |
+| Investigação de lacuna de teste | `npm run coverage` como diagnóstico, não meta percentual |
 
-O CI funcional executa `npm run check` com PostgreSQL efêmero.
-
-O workflow de Security atual é semanal/manual e cobre audit de dependências, CodeQL, SBOM e Trivy. Ele não é automaticamente um gate de todo PR.
-
-E2E e coverage também não são custo fixo de todo PR; devem ser executados quando protegem o risco real da mudança.
+E2E, coverage e audit não são custo fixo de todo PR. Execute-os quando protegem o risco da mudança.
 
 ### Quando um gate falhar
 
 Não faça retry cego.
 
-1. abra o log do job;
+1. leia o log;
 2. identifique a causa raiz;
-3. diferencie bug de produto, contrato stale, problema de teste ou infraestrutura;
-4. corrija a fonte adequada;
-5. não reintroduza código legado apenas para satisfazer teste antigo;
-6. não afrouxe E2E/coverage para “deixar verde”;
+3. diferencie bug de produto, contrato stale, problema de teste e infraestrutura;
+4. corrija a fonte correta;
+5. não reintroduza legado apenas para satisfazer teste antigo;
+6. não afrouxe assertion, E2E ou validação válida para “deixar verde”;
 7. gere novo SHA e revalide os gates aplicáveis.
+
+## Testes
+
+Testes protegem **comportamento e invariantes**, não detalhes acidentais de implementação.
+
+Priorize testes para:
+
+- regras de domínio e cálculos;
+- anti-leakage e metodologia;
+- persistência e contratos de dados;
+- APIs e fluxos operacionais;
+- segurança e validação de entradas;
+- regressões reproduzíveis;
+- comportamento crítico da interface;
+- fronteiras arquiteturais quando uma regressão de ownership seria perigosa.
+
+Evite teste que apenas espelha markup, estrutura interna ou implementação sem proteger contrato material.
+
+## Fluxo Git e PR
+
+Toda mudança de código/documentação versionada deve seguir um fluxo revisável:
+
+```text
+entender issue + main atual
+        ↓
+verificar PRs abertos
+        ↓
+criar branch curta
+        ↓
+implementar fatia pequena + testes
+        ↓
+validar localmente
+        ↓
+pré-review do diff contra main
+        ↓
+abrir PR
+        ↓
+CI + checks direcionados aplicáveis
+        ↓
+SHA final verde
+        ↓
+auto code review completo do patch publicado
+        ↓
+se houver achado: corrigir e repetir o ciclo
+        ↓
+registrar review no PR
+        ↓
+squash merge com head SHA esperado
+```
+
+Não considere um PR pronto apenas porque o CI ficou verde.
+
+Se a `main` avançar durante o trabalho, reconcilie a branch e revalide o diff final contra a base atual.
+
+Se o head SHA mudar depois do auto-review, o review precisa ser refeito.
+
+## Pré-review antes de abrir PR
+
+Antes de publicar:
+
+- compare branch contra `main`;
+- confira todos os arquivos alterados;
+- procure mudança acidental fora do escopo;
+- confirme imports/exports e contratos públicos;
+- revise erros, estados vazios, concorrência e cancelamento;
+- valide migration/SQL quando houver banco;
+- valide responsividade/acessibilidade quando houver UI;
+- confirme que testes provam comportamento relevante;
+- verifique se documentação continua verdadeira.
 
 ## Auto code review final — obrigatório
 
-O auto-review acontece **depois de todos os gates relevantes estarem verdes**, no SHA final.
+Depois de todos os gates relevantes estarem verdes, revise o patch inteiro no SHA final como reviewer independente.
 
-Revise o patch publicado inteiro como se fosse um reviewer independente.
-
-### Checklist geral
+Pergunte:
 
 - o diff continua dentro do escopo?
 - existe código morto ou implementação duplicada?
-- ownership ficou mais claro ou apenas mudou de arquivo?
-- contratos públicos mudaram sem intenção?
-- comportamento anterior foi preservado quando era refactor?
-- há edge case não coberto?
-- o teste novo pode passar por motivo errado?
-- a mudança introduz race condition?
-- erros/falhas liberam locks/gates/resources?
-- existem imports/ciclos/dependências invertidas?
-- há risco de dados incorretos, especialmente financeiro?
-- documentação continua verdadeira?
-
-### Backend
-
-- controller está fino?
-- regra pertence ao application/domain em vez do HTTP?
-- application importa `pg`/persistence concreta indevidamente?
-- porta mínima seria suficiente?
-- resource lifecycle está correto?
-- timeout/cancelamento/gate são liberados em sucesso e falha?
-- erro tipado é mapeado sem perder status/contrato?
-
-### Banco
-
-- migration nova é forward-only?
-- migration aplicada não foi modificada?
-- integridade TS ↔ PostgreSQL continua alinhada?
-- transações e locks estão corretos?
-- concorrência pode gerar duplicidade/revisão duplicada?
-- `NULL` continua distinto de zero/desconhecido quando necessário?
-
-### Frontend / UX/UI
-
-- desktop e mobile permanecem utilizáveis?
-- existe overflow horizontal?
-- texto funcional respeita >=16px?
-- foco e teclado funcionam?
-- `prefers-reduced-motion` foi preservado?
-- azul continua ação/seleção e verde sucesso/positivo?
-- estados loading/empty/error/success estão corretos?
-- a UI inventou gráfico/métrica sem dado real?
-- `innerHTML` com dados externos está protegido?
-- o novo CSS respeita ownership da feature e não mascara hardening necessário?
-
-### Segurança
-
-- nenhum segredo foi versionado ou exposto no browser/log?
-- mutações continuam protegidas por origem/auth quando aplicável?
-- input continua validado antes de chegar ao domínio/SQL?
-- queries continuam parametrizadas?
-- dependência nova é realmente necessária?
-- não foi criada exceção ampla para scanner/CodeQL/Trivy?
-
-### Metodologia / financeiro
-
+- ownership ficou mais claro?
+- contrato público mudou sem intenção?
+- um refactor preservou comportamento?
+- existe edge case não coberto?
+- o teste novo pode passar pelo motivo errado?
+- existe race condition ou resource leak?
+- erros e cancelamentos liberam locks/gates/workers?
+- há risco de dado incorreto, especialmente financeiro?
 - anti-leakage continua intacto?
-- pontuação/classificação não foram confundidas com previsão?
-- ROI usa a base financeira correta?
-- apostas pendentes não viraram perda artificial?
-- prêmio zero continua distinto de prêmio desconhecido?
-- controle aleatório/benchmark não foi enfraquecido?
+- UI continua segura, legível e utilizável?
+- documentação ainda descreve o sistema real?
 
-## O que fazer quando o auto-review encontrar algo
+Se encontrar algo, **não mergeie**. Corrija, teste novamente e repita o review no novo SHA.
 
-**Não mergear.**
-
-1. descreva o achado;
-2. corrija na branch;
-3. adicione/ajuste teste de regressão quando apropriado;
-4. gere novo SHA;
-5. rode novamente os gates aplicáveis;
-6. repita o auto-review final.
-
-Só o SHA revisado e verde pode ser mergeado.
-
-## Registro do review
-
-Antes do merge, registre no PR um comentário/review indicando:
+Registre no PR um `COMMENT` com:
 
 - SHA revisado;
 - escopo do review;
-- principais riscos conferidos;
-- eventuais achados corrigidos;
-- confirmação dos gates aplicáveis verdes;
-- ausência de threads bloqueantes.
+- riscos principais conferidos;
+- achados corrigidos, se houver;
+- gates aplicáveis executados/verdes;
+- confirmação de ausência de threads bloqueantes.
 
-O autor não pode aprovar o próprio PR no GitHub; use **COMMENT** para registrar o auto-review.
+O autor não deve registrar o próprio auto-review como `APPROVE`; use `COMMENT`.
 
-## Merge
+## Merge e proteção da main
 
-Padrão:
+Padrão do projeto:
 
-- **squash merge**;
-- usar o head SHA esperado/travado;
-- não mergear se o PR mudou depois do review;
-- depois do merge, confirmar o commit em `main`.
+- Pull Request;
+- squash merge;
+- head SHA esperado/travado;
+- nunca force-push ou delete `main`;
+- nunca mergear SHA vermelho, incompleto, stale ou não revisado.
 
-Se o head mudar depois do auto-review, o review precisa ser refeito no novo SHA.
-
-## Frontend: direção oficial
-
-A linguagem visual oficial é o **Protótipo 1 — Dark Moderno / Workspace científico compacto**.
-
-Fonte: `docs/design/PROTOTYPE_1_DARK_MODERN.md`.
-
-Guardrails:
-
-- azul = ação, seleção e dado principal;
-- verde = sucesso/resultado positivo;
-- fundos azul-preto/grafite;
-- sem gradiente/glow decorativo excessivo;
-- alta densidade controlada;
-- texto funcional >=16px;
-- gráficos apenas quando dado real justifica;
-- mobile não deve ser apenas desktop empilhado;
-- acessibilidade faz parte do design, não é acabamento posterior.
-
-Mudanças visuais devem respeitar #121. Arquitetura frontend/TypeScript pertence à #60; arquitetura de informação/jornada pertence à #64.
-
-## Backend: direção arquitetural
-
-Arquitetura alvo:
-
-```text
-HTTP / CLI / Scheduler / Worker
-          ↓
-Application Use Cases
-          ↓
-Domain / engines
-          ↓
-Ports
-          ↓
-PostgreSQL / CAIXA / OpenAI / worker_threads
-```
-
-Regras:
-
-- controllers fazem transporte, não regra;
-- use case não deve depender de `pg` ou repository concreto quando uma porta mínima resolve;
-- composição concreta deve ficar no composition root;
-- preserve contratos públicos durante refactors;
-- prefira compatibilidade estrutural de interfaces quando suficiente;
-- remova implementações legadas mortas após strangler, em PR pequeno próprio se necessário.
-
-A #61 concluiu a migração da borda HTTP em 2026-09-02: `src/api/server.ts` é o composition root das features HTTP. Novas mudanças devem preservar essa fronteira; decomposição de motores/hotspots pertence à #62 ou a novo trabalho com necessidade comprovada.
-
-## PostgreSQL e migrations
-
-- migrations são **imutáveis depois de aplicadas**;
-- mudanças de schema entram em migration nova;
-- preserve checksum e advisory lock;
-- use transação quando múltiplas escritas precisam ser atômicas;
-- mantenha queries parametrizadas;
-- valide invariantes no TypeScript e no PostgreSQL quando defesa em profundidade for valiosa;
-- testes integrados devem usar o helper de isolamento de database.
-
-## Concorrência e trabalhos pesados
-
-Para backtests/análises/Lab:
-
-- respeite gate compartilhado;
-- timeout e cancelamento precisam terminar worker;
-- `AbortSignal` deve propagar;
-- gate/resource deve ser liberado em `finally` ou equivalente;
-- não aumente concorrência sem medir CPU/heap/tempo;
-- enfileirar não deve ser forma de contornar limites do endpoint interativo.
+Se branch protection não estiver configurada no GitHub, trate estas regras como **proteção manual obrigatória**. A ausência de proteção técnica não autoriza bypass do fluxo.
 
 ## Documentação
 
 Documentação faz parte do Definition of Done quando comportamento, arquitetura, operação ou UX mudarem.
 
-Fontes principais:
+Não coloque no `AGENTS.md` snapshots de roadmap, datas de conclusão ou estado de epics. Atualize:
 
-- `README.md` — entrada do projeto;
-- `docs/DEVELOPMENT.md` — setup, execução local e gate antes do PR;
-- `docs/PRODUCTION.md` — preflight, backup, deploy e verify;
-- `docs/ROADMAP.md` — prioridade e estado real;
-- `docs/API.md` — HTTP;
-- `docs/WEB.md` — frontend;
-- `docs/DATABASE.md` — PostgreSQL e migrations;
-- `docs/TESTING.md` — testes, coverage e E2E;
-- `docs/RELIABILITY.md` — hardening;
-- `docs/QUALITY.md` — gates e supply chain;
-- `docs/design/PROTOTYPE_1_DARK_MODERN.md` — direção visual.
+- `docs/ROADMAP.md` para prioridade e estado estrutural;
+- issue para escopo e decisão da tarefa;
+- docs especializados para contrato duradouro;
+- `README.md` quando a visão pública/entrada do projeto mudar.
 
-Não deixe README/roadmap descrevendo código que já foi removido ou tarefas já concluídas.
+Issues abertas devem representar trabalho realmente pendente. Ao concluir um epic ou decisão, atualize o estado final, feche a issue quando apropriado e mova trabalho remanescente para a issue correta em vez de manter backlog escondido em item encerrado.
 
-`docs/tasks/` pode preservar histórico, mas deve deixar claro quando a tarefa já foi concluída.
+`docs/tasks/` pode preservar histórico, mas deve deixar claro quando uma tarefa já foi concluída.
 
-## Issues
+## Nunca faça
 
-Issues abertas devem representar trabalho real ainda pendente.
+- usar IA para escolher dezenas ou executar cálculo crítico;
+- permitir leakage do concurso alvo;
+- confundir score/ranking histórico com previsão futura;
+- converter dado financeiro desconhecido em zero;
+- editar migration já aplicada;
+- compor infraestrutura concreta dentro de controller de feature por conveniência;
+- mover lifecycle de processo entre camadas apenas por estética arquitetural;
+- criar interface, port ou abstraction sem boundary/benefício real;
+- adotar framework frontend ou fazer rewrite sem decisão explícita;
+- manter duas implementações funcionais canônicas da mesma feature durante migração;
+- aumentar concorrência de workers sem medição;
+- reintroduzir código legado para satisfazer teste stale;
+- remover/afrouxar teste válido apenas para obter CI verde;
+- inventar gráfico, métrica, ROI ou evidência ausente;
+- expor segredo, credencial, prompt sensível ou payload desnecessário em logs;
+- misturar refactor amplo com mudança funcional sem necessidade.
 
-Ao concluir um epic/decisão:
+## Definition of Done
 
-- atualize o corpo com o estado final;
-- feche como `completed`;
-- mova trabalho remanescente para a issue correta em vez de manter escopo obsoleto.
+Uma mudança só está pronta quando:
 
-Não use issue fechada como backlog escondido.
+- resolve o problema pedido sem ampliar escopo desnecessariamente;
+- respeita os invariantes do produto;
+- deixa ownership igual ou mais claro;
+- possui testes proporcionais ao risco;
+- `npm run check` está verde;
+- checks adicionais relevantes estão verdes;
+- documentação afetada continua verdadeira;
+- o diff final foi revisado contra a `main` atual;
+- o SHA final recebeu auto code review completo;
+- não existem achados ou threads bloqueantes pendentes.
 
-## Branch protection
+Antes de concluir, pense também nos caminhos ruins:
 
-A `main` ainda não possui branch protection obrigatória (#52). Até essa configuração administrativa ser aplicada, o agente deve tratar as regras deste arquivo como **proteção manual obrigatória**:
+- dado ausente;
+- chamada repetida;
+- chamadas concorrentes;
+- worker falhando no meio;
+- navegação durante loading;
+- mobile e teclado;
+- OpenAI indisponível;
+- PostgreSQL parcial/indisponível;
+- resultado financeiro ainda pendente;
+- concurso faltando no histórico;
+- `main` avançando durante o PR.
 
-- sempre PR;
-- CI funcional verde;
-- checks direcionados relevantes verdes quando aplicáveis;
-- auto-review final;
-- squash merge;
-- nunca force-push/deletar `main`.
-
-## Critério de qualidade sênior
-
-Uma mudança não é boa apenas por funcionar no happy path.
-
-Pergunte sempre:
-
-- o que acontece com dado ausente?
-- e se a chamada for repetida?
-- e se duas chamadas ocorrerem juntas?
-- e se o worker falhar no meio?
-- e se o usuário navegar durante loading?
-- e no mobile?
-- e sem OpenAI?
-- e com banco parcial?
-- e se o resultado financeiro ainda não estiver completo?
-- e se um concurso estiver faltando no histórico?
-- e se `main` avançar durante o PR?
-
-O objetivo é deixar o sistema **mais simples de entender, mais difícil de quebrar e mais fácil de auditar** após cada PR.
-
-
-### Extra
-
-# Diretrizes Universais de Desenvolvimento (Instruções para Agentes de IA)
-
-Você está atuando como o Principal Engineer e Arquiteto de Software deste repositório. Este arquivo define os padrões inegociáveis de engenharia, arquitetura e qualidade que devem ser aplicados a qualquer tecnologia, linguagem ou framework utilizado aqui.
-
-## 1. Engenharia de Código e Manutenibilidade
-*   **Princípios Práticos:** Aplique KISS (mantenha simples), DRY (não se repita) e YAGNI (não crie o que não precisa agora).
-*   **SOLID Restrito:**
-    *   Toda classe, função ou componente deve ter uma única responsabilidade.
-    *   Sistemas devem ser abertos para extensão e fechados para modificação.
-    *   Dependa de abstrações/interfaces, nunca de implementações concretas diretamente.
-*   **Legibilidade:** Código legível substitui comentários. Use nomes autoexplicativos para funções, variáveis e métodos. Funções não devem passar de 30 linhas.
-
-## 2. Paradigmas Arquiteturais
-*   **Separação de Conceitos (SoC):** Isole rigidamente a Lógica de Negócio (Domínio) dos detalhes técnicos (Bancos de dados, APIs externas, Interfaces de Usuário, Frameworks).
-*   **Desacoplamento:** Componentes ou serviços devem se comunicar por contratos claros. Evite acoplamento direto que impeça testes isolados.
-*   **Idempotência e Resiliência:** Operações que alteram estado devem ser seguras contra repetições (retries). Todo ponto de integração externa deve prever cenários de falha.
-
-## 3. Qualidade, Testes e Automação
-*   **Testabilidade:** O código gerado deve ser nativamente fácil de testar. Não misture efeitos colaterais (chamadas de rede/data) no meio da lógica pura.
-*   **Testes Automatizados:** Para qualquer nova funcionalidade ou correção de bug, sugira ou implemente os testes unitários ou de integração correspondentes.
-
-## 4. Segurança e Estabilidade por Padrão
-*   **Validação Estrita:** Nunca confie em inputs externos. Valide formatos, tipos e limites na entrada do fluxo.
-*   **Tratamento de Erros Eficiente:** Erros devem ser capturados na camada correta, gerando logs limpos sem expor segredos de infraestrutura ou stack traces para o cliente final.
-*   **Dados Sensíveis:** Certifique-se de que senhas, chaves de API, dados pessoais (LGPD/GDPR) ou tokens nunca sejam expostos em logs, URLs ou código aberto.
-
-## 5. Interfaces com Usuário (Front/Mobile - Se Aplicável)
-*   **Estados Visuais:** Garanta que toda interação tenha feedback claro (Loading, Vazio, Sucesso, Erro).
-*   **Consistência e Acessibilidade:** Siga rigorosamente o Design System ou os padrões visuais já existentes no projeto. Garanta contraste e tags de acessibilidade.
-
----
-**Protocolo de Ação:** Antes de entregar qualquer código ou plano, valide mentalmente: *"Minha solução quebra o SOLID, duplica código ou mistura regras de negócio com infraestrutura?"*. Se sim, corrija-a antes de responder.
+O Loto Lab privilegia **correção, auditabilidade, simplicidade e evidência**. Use princípios de engenharia para sustentar esses objetivos, nunca como regras mecânicas desconectadas do projeto.
