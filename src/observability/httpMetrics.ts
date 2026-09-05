@@ -71,7 +71,7 @@ export function classifyHttpRoute(pathname: string): HttpRouteFamily {
   if (
     isApiPrefix(path, "/api/v1/contests")
     || path === "/api/v1/lotteries"
-    || path === "/api/v1/data-status"
+    || path === "/api/v1/data/status"
   ) return "contests";
   if (isApiPrefix(path, "/api/v1")) return "api.other";
   if (path === "/" || !path.startsWith("/api/")) return "web";
