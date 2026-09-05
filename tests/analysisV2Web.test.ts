@@ -39,7 +39,10 @@ test("Analyses 2.0 is lazy-loaded, typed, independently degradable and exposes t
     readFile("src/api/analysisWorker.ts", "utf8"),
   ]);
 
-  assert.equal(boundary, 'import "./src/features/analysisV2.js";\n');
+  assert.equal(
+    boundary,
+    'import "./src/features/analysisV2.js";\nimport "./src/features/analysisV2/journey.js";\n',
+  );
   assert.match(source, /from "\.\.\/core\/api\.js"/);
   assert.match(source, /from "\.\.\/core\/viewLifecycle\.js"/);
   assert.match(source, /from "\.\.\/shared\/escaping\.js"/);
