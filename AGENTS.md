@@ -125,7 +125,8 @@ A evolução do frontend é incremental, sem rewrite e sem framework obrigatóri
 - `web/src/features/` — ownership funcional das features migradas;
 - arquivos JavaScript legados/boundaries em `web/` — compatibilidade durante a migração, não lugar para duplicar uma implementação já canônica em TypeScript;
 - CSS funcional da feature/superfície — comportamento visual com ownership explícito;
-- Design System e direção visual — seguem os documentos canônicos em `docs/design/` e `docs/WEB.md`.
+- `docs/design/PROTOTYPE_1_DARK_MODERN.md` — direção visual canônica enquanto não houver nova decisão explícita;
+- `docs/WEB.md` — arquitetura, lifecycle e contratos do frontend.
 
 Não crie fallback funcional paralelo para uma feature apenas para manter código legado vivo. Quando uma migração definir novo owner canônico, o boundary legado deve ficar fino.
 
@@ -172,7 +173,8 @@ Exemplos de documentação especializada:
 - `docs/RELIABILITY.md` — hardening e runtime;
 - `docs/PRODUCTION.md` — deploy, backup, restore e operação real;
 - `docs/AI.md` — integração com IA;
-- `docs/ANALYSES.md` — análises e metodologia.
+- `docs/ANALYSES.md` — análises e metodologia;
+- `docs/design/PROTOTYPE_1_DARK_MODERN.md` — direção visual atual.
 
 Não use busca incompleta como prova de ausência.
 
@@ -222,10 +224,11 @@ KISS, DRY, YAGNI e SOLID são ferramentas de decisão, não metas mecânicas. Cl
 ### Frontend / UX/UI
 
 - desktop e mobile devem continuar utilizáveis;
-- texto funcional deve respeitar o piso de legibilidade definido pelo projeto;
+- texto funcional deve respeitar **>=16px**;
 - foco, teclado e `prefers-reduced-motion` fazem parte do comportamento;
 - estados loading, empty, error e success precisam ser coerentes;
 - azul permanece ação/seleção/dado principal e verde sucesso/positivo conforme direção visual atual;
+- preserve fundos azul-preto/grafite, alta densidade controlada e evite gradiente/glow decorativo excessivo;
 - não invente gráfico ou métrica sem dado real;
 - dados externos devem usar `textContent`, escaping ou construção segura; trate `innerHTML` como risco explícito;
 - não masque problema de ownership adicionando mais uma camada global de CSS.
@@ -387,6 +390,8 @@ Registre no PR um `COMMENT` com:
 - gates aplicáveis executados/verdes;
 - confirmação de ausência de threads bloqueantes.
 
+O autor não deve registrar o próprio auto-review como `APPROVE`; use `COMMENT`.
+
 ## Merge e proteção da main
 
 Padrão do projeto:
@@ -409,6 +414,8 @@ Não coloque no `AGENTS.md` snapshots de roadmap, datas de conclusão ou estado 
 - issue para escopo e decisão da tarefa;
 - docs especializados para contrato duradouro;
 - `README.md` quando a visão pública/entrada do projeto mudar.
+
+Issues abertas devem representar trabalho realmente pendente. Ao concluir um epic ou decisão, atualize o estado final, feche a issue quando apropriado e mova trabalho remanescente para a issue correta em vez de manter backlog escondido em item encerrado.
 
 `docs/tasks/` pode preservar histórico, mas deve deixar claro quando uma tarefa já foi concluída.
 
