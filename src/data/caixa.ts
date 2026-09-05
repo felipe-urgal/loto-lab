@@ -1,5 +1,6 @@
 import type { Contest, ContestPrizeTier, LotteryId } from "../domain/types.js";
 import { assertValidContestNumbers } from "../domain/validation.js";
+import { recordCaixaRequest } from "../observability/caixaMetrics.js";
 import type { ContestSource, LotteryAgendaSnapshot, LotteryAgendaSource } from "./source.js";
 
 const BASE_URL = "https://servicebus2.caixa.gov.br/portaldeloterias/api";
@@ -125,22 +126,23 @@ export class CaixaContestSource implements ContestSource, LotteryAgendaSource {
     }
     const endpoint = endpointByLottery[lottery];
     const url = `${BASE_URL}/${endpoint}${contestNumber ? `/${contestNumber}` : ""}`;
+    const startedAt = performance.now();
 
-    let response: Response;
     try {
-      response = await this.fetchImpl(url, {
+      const response = await this.fetchImpl(url, {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(this.timeoutMs),
       });
+      if (!response.ok) throw new Error(`Caixa request failed (${response.status}) for ${lottery}`);
+      const payload = (await response.json()) as CaixaContestResponse;
+      recordCaixaRequest("success", performance.now() - startedAt);
+      return payload;
     } catch (error) {
-      if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-        throw new Error(`Caixa request timed out for ${lottery}`);
-      }
+      const timeout = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+      recordCaixaRequest(timeout ? "timeout" : "error", performance.now() - startedAt);
+      if (timeout) throw new Error(`Caixa request timed out for ${lottery}`);
       throw error;
     }
-
-    if (!response.ok) throw new Error(`Caixa request failed (${response.status}) for ${lottery}`);
-    return (await response.json()) as CaixaContestResponse;
   }
 
   async fetchContest(lottery: LotteryId, contestNumber?: number): Promise<Contest> {
