@@ -15,6 +15,7 @@ test("HTTP metrics classify dynamic routes into bounded families", () => {
   assert.equal(classifyHttpRoute("/api/v1/game-batches/42"), "games");
   assert.equal(classifyHttpRoute("/api/v1/strategies/foo"), "strategies");
   assert.equal(classifyHttpRoute("/api/v1/operations/sync"), "operations");
+  assert.equal(classifyHttpRoute("/api/v1/data/status"), "contests");
   assert.equal(classifyHttpRoute("/assets/app.js"), "web");
 });
 
