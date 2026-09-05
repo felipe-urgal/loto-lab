@@ -20,6 +20,7 @@ test("main shell and lifecycle share one typed view/lottery contract", async () 
   assert.match(context, /return hash\.replace\(\/\^#\/, ""\) \|\| "dashboard"/);
 
   assert.match(shell, /from "\.\/mainContext\.js"/);
+  assert.match(shell, /view\?: MainView/);
   assert.match(shell, /isMainView\(requested\)/);
   assert.match(shell, /isLotteryId\(storedLottery\)/);
   assert.doesNotMatch(shell, /const mainViews = new Set/);
