@@ -3,9 +3,10 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const [packageSource, composeSource] = await Promise.all([
+const [packageSource, composeSource, apiStartSource] = await Promise.all([
   readFile(new URL('../package.json', import.meta.url), 'utf8'),
   readFile(new URL('../docker-compose.prod.yml', import.meta.url), 'utf8'),
+  readFile(new URL('../src/cli/apiStart.ts', import.meta.url), 'utf8'),
 ]);
 
 const packageJson = JSON.parse(packageSource);
@@ -57,6 +58,25 @@ function assertBoundedLocalLogging(serviceSource, serviceName) {
     serviceSource,
     /^        max-file: ["']?5["']?\s*$/m,
     `${serviceName} deve manter no máximo cinco arquivos de log`,
+  );
+}
+
+function assertShutdownGrace(serviceSource, applicationSource) {
+  const graceSeconds = Number(
+    serviceSource.match(/^    stop_grace_period:\s*(\d+)s\s*$/m)?.[1] ?? Number.NaN,
+  );
+  const shutdownMaximumSeconds = Number(
+    applicationSource.match(/seconds > (\d+)\)/)?.[1] ?? Number.NaN,
+  );
+
+  assert.ok(Number.isFinite(graceSeconds), 'Aplicação precisa declarar stop_grace_period em segundos');
+  assert.ok(
+    Number.isFinite(shutdownMaximumSeconds),
+    'Contrato precisa conseguir ler o limite máximo de OPS_SHUTDOWN_TIMEOUT_SECONDS',
+  );
+  assert.ok(
+    graceSeconds > shutdownMaximumSeconds,
+    `stop_grace_period (${graceSeconds}s) precisa ser maior que o deadline máximo da aplicação (${shutdownMaximumSeconds}s)`,
   );
 }
 
@@ -124,6 +144,7 @@ assert.match(appService, /^    healthcheck:\s*$/m, 'Aplicação precisa manter h
 assert.match(appService, /\/health\/ready/, 'Healthcheck da aplicação precisa usar o readiness canônico');
 assertBoundedLocalLogging(postgresService, 'PostgreSQL');
 assertBoundedLocalLogging(appService, 'Aplicação');
+assertShutdownGrace(appService, apiStartSource);
 
 const expectedProdVerify =
   'docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app node -e "fetch(\'http://127.0.0.1:3000/health/ready\',{signal:AbortSignal.timeout(5000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"';
@@ -135,5 +156,5 @@ assert.equal(
 );
 
 console.log(
-  'Contrato de produção validado: check usa configuração segura, comandos canônicos não possuem aliases duplicados, deploy aguarda healthchecks, logs possuem retenção bounded e verify permanece somente leitura.',
+  'Contrato de produção validado: check usa configuração segura, comandos canônicos não possuem aliases duplicados, deploy aguarda healthchecks, logs possuem retenção bounded, shutdown do container cobre o deadline máximo da aplicação e verify permanece somente leitura.',
 );
