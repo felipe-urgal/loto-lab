@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 
 test("strategy lab workspace follows Prototype 1 while preserving statistical contracts", async () => {
-  const [html, workspace, boundary, lab, refinements] = await Promise.all([
+  const [html, workspace, boundary, lab, refinementsBoundary, refinements] = await Promise.all([
     readFile("web/lab.html", "utf8"),
     readFile("web/lab-workspace.css", "utf8"),
     readFile("web/lab.js", "utf8"),
     readFile("web/src/features/lab.ts", "utf8"),
     readFile("web/lab-refinements.js", "utf8"),
+    readFile("web/src/features/labRefinements.ts", "utf8"),
   ]);
 
   const sharedRefinements = html.indexOf('/assets/refinements.css');
@@ -59,7 +60,8 @@ test("strategy lab workspace follows Prototype 1 while preserving statistical co
   assert.match(lab, /AUC 0,500 equivale a ordenação sem informação/);
   assert.match(lab, /corrigir o número de variantes testadas/);
 
-  assert.match(refinements, /function refineTie\(\)/);
-  assert.match(refinements, /function refineMetric\(\)/);
+  assert.equal(refinementsBoundary.trim(), 'import "./src/features/labRefinements.js";');
+  assert.match(refinements, /function refineTie\(\): void/);
+  assert.match(refinements, /function refineMetric\(\): void/);
   assert.match(refinements, /Empate em \$\{basisName\}/);
 });
