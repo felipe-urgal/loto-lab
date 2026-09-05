@@ -22,10 +22,18 @@ export interface OperationsStatusConfig {
   staleAfterMinutes: number;
 }
 
+export interface OperationalSyncObservabilitySnapshot {
+  status: OperationStatus | "unknown";
+  partial: boolean;
+  running: boolean;
+  durationMs?: number;
+}
+
 export interface OperationsStatusSnapshot extends OperationsStatusConfig {
   stale: boolean;
   ageMinutes?: number;
   latest?: OperationRunSnapshot<unknown>;
+  sync: OperationalSyncObservabilitySnapshot;
 }
 
 export class OperationAlreadyRunningError extends Error {
@@ -35,6 +43,21 @@ export class OperationAlreadyRunningError extends Error {
     super("An operational synchronization is already running");
     this.name = "OperationAlreadyRunningError";
   }
+}
+
+function syncObservability(latest?: OperationRunSnapshot<unknown>): OperationalSyncObservabilitySnapshot {
+  const startedAt = latest ? Date.parse(latest.startedAt) : Number.NaN;
+  const finishedAt = latest?.finishedAt ? Date.parse(latest.finishedAt) : Number.NaN;
+  const durationMs = Number.isFinite(startedAt) && Number.isFinite(finishedAt)
+    ? Math.max(0, finishedAt - startedAt)
+    : undefined;
+
+  return {
+    status: latest?.status ?? "unknown",
+    partial: latest?.status === "partial",
+    running: latest?.status === "running",
+    ...(durationMs !== undefined ? { durationMs } : {}),
+  };
 }
 
 export class OperationsUseCase {
@@ -61,6 +84,7 @@ export class OperationsUseCase {
       stale,
       ...(ageMinutes !== undefined ? { ageMinutes } : {}),
       ...(latest ? { latest } : {}),
+      sync: syncObservability(latest),
     };
   }
 
