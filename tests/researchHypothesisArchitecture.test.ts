@@ -26,6 +26,7 @@ test("research hypotheses attach backtest evidence through explicit persisted ow
   assert.match(evidenceMigration, /REFERENCES research_hypotheses\(id\) ON DELETE CASCADE/);
   assert.match(evidenceMigration, /REFERENCES backtest_runs\(id\) ON DELETE RESTRICT/);
   assert.match(evidenceMigration, /PRIMARY KEY \(hypothesis_id, backtest_run_id\)/);
+  assert.match(evidenceMigration, /WHERE id = NEW\.hypothesis_id\s+FOR SHARE/);
   assert.doesNotMatch(evidenceMigration, /payload|jsonb|evidence_type/i);
 
   assert.match(application, /ResearchHypothesisBacktestEvidenceStore/);
