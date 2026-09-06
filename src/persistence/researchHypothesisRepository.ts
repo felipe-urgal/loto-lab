@@ -103,6 +103,27 @@ export class PostgresResearchHypothesisRepository {
     return result.rows.map(mapResearchHypothesis);
   }
 
+  async decide(
+    id: number,
+    decision: ResearchHypothesisDecision,
+    reason: string,
+  ): Promise<ResearchHypothesis | undefined> {
+    const result = await this.pool.query<ResearchHypothesisRow>(
+      `
+        UPDATE research_hypotheses
+        SET status = 'decided',
+            decision = $2,
+            decision_reason = $3,
+            decided_at = NOW(),
+            updated_at = NOW()
+        WHERE id = $1 AND status = 'open'
+        RETURNING *
+      `,
+      [id, decision, reason],
+    );
+    return result.rows[0] ? mapResearchHypothesis(result.rows[0]) : undefined;
+  }
+
   async linkBacktest(
     hypothesisId: number,
     backtestRunId: number,
