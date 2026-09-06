@@ -3,6 +3,7 @@ import {
   ResearchBacktestEvidenceNotFoundError,
   ResearchEvidenceLotteryMismatchError,
   ResearchHypothesisNotFoundError,
+  ResearchHypothesisNotOpenError,
   type ResearchHypothesesUseCase,
 } from "../application/researchHypotheses.js";
 import type { ApiServerOptions } from "./app.js";
@@ -38,6 +39,9 @@ function mapResearchError(error: unknown): ApiError | undefined {
   if (error instanceof ResearchBacktestEvidenceNotFoundError) {
     return new ApiError(404, error.code, error.message);
   }
+  if (error instanceof ResearchHypothesisNotOpenError) {
+    return new ApiError(409, error.code, error.message);
+  }
   if (error instanceof ResearchEvidenceLotteryMismatchError) {
     return new ApiError(409, error.code, error.message);
   }
@@ -52,7 +56,7 @@ export async function serveResearchHypotheses(
 ): Promise<boolean> {
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://localhost");
-  const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/$/, "") : url.pathname;
+  const pathname = url.pathname.length > 1 ? request.url?.split("?")[0]?.replace(/\/$/, "") ?? url.pathname : url.pathname;
   const collectionPath = "/api/v1/research/hypotheses";
   if (pathname !== collectionPath && !pathname.startsWith(`${collectionPath}/`)) return false;
 
