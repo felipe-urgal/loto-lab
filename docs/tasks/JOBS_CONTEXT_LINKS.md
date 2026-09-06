@@ -2,7 +2,7 @@
 
 Issue: #64
 
-Status: segunda fatia implementada em branch para validação.
+Status: segunda fatia concluída e pronta para merge após gates finais.
 
 ## Objetivo
 
