@@ -20,6 +20,9 @@ test("Execuções links completed backtests by jobId and keeps lifecycle separat
   assert.match(backtests, /linkedJob\.kind === "backtest"/);
   assert.match(backtests, /linkedJob\.lottery === lottery/);
   assert.match(backtests, /persistedRun\.lottery === lottery/);
+  assert.match(backtests, /function backtestRoundCount\(run: BacktestRun\)/);
+  assert.match(backtests, /Array\.isArray\(run\.rounds\) \? run\.rounds\.length : "—"/);
+  assert.match(backtests, /backtestRoundCount\(result\)/);
   assert.match(backtests, /O job resolveu o ID e o resultado foi lido do backtest persistido/);
   assert.doesNotMatch(backtests, /localStorage\.setItem\("loto-lab:lottery", linkedLottery\)/);
 });

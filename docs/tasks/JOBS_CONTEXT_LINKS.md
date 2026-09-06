@@ -2,7 +2,7 @@
 
 Issue: #64
 
-Status: segunda fatia concluída e pronta para merge após gates finais.
+Status: segunda fatia concluída; contrato de leitura por ID reconciliado com o formato canônico do backtest.
 
 ## Objetivo
 
@@ -27,7 +27,8 @@ A superfície de Testes históricos:
 3. valida que o ID corresponde, o tipo é `backtest`, a loteria é a ativa e o status está concluído;
 4. usa somente o `id` de `job.result` para localizar o artefato persistido em `GET /api/v1/backtest-runs/:id`;
 5. valida novamente ID e loteria do `backtest_run` canônico antes de renderizar;
-6. mostra esse backtest persistido no topo e mantém o catálogo normal abaixo.
+6. deriva a quantidade de concursos de `roundCount` quando presente ou de `rounds.length` no contrato detalhado retornado por ID;
+7. mostra esse backtest persistido no topo e mantém o catálogo normal abaixo.
 
 Se o job não estiver disponível, pertencer a outro tipo/loteria, ainda não estiver concluído ou apontar para um backtest indisponível/incompatível, a tela informa a inconsistência e não fabrica métricas.
 
@@ -40,6 +41,7 @@ Se o job não estiver disponível, pertencer a outro tipo/loteria, ainda não es
 - não existe `jobId` em localStorage;
 - o hint `lottery` só alinha o seletor para a navegação atual e não sobrescreve a preferência persistida;
 - o destino reconstrói o resultado pelas APIs persistidas, não pelo HTML/link nem por uma cópia de métricas na URL;
+- o frontend não assume que a resposta detalhada por ID possui o mesmo shape resumido da listagem;
 - o contrato começa somente por backtest; Laboratório não recebe deep link nesta fatia;
 - resultados incompletos/desconhecidos continuam apresentados como desconhecidos pelos formatters existentes.
 
