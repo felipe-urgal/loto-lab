@@ -64,6 +64,14 @@ export class ResearchHypothesisNotFoundError extends Error {
   }
 }
 
+export class ResearchHypothesisNotOpenError extends Error {
+  readonly code = "RESEARCH_HYPOTHESIS_NOT_OPEN";
+
+  constructor(readonly hypothesisId: number) {
+    super(`Research hypothesis ${hypothesisId} must be open to attach evidence`);
+  }
+}
+
 export class ResearchBacktestEvidenceNotFoundError extends Error {
   readonly code = "BACKTEST_RUN_NOT_FOUND";
 
@@ -108,6 +116,7 @@ export class ResearchHypothesesUseCase {
   ): Promise<ResearchHypothesisBacktestEvidence> {
     const hypothesis = await this.hypotheses.findById(hypothesisId);
     if (!hypothesis) throw new ResearchHypothesisNotFoundError(hypothesisId);
+    if (hypothesis.status !== "open") throw new ResearchHypothesisNotOpenError(hypothesisId);
 
     const backtest = await this.backtests.findById(backtestRunId);
     if (!backtest) throw new ResearchBacktestEvidenceNotFoundError(backtestRunId);
