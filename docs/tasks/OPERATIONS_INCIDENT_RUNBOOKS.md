@@ -2,7 +2,7 @@
 
 Issue: #63
 
-Status: fatia implementada em branch para validação.
+Status: concluída na `main` via #244 em 2026-09-06.
 
 ## Objetivo
 
@@ -27,9 +27,9 @@ Transformar os sinais operacionais já disponíveis em uma sequência curta de d
 - ausência de dado financeiro não é convertida para zero;
 - runbook orienta recuperação e coleta de evidência, não tuning automático.
 
-## Validação esperada
+## Validação
 
-Mudança documental: `npm run check` continua sendo o gate canônico do PR. O auto-review final deve conferir que os runbooks não inventam sinais, comandos destrutivos ou parâmetros que não existam no sistema atual.
+`npm run check` passou no CI do SHA final de #244. O auto-review final confirmou que os runbooks não inventam sinais, comandos destrutivos ou parâmetros inexistentes; `docs/OPERATIONS.md` referencia o runbook canônico.
 
 ## Próximo passo
 
