@@ -231,9 +231,26 @@ A associação usa:
 
 O vínculo aponta diretamente para `backtest_runs`; não copia o resultado para a hipótese nem cria `evidence_id` genérico. Hipótese decidida não recebe nova evidência, e hipótese restrita a uma loteria só aceita backtest compatível.
 
-**A API ainda não expõe mutação de decisão.** Evidência associada cria proveniência, não uma conclusão automática. O próximo contrato da #66 deve manter a decisão humana/auditável separada da interpretação de IA.
+A decisão humana/auditável usa a mesma raiz persistida:
 
-Detalhes de persistência: [`DATABASE.md`](DATABASE.md). Registro da fatia: [`tasks/RESEARCH_HYPOTHESIS_ROOT.md`](tasks/RESEARCH_HYPOTHESIS_ROOT.md).
+```http
+POST /api/v1/research/hypotheses/:id/decision
+```
+
+Body:
+
+```json
+{
+  "decision": "continue-testing",
+  "reason": "justificativa humana auditável"
+}
+```
+
+`decision` aceita `inconclusive`, `rejected`, `continue-testing` e `applied-experimentally`. A hipótese precisa estar `open`, possuir ao menos uma evidência de backtest persistida e receber uma justificativa de 1 a 4000 caracteres. A transição fecha a hipótese uma única vez; uma segunda decisão concorrente não sobrescreve a primeira.
+
+Nenhum ranking, p-value ou texto de IA decide automaticamente. `applied-experimentally` registra uma decisão humana de aplicação experimental e **não** representa comprovação de aumento de probabilidade futura.
+
+Detalhes de persistência: [`DATABASE.md`](DATABASE.md). Registros das fatias: [`tasks/RESEARCH_HYPOTHESIS_ROOT.md`](tasks/RESEARCH_HYPOTHESIS_ROOT.md) e [`tasks/RESEARCH_HYPOTHESIS_DECISION.md`](tasks/RESEARCH_HYPOTHESIS_DECISION.md).
 
 ## IA
 

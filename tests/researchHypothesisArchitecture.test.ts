@@ -6,7 +6,7 @@ async function source(path: string): Promise<string> {
   return readFile(path, "utf8");
 }
 
-test("research hypotheses attach backtest evidence through explicit persisted ownership", async () => {
+test("research hypotheses keep evidence and decisions on explicit persisted ownership", async () => {
   const [rootMigration, evidenceMigration, application, repository, api, routes, server] = await Promise.all([
     source("db/migrations/013_research_hypotheses.sql"),
     source("db/migrations/014_research_backtest_evidence.sql"),
@@ -32,14 +32,23 @@ test("research hypotheses attach backtest evidence through explicit persisted ow
   assert.match(application, /ResearchHypothesisBacktestEvidenceStore/);
   assert.match(application, /ResearchBacktestEvidenceReader/);
   assert.match(application, /ResearchEvidenceLotteryMismatchError/);
+  assert.match(application, /ResearchHypothesisDecisionEvidenceRequiredError/);
   assert.match(application, /hypothesis\.lottery !== null && hypothesis\.lottery !== backtest\.lottery/);
+  assert.match(application, /this\.evidence\.listBacktests\(hypothesisId\)/);
+  assert.match(application, /this\.hypotheses\.decide\(hypothesisId, input\.decision, reason\)/);
+
   assert.match(repository, /INSERT INTO research_hypothesis_backtest_evidence/);
   assert.match(repository, /JOIN backtest_runs/);
+  assert.match(repository, /WHERE id = \$1 AND status = 'open'/);
+  assert.match(repository, /decision_reason = \$3/);
+  assert.match(repository, /decided_at = NOW\(\)/);
 
+  assert.match(api, /const decisionMatch =/);
+  assert.match(api, /\/decision\$/);
+  assert.match(api, /hypotheses\.decide/);
   assert.match(api, /const evidenceMatch =/);
   assert.match(api, /hypotheses\.linkBacktestEvidence/);
   assert.match(api, /hypotheses\.listBacktestEvidence/);
-  assert.doesNotMatch(api, /decide\(|\/decision/);
 
   assert.match(routes, /serveResearchHypotheses/);
   assert.match(server, /new ResearchHypothesesUseCase\(\s*researchHypotheses,\s*researchHypotheses,\s*backtests,/s);

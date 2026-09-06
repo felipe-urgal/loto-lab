@@ -33,6 +33,11 @@ export interface CreateResearchHypothesisCommand {
   lottery?: LotteryId | null;
 }
 
+export interface DecideResearchHypothesisCommand {
+  decision: ResearchHypothesisDecision;
+  reason: string;
+}
+
 export interface ResearchHypothesisListFilter {
   lottery?: LotteryId;
   limit?: number;
@@ -42,6 +47,11 @@ export interface ResearchHypothesisStore {
   create(input: CreateResearchHypothesisCommand): Promise<ResearchHypothesis>;
   findById(id: number): Promise<ResearchHypothesis | undefined>;
   list(filter?: ResearchHypothesisListFilter): Promise<ResearchHypothesis[]>;
+  decide(
+    id: number,
+    decision: ResearchHypothesisDecision,
+    reason: string,
+  ): Promise<ResearchHypothesis | undefined>;
 }
 
 export interface ResearchHypothesisBacktestEvidenceStore {
@@ -68,7 +78,23 @@ export class ResearchHypothesisNotOpenError extends Error {
   readonly code = "RESEARCH_HYPOTHESIS_NOT_OPEN";
 
   constructor(readonly hypothesisId: number) {
-    super(`Research hypothesis ${hypothesisId} must be open to attach evidence`);
+    super(`Research hypothesis ${hypothesisId} must be open for this operation`);
+  }
+}
+
+export class ResearchHypothesisDecisionEvidenceRequiredError extends Error {
+  readonly code = "RESEARCH_HYPOTHESIS_EVIDENCE_REQUIRED";
+
+  constructor(readonly hypothesisId: number) {
+    super(`Research hypothesis ${hypothesisId} requires persisted evidence before a decision`);
+  }
+}
+
+export class ResearchHypothesisDecisionReasonInvalidError extends Error {
+  readonly code = "RESEARCH_HYPOTHESIS_DECISION_REASON_INVALID";
+
+  constructor() {
+    super("Research hypothesis decision reason must contain 1 to 4000 characters");
   }
 }
 
@@ -108,6 +134,32 @@ export class ResearchHypothesesUseCase {
 
   list(filter: ResearchHypothesisListFilter = {}): Promise<ResearchHypothesis[]> {
     return this.hypotheses.list(filter);
+  }
+
+  async decide(
+    hypothesisId: number,
+    input: DecideResearchHypothesisCommand,
+  ): Promise<ResearchHypothesis> {
+    const reason = input.reason.trim();
+    if (reason.length === 0 || reason.length > 4000) {
+      throw new ResearchHypothesisDecisionReasonInvalidError();
+    }
+
+    const hypothesis = await this.hypotheses.findById(hypothesisId);
+    if (!hypothesis) throw new ResearchHypothesisNotFoundError(hypothesisId);
+    if (hypothesis.status !== "open") throw new ResearchHypothesisNotOpenError(hypothesisId);
+
+    const evidence = await this.evidence.listBacktests(hypothesisId);
+    if (evidence.length === 0) {
+      throw new ResearchHypothesisDecisionEvidenceRequiredError(hypothesisId);
+    }
+
+    const decided = await this.hypotheses.decide(hypothesisId, input.decision, reason);
+    if (decided) return decided;
+
+    const current = await this.hypotheses.findById(hypothesisId);
+    if (!current) throw new ResearchHypothesisNotFoundError(hypothesisId);
+    throw new ResearchHypothesisNotOpenError(hypothesisId);
   }
 
   async linkBacktestEvidence(
