@@ -9,24 +9,26 @@ Ele não existe para “adivinhar dezenas”. O objetivo é transformar uma hip�
 ## North Star
 
 ```text
-Hipótese
+Hipótese humana persistida
   ↓
 Regra/estratégia versionada
   ↓
 Experimento reproduzível
   ↓
-Evidência estatística/financeira
+Job auditável
+  ↓
+Evidência estatística/financeira canônica
   ↓
 Validação fora da amostra
   ↓
-Decisão
+Decisão humana auditável
   ↓
 Eventual geração/aposta real
   ↓
 Resultado real auditável
 ```
 
-A #66 rastreia a modelagem explícita dessa cadeia de proveniência. Hoje várias peças já existem, mas ainda não formam uma entidade única de “pesquisa”.
+A #66 modela explicitamente essa cadeia. Hoje a raiz `research_hypotheses` já existe e pode associar um `backtest_run` persistido como primeiro tipo de evidência canônica. A decisão humana ainda não é exposta pela API; isso é intencional para não transformar simples presença de evidência em conclusão automática.
 
 ## Mapa funcional
 
@@ -51,23 +53,13 @@ Camadas:
 2. **esperado** — baseline matemático quando existe modelo válido;
 3. **validado** — diferença medida fora da amostra/sem leakage.
 
-O score operacional atual usa cinco janelas:
+O score operacional usa histórico, ano, mês, últimos 10 e últimos 20 concursos contínuos. `strong`, `balanced` e `cold` são rótulos do modelo, não afirmações de probabilidade futura.
 
-- histórico;
-- ano;
-- mês;
-- últimos 10;
-- últimos 20 concursos contínuos.
-
-`strong`, `balanced` e `cold` são rótulos do modelo, não afirmações de probabilidade futura.
-
-Análises 2.0 cobre Classificação, Estrutura, Dinâmica, Combinações e Validação.
+Análises 2.0 cobre Classificação, Estrutura, Dinâmica, Combinações e Validação. O hotspot `src/analysis/advanced.ts` está sendo decomposto de forma incremental; continuidade/qualidade já possui owner próprio em `src/analysis/continuity.ts`, preservando os contratos caracterizados.
 
 ### Geração
 
 A geração transforma metodologia em jogos auditáveis.
-
-Padrões atuais:
 
 | Loteria | Núcleo operacional |
 | --- | ---: |
@@ -79,9 +71,7 @@ Generator 2.0 separa planejamento, preview e save. Modo diversificado usa seed r
 
 ### Conferência e Meus Jogos
 
-Lotes gerados não equivalem a apostas reais.
-
-A conferência mede resultado oficial. Meus Jogos gerencia lifecycle, comparação e apostas reais sem apagar auditabilidade.
+Lotes gerados não equivalem a apostas reais. A conferência mede resultado oficial. Meus Jogos gerencia lifecycle, comparação e apostas reais sem apagar auditabilidade.
 
 ### Testes históricos
 
@@ -99,15 +89,21 @@ Só depois o resultado alvo é revelado.
 
 ### Strategy Lab
 
-Compara hipóteses sob o mesmo recorte e recursos equivalentes.
+Compara hipóteses sob o mesmo recorte e recursos equivalentes. O benchmark usa controles aleatórios reproduzíveis, correção por múltiplas comparações e guardrails de resolução/amostra.
 
-Famílias atuais incluem:
+### Pesquisa e proveniência
 
-- tamanho do núcleo;
-- modelos de score;
-- regras externas da Mega-Sena.
+`research_hypotheses` responde **qual hipótese humana está sendo investigada?**.
 
-O benchmark usa controles aleatórios reproduzíveis, correção por múltiplas comparações e guardrails de resolução/amostra.
+O primeiro vínculo de evidência usa `research_hypothesis_backtest_evidence` para apontar diretamente a um `backtest_run` canônico. Não existe `evidence_id` genérico nem cópia do resultado para um JSON paralelo.
+
+Guardrails:
+
+- hipótese decidida não recebe evidência nova;
+- hipótese restrita a uma loteria só recebe backtest compatível;
+- ausência/inconclusão de evidência não é preenchida artificialmente;
+- decisão não é inferida pela IA nem pelo simples fato de existir um backtest;
+- próxima vertical da #66 é a decisão humana/auditável sobre evidência já associada.
 
 ### Financeiro
 
@@ -132,11 +128,13 @@ Scheduler/CLI/HTTP compartilham a rotina de sincronização operacional:
 - atualizar agenda/notificações;
 - registrar `operation_runs`.
 
+Observabilidade operacional cobre HTTP, Analysis Jobs, sync, pool PostgreSQL, CAIXA e OpenAI. São sinais para construir baseline; não SLOs finais automáticos.
+
+Produção também possui `npm run prod:resources`, snapshot read-only de CPU/memória de `app` e `postgres` para comparação antes/depois de tuning.
+
 ### IA
 
-A IA recebe snapshot de evidências já calculadas e persiste interpretação auditável.
-
-Ela pode explicar riscos/resultados e sugerir próximos experimentos; não pode fabricar métricas ou jogos.
+A IA recebe snapshot de evidências já calculadas e persiste interpretação auditável. Ela pode explicar riscos/resultados e sugerir próximos experimentos; não fabrica métricas, escolhe dezenas nem decide hipótese.
 
 ## Arquitetura mental do código
 
@@ -144,10 +142,10 @@ Ela pode explicar riscos/resultados e sugerir próximos experimentos; não pode 
 src/
 ├── application/      use cases e portas de aplicação
 ├── analysis/         score, ranking e análise avançada
-├── api/              controllers HTTP, composição e adapters de worker HTTP
+├── api/              controllers HTTP e composition root
 ├── backtest/         simulação histórica
 ├── checker/          conferência
-├── cli/              interfaces de linha de comando
+├── cli/              interfaces e lifecycle de processo
 ├── data/             CAIXA, bootstrap e transformação
 ├── domain/           tipos e invariantes compartilhados
 ├── finance/          preço histórico, prêmios e ROI
@@ -155,27 +153,21 @@ src/
 ├── lab/              experimentos e inferência
 ├── lotteries/        configuração das loterias
 ├── notifications/    regras de notificações
+├── observability/    métricas process-local e logs
 ├── operations/       sincronização operacional
 ├── persistence/      repositories PostgreSQL
+├── realBets/         contratos de apostas reais
 └── ai/               contexto, provider e contratos de IA
 
 web/
-├── shell + feature-loader
-├── runtime.js         boundary compatível durante a migração
+├── *.html / boundaries JS finos
+├── runtime.js
 ├── src/
-│   └── shared/
-│       └── formatters.ts
+│   ├── core/         API, feature loader, lifecycle, contexto principal
+│   ├── features/     owners funcionais das superfícies
+│   └── shared/       escaping, formatters, toast e helpers compartilhados
 ├── design-system.css / ui-foundation.css
-├── Painel
-├── Análises
-├── Gerador
-├── Meus Jogos
-├── Testes históricos
-├── Laboratório
-├── Estratégias
-├── Execuções
-├── Agenda
-└── IA
+└── *-workspace.css + CSS funcional quando necessário
 ```
 
 ## Direção arquitetural backend
@@ -192,17 +184,19 @@ Ports
 PostgreSQL / CAIXA / OpenAI / worker_threads
 ```
 
-Na borda HTTP, concursos, análises, geração, backtests, estratégias, Strategy Lab, operações, apostas reais, status de dados, game batches/comparação, Agenda/notificações, IA interpretativa e Analysis Jobs seguem controllers/use cases injetados com composição concreta em `src/api/server.ts`. `src/api/app.ts` ficou restrito à infraestrutura comum e `src/api/services.ts` preserva apenas exports auxiliares de compatibilidade, sem `LotoLabApiServices` nem repositories concretos.
+A #61 está concluída: controllers de feature HTTP não criam repositories/managers/providers concretos. `src/api/server.ts` é o composition root das features HTTP; `src/cli/apiStart.ts` continua dono de start/recovery/drain do `AnalysisJobManager`, scheduler e runtime lock.
 
-A #61 foi concluída em 2026-09-02: não resta controller de feature HTTP criando repositories, managers ou providers concretos, e `src/api/server.ts` é o composition root das features HTTP. O lifecycle de processo permanece corretamente separado em `src/cli/apiStart.ts`, responsável por start/recovery/drain do `AnalysisJobManager`, scheduler e runtime lock. A decomposição de motores/hotspots pertence à #62 e não deve reabrir a fronteira HTTP sem necessidade comprovada.
+A decomposição de motores/hotspots pertence à #62 e não deve reabrir a fronteira HTTP sem necessidade comprovada.
 
 ## Direção frontend
 
-A linguagem oficial é o **Protótipo 1 — Dark Moderno**.
+A linguagem visual oficial é o **Protótipo 1 — Dark Moderno** e o rollout visual está concluído pela #121.
 
-O rollout visual e sua consolidação estão concluídos pela #121. A #60 agora está em execução arquitetural: #148 estabeleceu `tsconfig.web.json`, typecheck/lint de `web/src`, emissão via `tsc` e `web/src/shared/formatters.ts` como primeiro helper compartilhado, preservando `runtime.js` como boundary para os módulos JavaScript atuais.
+A #60 agora é arquitetural. `web/src` já possui core compartilhado e owners TypeScript para as principais features; boundaries JavaScript migrados permanecem import-only. A evolução continua incremental, decompondo state/lifecycle e módulos grandes por responsabilidade real, sem rewrite de framework.
 
-As próximas fatias da #60 devem expandir `web/src` apenas quando houver ownership claro — API client/errors/escaping/lifecycle/state, primitives e features — e decompor módulos grandes por responsabilidade, sem rewrite de framework. #64 acompanha arquitetura de informação pós-redesign.
+A #64 trata a jornada pós-redesign. O padrão adotado é contexto sem remoção de rotas: Análises, Laboratório, Execuções e Testes históricos se conectam por identidades canônicas/deep links, sem transportar payload opaco ou criar estado paralelo.
+
+Detalhes: [`WEB.md`](WEB.md).
 
 ## Fronteiras que o projeto não deve cruzar
 
@@ -215,8 +209,10 @@ O Loto Lab não deve:
 - esconder resultados negativos;
 - permitir leakage;
 - misturar aposta real com backtest;
-- usar IA para fabricar cálculo;
+- usar IA para fabricar cálculo ou decidir hipótese;
+- duplicar identidade/evidência quando existe owner canônico;
 - alterar migration aplicada retroativamente;
+- otimizar sem baseline comparável;
 - enfraquecer teste/E2E para liberar PR.
 
 ## Como evoluir
