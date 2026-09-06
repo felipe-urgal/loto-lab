@@ -16,9 +16,10 @@ test("Execuções links completed backtests by jobId and keeps lifecycle separat
   assert.doesNotMatch(jobs, /winner=.*href|ranking=.*href|adjustedPValue=.*href/i);
 
   assert.match(backtests, /\/analysis-jobs\/\$\{encodeURIComponent\(String\(linkedJobId\)\)\}/);
-  assert.match(backtests, /job\.kind !== "backtest"/);
-  assert.match(backtests, /job\.lottery !== lottery/);
-  assert.match(backtests, /job\.status !== "completed" && job\.status !== "succeeded"/);
-  assert.match(backtests, /Este resultado foi resolvido pelo job persistido/);
+  assert.match(backtests, /\/backtest-runs\/\$\{encodeURIComponent\(String\(validBacktestRunId\)\)\}/);
+  assert.match(backtests, /linkedJob\.kind === "backtest"/);
+  assert.match(backtests, /linkedJob\.lottery === lottery/);
+  assert.match(backtests, /persistedRun\.lottery === lottery/);
+  assert.match(backtests, /O job resolveu o ID e o resultado foi lido do backtest persistido/);
   assert.doesNotMatch(backtests, /localStorage\.setItem\("loto-lab:lottery", linkedLottery\)/);
 });
