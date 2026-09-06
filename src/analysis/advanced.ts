@@ -5,6 +5,12 @@ import type {
   NumberAnalysis,
   NumberTier,
 } from "../domain/types.js";
+import {
+  buildDataQuality,
+  isConsecutive,
+  latestContinuousSegment,
+  splitContinuousSegments,
+} from "./continuity.js";
 import { calculateFrequency, numberRange } from "./frequency.js";
 import { buildNumberAnalysis, DEFAULT_WEIGHTS } from "./scoring.js";
 
@@ -231,46 +237,6 @@ function evidenceLevel(adjustedPValue: number): EvidenceLevel {
 
 function sortedNumbers(contest: Contest): number[] {
   return [...contest.numbers].sort((a, b) => a - b);
-}
-
-function isConsecutive(previous: Contest | undefined, current: Contest | undefined): boolean {
-  return Boolean(previous && current && current.number === previous.number + 1);
-}
-
-function splitContinuousSegments(contests: Contest[]): Contest[][] {
-  if (contests.length === 0) return [];
-  const segments: Contest[][] = [[contests[0]!]];
-  for (let index = 1; index < contests.length; index += 1) {
-    const contest = contests[index]!;
-    const previous = contests[index - 1]!;
-    if (isConsecutive(previous, contest)) segments.at(-1)!.push(contest);
-    else segments.push([contest]);
-  }
-  return segments;
-}
-
-function latestContinuousSegment(contests: Contest[]): Contest[] {
-  return splitContinuousSegments(contests).at(-1) ?? [];
-}
-
-function buildDataQuality(contests: Contest[]) {
-  const gaps: Array<{ after: number; before: number; missing: number }> = [];
-  let missingContestCount = 0;
-  for (let index = 1; index < contests.length; index += 1) {
-    const previous = contests[index - 1]!;
-    const current = contests[index]!;
-    const missing = Math.max(0, current.number - previous.number - 1);
-    if (missing > 0) {
-      gaps.push({ after: previous.number, before: current.number, missing });
-      missingContestCount += missing;
-    }
-  }
-  return {
-    continuous: gaps.length === 0,
-    missingContestCount,
-    gaps: gaps.slice(-20),
-    latestContinuousContests: latestContinuousSegment(contests).length,
-  };
 }
 
 function longestConsecutiveRun(numbers: number[]): number {
