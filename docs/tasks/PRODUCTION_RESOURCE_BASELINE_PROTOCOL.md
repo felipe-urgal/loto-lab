@@ -2,7 +2,7 @@
 
 Issue: #65
 
-Status: fatia implementada em branch para validação.
+Status: concluída na `main` via #245 em 2026-09-06.
 
 ## Objetivo
 
@@ -28,9 +28,9 @@ Dar um método reproduzível para transformar `npm run prod:resources` em evidê
 - Web Vitals e providers externos usam seus próprios sinais, não inferência a partir de Docker stats;
 - uma série não comparável não é usada como prova de ganho.
 
-## Validação esperada
+## Validação
 
-Mudança documental: `npm run check` continua sendo o gate canônico. O auto-review deve confirmar que nenhum threshold arbitrário foi introduzido e que o protocolo não descreve comandos destrutivos.
+`npm run check` passou no CI do SHA final de #245. O auto-review final confirmou ausência de thresholds arbitrários/comandos destrutivos e `docs/PRODUCTION.md` referencia o protocolo detalhado.
 
 ## Próximo passo
 
