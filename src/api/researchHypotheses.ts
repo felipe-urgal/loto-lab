@@ -2,8 +2,11 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   ResearchBacktestEvidenceNotFoundError,
   ResearchEvidenceLotteryMismatchError,
+  ResearchHypothesisDecisionEvidenceRequiredError,
+  ResearchHypothesisDecisionReasonInvalidError,
   ResearchHypothesisNotFoundError,
   ResearchHypothesisNotOpenError,
+  type ResearchHypothesisDecision,
   type ResearchHypothesesUseCase,
 } from "../application/researchHypotheses.js";
 import type { ApiServerOptions } from "./app.js";
@@ -15,6 +18,13 @@ import {
   sendJson,
   sendNoContent,
 } from "./http.js";
+
+const researchHypothesisDecisions = new Set<ResearchHypothesisDecision>([
+  "inconclusive",
+  "rejected",
+  "continue-testing",
+  "applied-experimentally",
+]);
 
 function requiredString(value: unknown, field: string, maxLength: number): string {
   if (typeof value !== "string") {
@@ -31,6 +41,17 @@ function requiredString(value: unknown, field: string, maxLength: number): strin
   return normalized;
 }
 
+function parseResearchHypothesisDecision(value: unknown): ResearchHypothesisDecision {
+  if (typeof value !== "string" || !researchHypothesisDecisions.has(value as ResearchHypothesisDecision)) {
+    throw new ApiError(
+      400,
+      "INVALID_ARGUMENT",
+      "decision must be one of: inconclusive, rejected, continue-testing, applied-experimentally",
+    );
+  }
+  return value as ResearchHypothesisDecision;
+}
+
 function mapResearchError(error: unknown): ApiError | undefined {
   if (error instanceof ApiError) return error;
   if (error instanceof ResearchHypothesisNotFoundError) {
@@ -39,7 +60,13 @@ function mapResearchError(error: unknown): ApiError | undefined {
   if (error instanceof ResearchBacktestEvidenceNotFoundError) {
     return new ApiError(404, error.code, error.message);
   }
+  if (error instanceof ResearchHypothesisDecisionReasonInvalidError) {
+    return new ApiError(400, error.code, error.message);
+  }
   if (error instanceof ResearchHypothesisNotOpenError) {
+    return new ApiError(409, error.code, error.message);
+  }
+  if (error instanceof ResearchHypothesisDecisionEvidenceRequiredError) {
     return new ApiError(409, error.code, error.message);
   }
   if (error instanceof ResearchEvidenceLotteryMismatchError) {
@@ -88,6 +115,17 @@ export async function serveResearchHypotheses(
         max: 100,
       });
       sendJson(response, 200, { items: await hypotheses.list({ lottery, limit }) }, corsOrigin);
+      return true;
+    }
+
+    const decisionMatch = /^\/api\/v1\/research\/hypotheses\/(\d+)\/decision$/.exec(pathname);
+    if (method === "POST" && decisionMatch) {
+      const hypothesisId = parsePositiveInt(decisionMatch[1], "hypothesisId");
+      const body = await readJsonBody(request);
+      const decision = parseResearchHypothesisDecision(body.decision);
+      const reason = requiredString(body.reason, "reason", 4000);
+      const decided = await hypotheses.decide(hypothesisId, { decision, reason });
+      sendJson(response, 200, decided, corsOrigin);
       return true;
     }
 
