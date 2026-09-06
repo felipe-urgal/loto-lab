@@ -41,4 +41,33 @@ test("research hypothesis persists one idempotent FK-backed backtest evidence re
     hypothesis_id: String(hypothesis.id),
     backtest_run_id: String(backtest.id),
   }]);
+
+  await database.pool.query(
+    `
+      UPDATE research_hypotheses
+      SET status = 'decided',
+          decision = 'inconclusive',
+          decision_reason = 'Amostra ainda insuficiente',
+          decided_at = NOW()
+      WHERE id = $1
+    `,
+    [hypothesis.id],
+  );
+  const laterBacktest = await backtests.save({
+    lottery: "lotofacil",
+    options: { source: "research-evidence-after-decision" },
+    summary: { testedContests: 0, totalGames: 0 },
+    rounds: [],
+  });
+
+  await assert.rejects(
+    database.pool.query(
+      `
+        INSERT INTO research_hypothesis_backtest_evidence (hypothesis_id, backtest_run_id)
+        VALUES ($1, $2)
+      `,
+      [hypothesis.id, laterBacktest.id],
+    ),
+    /must be open to attach evidence/,
+  );
 });
