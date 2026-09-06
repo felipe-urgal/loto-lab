@@ -145,6 +145,28 @@ Isso limita o crescimento local de logs por container sem introduzir uma stack e
 
 `npm run production:contract:verify` valida a presença dessa política para impedir remoção acidental em mudanças futuras do compose.
 
+### Baseline de CPU e memória
+
+Antes de propor limites de container ou elevar concorrência, capture uma amostra somente leitura dos serviços de produção:
+
+```bash
+npm run prod:resources
+```
+
+O comando executa `docker compose stats --no-stream --format json app postgres`: produz um snapshot estruturado de CPU/memória e termina, sem reiniciar, parar ou alterar a stack.
+
+Uma amostra isolada **não** define limite, SLO nem capacidade. Para justificar tuning, registre pelo menos:
+
+- data/hora e release (`LOTO_LAB_IMAGE_TAG`) observada;
+- tipo de carga em andamento (idle, sync, backtest, análise pesada etc.);
+- saída de `prod:resources` antes da mudança;
+- mesma medição sob carga comparável depois da mudança;
+- interpretação explícita do ganho/regressão e margem operacional adotada.
+
+Se as condições não forem comparáveis, trate os valores como observações independentes, não como evidência de melhoria. Limites de CPU/memória continuam fora do Compose até existir baseline suficiente para uma decisão consciente.
+
+`production:contract:verify` protege `prod:resources` como operação read-only, bounded (`--no-stream`) e estruturada (`--format json`). O comando é diagnóstico manual de operação e **não** amplia a interface allowlisted do Dev Dashboard nesta fatia.
+
 ## Operações adicionais
 
 Parar a stack sem remover o volume PostgreSQL:
@@ -218,5 +240,6 @@ Antes de considerar a atualização concluída:
 - `prod:deploy` concluiu com healthchecks verdes;
 - `prod:verify` passou;
 - status/logs não mostram regressão;
+- quando houver tuning de recursos/performance, baseline antes/depois foi registrada sob carga comparável;
 - smoke funcional proporcional ao risco foi executado;
 - plano de recuperação continua conhecido.
