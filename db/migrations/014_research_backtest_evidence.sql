@@ -22,7 +22,8 @@ BEGIN
   SELECT status, lottery
     INTO hypothesis_status, hypothesis_lottery
   FROM research_hypotheses
-  WHERE id = NEW.hypothesis_id;
+  WHERE id = NEW.hypothesis_id
+  FOR SHARE;
 
   IF hypothesis_status IS NULL THEN
     RAISE EXCEPTION 'Unknown research hypothesis %', NEW.hypothesis_id;
