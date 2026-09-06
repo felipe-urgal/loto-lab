@@ -18,6 +18,7 @@ const prodBackup = scripts['prod:backup'];
 const prodDeploy = scripts['prod:deploy'];
 const prodVerify = scripts['prod:verify'];
 const prodRestoreCheck = scripts['prod:restore-check'];
+const prodResources = scripts['prod:resources'];
 
 function extractComposeService(source, serviceName) {
   const lines = source.split(/\r?\n/);
@@ -109,6 +110,8 @@ const expectedProdDeploy =
   'docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build --wait --wait-timeout 120';
 const expectedProdRestoreCheck =
   'node --env-file-if-exists=.env.production scripts/verifyBackup.mjs';
+const expectedProdResources =
+  'docker compose --env-file .env.production -f docker-compose.prod.yml stats --no-stream --format json app postgres';
 
 assert.equal(
   prodConfig,
@@ -136,6 +139,23 @@ assert.equal(
   prodRestoreCheck,
   expectedProdRestoreCheck,
   'prod:restore-check deve ser a operação canônica de validação de restore',
+);
+assert.equal(
+  prodResources,
+  expectedProdResources,
+  'prod:resources deve permanecer uma amostra read-only de CPU/memória via Docker Compose',
+);
+assert.match(prodResources, /\bstats\b/, 'prod:resources deve usar o coletor read-only stats');
+assert.match(prodResources, /(?:^|\s)--no-stream(?:\s|$)/, 'prod:resources não pode abrir stream infinito');
+assert.match(
+  prodResources,
+  /(?:^|\s)--format\s+json(?:\s|$)/,
+  'prod:resources deve emitir formato estruturado para comparação de baseline',
+);
+assert.doesNotMatch(
+  prodResources,
+  /\b(?:up|down|restart|stop|rm|kill)\b/,
+  'prod:resources não pode executar ação mutável sobre a stack',
 );
 assert.equal(scripts['prod:up'], undefined, 'prod:up não deve duplicar prod:deploy');
 assert.equal(scripts['ops:backup'], undefined, 'ops:backup não deve duplicar prod:backup');
@@ -174,5 +194,5 @@ assert.equal(
 );
 
 console.log(
-  'Contrato de produção validado: check usa configuração segura, comandos canônicos não possuem aliases duplicados, deploy aguarda healthchecks, logs possuem retenção bounded, shutdown do container cobre o deadline máximo da aplicação, PostgreSQL fica isolado em rede interna e verify permanece somente leitura.',
+  'Contrato de produção validado: check usa configuração segura, comandos canônicos não possuem aliases duplicados, deploy aguarda healthchecks, logs possuem retenção bounded, shutdown do container cobre o deadline máximo da aplicação, PostgreSQL fica isolado em rede interna, resources oferece snapshot read-only estruturado e verify permanece somente leitura.',
 );

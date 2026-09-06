@@ -46,6 +46,7 @@
     "prod:config:check": "docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet",
     "prod:down": "docker compose --env-file .env.production -f docker-compose.prod.yml down",
     "prod:status": "docker compose --env-file .env.production -f docker-compose.prod.yml ps",
+    "prod:resources": "docker compose --env-file .env.production -f docker-compose.prod.yml stats --no-stream --format json app postgres",
     "prod:check": "npm run prod:config:check && npm run quality:static && npm run build:prod",
     "prod:backup": "node --env-file-if-exists=.env.production scripts/backupPostgres.mjs",
     "prod:deploy": "docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build --wait --wait-timeout 120",
