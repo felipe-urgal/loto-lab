@@ -9,6 +9,7 @@ Documentos especializados:
 - [`DEPLOYMENT.md`](DEPLOYMENT.md): topologia, configuração, exposição de rede e detalhes de deploy;
 - [`RELIABILITY.md`](RELIABILITY.md): backup, restore e hardening operacional;
 - [`PRODUCTION-CONTRACT.md`](PRODUCTION-CONTRACT.md): detalhes do contrato consumido pelo Dev Dashboard;
+- [`PRODUCTION_RESOURCE_BASELINE.md`](PRODUCTION_RESOURCE_BASELINE.md): protocolo para baseline comparável de CPU/memória antes de tuning;
 - [`DATABASE.md`](DATABASE.md): schema, migrations e invariantes de persistência.
 
 ## Fluxo canônico
@@ -164,6 +165,8 @@ Uma amostra isolada **não** define limite, SLO nem capacidade. Para justificar 
 - interpretação explícita do ganho/regressão e margem operacional adotada.
 
 Se as condições não forem comparáveis, trate os valores como observações independentes, não como evidência de melhoria. Limites de CPU/memória continuam fora do Compose até existir baseline suficiente para uma decisão consciente.
+
+O protocolo completo de coleta, comparação e critérios de evidência insuficiente está em [`PRODUCTION_RESOURCE_BASELINE.md`](PRODUCTION_RESOURCE_BASELINE.md).
 
 `production:contract:verify` protege `prod:resources` como operação read-only, bounded (`--no-stream`) e estruturada (`--format json`). O comando é diagnóstico manual de operação e **não** amplia a interface allowlisted do Dev Dashboard nesta fatia.
 
