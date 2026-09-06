@@ -1,8 +1,8 @@
 import { ApiError, api } from "../core/api.js";
+import type { LotteryId } from "../core/mainContext.js";
 import { escapeHtml } from "../shared/escaping.js";
 
 type AgendaFilter = "all" | "unread";
-type LotteryId = "mega-sena" | "lotofacil" | "dia-de-sorte";
 type NotificationSeverity = "info" | "success" | "warning" | "error";
 
 type AgendaItem = {
