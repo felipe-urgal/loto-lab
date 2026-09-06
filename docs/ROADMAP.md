@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline reconciliada em **2026-09-05** sobre `main`, após os merges #222–#231.
+> Baseline reconciliada em **2026-09-06** sobre `main`, após os merges #234–#240.
 >
 > Este documento é a fonte de verdade para **prioridade, dependências e estado atual** das issues estruturais. Detalhes de implementação, decisões históricas e contratos de cada fatia pertencem às próprias issues/PRs e a `docs/tasks/`.
 
@@ -25,7 +25,7 @@ Validação fora da amostra
   ↓
 IA interpreta a evidência
   ↓
-Decisão
+Decisão humana auditável
   ↓
 Eventual geração/aposta real
   ↓
@@ -45,34 +45,32 @@ A diretriz permanece:
 - PostgreSQL é a fonte de verdade operacional, com migrations forward-only, checksum e advisory lock;
 - composition root das features HTTP centralizado em `src/api/server.ts` (#61 concluída);
 - core estatístico, anti-leakage, geração reproduzível, Strategy Lab e financeiro auditável protegidos por testes;
-- frontend em migração TypeScript incremental, sem rewrite e com owners canônicos por feature;
+- frontend em migração TypeScript incremental, com owners canônicos em `web/src` e boundaries JavaScript migrados mantidos como import-only;
 - Protótipo 1 consolidado e arquitetura de informação seguindo o Protótipo A contextual;
-- observabilidade operacional já cobre HTTP, Analysis Jobs, sync, pool PostgreSQL e requests à CAIXA;
-- primeira raiz persistida da jornada científica criada em `research_hypotheses`;
+- observabilidade operacional cobre HTTP, Analysis Jobs, sync, pool PostgreSQL, requests à CAIXA e requests à OpenAI;
+- a jornada científica possui raiz persistida em `research_hypotheses` e primeiro vínculo de evidência canônica para `backtest_runs`;
+- produção possui operação read-only `prod:resources` para capturar baseline de CPU/memória antes de qualquer tuning;
 - CI funcional, Security e E2E continuam como guardrails proporcionais ao risco.
 
-### Entregas recentes #222–#231
+### Entregas recentes #234–#240
 
-- #222 / #60 — guard arquitetural para boundaries JavaScript já migrados: import-only, sem fallback funcional paralelo;
-- #223 / #62 — plano de decomposição segura de `analysis/advanced.ts`, com ordem e critérios de aborto;
-- #224 / #63 — métricas de pressão do pool PostgreSQL no endpoint operacional autenticado;
-- #225 / #64 — próximos passos contextuais em Análises para Laboratório e Gerador, sem estado cruzado;
-- #226 / #66 — contrato mínimo de proveniência e decisão, reaproveitando IDs canônicos existentes;
-- #227 / #60 — contrato compartilhado para identidade/normalização de contexto principal da UI;
-- #228 / #62 — characterization tests de continuidade/qualidade antes da primeira extração de `advanced.ts`;
-- #229 / #64 — Execuções aponta de volta para os owners funcionais que originam os trabalhos, sem novo controller/estado;
-- #230 / #63 — métricas process-local de requests à CAIXA, com cardinalidade fixa e latência bounded;
-- #231 / #66 — migration `013_research_hypotheses.sql`, repository/use case e API autenticada para criar/listar/ler hipóteses abertas.
+- #234 / #60 — Agenda passou a reutilizar o contrato tipado compartilhado de identidade de loteria;
+- #235 / #63 — métricas process-local da OpenAI com outcomes, latência e uso de tokens conhecido, sem conteúdo sensível;
+- #236 / #62 — primeira extração efetiva de `analysis/advanced.ts`: continuidade/qualidade agora possui owner dedicado;
+- #237 / #64 — Execuções pode retornar um backtest concluído por `jobId`, reconstruindo o resultado a partir das fontes persistidas;
+- #238 / #66 — hipótese pode associar `backtest_run` como evidência canônica por FK explícita e invariantes de lifecycle/loteria;
+- #239 / #64 — contrato de leitura detalhada de backtest por ID foi reconciliado para não fabricar a contagem de rounds;
+- #240 / #65 — `prod:resources` adicionou snapshot bounded/read-only de CPU e memória para `app` e `postgres`.
 
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
-- frontend ainda possui state/lifecycle imperativo e módulos grandes em superfícies legadas/restantes (#60);
-- `analysis/advanced.ts` ainda é hotspot; agora existe plano + characterization para decompor sem mudar metodologia (#62);
-- observabilidade ainda não cobre OpenAI e ainda não há baseline observada suficiente para fixar SLOs/runbooks finais (#63);
-- jornada contextual ainda precisa de retorno operacional por `jobId` e proveniência útil entre superfícies (#64);
-- otimizações operacionais/performance continuam dependentes de medição antes/depois (#65);
-- hipótese persistida existe, mas ainda falta ligar evidência canônica antes de permitir decisão auditável (#66).
+- frontend ainda possui state/lifecycle imperativo e módulos grandes nas superfícies restantes (#60);
+- `analysis/advanced.ts` continua hotspot, embora continuidade/qualidade já tenha sido extraída (#62);
+- métricas operacionais existem, mas ainda falta baseline observada suficiente para transformar sinais em poucos SLOs e runbooks (#63);
+- a jornada contextual ainda pode reduzir troca de contexto em Laboratório/proveniência/IA, desde que sem criar estado duplicado (#64);
+- performance continua dependente de medições comparáveis antes/depois; `prod:resources` é ferramenta de baseline, não autorização para tuning (#65);
+- hipótese + evidência de backtest existem, mas a API ainda não expõe a decisão humana/auditável (#66).
 
 ---
 
@@ -80,7 +78,7 @@ A diretriz permanece:
 
 ## #52 — Governança de `main` · P0 · bloqueada
 
-Revalidado em **2026-09-05**: `main.protected = false` e não há required status checks aplicados pela proteção de branch.
+Revalidado em **2026-09-06**: `main.protected = false` e não há required status checks aplicados pela proteção de branch.
 
 **Próxima ação:** configuração administrativa no GitHub para exigir PR + `CI / test`, bloquear force-push/exclusão e então revalidar.
 
@@ -88,17 +86,18 @@ Esta tarefa não precisa de PR de código.
 
 ## #60 — Frontend TypeScript, módulos e primitives · P1 · em andamento
 
-A fundação TypeScript e os principais owners funcionais já estão consolidados. As fatias mais recentes adicionaram dois guardrails importantes:
+A fundação TypeScript e os principais owners funcionais já estão consolidados. Guardrails recentes incluem:
 
 - #222 protege boundaries JavaScript migrados contra reintrodução de implementação/fallback paralelo;
-- #227 centraliza identidade e normalização do contexto principal, mantendo shell/lifecycle no mesmo contrato tipado.
+- #227 centraliza identidade e normalização do contexto principal;
+- #234 fez a Agenda consumir o mesmo contrato de identidade de loteria sem duplicar a union local.
 
 **Próximas fatias:**
 
 - reduzir state/lifecycle imperativo nas superfícies restantes;
 - decompor módulos grandes por responsabilidade real;
-- mover ownership para `web/src/{core,features,shared}` somente quando houver contrato concreto;
-- manter boundaries JS finos durante a migração;
+- expandir `web/src/{core,features,shared}` somente quando houver contrato concreto;
+- manter boundaries JS finos/import-only durante a migração;
 - continuar usando escaping/`textContent`, cleanup explícito e lifecycle compartilhado.
 
 Não reabrir redesign visual nem iniciar rewrite/framework sem evidência.
@@ -111,16 +110,17 @@ Entregue até aqui:
 - #212 — snapshot persistido da saúde de Analysis Jobs;
 - #217 — snapshot operacional de sync com estados/duração;
 - #224 — métricas de pressão do pool PostgreSQL;
-- #230 — requests/sucessos/erros/timeouts e latência da CAIXA, sem labels de alta cardinalidade.
+- #230 — requests/sucessos/erros/timeouts e latência da CAIXA;
+- #235 — requests/sucessos/erros/timeouts, latência e uso de tokens conhecido da OpenAI.
 
 Todos os sinais ficam atrás do endpoint operacional autenticado e nenhum é tratado como SLO final sem baseline observada.
 
 **Próximas fatias:**
 
-- instrumentar OpenAI sem prompt, conteúdo ou credencial em métricas/logs;
-- observar baseline real dos sinais existentes;
-- definir poucos SLOs úteis para HTTP, sync, jobs e dependências;
-- escrever runbooks baseados em falhas reais/observáveis.
+- observar baseline real de HTTP, jobs, sync, PostgreSQL, CAIXA e OpenAI;
+- definir poucos SLOs úteis para HTTP, sync e jobs a partir dos dados observados;
+- escrever runbooks curtos para falhas reais/observáveis;
+- só então decidir timeout/retry/backoff ou tuning relacionado aos providers.
 
 Não introduzir tracing distribuído ou tuning de pool/timeouts sem necessidade medida.
 
@@ -136,11 +136,12 @@ A dependência arquitetural da #61 está concluída. Também já existem:
 - #208 — reporting/séries do Strategy Lab extraídos;
 - #213 — constraints estruturais do gerador extraídas;
 - #223 — plano explícito de decomposição de `analysis/advanced.ts`;
-- #228 — characterization de continuidade/qualidade, incluindo gaps e left-censoring.
+- #228 — characterization de continuidade/qualidade, incluindo gaps e left-censoring;
+- #236 — continuidade/qualidade extraída para `src/analysis/continuity.ts` com equivalência preservada.
 
-**Próxima fatia de código:** extrair primeiro o owner de **continuidade/qualidade de dados**, preservando exatamente os contratos caracterizados em #228.
+**Próxima fatia de código:** seguir a ordem do plano com **estatística/combinatória compartilhada**, em PR independente e sem mudança metodológica.
 
-Depois, seguir a ordem planejada: estatística/combinatória compartilhada → estrutura → associações → dinâmica/ciclos → validação rolling → similaridade/composição final.
+Depois, quando houver seam coesa: estrutura → associações → dinâmica/ciclos → validação rolling → similaridade/composição final.
 
 Qualquer mudança metodológica deve ser separada do refactor e possuir issue/PR próprios.
 
@@ -153,48 +154,55 @@ Entregue:
 - #210 — decisão e mapa da jornada `Entender → Experimentar → Aplicar → Acompanhar → Operar`;
 - #220 — Laboratório → Testes históricos;
 - #225 — Análises → Laboratório/Gerador;
-- #229 — Execuções → owners funcionais de origem.
+- #229 — Execuções → owners funcionais de origem;
+- #237 — retorno de backtest concluído por `jobId`, reconstruído a partir de `analysis_jobs` + `backtest_runs`;
+- #239 — reconciliação do shape detalhado do backtest por ID sem fabricar `roundCount`.
 
-Esses links reutilizam rotas/owners existentes e não carregam estado implícito, prefill ou recomendação automática.
+Esses links reutilizam rotas/owners existentes e não carregam payload de resultado, prefill opaco ou recomendação automática.
 
 **Próximas fatias:**
 
-- `jobId` como retorno operacional com contrato único e deep link seguro;
-- proveniência útil entre experimento/evidência quando o dado já existir;
-- integração contextual da IA somente após existir evidência canônica suficiente;
+- avaliar retorno contextual do Laboratório somente quando houver identidade persistida suficiente;
+- integrar proveniência experimento/evidência com #66 quando isso reduzir troca de contexto;
+- integrar IA a evidências/resultados apenas sem esconder metodologia nem criar estado paralelo;
 - revisar agrupamento global da navegação apenas com evidência de uso.
 
 ## #66 — Hipótese → experimento → evidência → decisão · P2 · em andamento
 
-O desenho mínimo foi fechado em #226 e a primeira vertical persistida entrou em #231.
+O desenho mínimo foi fechado em #226, a raiz persistida entrou em #231 e a primeira evidência canônica em #238.
 
 Estado atual:
 
 - `research_hypotheses` fornece ID estável, título, descrição, loteria opcional, lifecycle e campos de decisão protegidos por constraints;
 - API autenticada permite criar/listar/ler hipóteses abertas;
-- nenhuma identidade paralela foi criada para backtest, job, preview, batch, aposta ou AI insight;
-- a API **não permite decidir** uma hipótese ainda, porque decisão sem evidência associada produziria proveniência incompleta.
+- `research_hypothesis_backtest_evidence` associa diretamente `backtest_runs`, sem `evidence_id` genérico nem cópia de payload;
+- use case e PostgreSQL validam lifecycle e compatibilidade de loteria, inclusive contra associação concorrente após decisão;
+- a API **ainda não permite decidir** uma hipótese.
 
-**Próxima fatia:** associar **um único tipo de evidência persistida existente** à hipótese com FK explícita e validação de compatibilidade. Somente depois disso expor mutação de decisão humana/auditável.
+**Próxima fatia:** definir e implementar o contrato de decisão humana/auditável usando evidência já associada e justificativa explícita.
 
-A IA continua apenas interpretando evidências calculadas; não cria cálculo crítico nem decide probabilidade futura.
+A decisão deve distinguir ausência de evidência, evidência inconclusiva/desfavorável, continuação de teste e aplicação experimental. A IA continua apenas interpretando evidências calculadas; não decide probabilidade futura.
 
----
+## #65 — Runtime/Docker/performance baseada em evidência · P2 · em andamento
 
-# Later / P2
+Guardrails já entregues incluem retenção bounded de logs, grace period coerente com shutdown, separação de rede interna/egress e profiling PostgreSQL.
 
-## #65 — Runtime/Docker/performance baseada em evidência
+#240 adicionou:
 
-Guardrails já entregues incluem retenção bounded de logs, grace period coerente com shutdown e separação de rede interna/egress.
+```bash
+npm run prod:resources
+```
 
-Restam decisões que exigem baseline antes/depois:
+O comando captura um snapshot estruturado e somente leitura de CPU/memória de `app` e `postgres`. Uma amostra isolada não define limite, capacidade nem SLO.
 
+Próximas decisões continuam exigindo baseline antes/depois:
+
+- coletar `prod:resources` sob cargas comparáveis antes de considerar limites de CPU/memória;
 - Web Vitals/LCP/INP/CLS em ambiente representativo;
-- limites CPU/memória;
-- cache de análise;
-- índices PostgreSQL após profiling;
+- cache/revisão da análise avançada apenas com gargalo medido;
+- índices PostgreSQL somente após profiling;
 - concorrência de workers após medir heap/tempo;
-- ajustes de resiliência CAIXA a partir dos sinais agora disponíveis na #63.
+- ajustes de resiliência CAIXA/OpenAI a partir das baselines da #63.
 
 ---
 
@@ -217,13 +225,13 @@ A conclusão da #61 não inclui decomposição matemática da #62 e não deve se
   ↓
 #64 jornada/contexto
 
-#63 observabilidade → baseline → SLO/runbooks
-
-#62 advanced.ts: continuidade/qualidade primeiro
+#63 observar baseline → SLOs/runbooks
   ↓
-#66 hipótese + evidência + decisão
+#65 tuning somente quando a medição justificar
 
-#65 avança somente quando houver medição suficiente
+#62 advanced.ts: estatística/combinatória
+
+#66 decisão humana sobre hipótese/evidência
 ```
 
 Trabalhos independentes podem avançar em paralelo quando não compartilham owners/risco.
