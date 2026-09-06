@@ -20,6 +20,13 @@ export interface ResearchHypothesis {
   updatedAt: string;
 }
 
+export interface ResearchHypothesisBacktestEvidence {
+  hypothesisId: number;
+  backtestRunId: number;
+  lottery: LotteryId;
+  createdAt: string;
+}
+
 export interface CreateResearchHypothesisCommand {
   title: string;
   description: string;
@@ -37,8 +44,59 @@ export interface ResearchHypothesisStore {
   list(filter?: ResearchHypothesisListFilter): Promise<ResearchHypothesis[]>;
 }
 
+export interface ResearchHypothesisBacktestEvidenceStore {
+  linkBacktest(
+    hypothesisId: number,
+    backtestRunId: number,
+  ): Promise<ResearchHypothesisBacktestEvidence>;
+  listBacktests(hypothesisId: number): Promise<ResearchHypothesisBacktestEvidence[]>;
+}
+
+export interface ResearchBacktestEvidenceReader {
+  findById(id: number): Promise<{ id: number; lottery: LotteryId } | undefined>;
+}
+
+export class ResearchHypothesisNotFoundError extends Error {
+  readonly code = "RESEARCH_HYPOTHESIS_NOT_FOUND";
+
+  constructor(readonly hypothesisId: number) {
+    super(`Research hypothesis ${hypothesisId} was not found`);
+  }
+}
+
+export class ResearchHypothesisNotOpenError extends Error {
+  readonly code = "RESEARCH_HYPOTHESIS_NOT_OPEN";
+
+  constructor(readonly hypothesisId: number) {
+    super(`Research hypothesis ${hypothesisId} must be open to attach evidence`);
+  }
+}
+
+export class ResearchBacktestEvidenceNotFoundError extends Error {
+  readonly code = "BACKTEST_RUN_NOT_FOUND";
+
+  constructor(readonly backtestRunId: number) {
+    super(`Backtest run ${backtestRunId} was not found`);
+  }
+}
+
+export class ResearchEvidenceLotteryMismatchError extends Error {
+  readonly code = "RESEARCH_EVIDENCE_LOTTERY_MISMATCH";
+
+  constructor(
+    readonly hypothesisLottery: LotteryId,
+    readonly backtestLottery: LotteryId,
+  ) {
+    super(`Research hypothesis belongs to ${hypothesisLottery}, but backtest belongs to ${backtestLottery}`);
+  }
+}
+
 export class ResearchHypothesesUseCase {
-  constructor(private readonly hypotheses: ResearchHypothesisStore) {}
+  constructor(
+    private readonly hypotheses: ResearchHypothesisStore,
+    private readonly evidence: ResearchHypothesisBacktestEvidenceStore,
+    private readonly backtests: ResearchBacktestEvidenceReader,
+  ) {}
 
   create(input: CreateResearchHypothesisCommand): Promise<ResearchHypothesis> {
     return this.hypotheses.create(input);
@@ -50,5 +108,29 @@ export class ResearchHypothesesUseCase {
 
   list(filter: ResearchHypothesisListFilter = {}): Promise<ResearchHypothesis[]> {
     return this.hypotheses.list(filter);
+  }
+
+  async linkBacktestEvidence(
+    hypothesisId: number,
+    backtestRunId: number,
+  ): Promise<ResearchHypothesisBacktestEvidence> {
+    const hypothesis = await this.hypotheses.findById(hypothesisId);
+    if (!hypothesis) throw new ResearchHypothesisNotFoundError(hypothesisId);
+    if (hypothesis.status !== "open") throw new ResearchHypothesisNotOpenError(hypothesisId);
+
+    const backtest = await this.backtests.findById(backtestRunId);
+    if (!backtest) throw new ResearchBacktestEvidenceNotFoundError(backtestRunId);
+
+    if (hypothesis.lottery !== null && hypothesis.lottery !== backtest.lottery) {
+      throw new ResearchEvidenceLotteryMismatchError(hypothesis.lottery, backtest.lottery);
+    }
+
+    return this.evidence.linkBacktest(hypothesisId, backtestRunId);
+  }
+
+  async listBacktestEvidence(hypothesisId: number): Promise<ResearchHypothesisBacktestEvidence[]> {
+    const hypothesis = await this.hypotheses.findById(hypothesisId);
+    if (!hypothesis) throw new ResearchHypothesisNotFoundError(hypothesisId);
+    return this.evidence.listBacktests(hypothesisId);
   }
 }

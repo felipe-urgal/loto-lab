@@ -1,5 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { ResearchHypothesesUseCase } from "../application/researchHypotheses.js";
+import {
+  ResearchBacktestEvidenceNotFoundError,
+  ResearchEvidenceLotteryMismatchError,
+  ResearchHypothesisNotFoundError,
+  ResearchHypothesisNotOpenError,
+  type ResearchHypothesesUseCase,
+} from "../application/researchHypotheses.js";
 import type { ApiServerOptions } from "./app.js";
 import {
   ApiError,
@@ -23,6 +29,23 @@ function requiredString(value: unknown, field: string, maxLength: number): strin
     );
   }
   return normalized;
+}
+
+function mapResearchError(error: unknown): ApiError | undefined {
+  if (error instanceof ApiError) return error;
+  if (error instanceof ResearchHypothesisNotFoundError) {
+    return new ApiError(404, error.code, error.message);
+  }
+  if (error instanceof ResearchBacktestEvidenceNotFoundError) {
+    return new ApiError(404, error.code, error.message);
+  }
+  if (error instanceof ResearchHypothesisNotOpenError) {
+    return new ApiError(409, error.code, error.message);
+  }
+  if (error instanceof ResearchEvidenceLotteryMismatchError) {
+    return new ApiError(409, error.code, error.message);
+  }
+  return undefined;
 }
 
 export async function serveResearchHypotheses(
@@ -68,6 +91,27 @@ export async function serveResearchHypotheses(
       return true;
     }
 
+    const evidenceMatch = /^\/api\/v1\/research\/hypotheses\/(\d+)\/evidence\/backtests$/.exec(pathname);
+    if (evidenceMatch) {
+      const hypothesisId = parsePositiveInt(evidenceMatch[1], "hypothesisId");
+      if (method === "POST") {
+        const body = await readJsonBody(request);
+        const backtestRunId = parsePositiveInt(body.backtestRunId, "backtestRunId");
+        const evidence = await hypotheses.linkBacktestEvidence(hypothesisId, backtestRunId);
+        sendJson(response, 201, evidence, corsOrigin);
+        return true;
+      }
+      if (method === "GET") {
+        sendJson(
+          response,
+          200,
+          { items: await hypotheses.listBacktestEvidence(hypothesisId) },
+          corsOrigin,
+        );
+        return true;
+      }
+    }
+
     const itemMatch = /^\/api\/v1\/research\/hypotheses\/(\d+)$/.exec(pathname);
     if (method === "GET" && itemMatch) {
       const id = parsePositiveInt(itemMatch[1], "hypothesisId");
@@ -81,11 +125,12 @@ export async function serveResearchHypotheses(
 
     throw new ApiError(404, "ROUTE_NOT_FOUND", `${method} ${pathname} was not found`);
   } catch (error) {
-    if (error instanceof ApiError) {
+    const mapped = mapResearchError(error);
+    if (mapped) {
       sendJson(
         response,
-        error.statusCode,
-        { error: { code: error.code, message: error.message } },
+        mapped.statusCode,
+        { error: { code: mapped.code, message: mapped.message } },
         corsOrigin,
       );
       return true;

@@ -144,7 +144,11 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
       new RealBetService(options.pool),
       new PostgresRealBetRepository(options.pool),
     ),
-    researchHypotheses: new ResearchHypothesesUseCase(researchHypotheses),
+    researchHypotheses: new ResearchHypothesesUseCase(
+      researchHypotheses,
+      researchHypotheses,
+      backtests,
+    ),
     strategyCatalog: new StrategyCatalogUseCase(strategies),
     runStrategyLab: new RunStrategyLabUseCase(
       contests,
