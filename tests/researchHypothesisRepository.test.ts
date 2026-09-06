@@ -38,3 +38,38 @@ test("research hypotheses persist an auditable root without synthetic evidence I
     /research_hypotheses_decision_state_check/,
   );
 });
+
+test("research hypothesis decision atomically closes an open root once", async (t) => {
+  const database = await createIsolatedPostgresDatabase({ label: "research_hypothesis_decision" });
+  t.after(async () => database.close());
+  const repository = new PostgresResearchHypothesisRepository(database.pool);
+
+  const hypothesis = await repository.create({
+    title: "Hipótese com decisão humana",
+    description: "A decisão deve ser persistida no mesmo owner da hipótese.",
+    lottery: "mega-sena",
+  });
+
+  const decided = await repository.decide(
+    hypothesis.id,
+    "applied-experimentally",
+    "Evidência suficiente para experimento controlado, sem promoção automática.",
+  );
+
+  assert.equal(decided?.status, "decided");
+  assert.equal(decided?.decision, "applied-experimentally");
+  assert.equal(
+    decided?.decisionReason,
+    "Evidência suficiente para experimento controlado, sem promoção automática.",
+  );
+  assert.ok(decided?.decidedAt);
+  assert.equal((await repository.findById(hypothesis.id))?.decision, "applied-experimentally");
+
+  const secondDecision = await repository.decide(
+    hypothesis.id,
+    "rejected",
+    "Esta segunda decisão não pode sobrescrever a primeira.",
+  );
+  assert.equal(secondDecision, undefined);
+  assert.equal((await repository.findById(hypothesis.id))?.decision, "applied-experimentally");
+});
