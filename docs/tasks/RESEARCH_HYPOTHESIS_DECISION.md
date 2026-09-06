@@ -2,6 +2,8 @@
 
 Issue: #66
 
+Status: concluída na `main` via #246 em 2026-09-06.
+
 ## Objetivo
 
 Completar a fatia C do contrato de proveniência sem criar novo owner de evidência ou migration especulativa.
@@ -68,6 +70,8 @@ A fatia cobre:
 - corrida entre duas decisões;
 - persistência atômica e impossibilidade de sobrescrever a primeira decisão;
 - ownership arquitetural da rota, use case e SQL.
+
+`npm run check` passou no CI do SHA final de #246 e o auto-review final foi repetido depois da correção de `docs/API.md`.
 
 ## Próximo passo
 

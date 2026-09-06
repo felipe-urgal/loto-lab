@@ -2,7 +2,7 @@
 
 Issue: #60
 
-Status: fatia implementada em branch para validação.
+Status: concluída na `main` via #242 em 2026-09-06.
 
 ## Objetivo
 
@@ -24,9 +24,9 @@ Reduzir a responsabilidade de `web/src/features/jobs.ts` sem alterar a jornada d
 - métricas/resultados continuam escapados antes da interpolação em HTML;
 - apresentação não ganha acesso a API, `document`, `window` ou storage.
 
-## Testes
+## Validação
 
-`tests/jobsContextLinks.test.ts` continua protegendo a navegação contextual da #64 no owner correto. `tests/jobsPresentationOwnership.test.ts` protege a separação entre lifecycle e apresentação e impede a reintrodução da union local de loteria.
+`tests/jobsContextLinks.test.ts` continua protegendo a navegação contextual da #64 no owner correto. `tests/jobsPresentationOwnership.test.ts` protege a separação entre lifecycle e apresentação e impede a reintrodução da union local de loteria. `npm run check` passou no CI do SHA final de #242 e o auto-review não encontrou achado bloqueante.
 
 ## Próximo passo
 

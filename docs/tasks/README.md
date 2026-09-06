@@ -11,7 +11,8 @@ Registros relevantes:
 - [`WEB_TYPED_BOUNDARY_CONTRACT.md`](WEB_TYPED_BOUNDARY_CONTRACT.md) — boundaries JavaScript migrados permanecem import-only;
 - [`MAIN_CONTEXT_CONTRACT.md`](MAIN_CONTEXT_CONTRACT.md) — identidade/normalização compartilhada do contexto principal;
 - [`APP_SHARED_PRIMITIVES.md`](APP_SHARED_PRIMITIVES.md) — primitives compartilhadas já consolidadas;
-- [`AGENDA_MAIN_CONTEXT.md`](AGENDA_MAIN_CONTEXT.md) — Agenda reutiliza o contrato compartilhado de loteria; concluído em #234.
+- [`AGENDA_MAIN_CONTEXT.md`](AGENDA_MAIN_CONTEXT.md) — Agenda reutiliza o contrato compartilhado de loteria; concluído em #234;
+- [`JOBS_PRESENTATION_OWNER.md`](JOBS_PRESENTATION_OWNER.md) — apresentação de Execuções separada do lifecycle; concluído em #242.
 
 Próximo foco: reduzir state/lifecycle imperativo e decompor módulos grandes restantes por responsabilidade real.
 
@@ -21,9 +22,10 @@ Registros relevantes:
 
 - [`ADVANCED_ANALYSIS_DECOMPOSITION_PLAN.md`](ADVANCED_ANALYSIS_DECOMPOSITION_PLAN.md) — ordem segura de extração de `analysis/advanced.ts`;
 - [`ADVANCED_CONTINUITY_CHARACTERIZATION.md`](ADVANCED_CONTINUITY_CHARACTERIZATION.md) — contratos de gaps, continuidade e left-censoring;
-- [`ADVANCED_CONTINUITY_OWNER.md`](ADVANCED_CONTINUITY_OWNER.md) — owner de continuidade/qualidade extraído em #236.
+- [`ADVANCED_CONTINUITY_OWNER.md`](ADVANCED_CONTINUITY_OWNER.md) — owner de continuidade/qualidade extraído em #236;
+- `src/analysis/statistics.ts` — owner de estatística/combinatória extraído em #243 com reexports públicos preservados.
 
-Próximo foco: estatística/combinatória compartilhada, preservando equivalência metodológica.
+Próximo foco: avaliar a seam de estrutura/filtros metodológicos apenas se houver characterization suficiente para provar equivalência sem mudança metodológica.
 
 ## #63 — Observabilidade operacional
 
@@ -33,9 +35,10 @@ Registros relevantes:
 - [`ANALYSIS_JOB_OBSERVABILITY.md`](ANALYSIS_JOB_OBSERVABILITY.md) — saúde persistida da fila;
 - [`POSTGRES_POOL_METRICS.md`](POSTGRES_POOL_METRICS.md) — pressão do pool PostgreSQL;
 - [`CAIXA_REQUEST_METRICS.md`](CAIXA_REQUEST_METRICS.md) — requests/latência/erros/timeouts da CAIXA;
-- [`OPENAI_REQUEST_METRICS.md`](OPENAI_REQUEST_METRICS.md) — requests/latência/erros/timeouts e uso conhecido da OpenAI; concluído em #235.
+- [`OPENAI_REQUEST_METRICS.md`](OPENAI_REQUEST_METRICS.md) — requests/latência/erros/timeouts e uso conhecido da OpenAI; concluído em #235;
+- [`OPERATIONS_INCIDENT_RUNBOOKS.md`](OPERATIONS_INCIDENT_RUNBOOKS.md) — runbooks operacionais derivados dos sinais existentes; concluído em #244.
 
-Próximo foco: observar baseline real, definir poucos SLOs úteis e escrever runbooks derivados dos sinais existentes.
+Próximo foco: observar baseline real e definir poucos SLOs úteis antes de qualquer tuning de timeout/retry/backoff/pool/concorrência.
 
 ## #64 — Jornada e contexto pós-redesign
 
@@ -48,14 +51,23 @@ Registros relevantes:
 
 Próximo foco: avaliar retorno contextual do Laboratório e proveniência/IA somente quando existir identidade persistida suficiente, sem estado duplicado.
 
+## #65 — Produção e performance baseada em evidência
+
+Registros relevantes:
+
+- [`PRODUCTION_RESOURCE_BASELINE_PROTOCOL.md`](PRODUCTION_RESOURCE_BASELINE_PROTOCOL.md) — protocolo reproduzível para transformar `prod:resources` em evidência comparável; concluído em #245.
+
+Próximo foco: coletar séries reais sob workloads comparáveis. Limites, índices, concorrência e timeouts continuam dependendo de baseline antes/depois.
+
 ## #66 — Proveniência científica
 
 Registros relevantes:
 
 - [`RESEARCH_PROVENANCE_CONTRACT.md`](RESEARCH_PROVENANCE_CONTRACT.md) — identidade mínima e guardrails de proveniência/decisão;
-- [`RESEARCH_HYPOTHESIS_ROOT.md`](RESEARCH_HYPOTHESIS_ROOT.md) — raiz persistida em #231 e primeira evidência canônica (`backtest_run`) em #238.
+- [`RESEARCH_HYPOTHESIS_ROOT.md`](RESEARCH_HYPOTHESIS_ROOT.md) — raiz persistida em #231 e primeira evidência canônica (`backtest_run`) em #238;
+- [`RESEARCH_HYPOTHESIS_DECISION.md`](RESEARCH_HYPOTHESIS_DECISION.md) — decisão humana/auditável com evidência obrigatória e concorrência protegida; concluído em #246.
 
-Próximo foco: contrato de decisão humana/auditável usando evidência já associada, sem criar owner paralelo.
+Próximo foco: conectar eventual aplicação/resultado real usando IDs canônicos já existentes, sem owner genérico de experimento/evidência.
 
 ## Histórico concluído fora das epics acima
 
