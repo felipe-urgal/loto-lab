@@ -329,9 +329,14 @@ function renderJobMeta(job: AnalysisJob): string {
 }
 
 function ownerAction(job: AnalysisJob): string {
-  return job.kind === "backtest"
-    ? '<a class="button compact" href="/#backtests">Abrir Testes históricos</a>'
-    : '<a class="button compact" href="/lab">Abrir Laboratório</a>';
+  if (job.kind !== "backtest") {
+    return '<a class="button compact" href="/lab">Abrir Laboratório</a>';
+  }
+  const completed = (job.status === "completed" || job.status === "succeeded") && job.result;
+  const href = completed
+    ? `/?jobId=${encodeURIComponent(String(job.id))}&lottery=${encodeURIComponent(job.lottery)}#backtests`
+    : "/#backtests";
+  return `<a class="button compact" href="${href}">Abrir Testes históricos</a>`;
 }
 
 function renderJobCard(job: AnalysisJob): string {
