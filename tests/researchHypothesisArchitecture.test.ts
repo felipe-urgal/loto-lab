@@ -35,7 +35,7 @@ test("research hypotheses attach backtest evidence through explicit persisted ow
   assert.match(repository, /INSERT INTO research_hypothesis_backtest_evidence/);
   assert.match(repository, /JOIN backtest_runs/);
 
-  assert.match(api, /\/evidence\/backtests/);
+  assert.match(api, /const evidenceMatch =/);
   assert.match(api, /hypotheses\.linkBacktestEvidence/);
   assert.match(api, /hypotheses\.listBacktestEvidence/);
   assert.doesNotMatch(api, /decide\(|\/decision/);
