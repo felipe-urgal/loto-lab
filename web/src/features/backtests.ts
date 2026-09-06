@@ -17,7 +17,8 @@ type BacktestSummary = {
 type BacktestRun = {
   id?: number | string | null;
   lottery?: LotteryId;
-  roundCount: number;
+  roundCount?: number;
+  rounds?: unknown[];
   createdAt?: string | null;
   summary?: BacktestSummary | null;
 };
@@ -123,11 +124,18 @@ function emptyState(title: string, copy: string): string {
   return `<div class="empty-state"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(copy)}</p></div>`;
 }
 
+function backtestRoundCount(run: BacktestRun): number | string {
+  if (typeof run.roundCount === "number" && Number.isSafeInteger(run.roundCount) && run.roundCount >= 0) {
+    return run.roundCount;
+  }
+  return Array.isArray(run.rounds) ? run.rounds.length : "—";
+}
+
 function backtestRow(run: BacktestRun): string {
   const summary = run.summary ?? {};
   const roi = summary.roi;
   const id = run.id ?? "—";
-  return `<div class="list-row"><div class="list-row-main"><strong>Teste histórico #${escapeHtml(id)}</strong><p>${escapeHtml(run.roundCount)} concurso(s) · ${escapeHtml(summary.totalGames ?? "—")} jogo(s) · ${escapeHtml(formatDateTime(run.createdAt))}</p></div><div class="list-row-value"><strong class="${typeof roi === "number" && roi >= 0 ? "positive" : ""}">${escapeHtml(formatPercent(roi))}</strong><small>ROI · cobertura ${escapeHtml(formatPercent(summary.financialCoverage))}</small></div></div>`;
+  return `<div class="list-row"><div class="list-row-main"><strong>Teste histórico #${escapeHtml(id)}</strong><p>${escapeHtml(backtestRoundCount(run))} concurso(s) · ${escapeHtml(summary.totalGames ?? "—")} jogo(s) · ${escapeHtml(formatDateTime(run.createdAt))}</p></div><div class="list-row-value"><strong class="${typeof roi === "number" && roi >= 0 ? "positive" : ""}">${escapeHtml(formatPercent(roi))}</strong><small>ROI · cobertura ${escapeHtml(formatPercent(summary.financialCoverage))}</small></div></div>`;
 }
 
 function linkedJobSection(jobId: number | undefined, job: AnalysisJob | null, lottery: LotteryId): string {
@@ -152,7 +160,7 @@ function linkedJobSection(jobId: number | undefined, job: AnalysisJob | null, lo
   const summary = result.summary ?? {};
   const roi = summary.roi;
   const resultId = result.id ? ` · teste #${escapeHtml(result.id)}` : "";
-  return `<section id="linked-backtest-result"><div class="section-head"><div><h2>Retorno da execução #${escapeHtml(jobId)}${resultId}</h2><p>${escapeHtml(result.roundCount)} concurso(s) simulados. O job resolveu o ID e o resultado foi lido do backtest persistido.</p></div><a class="button compact" href="/jobs?lottery=${encodeURIComponent(lottery)}">Abrir Execuções</a></div><div class="grid cols-4">${metric("ROI", formatPercent(roi), "resultado sobre o custo coberto", typeof roi === "number" ? (roi >= 0 ? "positive" : "negative") : "")}${metric("Custo", formatCurrency(summary.financialCost), "custo com rateio disponível")}${metric("Prêmios", formatCurrency(summary.totalPrizeValue), "retorno bruto conhecido")}${metric("Cobertura", formatPercent(summary.financialCoverage), `${summary.totalGames ?? "—"} jogos simulados`)}</div></section>`;
+  return `<section id="linked-backtest-result"><div class="section-head"><div><h2>Retorno da execução #${escapeHtml(jobId)}${resultId}</h2><p>${escapeHtml(backtestRoundCount(result))} concurso(s) simulados. O job resolveu o ID e o resultado foi lido do backtest persistido.</p></div><a class="button compact" href="/jobs?lottery=${encodeURIComponent(lottery)}">Abrir Execuções</a></div><div class="grid cols-4">${metric("ROI", formatPercent(roi), "resultado sobre o custo coberto", typeof roi === "number" ? (roi >= 0 ? "positive" : "negative") : "")}${metric("Custo", formatCurrency(summary.financialCost), "custo com rateio disponível")}${metric("Prêmios", formatCurrency(summary.totalPrizeValue), "retorno bruto conhecido")}${metric("Cobertura", formatPercent(summary.financialCoverage), `${summary.totalGames ?? "—"} jogos simulados`)}</div></section>`;
 }
 
 function defaultStartContest(endContest: number | undefined): number | undefined {
@@ -231,7 +239,7 @@ async function handleBacktest(event: SubmitEvent, lottery: LotteryId): Promise<v
     const summary = result.summary ?? {};
     const roi = summary.roi;
     const resultId = result.id ? ` · #${escapeHtml(result.id)}` : "";
-    output.innerHTML = `<div class="section-head"><div><h2>Resultado${resultId}</h2><p>${escapeHtml(result.roundCount)} concurso(s) simulados.</p></div></div><div class="grid cols-4">${metric("ROI", formatPercent(roi), "resultado sobre o custo coberto", typeof roi === "number" ? (roi >= 0 ? "positive" : "negative") : "")}${metric("Custo", formatCurrency(summary.financialCost), "custo com rateio disponível")}${metric("Prêmios", formatCurrency(summary.totalPrizeValue), "retorno bruto conhecido")}${metric("Cobertura", formatPercent(summary.financialCoverage), `${summary.totalGames ?? "—"} jogos simulados`)}</div>`;
+    output.innerHTML = `<div class="section-head"><div><h2>Resultado${resultId}</h2><p>${escapeHtml(backtestRoundCount(result))} concurso(s) simulados.</p></div></div><div class="grid cols-4">${metric("ROI", formatPercent(roi), "resultado sobre o custo coberto", typeof roi === "number" ? (roi >= 0 ? "positive" : "negative") : "")}${metric("Custo", formatCurrency(summary.financialCost), "custo com rateio disponível")}${metric("Prêmios", formatCurrency(summary.totalPrizeValue), "retorno bruto conhecido")}${metric("Cobertura", formatPercent(summary.financialCoverage), `${summary.totalGames ?? "—"} jogos simulados`)}</div>`;
     toast("Teste histórico concluído.");
   } catch (error) {
     if (controller.signal.aborted || isAbort(error) || !output.isConnected) return;
