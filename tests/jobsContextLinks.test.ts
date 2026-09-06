@@ -3,17 +3,20 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 
 test("Execuções links completed backtests by jobId and keeps lifecycle separate", async () => {
-  const [jobs, backtests] = await Promise.all([
+  const [jobs, presentation, backtests] = await Promise.all([
     readFile("web/src/features/jobs.ts", "utf8"),
+    readFile("web/src/features/jobs/presentation.ts", "utf8"),
     readFile("web/src/features/backtests.ts", "utf8"),
   ]);
 
-  assert.match(jobs, /job\.status === "completed" \|\| job\.status === "succeeded"/);
-  assert.match(jobs, /jobId=\$\{encodeURIComponent\(String\(job\.id\)\)\}/);
-  assert.match(jobs, /href="\/lab">Abrir Laboratório<\/a>/);
-  assert.match(jobs, /: "\/#backtests"/);
+  assert.match(jobs, /from "\.\/jobs\/presentation\.js"/);
+  assert.match(presentation, /job\.status === "completed" \|\| job\.status === "succeeded"/);
+  assert.match(presentation, /jobId=\$\{encodeURIComponent\(String\(job\.id\)\)\}/);
+  assert.match(presentation, /href="\/lab">Abrir Laboratório<\/a>/);
+  assert.match(presentation, /: "\/#backtests"/);
   assert.doesNotMatch(jobs, /localStorage\.setItem\([^)]*job/i);
-  assert.doesNotMatch(jobs, /winner=.*href|ranking=.*href|adjustedPValue=.*href/i);
+  assert.doesNotMatch(presentation, /localStorage|sessionStorage/i);
+  assert.doesNotMatch(presentation, /winner=.*href|ranking=.*href|adjustedPValue=.*href/i);
 
   assert.match(backtests, /\/analysis-jobs\/\$\{encodeURIComponent\(String\(linkedJobId\)\)\}/);
   assert.match(backtests, /\/backtest-runs\/\$\{encodeURIComponent\(String\(validBacktestRunId\)\)\}/);

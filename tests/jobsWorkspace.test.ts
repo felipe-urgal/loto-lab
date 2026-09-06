@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 
 test("jobs workspace follows Prototype 1 while preserving queue contracts", async () => {
-  const [html, workspace, boundary, jobs] = await Promise.all([
+  const [html, workspace, boundary, jobs, presentation] = await Promise.all([
     readFile("web/jobs.html", "utf8"),
     readFile("web/jobs-workspace.css", "utf8"),
     readFile("web/jobs.js", "utf8"),
     readFile("web/src/features/jobs.ts", "utf8"),
+    readFile("web/src/features/jobs/presentation.ts", "utf8"),
   ]);
 
   assert.match(html, /\/assets\/jobs-workspace\.css/);
@@ -32,9 +33,11 @@ test("jobs workspace follows Prototype 1 while preserving queue contracts", asyn
   assert.equal(boundary.trim(), 'import "./src/features/jobs.js";');
   assert.ok(jobs.includes('from "../core/api.js"'));
   assert.ok(jobs.includes('from "../shared/escaping.js"'));
-  assert.ok(jobs.includes('from "../shared/formatters.js"'));
+  assert.ok(presentation.includes('from "../../shared/escaping.js"'));
+  assert.ok(presentation.includes('from "../../shared/formatters.js"'));
   assert.ok(jobs.includes('from "../shared/toast.js"'));
   assert.ok(!jobs.includes("runtime.js"));
+  assert.ok(!presentation.includes("runtime.js"));
 
   assert.ok(jobs.includes('api<AnalysisJob>("/analysis-jobs", {'));
   assert.ok(jobs.includes('method: "POST"'));
@@ -47,4 +50,5 @@ test("jobs workspace follows Prototype 1 while preserving queue contracts", asyn
   assert.ok(jobs.includes("token !== loadToken || lottery.value !== requestedLottery"));
   assert.ok(jobs.includes("await Promise.all([loadStrategies(), loadJobs()])"));
   assert.ok(jobs.includes("requiredPayload("));
+  assert.ok(presentation.includes("renderJobCard"));
 });
