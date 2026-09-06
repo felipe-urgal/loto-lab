@@ -4,6 +4,8 @@ A manutenção diária da base é tratada como uma operação única, auditável
 
 O objetivo não é apenas buscar o concurso mais recente: a rotina também repara lacunas, atualiza agenda, revisita rateios relevantes e reconcilia apostas reais sem criar caminhos paralelos de atualização.
 
+Para diagnóstico e contenção de incidentes usando os sinais descritos neste contrato, consulte [`OPERATIONS_RUNBOOKS.md`](OPERATIONS_RUNBOOKS.md).
+
 ## O que acontece em uma sincronização operacional
 
 Para cada loteria (`mega-sena`, `lotofacil`, `dia-de-sorte`), o Loto Lab:
