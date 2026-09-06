@@ -16,6 +16,7 @@ type BacktestSummary = {
 
 type BacktestRun = {
   id?: number | string | null;
+  lottery?: LotteryId;
   roundCount: number;
   createdAt?: string | null;
   summary?: BacktestSummary | null;
@@ -140,15 +141,18 @@ function linkedJobSection(jobId: number | undefined, job: AnalysisJob | null, lo
   if (job.lottery !== lottery) {
     return `<section><div class="panel error-state"><span class="error-code">JOB_LOTTERY_MISMATCH</span><strong>Execução de outra loteria</strong><p>A execução #${escapeHtml(jobId)} pertence a ${escapeHtml(LOTTERY_LABELS[job.lottery])}.</p></div></section>`;
   }
-  if ((job.status !== "completed" && job.status !== "succeeded") || !job.result) {
+  if (job.status !== "completed" && job.status !== "succeeded") {
     return `<section><div class="panel error-state"><span class="error-code">JOB_NOT_COMPLETED</span><strong>Resultado ainda não disponível</strong><p>A execução #${escapeHtml(jobId)} está com status ${escapeHtml(job.status)}. Acompanhe o lifecycle em Execuções.</p></div></section>`;
+  }
+  if (!job.result) {
+    return `<section><div class="panel error-state"><span class="error-code">BACKTEST_NOT_AVAILABLE</span><strong>Backtest persistido indisponível</strong><p>A execução #${escapeHtml(jobId)} foi concluída, mas o artefato canônico não pôde ser recuperado. O histórico abaixo continua disponível.</p></div></section>`;
   }
 
   const result = job.result;
   const summary = result.summary ?? {};
   const roi = summary.roi;
   const resultId = result.id ? ` · teste #${escapeHtml(result.id)}` : "";
-  return `<section id="linked-backtest-result"><div class="section-head"><div><h2>Retorno da execução #${escapeHtml(jobId)}${resultId}</h2><p>${escapeHtml(result.roundCount)} concurso(s) simulados. Este resultado foi resolvido pelo job persistido.</p></div><a class="button compact" href="/jobs?lottery=${encodeURIComponent(lottery)}">Abrir Execuções</a></div><div class="grid cols-4">${metric("ROI", formatPercent(roi), "resultado sobre o custo coberto", typeof roi === "number" ? (roi >= 0 ? "positive" : "negative") : "")}${metric("Custo", formatCurrency(summary.financialCost), "custo com rateio disponível")}${metric("Prêmios", formatCurrency(summary.totalPrizeValue), "retorno bruto conhecido")}${metric("Cobertura", formatPercent(summary.financialCoverage), `${summary.totalGames ?? "—"} jogos simulados`)}</div></section>`;
+  return `<section id="linked-backtest-result"><div class="section-head"><div><h2>Retorno da execução #${escapeHtml(jobId)}${resultId}</h2><p>${escapeHtml(result.roundCount)} concurso(s) simulados. O job resolveu o ID e o resultado foi lido do backtest persistido.</p></div><a class="button compact" href="/jobs?lottery=${encodeURIComponent(lottery)}">Abrir Execuções</a></div><div class="grid cols-4">${metric("ROI", formatPercent(roi), "resultado sobre o custo coberto", typeof roi === "number" ? (roi >= 0 ? "positive" : "negative") : "")}${metric("Custo", formatCurrency(summary.financialCost), "custo com rateio disponível")}${metric("Prêmios", formatCurrency(summary.totalPrizeValue), "retorno bruto conhecido")}${metric("Cobertura", formatPercent(summary.financialCoverage), `${summary.totalGames ?? "—"} jogos simulados`)}</div></section>`;
 }
 
 function defaultStartContest(endContest: number | undefined): number | undefined {
@@ -260,8 +264,38 @@ async function renderBacktests(): Promise<void> {
         ? Promise.resolve(null)
         : optionalApi<AnalysisJob>(`/analysis-jobs/${encodeURIComponent(String(linkedJobId))}`, controller.signal),
     ]);
+
+    let resolvedLinkedJob = linkedJob;
+    if (
+      linkedJobId !== undefined
+      && linkedJob
+      && linkedJob.id === linkedJobId
+      && linkedJob.kind === "backtest"
+      && linkedJob.lottery === lottery
+      && (linkedJob.status === "completed" || linkedJob.status === "succeeded")
+    ) {
+      const backtestRunId = Number(linkedJob.result?.id);
+      const validBacktestRunId = Number.isSafeInteger(backtestRunId) && backtestRunId > 0
+        ? backtestRunId
+        : undefined;
+      const persistedRun = validBacktestRunId === undefined
+        ? null
+        : await optionalApi<BacktestRun>(
+            `/backtest-runs/${encodeURIComponent(String(validBacktestRunId))}`,
+            controller.signal,
+          );
+      resolvedLinkedJob = {
+        ...linkedJob,
+        result: persistedRun
+          && Number(persistedRun.id) === validBacktestRunId
+          && persistedRun.lottery === lottery
+          ? persistedRun
+          : undefined,
+      };
+    }
+
     if (!isCurrentRender(sequence, lottery, controller.signal)) return;
-    renderWorkspace(lottery, catalog?.items ?? [], latest, linkedJob);
+    renderWorkspace(lottery, catalog?.items ?? [], latest, resolvedLinkedJob);
   } catch (error) {
     if (controller.signal.aborted || isAbort(error) || !isCurrentRender(sequence, lottery, controller.signal)) return;
     const details = errorDetails(error);
