@@ -74,7 +74,6 @@ if (
   && lotterySelect
 ) {
   lotterySelect.value = linkedLottery;
-  localStorage.setItem("loto-lab:lottery", linkedLottery);
 }
 
 let activeController: AbortController | null = null;
