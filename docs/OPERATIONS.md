@@ -135,11 +135,17 @@ O endpoint autenticado agrega sinais de cardinalidade fixa do processo atual e d
 - `postgres.waitingRequests`;
 - `caixa.requests`, `caixa.successes`, `caixa.errors` e `caixa.timeouts`;
 - `caixa.errorRate` e `caixa.timeoutRate`;
-- `caixa.latencyMs.samples/p50/p95/p99` para as chamadas HTTP realmente feitas pelo `CaixaContestSource`.
+- `caixa.latencyMs.samples/p50/p95/p99` para as chamadas HTTP realmente feitas pelo `CaixaContestSource`;
+- `openai.requests`, `openai.successes`, `openai.errors` e `openai.timeouts`;
+- `openai.errorRate` e `openai.timeoutRate`;
+- `openai.latencyMs.samples/p50/p95/p99`;
+- `openai.usage.samples/inputTokens/outputTokens/totalTokens` quando a resposta do provider contém os três contadores de uso.
 
 As contagens do PostgreSQL são lidas diretamente do `pg.Pool` já usado pela aplicação. Elas não carregam SQL, query, loteria, request ID ou outro identificador como label e não criam uma segunda fonte de verdade. Nesta etapa não existe threshold de saturação nem SLO derivado desses números: a baseline deve ser observada antes de qualquer tuning de tamanho do pool, timeout, índice ou concorrência.
 
 As métricas da CAIXA também são process-local e de cardinalidade fixa. Elas medem o boundary de requisição externa — incluindo parse da resposta HTTP — sem expor loteria, concurso, URL livre, payload ou identificadores. `timeout` fica separado de outros erros para permitir construir uma baseline antes de decidir backoff, jitter, timeout ou SLO. Nenhum desses parâmetros é alterado nesta fatia.
+
+As métricas da OpenAI seguem o mesmo princípio: medem o boundary do provider sem armazenar prompt, evidência, texto de resposta, credencial, loteria, request ID ou provider response ID. Uso de tokens só é agregado quando `input_tokens`, `output_tokens` e `total_tokens` estão todos presentes; caso contrário o snapshot mantém uso desconhecido em vez de fabricar totais. A instrumentação não altera modelo, timeout, retry, schema de resposta ou conteúdo enviado ao provider.
 
 ### Estado operacional
 

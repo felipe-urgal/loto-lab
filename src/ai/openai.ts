@@ -1,3 +1,4 @@
+import { recordOpenAiRequest } from "../observability/openAiMetrics.js";
 import { AiInterpretationError } from "./types.js";
 import type {
   AiInsightContent,
@@ -145,6 +146,7 @@ export class OpenAiInterpretationProvider implements AiInterpretationProvider {
       throw new OpenAiProviderError("AI_NOT_CONFIGURED", "OPENAI_API_KEY is not configured");
     }
 
+    const startedAt = performance.now();
     let response: Response;
     try {
       response = await this.fetchImpl(OPENAI_RESPONSES_URL, {
@@ -174,7 +176,9 @@ export class OpenAiInterpretationProvider implements AiInterpretationProvider {
         signal: AbortSignal.timeout(this.timeoutMs),
       });
     } catch (error) {
-      if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      const timeout = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+      recordOpenAiRequest(timeout ? "timeout" : "error", performance.now() - startedAt);
+      if (timeout) {
         throw new OpenAiProviderError("AI_PROVIDER_TIMEOUT", "OpenAI request timed out", 504);
       }
       throw new OpenAiProviderError(
@@ -186,6 +190,7 @@ export class OpenAiInterpretationProvider implements AiInterpretationProvider {
 
     const payload = (await response.json().catch(() => ({}))) as OpenAiResponse;
     if (!response.ok) {
+      recordOpenAiRequest("error", performance.now() - startedAt);
       throw new OpenAiProviderError(
         payload.error?.code ?? "AI_PROVIDER_ERROR",
         payload.error?.message ?? `OpenAI request failed with HTTP ${response.status}`,
@@ -194,12 +199,24 @@ export class OpenAiInterpretationProvider implements AiInterpretationProvider {
     }
 
     const text = extractText(payload);
-    if (!text) throw new OpenAiProviderError("AI_EMPTY_RESPONSE", "OpenAI returned no text output");
+    if (!text) {
+      recordOpenAiRequest("error", performance.now() - startedAt);
+      throw new OpenAiProviderError("AI_EMPTY_RESPONSE", "OpenAI returned no text output");
+    }
 
+    let insight: AiInsightContent;
+    try {
+      insight = parseInsight(text);
+    } catch (error) {
+      recordOpenAiRequest("error", performance.now() - startedAt);
+      throw error;
+    }
+
+    recordOpenAiRequest("success", performance.now() - startedAt, payload.usage);
     return {
       model: payload.model ?? this.modelName,
       ...(payload.id ? { providerResponseId: payload.id } : {}),
-      insight: parseInsight(text),
+      insight,
       ...(payload.usage ? { usage: payload.usage } : {}),
     };
   }
