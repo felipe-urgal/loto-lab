@@ -36,6 +36,7 @@ function stores(current: ResearchHypothesis | undefined) {
     create: async () => current ?? hypothesis(null),
     findById: async () => current,
     list: async () => current ? [current] : [],
+    decide: async () => current,
   };
   const evidence: ResearchHypothesisBacktestEvidenceStore = {
     linkBacktest: async (hypothesisId, backtestRunId) => {
