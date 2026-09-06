@@ -25,6 +25,14 @@ type BacktestListResponse = {
   items?: BacktestRun[];
 };
 
+type AnalysisJob = {
+  id: number;
+  kind: "backtest" | "strategy-lab";
+  lottery: LotteryId;
+  status: string;
+  result?: BacktestRun;
+};
+
 type ContestSummary = {
   number: number;
 };
@@ -53,6 +61,22 @@ const LOTTERY_LABELS: Record<LotteryId, string> = {
 
 const content = document.querySelector<HTMLElement>("#content");
 const lotterySelect = document.querySelector<HTMLSelectElement>("#lottery-select");
+const query = new URLSearchParams(location.search);
+const rawLinkedJobId = Number(query.get("jobId"));
+const linkedJobId = Number.isSafeInteger(rawLinkedJobId) && rawLinkedJobId > 0
+  ? rawLinkedJobId
+  : undefined;
+const linkedLottery = query.get("lottery");
+if (
+  linkedJobId !== undefined
+  && linkedLottery !== null
+  && linkedLottery in DEFAULT_GAMES
+  && lotterySelect
+) {
+  lotterySelect.value = linkedLottery;
+  localStorage.setItem("loto-lab:lottery", linkedLottery);
+}
+
 let activeController: AbortController | null = null;
 let renderSequence = 0;
 
@@ -106,12 +130,39 @@ function backtestRow(run: BacktestRun): string {
   return `<div class="list-row"><div class="list-row-main"><strong>Teste histórico #${escapeHtml(id)}</strong><p>${escapeHtml(run.roundCount)} concurso(s) · ${escapeHtml(summary.totalGames ?? "—")} jogo(s) · ${escapeHtml(formatDateTime(run.createdAt))}</p></div><div class="list-row-value"><strong class="${typeof roi === "number" && roi >= 0 ? "positive" : ""}">${escapeHtml(formatPercent(roi))}</strong><small>ROI · cobertura ${escapeHtml(formatPercent(summary.financialCoverage))}</small></div></div>`;
 }
 
+function linkedJobSection(jobId: number | undefined, job: AnalysisJob | null, lottery: LotteryId): string {
+  if (jobId === undefined) return "";
+  if (!job) {
+    return `<section><div class="panel error-state"><span class="error-code">JOB_NOT_AVAILABLE</span><strong>Execução #${escapeHtml(jobId)} indisponível</strong><p>Não foi possível recuperar o contexto dessa execução. O histórico abaixo continua disponível.</p></div></section>`;
+  }
+  if (job.id !== jobId || job.kind !== "backtest") {
+    return `<section><div class="panel error-state"><span class="error-code">JOB_CONTEXT_MISMATCH</span><strong>Execução incompatível</strong><p>O identificador informado não representa um teste histórico.</p></div></section>`;
+  }
+  if (job.lottery !== lottery) {
+    return `<section><div class="panel error-state"><span class="error-code">JOB_LOTTERY_MISMATCH</span><strong>Execução de outra loteria</strong><p>A execução #${escapeHtml(jobId)} pertence a ${escapeHtml(LOTTERY_LABELS[job.lottery])}.</p></div></section>`;
+  }
+  if ((job.status !== "completed" && job.status !== "succeeded") || !job.result) {
+    return `<section><div class="panel error-state"><span class="error-code">JOB_NOT_COMPLETED</span><strong>Resultado ainda não disponível</strong><p>A execução #${escapeHtml(jobId)} está com status ${escapeHtml(job.status)}. Acompanhe o lifecycle em Execuções.</p></div></section>`;
+  }
+
+  const result = job.result;
+  const summary = result.summary ?? {};
+  const roi = summary.roi;
+  const resultId = result.id ? ` · teste #${escapeHtml(result.id)}` : "";
+  return `<section id="linked-backtest-result"><div class="section-head"><div><h2>Retorno da execução #${escapeHtml(jobId)}${resultId}</h2><p>${escapeHtml(result.roundCount)} concurso(s) simulados. Este resultado foi resolvido pelo job persistido.</p></div><a class="button compact" href="/jobs?lottery=${encodeURIComponent(lottery)}">Abrir Execuções</a></div><div class="grid cols-4">${metric("ROI", formatPercent(roi), "resultado sobre o custo coberto", typeof roi === "number" ? (roi >= 0 ? "positive" : "negative") : "")}${metric("Custo", formatCurrency(summary.financialCost), "custo com rateio disponível")}${metric("Prêmios", formatCurrency(summary.totalPrizeValue), "retorno bruto conhecido")}${metric("Cobertura", formatPercent(summary.financialCoverage), `${summary.totalGames ?? "—"} jogos simulados`)}</div></section>`;
+}
+
 function defaultStartContest(endContest: number | undefined): number | undefined {
   if (!Number.isInteger(endContest) || !endContest || endContest < 1) return undefined;
   return Math.max(1, endContest - 99);
 }
 
-function renderWorkspace(lottery: LotteryId, runs: BacktestRun[], latest: ContestSummary | null): void {
+function renderWorkspace(
+  lottery: LotteryId,
+  runs: BacktestRun[],
+  latest: ContestSummary | null,
+  linkedJob: AnalysisJob | null,
+): void {
   if (!content) return;
   const endContest = Number.isInteger(latest?.number) ? latest?.number : undefined;
   const startContest = defaultStartContest(endContest);
@@ -120,6 +171,7 @@ function renderWorkspace(lottery: LotteryId, runs: BacktestRun[], latest: Contes
     : "";
 
   content.innerHTML = `<div class="stack">
+    ${linkedJobSection(linkedJobId, linkedJob, lottery)}
     <section><div class="section-head"><div><h2>Executar teste histórico</h2><p>Cada concurso é simulado usando somente o histórico disponível antes dele.</p></div></div><form class="panel form-panel" id="backtest-form" data-ui-refined="true"><div class="form-grid">
       <div class="field"><label for="bt-games">Jogos por concurso</label><input id="bt-games" name="gameCount" type="number" min="1" max="10" value="${DEFAULT_GAMES[lottery]}" /></div>
       <div class="field"><label for="bt-warmup">Aquecimento</label><input id="bt-warmup" name="warmupContests" type="number" min="1" max="500" value="20" /></div>
@@ -202,12 +254,15 @@ async function renderBacktests(): Promise<void> {
   activeController = controller;
 
   try {
-    const [catalog, latest] = await Promise.all([
+    const [catalog, latest, linkedJob] = await Promise.all([
       api<BacktestListResponse>(`/backtests/${lottery}?limit=20`, { signal: controller.signal }),
       optionalApi<ContestSummary>(`/contests/${lottery}/latest`, controller.signal),
+      linkedJobId === undefined
+        ? Promise.resolve(null)
+        : optionalApi<AnalysisJob>(`/analysis-jobs/${encodeURIComponent(String(linkedJobId))}`, controller.signal),
     ]);
     if (!isCurrentRender(sequence, lottery, controller.signal)) return;
-    renderWorkspace(lottery, catalog?.items ?? [], latest);
+    renderWorkspace(lottery, catalog?.items ?? [], latest, linkedJob);
   } catch (error) {
     if (controller.signal.aborted || isAbort(error) || !isCurrentRender(sequence, lottery, controller.signal)) return;
     const details = errorDetails(error);
