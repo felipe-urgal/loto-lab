@@ -4,6 +4,7 @@ import {
   ResearchBacktestEvidenceNotFoundError,
   ResearchEvidenceLotteryMismatchError,
   ResearchHypothesisNotFoundError,
+  ResearchHypothesisNotOpenError,
   ResearchHypothesesUseCase,
   type ResearchHypothesis,
   type ResearchHypothesisBacktestEvidence,
@@ -11,16 +12,19 @@ import {
   type ResearchHypothesisStore,
 } from "../src/application/researchHypotheses.js";
 
-function hypothesis(lottery: ResearchHypothesis["lottery"]): ResearchHypothesis {
+function hypothesis(
+  lottery: ResearchHypothesis["lottery"],
+  status: ResearchHypothesis["status"] = "open",
+): ResearchHypothesis {
   return {
     id: 7,
     title: "Hipótese",
     description: "Descrição auditável",
     lottery,
-    status: "open",
-    decision: null,
-    decisionReason: null,
-    decidedAt: null,
+    status,
+    decision: status === "decided" ? "inconclusive" : null,
+    decisionReason: status === "decided" ? "Evidência insuficiente" : null,
+    decidedAt: status === "decided" ? "2026-09-06T12:30:00.000Z" : null,
     createdAt: "2026-09-06T12:00:00.000Z",
     updatedAt: "2026-09-06T12:00:00.000Z",
   };
@@ -59,6 +63,28 @@ test("research evidence links a compatible persisted backtest", async () => {
   const result = await useCase.linkBacktestEvidence(7, 11);
   assert.equal(result.backtestRunId, 11);
   assert.deepEqual(setup.linked, [[7, 11]]);
+});
+
+test("research evidence rejects a decided hypothesis before loading or persisting evidence", async () => {
+  const setup = stores(hypothesis("lotofacil", "decided"));
+  let backtestRead = false;
+  const useCase = new ResearchHypothesesUseCase(
+    setup.hypotheses,
+    setup.evidence,
+    {
+      findById: async () => {
+        backtestRead = true;
+        return { id: 11, lottery: "lotofacil" };
+      },
+    },
+  );
+
+  await assert.rejects(
+    () => useCase.linkBacktestEvidence(7, 11),
+    ResearchHypothesisNotOpenError,
+  );
+  assert.equal(backtestRead, false);
+  assert.deepEqual(setup.linked, []);
 });
 
 test("research evidence rejects a backtest from another lottery before persistence", async () => {
