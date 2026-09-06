@@ -35,14 +35,18 @@ O banco garante que uma hipótese `open` não possua decisão e que uma hipótes
 
 Não existe `evidence_id`, discriminator genérico ou cópia JSON do resultado. O backtest continua pertencendo ao seu owner canônico.
 
-## Compatibilidade
+## Compatibilidade e lifecycle
 
 Antes de persistir, `ResearchHypothesesUseCase` carrega a hipótese e o backtest canônico.
 
+- somente hipótese `open` aceita nova evidência;
+- hipótese `decided` preserva os vínculos já existentes, mas não pode receber artefatos depois da decisão;
 - hipótese com loteria específica só aceita backtest da mesma loteria;
 - hipótese com `lottery = null` permanece transversal e pode receber um backtest persistido de qualquer loteria;
-- hipótese inexistente, backtest inexistente e incompatibilidade de loteria têm erros distintos;
+- hipótese inexistente, hipótese já decidida, backtest inexistente e incompatibilidade de loteria têm erros distintos;
 - a validação ocorre antes do insert da relação.
+
+A migration `014` repete os invariantes críticos no PostgreSQL por trigger, evitando que SQL direto associe evidência depois da decisão ou atravesse loterias incompatíveis.
 
 ## API
 
@@ -66,7 +70,8 @@ A mutação de decisão **continua não exposta**. Ter um artefato associado cri
 - `decision = null` continua significando ausência de decisão;
 - IA não cria, associa nem decide hipótese;
 - nenhuma mudança em score, geração, anti-leakage ou cálculo estatístico;
-- reenvio do mesmo vínculo não cria uma segunda evidência.
+- reenvio do mesmo vínculo não cria uma segunda evidência;
+- decisão congela a entrada de novas evidências sem apagar a trilha já associada.
 
 ## Próxima fatia
 
