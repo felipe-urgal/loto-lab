@@ -2,15 +2,15 @@
 
 Issue: #66
 
-Status: primeira fatia vertical de persistência implementada.
+Status: segunda fatia vertical implementada em branch para validação.
 
 ## Objetivo
 
-Criar a identidade ausente da jornada de pesquisa sem inventar IDs paralelos para experimento, evidência, aplicação ou interpretação.
+Criar uma trilha auditável de hipótese → evidência sem inventar IDs paralelos para experimento, evidência, aplicação ou interpretação.
 
-A raiz responde apenas à pergunta: **qual hipótese humana está sendo investigada?**
+A raiz `research_hypotheses` continua respondendo à pergunta **qual hipótese humana está sendo investigada?**. A segunda fatia associa o primeiro artefato canônico: um `backtest_run` persistido.
 
-## Persistência
+## Persistência da raiz
 
 `research_hypotheses` possui:
 
@@ -24,25 +24,50 @@ A raiz responde apenas à pergunta: **qual hipótese humana está sendo investig
 
 O banco garante que uma hipótese `open` não possua decisão e que uma hipótese `decided` só exista com decisão, justificativa não vazia e `decided_at`.
 
-## API desta fatia
+## Evidência de backtest
 
-A API autenticada expõe somente:
+`research_hypothesis_backtest_evidence` relaciona diretamente:
 
-- `POST /api/v1/research/hypotheses` — cria hipótese aberta;
-- `GET /api/v1/research/hypotheses` — lista, com filtro opcional de loteria e limite;
-- `GET /api/v1/research/hypotheses/:id` — lê uma hipótese.
+- `hypothesis_id` → FK para `research_hypotheses` com cascade quando a raiz é removida;
+- `backtest_run_id` → FK para `backtest_runs` com delete restrito;
+- `created_at` → instante auditável da associação;
+- PK composta `(hypothesis_id, backtest_run_id)` → associação idempotente, sem duplicatas.
 
-A mutação de decisão **não é exposta ainda**. O contrato de proveniência definiu que decisão deve vir depois de evidência associada; permitir decidir uma hipótese sem essa etapa criaria uma trilha incompleta por construção.
+Não existe `evidence_id`, discriminator genérico ou cópia JSON do resultado. O backtest continua pertencendo ao seu owner canônico.
+
+## Compatibilidade
+
+Antes de persistir, `ResearchHypothesesUseCase` carrega a hipótese e o backtest canônico.
+
+- hipótese com loteria específica só aceita backtest da mesma loteria;
+- hipótese com `lottery = null` permanece transversal e pode receber um backtest persistido de qualquer loteria;
+- hipótese inexistente, backtest inexistente e incompatibilidade de loteria têm erros distintos;
+- a validação ocorre antes do insert da relação.
+
+## API
+
+A API autenticada mantém:
+
+- `POST /api/v1/research/hypotheses`;
+- `GET /api/v1/research/hypotheses`;
+- `GET /api/v1/research/hypotheses/:id`.
+
+E adiciona apenas para o primeiro tipo de evidência:
+
+- `POST /api/v1/research/hypotheses/:id/evidence/backtests` com `{ "backtestRunId": <id> }`;
+- `GET /api/v1/research/hypotheses/:id/evidence/backtests` para listar os vínculos persistidos.
+
+A mutação de decisão **continua não exposta**. Ter um artefato associado cria proveniência, mas não autoriza automaticamente uma conclusão metodológica.
 
 ## Invariants preservados
 
-- não existe `experiment_id` ou `evidence_id` genérico;
-- não existem FKs antecipadas para backtest/job/preview/lote/aposta/AI insight;
-- nenhuma evidência é copiada como JSON dentro da hipótese;
-- `decision = null` significa ausência de decisão, nunca resultado zero/negativo;
-- IA não cria nem decide hipótese nesta fatia;
-- nenhuma mudança em score, geração, anti-leakage ou cálculo estatístico.
+- nenhum payload de evidência é copiado para a hipótese;
+- nenhum job/preview/lote/aposta/AI insight é aceito como evidência nesta fatia;
+- `decision = null` continua significando ausência de decisão;
+- IA não cria, associa nem decide hipótese;
+- nenhuma mudança em score, geração, anti-leakage ou cálculo estatístico;
+- reenvio do mesmo vínculo não cria uma segunda evidência.
 
 ## Próxima fatia
 
-Associar **um único tipo de evidência persistida** com FK explícita — backtest run ou Strategy Lab job concluído — validando loteria/compatibilidade. Somente depois disso a API de decisão deve ser implementada.
+Definir o contrato de decisão usando evidência já associada e exigindo justificativa auditável. A implementação deve explicitar quais condições mínimas permitem cada decisão e continuar distinguindo ausência de evidência, evidência inconclusiva e evidência desfavorável.
