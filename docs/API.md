@@ -1,12 +1,8 @@
 # Loto Lab HTTP API
 
-A API HTTP expõe as capacidades do Loto Lab sem duplicar regras estatísticas, financeiras ou de metodologia na camada de transporte.
-
-O mesmo processo Node também serve a interface web.
+A API HTTP expõe as capacidades do Loto Lab sem duplicar regras estatísticas, financeiras ou de metodologia na camada de transporte. O mesmo processo Node também serve a interface web.
 
 ## Arquitetura da borda HTTP
-
-A direção atual é:
 
 ```text
 HTTP controller
@@ -18,11 +14,11 @@ Domain / engines / ports
 PostgreSQL / CAIXA / OpenAI / workers
 ```
 
-Concursos, análises, geração compatível/Generator 2.0, backtests, estratégias, Strategy Lab, Analysis Jobs, operações, apostas reais, status de dados, game batches, comparação de game batches, Agenda/notificações e IA interpretativa entram por controllers dedicados e application use cases injetados, com dependências concretas compostas em `src/api/server.ts`. `src/api/app.ts` ficou restrito à borda comum da API e `src/api/services.ts` não possui mais facade de infraestrutura.
+Concursos, análises, geração, game batches, backtests, estratégias, Strategy Lab, Analysis Jobs, operações, apostas reais, status de dados, Agenda/notificações, IA interpretativa e pesquisa/proveniência entram por controllers dedicados e application use cases injetados. Dependências concretas são compostas em `src/api/server.ts`.
 
-Com a extração de Analysis Jobs, não resta controller de feature HTTP compondo repositories, managers ou providers concretos. `src/api/server.ts` é o composition root das features HTTP; lifecycle de processo, como start/drain da fila e scheduler, continua pertencendo ao entrypoint `src/cli/apiStart.ts`.
+`src/api/app.ts` fica restrito à borda comum da API; `src/api/services.ts` preserva apenas exports auxiliares compatíveis. Lifecycle de processo — start/recovery/drain da fila, scheduler e runtime lock — pertence a `src/cli/apiStart.ts`.
 
-Controllers devem cuidar de parse, CORS/auth/rate-limit quando aplicável, serialização e error mapping. Regras de negócio pertencem ao application/core.
+Controllers cuidam de parse, CORS/auth/rate-limit quando aplicável, serialização e error mapping. Regra de negócio pertence ao application/core.
 
 ## Execução local
 
@@ -49,13 +45,9 @@ http://127.0.0.1:5200/api/v1
 
 ## Autenticação, origem e JSON
 
-No ambiente local padrão não há credenciais.
+No ambiente local padrão não há credenciais. Em produção, `APP_AUTH_USER` e `APP_AUTH_PASSWORD` protegem toda UI/API, exceto healthchecks.
 
-Em produção, `APP_AUTH_USER` e `APP_AUTH_PASSWORD` protegem toda UI/API, exceto healthchecks.
-
-Mutações passam por proteção same-origin. Requests com corpo usam `Content-Type: application/json`.
-
-Cada resposta recebe `X-Request-Id` para correlação com logs.
+Mutações passam por proteção same-origin. Requests com corpo usam `Content-Type: application/json`. Cada resposta recebe `X-Request-Id` para correlação com logs.
 
 ## Health
 
@@ -76,12 +68,7 @@ GET /api/v1/contests/:lottery/latest
 GET /api/v1/contests/:lottery/:contestNumber
 ```
 
-Listagem de concursos aceita:
-
-- `limit`: 1–200;
-- `order`: `asc` ou `desc`;
-- `startContest`;
-- `endContest`.
+Listagem aceita `limit` (1–200), `order=asc|desc`, `startContest` e `endContest`.
 
 ## Análises
 
@@ -90,35 +77,21 @@ GET /api/v1/analysis/:lottery
 GET /api/v1/analysis/:lottery/advanced
 ```
 
-A resposta básica permanece utilizável mesmo quando a análise avançada estiver ocupada ou falhar.
-
-O contrato técnico pode manter nomes como `score` e `ranking`; a UI usa **pontuação** e **classificação**.
+A resposta básica permanece utilizável mesmo quando a análise avançada estiver ocupada ou falhar. O contrato técnico pode manter `score`/`ranking`; a UI usa **pontuação** e **classificação**.
 
 Detalhes: [`ANALYSES.md`](ANALYSES.md).
 
 ## Generator 2.0
 
-Planejamento:
-
 ```http
 POST /api/v1/generation/plan
-```
-
-Preview:
-
-```http
 POST /api/v1/generation/preview
-```
-
-Persistência:
-
-```http
 POST /api/v1/generation/save
 ```
 
 Gerações diversificadas retornam seed auditável. Ao salvar uma prévia diversificada, a seed retornada pela prévia deve ser reutilizada.
 
-Endpoint de compatibilidade:
+Compatibilidade:
 
 ```http
 POST /api/v1/games/generate
@@ -135,15 +108,11 @@ GET  /api/v1/game-batches/:id/comparison?startContest=3760&count=5
 POST /api/v1/games/check
 ```
 
-A gestão de lifecycle de lotes expõe também consulta/arquivamento/restauração usados por **Meus Jogos**.
-
-Uma comparação sem concursos ainda sincronizados pode retornar disponibilidade pendente sem transformar isso em erro 5xx.
+A gestão de lifecycle de lotes também expõe consulta/arquivamento/restauração usados por **Meus Jogos**. Uma comparação sem concursos ainda sincronizados pode retornar disponibilidade pendente sem virar erro 5xx.
 
 Detalhes: [`MY_GAMES.md`](MY_GAMES.md).
 
 ## Apostas reais
-
-Família principal:
 
 ```http
 POST /api/v1/real-bets
@@ -196,36 +165,19 @@ GET  /api/v1/analysis-jobs/:id
 POST /api/v1/analysis-jobs/:id/cancel
 ```
 
-`kind` aceita:
+`kind` aceita `backtest` e `strategy-lab`. A criação valida loteria, estratégia/versionamento opcional, período e orçamento antes de enfileirar.
 
-- `backtest`;
-- `strategy-lab`.
-
-A criação valida loteria, estratégia/versionamento opcional, período e orçamento antes de enfileirar. A fila persistida diferencia `queued`, `running`, estados terminais e cancelamento.
-
-O controller HTTP delega resolução de estratégia/config, validação dependente do histórico e operações de fila ao `AnalysisJobsUseCase`. O `AnalysisJobManager` singleton, repositories de estratégia/concursos e demais dependências concretas são ligados em `src/api/server.ts`; `src/cli/apiStart.ts` continua responsável apenas pelo lifecycle de start/recovery/drain do manager.
+O controller delega resolução de estratégia/config, validação dependente do histórico e operações de fila ao `AnalysisJobsUseCase`. O `AnalysisJobManager` singleton e dependências concretas são ligados em `src/api/server.ts`; `src/cli/apiStart.ts` cuida do lifecycle do manager.
 
 ## Operação e dados
 
-Estado operacional:
-
 ```http
-GET /api/v1/operations/status
-```
-
-Sincronização manual:
-
-```http
+GET  /api/v1/operations/status
 POST /api/v1/operations/sync
+GET  /api/v1/data/status
 ```
 
-Status da base:
-
-```http
-GET /api/v1/data/status
-```
-
-Scheduler, CLI e HTTP compartilham o mesmo contrato operacional e advisory lock.
+O status operacional autenticado agrega sinais de HTTP, Analysis Jobs, sync, pool PostgreSQL, CAIXA e OpenAI. Esses snapshots são sinais de observabilidade; não são SLOs finais nem série histórica automaticamente persistida.
 
 Detalhes: [`OPERATIONS.md`](OPERATIONS.md).
 
@@ -240,24 +192,55 @@ POST /api/v1/notifications/read-all
 
 Detalhes: [`AGENDA.md`](AGENDA.md).
 
+## Pesquisa e proveniência
+
+A raiz atual é uma hipótese humana persistida:
+
+```http
+POST /api/v1/research/hypotheses
+GET  /api/v1/research/hypotheses
+GET  /api/v1/research/hypotheses/:id
+```
+
+Criação usa:
+
+```json
+{
+  "title": "hipótese a investigar",
+  "description": "descrição auditável",
+  "lottery": "mega-sena"
+}
+```
+
+`lottery` pode ser omitida/nula para hipótese transversal. A listagem aceita `lottery` e `limit` (máximo 100).
+
+Primeiro tipo de evidência canônica:
+
+```http
+POST /api/v1/research/hypotheses/:id/evidence/backtests
+GET  /api/v1/research/hypotheses/:id/evidence/backtests
+```
+
+A associação usa:
+
+```json
+{
+  "backtestRunId": 123
+}
+```
+
+O vínculo aponta diretamente para `backtest_runs`; não copia o resultado para a hipótese nem cria `evidence_id` genérico. Hipótese decidida não recebe nova evidência, e hipótese restrita a uma loteria só aceita backtest compatível.
+
+**A API ainda não expõe mutação de decisão.** Evidência associada cria proveniência, não uma conclusão automática. O próximo contrato da #66 deve manter a decisão humana/auditável separada da interpretação de IA.
+
+Detalhes de persistência: [`DATABASE.md`](DATABASE.md). Registro da fatia: [`tasks/RESEARCH_HYPOTHESIS_ROOT.md`](tasks/RESEARCH_HYPOTHESIS_ROOT.md).
+
 ## IA
 
-Status:
-
 ```http
-GET /api/v1/ai/status
-```
-
-Gerar interpretação:
-
-```http
+GET  /api/v1/ai/status
 POST /api/v1/ai/insights
-```
-
-Histórico:
-
-```http
-GET /api/v1/ai/insights/:lottery?limit=10
+GET  /api/v1/ai/insights/:lottery?limit=10
 ```
 
 A IA recebe evidências calculadas e nunca substitui o core. O controller delega status, geração, cache semântico e histórico ao `AiInsightsUseCase`; OpenAI e PostgreSQL são injetados no composition root.
@@ -283,17 +266,17 @@ Status comuns:
 - `201`: criação/persistência;
 - `202`: trabalho assíncrono enfileirado;
 - `204`: preflight/sem conteúdo;
-- `400`: entrada inválida; alguns budgets de validação, como limites de unidades do Strategy Lab, também usam esse status;
+- `400`: entrada inválida;
 - `401`: autenticação ausente/incorreta;
 - `404`: rota/recurso inexistente;
-- `409`: conflito de estado/operação;
+- `409`: conflito de estado/operação — inclusive lifecycle/loteria incompatível em proveniência;
 - `413`: body acima do limite;
-- `422`: request bem formado, mas inviável para execução segura/semântica — por exemplo ausência de combinações válidas no Generator 2.0 ou backtest acima do limite de rounds (`BACKTEST_LIMIT_EXCEEDED`);
+- `422`: request bem formado, mas inviável para execução segura/semântica;
 - `429`: rate limit ou gate de trabalho caro ocupado;
 - `500`: erro inesperado;
 - `504`: timeout de execução pesada quando mapeado pelo controller.
 
-Erros específicos mantêm `code` próprio, como `NO_VALID_COMBINATIONS`, `ALGORITHM_SPACE_UNSATISFIED`, `BACKTEST_LIMIT_EXCEEDED` e `ANALYSIS_TIMEOUT`, sem expor detalhes internos desnecessários.
+Erros específicos mantêm `code` próprio sem expor detalhes internos desnecessários.
 
 ## Produção
 
@@ -305,4 +288,4 @@ Por padrão:
 
 PostgreSQL não publica porta no host de produção.
 
-Veja [`DEPLOYMENT.md`](DEPLOYMENT.md), [`RELIABILITY.md`](RELIABILITY.md) e [`QUALITY.md`](QUALITY.md).
+Veja [`PRODUCTION.md`](PRODUCTION.md), [`DEPLOYMENT.md`](DEPLOYMENT.md), [`RELIABILITY.md`](RELIABILITY.md) e [`QUALITY.md`](QUALITY.md).
