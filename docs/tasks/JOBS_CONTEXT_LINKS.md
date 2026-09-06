@@ -16,7 +16,7 @@ Cada card de Execuções oferece retorno para a superfície canônica do seu tip
 - `backtest` queued/running/failed/cancelled continua retornando para `/#backtests` sem `jobId`;
 - `backtest` concluído e com resultado passa a retornar para `/?jobId=<id>&lottery=<lottery>#backtests`.
 
-`jobId` é a identidade canônica do retorno. `lottery` é apenas um hint de roteamento para alinhar o seletor antes da leitura; Testes históricos não confia nele para o resultado.
+`jobId` é a identidade canônica do retorno. `lottery` é apenas um hint de roteamento para alinhar o seletor antes da leitura; Testes históricos não confia nele para o resultado e esse hint não altera a preferência persistida de loteria.
 
 ## Consumo em Testes históricos
 
@@ -36,6 +36,7 @@ Se o job não estiver disponível, pertencer a outro tipo/loteria ou ainda não 
 - nenhum formulário/controller de backtest é copiado para Execuções;
 - nenhum ranking, winner, p-value ou evidência é transportado em query;
 - não existe `jobId` em localStorage;
+- o hint `lottery` só alinha o seletor para a navegação atual e não sobrescreve a preferência persistida;
 - o destino reconstrói o resultado pela API persistida, não pelo HTML/link;
 - o contrato começa somente por backtest; Laboratório não recebe deep link nesta fatia;
 - resultados incompletos/desconhecidos continuam apresentados como desconhecidos pelos formatters existentes.
