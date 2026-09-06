@@ -2,7 +2,7 @@
 
 Issue: #62
 
-Status: fatia de refactor implementada em branch para validação.
+Status: fatia concluída via PR #236.
 
 ## Objetivo
 
@@ -37,4 +37,4 @@ Esses helpers continuam sendo usados por estrutura/repetição, dinâmica de atr
 
 ## Próximo passo
 
-Somente após esta fatia estar verde e reconciliada, a #62 pode seguir a ordem do plano para estatística/combinatória compartilhada. Mudança metodológica continua fora deste refactor.
+Com esta fatia concluída, a #62 segue a ordem do plano para estatística/combinatória compartilhada. Mudança metodológica continua fora deste refactor.

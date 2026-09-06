@@ -2,7 +2,7 @@
 
 Issue: #60
 
-Status: fatia implementada em branch para validação.
+Status: fatia concluída via PR #234.
 
 ## Objetivo
 

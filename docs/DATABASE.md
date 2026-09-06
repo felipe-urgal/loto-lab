@@ -21,7 +21,7 @@ O fluxo canônico de desenvolvimento está em [`DEVELOPMENT.md`](DEVELOPMENT.md)
 
 ## Migrations
 
-As migrations ficam em `db/migrations/` e hoje vão de `001_initial.sql` a `012_domain_contract_alignment.sql`.
+As migrations ficam em `db/migrations/` e hoje vão de `001_initial.sql` a `014_research_backtest_evidence.sql`.
 
 O runner:
 
@@ -51,47 +51,46 @@ O runner:
 | `009_generator_previews.sql` | previews auditáveis do Generator 2.0 |
 | `010_reliability_hardening.sql` | reforços operacionais adicionais |
 | `011_real_bet_financial_revisions.sql` | trilha de revisões financeiras oficiais |
-| `012_domain_contract_alignment.sql` | alinhamento final de invariantes TS ↔ PostgreSQL |
+| `012_domain_contract_alignment.sql` | alinhamento de invariantes TS ↔ PostgreSQL |
+| `013_research_hypotheses.sql` | raiz persistida de hipótese de pesquisa e lifecycle de decisão |
+| `014_research_backtest_evidence.sql` | vínculo auditável entre hipótese e `backtest_run`, com invariantes de lifecycle/loteria |
 
 ## Entidades principais
 
 ### Concursos
 
-`contests` armazena:
-
-- loteria;
-- número/data;
-- dezenas;
-- Mês da Sorte quando aplicável;
-- arrecadação e metadados oficiais relevantes.
-
-`contest_prize_tiers` armazena as faixas de premiação oficiais por concurso.
+`contests` armazena loteria, número/data, dezenas, Mês da Sorte quando aplicável, arrecadação e metadados oficiais relevantes. `contest_prize_tiers` armazena as faixas de premiação oficiais por concurso.
 
 ### Estratégias
 
 `strategies` mantém identidade estável. O versionamento imutável preserva configuração/metodologia usada por execuções históricas.
 
-A camada de domínio e o PostgreSQL impedem mutações que destruiriam a auditabilidade das versões.
-
 ### Geração
 
-`generated_game_batches` representa um lote; `generated_games` preserva os jogos e posição dentro dele.
-
-O lifecycle permite ocultar/restaurar sem apagar histórico. Lotes vinculados a apostas reais mantêm as restrições de integridade necessárias.
-
-Generator 2.0 também persiste previews auditáveis para conferir seed/snapshot antes de salvar um lote.
+`generated_game_batches` representa um lote; `generated_games` preserva os jogos e posição dentro dele. O lifecycle permite ocultar/restaurar sem apagar histórico. Generator 2.0 também persiste previews auditáveis para conferir seed/snapshot antes de salvar um lote.
 
 ### Testes históricos
 
-`backtest_runs` armazena opções, resumo e métricas principais. `backtest_rounds` guarda o artefato compacto por concurso.
+`backtest_runs` armazena opções, resumo e métricas principais. `backtest_rounds` guarda o artefato compacto por concurso. Estruturas grandes usadas apenas durante cálculo não devem ser persistidas desnecessariamente.
 
-Estruturas grandes usadas apenas durante cálculo, como jogos gerados/checks completos, não devem ser persistidas desnecessariamente.
+### Pesquisa e proveniência
+
+`research_hypotheses` é a raiz persistida da hipótese humana investigada. Ela possui ID estável, título/descrição, loteria opcional, lifecycle `open | decided` e campos de decisão protegidos por constraints.
+
+`research_hypothesis_backtest_evidence` liga diretamente uma hipótese a um `backtest_run` canônico:
+
+- PK composta evita vínculo duplicado;
+- FKs preservam os owners originais;
+- não existe `evidence_id` genérico nem cópia JSON do resultado;
+- hipótese decidida preserva vínculos antigos, mas não recebe evidência nova;
+- hipótese específica de uma loteria só aceita backtest da mesma loteria;
+- a migration `014` repete no PostgreSQL os invariantes críticos usados pelo application use case.
+
+A API ainda não expõe a mutação de decisão. A associação de evidência cria proveniência; não transforma automaticamente o resultado histórico em conclusão metodológica.
 
 ### Apostas reais
 
-`real_bets` separa dinheiro efetivamente apostado de geração e backtest. `real_bet_games` preserva snapshot dos jogos apostados.
-
-`real_bet_financial_revisions` registra correções oficiais posteriores que alterem prêmio/resultado líquido, preservando o `checked_at` original.
+`real_bets` separa dinheiro efetivamente apostado de geração e backtest. `real_bet_games` preserva snapshot dos jogos apostados. `real_bet_financial_revisions` registra correções oficiais posteriores sem apagar o histórico anterior.
 
 ### Operação e agenda
 
@@ -101,34 +100,17 @@ Estruturas grandes usadas apenas durante cálculo, como jogos gerados/checks com
 
 ### Jobs
 
-A fila de análises persiste trabalhos `backtest` e `strategy-lab`, incluindo estados, input/result/error e cancelamento.
-
-O runtime single-instance usa advisory lock para tornar o recovery atual seguro.
+A fila de análises persiste trabalhos `backtest` e `strategy-lab`, incluindo estados, input/result/error e cancelamento. O runtime single-instance usa advisory lock para tornar o recovery atual seguro.
 
 ### IA
 
-`ai_insights` persiste:
-
-- modelo usado e ID da resposta do provedor quando disponível;
-- snapshot de evidências;
-- interpretação estruturada;
-- uso retornado pelo provedor quando disponível.
+`ai_insights` persiste modelo/provedor quando disponível, snapshot de evidências, interpretação estruturada e uso retornado pelo provider quando conhecido.
 
 ## Repositories
 
-A camada concreta fica em `src/persistence/`:
+A camada concreta fica em `src/persistence/` e inclui repositories para concursos, lotes/jogos, backtests, estratégias, apostas reais, Analysis Jobs, operações, Agenda/notificações, AI Insights e hipóteses de pesquisa (`researchHypothesisRepository.ts`).
 
-- `PostgresContestRepository`;
-- `PostgresGameRepository`;
-- `PostgresBacktestRepository`;
-- `PostgresStrategyRepository`;
-- `PostgresRealBetRepository`;
-- `PostgresAnalysisJobRepository`;
-- `PostgresOperationRepository`;
-- repositories de Agenda/Notificações;
-- repository de AI Insights.
-
-Application use cases novos devem depender de **portas mínimas**, não de repositories concretos, quando isso for suficiente. A composição concreta ocorre progressivamente no servidor.
+Application use cases dependem de portas mínimas sempre que isso for suficiente. A composição concreta das features HTTP acontece em `src/api/server.ts`.
 
 ## Integridade
 
@@ -140,13 +122,14 @@ Invariantes importantes são protegidos em profundidade:
 - transações em operações multi-write;
 - locks explícitos quando concorrência pode gerar revisão/duplicidade;
 - versões históricas imutáveis;
-- diferença entre `NULL`/desconhecido e zero conhecido preservada.
+- diferença entre `NULL`/desconhecido e zero conhecido preservada;
+- relações explícitas de proveniência em vez de payloads opacos quando existe owner canônico.
 
 ## Pool
 
-`createPostgresPool()` mantém um único `pg.Pool` por processo, com limites/timeouts controlados e `application_name = loto-lab`.
+`createPostgresPool()` mantém um único `pg.Pool` por processo, com limites/timeouts controlados e `application_name = loto-lab`. O pool não deve ser criado por request.
 
-O pool não deve ser criado por request.
+O endpoint operacional autenticado expõe snapshot de pressão do pool (`total`, `idle`, `active`, `waiting`) para observação antes de qualquer tuning.
 
 ## Dataset offline e importação
 
@@ -157,19 +140,13 @@ npm run dataset:sync -- mega-sena
 npm run dataset:refresh -- mega-sena 1 100
 ```
 
-Por padrão eles operam sobre:
-
-```text
-data/contests.json
-```
+Por padrão eles operam sobre `data/contests.json`.
 
 Importar esse dataset para PostgreSQL:
 
 ```bash
 npm run db:import-dataset -- data/contests.json
 ```
-
-O nome explicita a direção da operação: **dataset offline → banco PostgreSQL**.
 
 ## Bootstrap e sync PostgreSQL
 
@@ -204,26 +181,12 @@ app -> postgres:5432
 
 A porta do banco não é publicada no host de produção.
 
-Procedimento operacional: [`PRODUCTION.md`](PRODUCTION.md).
-
-Detalhes de topologia/restore: [`DEPLOYMENT.md`](DEPLOYMENT.md) e [`RELIABILITY.md`](RELIABILITY.md).
+Procedimento operacional: [`PRODUCTION.md`](PRODUCTION.md). Detalhes de topologia/restore: [`DEPLOYMENT.md`](DEPLOYMENT.md) e [`RELIABILITY.md`](RELIABILITY.md).
 
 ## Testes
 
 As suítes PostgreSQL usam database temporário isolado por arquivo de teste, migrations reais e concorrência controlada.
 
-O baseline cobre:
-
-- instalação limpa e idempotência de migrations;
-- checksum drift;
-- upgrade de schema anterior para atual;
-- contracts TS ↔ PostgreSQL;
-- contests/rateios;
-- estratégias/versionamento;
-- lotes/jogos;
-- apostas reais/revisões financeiras;
-- jobs/operações;
-- testes históricos;
-- endpoints usando os mesmos adapters concretos.
+O baseline cobre instalação limpa/idempotência, checksum drift, upgrade de schema, contratos TS ↔ PostgreSQL, concursos/rateios, estratégias/versionamento, lotes/jogos, apostas reais/revisões, jobs/operações, backtests e a trilha de pesquisa hipótese → evidência.
 
 Veja [`QUALITY.md`](QUALITY.md).

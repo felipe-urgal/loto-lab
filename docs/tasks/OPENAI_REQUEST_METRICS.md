@@ -2,7 +2,7 @@
 
 Issue: #63
 
-Status: fatia concluída e pronta para merge após gates finais.
+Status: fatia concluída via PR #235.
 
 ## Objetivo
 

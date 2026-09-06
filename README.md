@@ -12,27 +12,25 @@ O Loto Lab organiza hipóteses, estratégias e jogos de forma reproduzível. Fre
 | Runtime | Node.js 24.19.0 LTS / linha 24.x |
 | TypeScript | 7.x |
 | Persistência | PostgreSQL 16 |
-| Frontend | HTML + CSS + ES Modules; source TypeScript incremental, sem framework |
+| Frontend | HTML + CSS + ES Modules; owners TypeScript incrementais, sem framework |
 | Backend | Node.js + TypeScript |
 
 ## Estado atual
 
-Em 2026-09-02, após #155–#160/#163 e as extrações finais #167–#170:
+Baseline reconciliada em **2026-09-06**, com a `main` até #240:
 
-- a fonte PT-BR e o piso funcional de 16px pertencem aos módulos/estilos canônicos; não existem mais `localization.js`, `readability.js` ou `readability.css` globais;
-- o **Protótipo 1 — Dark Moderno / Workspace científico compacto** está aplicado e consolidado nas superfícies principais; a #121 foi concluída;
-- Painel, Análises, Gerador, Meus Jogos, Testes históricos, Laboratório, Estratégias, Execuções, Agenda e IA possuem workspaces próprios;
-- a consolidação visual #134–#142 removeu/absorveu camadas redundantes com ownership comprovado; folhas funcionais e fallbacks deliberados permaneceram quando possuem responsabilidade real;
-- o #143 adicionou auditoria transversal em navegador real para desktop/mobile, texto funcional >=16px, foco por teclado, reduced-motion e ausência de overflow horizontal estrutural;
-- o #148 iniciou a modularização TypeScript do frontend com `tsconfig.web.json`, typecheck/lint de `web/src`, emissão via `tsc` para `web-dist/assets/src` e `web/src/shared/formatters.ts` como primeiro helper compartilhado;
-- #155–#160 retiraram do monólito HTTP concursos, análise básica/avançada, geração compatível, Generator 2.0 e game batches/conferência; esses fluxos agora entram por feature controllers/use cases injetados, com composição concreta em `server.ts`;
-- #163 removeu a facade concreta `LotoLabApiServices` de `src/api/services.ts`, que preserva somente exports auxiliares compatíveis;
-- #167–#170 extraíram comparação de game batches, Agenda/notificações, IA interpretativa e Analysis Jobs para application use cases, concluindo a #61; não resta controller de feature HTTP compondo repositories, managers ou providers concretos, e `src/api/server.ts` é o composition root das features HTTP;
-- o lifecycle de processo permanece deliberadamente em `src/cli/apiStart.ts`, que inicia/recover/draina o mesmo `AnalysisJobManager` singleton e continua dono do scheduler/runtime lock;
-- o CI funcional usa `npm run check`; coverage/E2E/audit permanecem direcionados por risco, e o workflow de Security roda semanalmente/manualmente com audit, CodeQL, SBOM e Trivy;
-- a `main` **ainda não possui branch protection obrigatória**; isso permanece bloqueado na #52 por configuração administrativa do GitHub.
+- PostgreSQL é a fonte de verdade operacional, com migrations forward-only, checksum e advisory lock;
+- `src/api/server.ts` é o composition root das features HTTP; controllers delegam regra de negócio a application use cases;
+- o frontend continua vanilla, mas as principais superfícies e primitives já possuem ownership TypeScript em `web/src`; boundaries JavaScript migrados ficam finos/import-only;
+- o Protótipo 1 — Dark Moderno está consolidado nas superfícies principais, com piso funcional de 16px, foco/teclado, reduced-motion e mobile como guardrails;
+- análises, geração, backtests, Strategy Lab e financeiro preservam reprodutibilidade, anti-leakage e distinção entre dado desconhecido e zero conhecido;
+- a jornada científica já possui raiz persistida em `research_hypotheses` e pode associar um `backtest_run` como primeira evidência canônica; a decisão humana ainda não é exposta pela API;
+- observabilidade operacional cobre HTTP, Analysis Jobs, sync, pool PostgreSQL, CAIXA e OpenAI;
+- produção possui `prod:resources`, snapshot read-only de CPU/memória para comparar baseline antes/depois de tuning;
+- `npm run check` é o gate funcional canônico; E2E, coverage, audit e Security são direcionados por risco;
+- a `main` ainda não possui branch protection obrigatória; isso permanece como configuração administrativa da #52.
 
-O backlog atualizado está em [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Prioridade e dependências atuais: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Princípios do produto
 
@@ -40,7 +38,9 @@ O backlog atualizado está em [`docs/ROADMAP.md`](docs/ROADMAP.md).
 2. **Anti-leakage.** Ao avaliar um concurso histórico, o algoritmo só enxerga dados anteriores ao alvo.
 3. **Sem promessa de previsão.** Frequência, atraso, score, estrutura e evidência histórica não alteram a probabilidade matemática individual de uma combinação válida.
 4. **IA fora do cálculo crítico.** IA interpreta evidências; regras matemáticas, geração, conferência, financeiro e testes históricos continuam no código.
-5. **UX técnica e legível.** Alta densidade controlada, texto funcional >=16px, foco, teclado, mobile e reduced-motion são guardrails.
+5. **Proveniência explícita.** Hipótese, execução e evidência reutilizam IDs/owners canônicos; o sistema evita snapshots opacos e identidades paralelas quando existe FK real.
+6. **UX técnica e legível.** Alta densidade controlada, texto funcional >=16px, foco, teclado, mobile e reduced-motion são guardrails.
+7. **Performance baseada em evidência.** Não se escolhe índice, concorrência, cache, timeout ou limite de recurso sem baseline comparável.
 
 ## Loterias suportadas
 
@@ -72,7 +72,7 @@ A aplicação principal usa hash routes:
 | Agenda | `/agenda` | próximos concursos e notificações |
 | IA | `/ai` | interpretar evidências já calculadas |
 
-No mobile, Painel, Análises, Gerar jogos e Meus jogos ficam na navegação principal; os destinos secundários ficam sob **Mais**.
+No mobile, os destinos secundários ficam sob **Mais** quando necessário.
 
 ## Direção visual
 
@@ -90,16 +90,16 @@ Regras principais:
 - tabelas, filtros e métricas compactos sem sacrificar legibilidade;
 - gráficos apenas quando existe dado real que justifique a visualização.
 
-A decisão de design foi encerrada na #120. O rollout principal foi entregue em #123–#133 e a consolidação final em #134–#143 encerrou a #121. Evolução arquitetural do frontend segue na #60, jornada/IA na #64 e performance medida na #65.
-
 ## Arquitetura
 
 ```text
 Browser
   │
-  ├─ web/                         HTML + CSS + ES Modules
-  │   ├─ runtime.js               boundary compatível do runtime atual
-  │   └─ src/shared/*.ts          fundação TypeScript incremental (#60)
+  ├─ web/                         HTML + CSS + boundaries JS finos
+  │   └─ src/
+  │       ├─ core/                API, loader, lifecycle, contexto
+  │       ├─ features/            owners funcionais das superfícies
+  │       └─ shared/              escaping, formatters, toast etc.
   │
   ▼
 Node HTTP Server
@@ -109,7 +109,7 @@ Node HTTP Server
   │        ▼
   ├─ application use cases        src/application/
   │        │
-  │        ├─ analysis/generator/backtest/lab/finance
+  │        ├─ analysis/generator/backtest/lab/finance/research
   │        └─ ports/interfaces
   │
   ├─ adapters/repositories        src/persistence/, src/data/, src/ai/
@@ -121,34 +121,37 @@ Node HTTP Server
   └─ workers/scheduler/observability
 ```
 
-A arquitetura segue em transição incremental. O strangler já retirou da borda HTTP o ownership de concursos, análises, geração, game batches/conferência, comparação de lotes, Agenda, IA e Analysis Jobs. Controllers de feature delegam a application use cases, `src/api/app.ts` fica restrito à infraestrutura comum e `src/api/services.ts` preserva apenas exports auxiliares compatíveis. A #61 foi concluída no #170 com `src/api/server.ts` confirmado como composition root das features HTTP; lifecycle de processo continua separado em `src/cli/apiStart.ts`.
-
 ### Frontend
 
-O frontend continua sem framework. A #60 agora possui uma fundação TypeScript real: `tsconfig.web.json` cobre `web/src/**/*.ts`; `typecheck` e `lint` validam essa camada sem emissão, e `npm run web:build` emite JavaScript via `tsc` para `web-dist/assets/src`.
+O frontend continua sem framework. `tsconfig.web.json` cobre `web/src/**/*.ts`; `typecheck` e `lint` validam essa camada, e `npm run web:build` emite JavaScript para `web-dist/assets/src`.
 
-O build também:
+`web/src/core/featureLoader.ts` é o owner canônico do lazy loading. `web/feature-loader.js` e outros boundaries já migrados permanecem import-only para compatibilidade com assets/HTML existentes.
 
-- copia os demais assets para `web-dist/`, sem publicar fontes `.ts` cruas;
-- calcula fingerprint SHA-256;
-- reescreve URLs com `?v=<hash>`;
-- mantém HTML sem cache permanente;
-- usa lazy loading por feature;
-- executa E2E em Chrome/Chromium real quando `test:e2e` é chamado.
+Owners TypeScript já existem para primitives compartilhadas e para as principais features, incluindo Painel/status, Agenda, IA, Estratégias, Execuções, Laboratório, Meus Jogos, Análises, Gerador e Testes históricos. A evolução da #60 continua incremental: reduzir state/lifecycle imperativo e decompor módulos grandes sem rewrite de framework.
 
-`web/runtime.js` permanece como boundary compatível para os módulos JavaScript existentes; os formatters compartilhados já vivem em `web/src/shared/formatters.ts` e são reexportados pelo runtime. A migração seguinte deve expandir essa base em fatias pequenas, sem big-bang.
-
-A apresentação segue a cascata `styles.css` → `ui-foundation.css` → `design-system.css` → CSS funcional da feature quando necessário → stylesheet canônico da superfície. Folhas adicionais permanecem apenas quando possuem responsabilidade real; redundância visual não deve voltar a ser mascarada por camadas globais.
+Detalhes: [`docs/WEB.md`](docs/WEB.md).
 
 ### Backend/application layer
 
-Use cases extraídos incluem catálogo de concursos, análise básica/avançada, geração compatível e Generator 2.0, game batches/conferência e comparação, backtest, Strategy Lab, catálogo de estratégias/backtests, operações, apostas reais, status de dados, Agenda/notificações, IA interpretativa e Analysis Jobs. As dependências concretas dessas features HTTP são compostas em `server.ts`.
+Use cases cobrem catálogo de concursos, análise básica/avançada, geração compatível/Generator 2.0, game batches/conferência/comparação, backtests, Strategy Lab, estratégias, operações, apostas reais, status de dados, Agenda/notificações, IA, Analysis Jobs e pesquisa/proveniência.
 
-A #61 está concluída: nenhum controller de feature HTTP compõe repositories, managers ou providers concretos. `src/cli/apiStart.ts` permanece dono do lifecycle de processo (start/recovery/drain, scheduler e runtime lock), sem duplicar a composição das features HTTP. A decomposição algorítmica restante pertence à #62 e deve avançar sem reabrir essa fronteira.
+`src/api/server.ts` compõe dependências concretas das features HTTP. `src/cli/apiStart.ts` permanece dono do lifecycle de processo: start/recovery/drain da fila, scheduler e runtime lock.
 
-### Persistência
+A decomposição algorítmica restante pertence à #62 e deve avançar sem reabrir a fronteira HTTP consolidada.
 
-PostgreSQL é a fonte de verdade operacional. Migrations são forward-only, possuem checksum e advisory lock. Repositories concretos ficam em `src/persistence/`.
+### Persistência e pesquisa
+
+PostgreSQL é a fonte de verdade operacional. Migrations são forward-only, possuem checksum e advisory lock.
+
+O schema atual vai até `014_research_backtest_evidence.sql`:
+
+- `research_hypotheses` persiste a hipótese humana;
+- `research_hypothesis_backtest_evidence` liga diretamente a hipótese a um `backtest_run` canônico;
+- lifecycle e compatibilidade de loteria são defendidos no use case e no PostgreSQL;
+- não existe `evidence_id` genérico nem cópia do resultado para a hipótese;
+- decisão humana continua fora da API até existir contrato auditável explícito.
+
+Detalhes: [`docs/DATABASE.md`](docs/DATABASE.md) e [`docs/API.md`](docs/API.md).
 
 ## Requisitos
 
@@ -213,15 +216,8 @@ npm run db:status
 npm run db:sync -- mega-sena
 npm run db:sync -- lotofacil
 npm run db:sync -- dia-de-sorte
-```
-
-A sincronização operacional das três loterias e apostas pendentes usa:
-
-```bash
 npm run ops:sync
 ```
-
-Com `OPS_AUTO_SYNC=true`, o scheduler roda junto da API.
 
 O dataset JSON offline usa namespace próprio:
 
@@ -231,7 +227,7 @@ npm run dataset:refresh -- mega-sena 1 100
 npm run db:import-dataset -- data/contests.json
 ```
 
-Detalhes em [`docs/DATABASE.md`](docs/DATABASE.md) e [`docs/DATA_OPERATIONS.md`](docs/DATA_OPERATIONS.md).
+Detalhes: [`docs/DATABASE.md`](docs/DATABASE.md), [`docs/DATA_OPERATIONS.md`](docs/DATA_OPERATIONS.md) e [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
 ## API
 
@@ -254,9 +250,10 @@ Principais famílias:
 - `/real-bets`;
 - `/operations` e `/data/status`;
 - `/agenda` e `/notifications`;
+- `/research/hypotheses` e evidência de backtests;
 - `/ai`.
 
-Detalhes em [`docs/API.md`](docs/API.md).
+Detalhes: [`docs/API.md`](docs/API.md).
 
 ## Testes e qualidade
 
@@ -266,7 +263,7 @@ Gate obrigatório antes do PR:
 npm run check
 ```
 
-`npm run check` cobre contrato de produção versionado, higiene textual, baseline de plataforma/TypeScript, build e testes funcionais.
+`npm run check` cobre contrato de produção versionado, formatação, baseline de plataforma/TypeScript, build e testes funcionais.
 
 Checks direcionados:
 
@@ -276,9 +273,9 @@ npm run coverage
 npm run audit:prod
 ```
 
-Coverage e E2E não são custo fixo de todo PR. O workflow de Security atual é semanal/manual e executa audit, CodeQL, SBOM e Trivy.
+Coverage e E2E não são custo fixo de todo PR. O workflow de Security é semanal/manual e executa audit, CodeQL, SBOM e Trivy.
 
-Detalhes em [`docs/TESTING.md`](docs/TESTING.md) e [`docs/QUALITY.md`](docs/QUALITY.md).
+Detalhes: [`docs/TESTING.md`](docs/TESTING.md) e [`docs/QUALITY.md`](docs/QUALITY.md).
 
 ## Produção
 
@@ -295,6 +292,14 @@ npm run prod:deploy
 npm run prod:verify
 ```
 
+Diagnóstico read-only de CPU/memória:
+
+```bash
+npm run prod:resources
+```
+
+Uma amostra isolada não define limite nem SLO. Tuning exige comparação antes/depois sob carga equivalente.
+
 Por padrão a aplicação fica publicada somente em `127.0.0.1:5200`, adequada para reverse proxy HTTPS no mesmo host. PostgreSQL não publica porta em produção.
 
 Restore check:
@@ -303,7 +308,7 @@ Restore check:
 npm run prod:restore-check -- backups/loto-lab-AAAA-MM-DD.dump
 ```
 
-Detalhes técnicos em [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md), [`docs/RELIABILITY.md`](docs/RELIABILITY.md) e [`docs/PRODUCTION-CONTRACT.md`](docs/PRODUCTION-CONTRACT.md).
+Detalhes: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md), [`docs/RELIABILITY.md`](docs/RELIABILITY.md), [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) e [`docs/PRODUCTION-CONTRACT.md`](docs/PRODUCTION-CONTRACT.md).
 
 ## Segurança operacional
 
@@ -326,6 +331,8 @@ OPENAI_MODEL=gpt-5.6-luna
 ```
 
 Sem chave, somente a geração de novas interpretações fica indisponível. O restante do produto funciona normalmente.
+
+Métricas da OpenAI registram outcomes/latência e uso de tokens quando conhecido, sem armazenar prompt, evidência, texto da resposta, credencial ou IDs de alta cardinalidade.
 
 ## Metodologia e financeiro
 
@@ -356,29 +363,27 @@ Não enfraqueça teste/E2E para fazer um PR ficar verde.
 
 **Agentes de IA e automações de desenvolvimento devem ler e seguir [`AGENTS.md`](AGENTS.md) antes de alterar o repositório.**
 
-A proteção obrigatória da `main` ainda precisa ser configurada administrativamente (#52).
-
 ## Mapa da documentação
 
 | Documento | Assunto |
 | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | contrato operacional para agentes de IA e fluxo de PR/review |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | setup, execução local e gate antes do PR |
-| [`docs/PRODUCTION.md`](docs/PRODUCTION.md) | preflight, backup, deploy e verify de produção |
+| [`docs/PRODUCTION.md`](docs/PRODUCTION.md) | preflight, backup, deploy, verify e baseline de recursos |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | prioridades e issues ativas |
 | [`docs/MENTAL_MODEL.md`](docs/MENTAL_MODEL.md) | mapa conceitual e arquitetural |
 | [`docs/WEB.md`](docs/WEB.md) | frontend, navegação e lifecycle |
-| [`docs/API.md`](docs/API.md) | API HTTP |
-| [`docs/DATABASE.md`](docs/DATABASE.md) | PostgreSQL, migrations e repositories |
+| [`docs/API.md`](docs/API.md) | API HTTP, incluindo pesquisa/proveniência |
+| [`docs/DATABASE.md`](docs/DATABASE.md) | PostgreSQL, migrations, repositories e pesquisa |
 | [`docs/DATA_OPERATIONS.md`](docs/DATA_OPERATIONS.md) | bootstrap e manutenção do histórico |
-| [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | scheduler e sync operacional |
+| [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | scheduler, sync e observabilidade operacional |
 | [`docs/RELIABILITY.md`](docs/RELIABILITY.md) | hardening e guardrails |
 | [`docs/TESTING.md`](docs/TESTING.md) | testes funcionais, coverage e E2E |
 | [`docs/QUALITY.md`](docs/QUALITY.md) | CI, gates e supply chain |
 | [`docs/PLATFORM.md`](docs/PLATFORM.md) | baseline Node/TypeScript |
 | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | topologia e detalhes de produção |
 | [`docs/PRODUCTION-CONTRACT.md`](docs/PRODUCTION-CONTRACT.md) | contrato consumido pelo Dev Dashboard |
-| [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | build, workers e profiling |
+| [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | build, workers, profiling e medição antes de tuning |
 | [`docs/ANALYSES.md`](docs/ANALYSES.md) | Análises 2.0 |
 | [`docs/GENERATION.md`](docs/GENERATION.md) | geração e score-v2 |
 | [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) | regras funcionais da metodologia |
@@ -389,6 +394,7 @@ A proteção obrigatória da `main` ainda precisa ser configurada administrativa
 | [`docs/AGENDA.md`](docs/AGENDA.md) | agenda/notificações |
 | [`docs/AI.md`](docs/AI.md) | IA interpretativa |
 | [`docs/LOTOFACIL_READINESS.md`](docs/LOTOFACIL_READINESS.md) | checklist operacional da Lotofácil |
+| [`docs/tasks/README.md`](docs/tasks/README.md) | índice de registros históricos por epic; não é backlog paralelo |
 
 ## Aviso
 
