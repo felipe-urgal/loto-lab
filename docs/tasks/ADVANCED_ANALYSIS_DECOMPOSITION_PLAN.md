@@ -2,13 +2,19 @@
 
 Issue: #62
 
-Status: plano executável concluído; nenhuma mudança metodológica nesta fatia.
+Status: execução incremental em andamento; PR A (continuidade/qualidade) já está na `main` e PR B (estatística/combinatória) é a fatia atual.
 
 ## Contexto
 
 `src/analysis/advanced.ts` concentra composição e várias responsabilidades estatísticas. Uma extração ampla de estrutura já foi corretamente abortada em uma rodada anterior porque reescrever o hotspot inteiro criaria risco maior que o benefício imediato.
 
 Este documento transforma o código atual em uma sequência de seams pequenas e verificáveis. A regra é preservar byte a byte o contrato lógico de `buildAdvancedAnalysis`: um PR de decomposição não é oportunidade para mudar score, janelas, thresholds, correção estatística, copy metodológica ou schema público.
+
+## Estado atual
+
+- **PR A — continuidade/qualidade: concluído na `main`.** `src/analysis/continuity.ts` é o owner de `isConsecutive`, `splitContinuousSegments`, `latestContinuousSegment` e `buildDataQuality`, protegido por characterization e teste de ownership.
+- **PR B — estatística/combinatória: fatia atual.** `src/analysis/statistics.ts` recebe apenas helpers matemáticos puros; `advanced.ts` mantém os exports públicos históricos durante a transição.
+- PRs C–G permanecem futuros e só avançam se a extração anterior estiver estável.
 
 ## Mapa atual de responsabilidades
 
@@ -18,11 +24,13 @@ Funções: `round`, `mean`, `quantile`, `summarize`, `percentileRank`, `combinat
 
 Consumidores: estrutura, associações, delays/dinâmica e validação.
 
-Risco especial: `combination`, `hypergeometricDistribution` e `exactBinomialTwoSidedP` são exports públicos e precisam continuar importáveis pelo caminho atual durante qualquer extração.
+Risco especial: `combination`, `hypergeometricDistribution` e `exactBinomialTwoSidedP` são exports públicos e precisam continuar importáveis pelo caminho `src/analysis/advanced.ts` durante a extração.
 
 ### 2. Continuidade e qualidade histórica
 
-Funções: `sortedNumbers`, `isConsecutive`, `splitContinuousSegments`, `latestContinuousSegment`, `buildDataQuality`.
+Owner atual: `src/analysis/continuity.ts`.
+
+Funções: `isConsecutive`, `splitContinuousSegments`, `latestContinuousSegment`, `buildDataQuality`.
 
 Consumidores: estrutura de repetição, delay/streak, ciclos, similaridade e rolling validation.
 
@@ -80,30 +88,23 @@ Invariants: cada target usa somente prefixo anterior; warmup permanece 20; janel
 
 `buildAdvancedAnalysis` deve terminar como um compositor legível: filtra/ordena a loteria, monta o ranking base e delega os blocos acima. Ele continua dono do schema agregado e do disclaimer público.
 
-## Ordem recomendada de PRs
+## Ordem dos PRs
 
-### PR A — continuidade/qualidade
+### PR A — continuidade/qualidade — concluído
 
-Extrair somente os helpers de continuidade e `buildDataQuality` para um módulo interno. É o seam de menor ambiguidade e reduz duplicação conceitual antes de mover consumidores maiores.
+Extraído para `src/analysis/continuity.ts` com characterization de histórico contínuo, gaps e ownership. Não repetir esta fatia nem devolver helpers ao hotspot.
 
-Caracterização obrigatória:
+### PR B — estatística/combinatória — atual
 
-- histórico totalmente contínuo;
-- uma e múltiplas lacunas;
-- lacuna no trecho final;
-- delay/streak desconhecido quando o início necessário está censurado;
-- repetição e validation não atravessam gap.
-
-### PR B — estatística/combinatória reutilizada
-
-Separar helpers puros, preservando reexports públicos a partir de `advanced.ts` no primeiro passo. Não alterar arredondamento, algoritmo de probabilidade ou thresholds.
+Separar helpers puros, preservando reexports públicos a partir de `advanced.ts`. Não alterar arredondamento, algoritmo de probabilidade ou thresholds.
 
 Caracterização obrigatória:
 
 - combinações nos limites;
 - distribuição hipergeométrica soma ~1;
 - binomial bilateral nos casos já cobertos;
-- mesmos outputs serializados da análise avançada em fixtures atuais.
+- mesmos outputs da análise avançada nas fixtures atuais;
+- teste de ownership impede que os helpers retornem silenciosamente ao hotspot.
 
 ### PR C — estrutura
 
@@ -153,6 +154,6 @@ Pare e não abra PR quando qualquer um ocorrer:
 - invariants de gaps/anti-leakage não conseguem ser caracterizados antes da mudança;
 - surge mudança metodológica incidental — ela deve virar issue/PR próprio com justificativa científica.
 
-## Decisão
+## Decisão atual
 
-O próximo refactor de código recomendado é **PR A — continuidade/qualidade**, isolado e pequeno. A antiga ideia de extrair `buildStructure` diretamente do hotspot não deve ser retomada antes de estabilizar suas dependências.
+Com continuidade já estabilizada na `main`, a próxima extração segura é **PR B — estatística/combinatória reutilizada**. Estrutura, associações, dinâmica, ciclos, rolling validation e similaridade permanecem fora desta fatia.
