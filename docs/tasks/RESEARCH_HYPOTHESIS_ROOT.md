@@ -2,7 +2,7 @@
 
 Issue: #66
 
-Status: segunda fatia vertical concluída e pronta para merge após gates finais.
+Status: raiz entregue via PR #231 e primeira evidência canônica entregue via PR #238.
 
 ## Objetivo
 
