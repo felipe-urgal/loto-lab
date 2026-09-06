@@ -56,7 +56,7 @@ export async function serveResearchHypotheses(
 ): Promise<boolean> {
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://localhost");
-  const pathname = url.pathname.length > 1 ? request.url?.split("?")[0]?.replace(/\/$/, "") ?? url.pathname : url.pathname;
+  const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/$/, "") : url.pathname;
   const collectionPath = "/api/v1/research/hypotheses";
   if (pathname !== collectionPath && !pathname.startsWith(`${collectionPath}/`)) return false;
 
