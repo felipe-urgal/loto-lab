@@ -13,7 +13,7 @@ import {
 } from "./statistics.js";
 import type { DistributionSummary, ProbabilityPoint } from "./statistics.js";
 
-interface StructuralMetric {
+export interface StructuralMetric {
   current: number | null;
   observed: DistributionSummary | null;
   expectedMean?: number;
@@ -23,7 +23,7 @@ interface StructuralMetric {
   theoreticalDistribution?: ProbabilityPoint[];
 }
 
-interface ContestStructure {
+export interface ContestStructure {
   odd: number;
   even: number;
   sum: number;
