@@ -2,7 +2,7 @@
 
 Issue: #62
 
-Status: fatia em implementação na branch `refactor/62-analysis-structure-owner`.
+Status: fatia em review via PR #250.
 
 ## Objetivo
 
@@ -56,4 +56,4 @@ Nenhum expected value da characterization deve ser atualizado para fazer a extra
 
 ## Próximo passo
 
-Depois que esta fatia for integrada, a #62 deve reavaliar o hotspot restante a partir do novo tamanho e das dependências reais. Qualquer próxima extração precisa ser uma fatia independente; mudança metodológica continua fora deste refactor.
+Depois que a PR #250 for integrada, a #62 deve reavaliar o hotspot restante a partir do novo tamanho e das dependências reais. Qualquer próxima extração precisa ser uma fatia independente; mudança metodológica continua fora deste refactor.
