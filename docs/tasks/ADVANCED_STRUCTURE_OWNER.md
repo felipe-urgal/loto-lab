@@ -2,7 +2,7 @@
 
 Issue: #62
 
-Status: fatia em review via PR #250.
+Status: fatia concluída via PR #250.
 
 ## Objetivo
 
@@ -52,8 +52,8 @@ A characterization de `ADVANCED_STRUCTURE_CHARACTERIZATION.md` continua sendo a 
 
 A rede principal continua em `tests/advancedStructureCharacterization.test.ts`, cobrindo as três loterias e regressão de gap. `tests/advancedStructureOwnership.test.ts` adiciona o guard arquitetural para garantir que os helpers estruturais não retornem ao hotspot e que o novo owner não absorva ranking, validação ou associações.
 
-Nenhum expected value da characterization deve ser atualizado para fazer a extração passar.
+Nenhum expected value da characterization foi atualizado para fazer a extração passar. O SHA final foi validado com `npm run check`, incluindo build/declaration emit e a suíte completa de testes.
 
 ## Próximo passo
 
-Depois que a PR #250 for integrada, a #62 deve reavaliar o hotspot restante a partir do novo tamanho e das dependências reais. Qualquer próxima extração precisa ser uma fatia independente; mudança metodológica continua fora deste refactor.
+Com esta fatia concluída, a #62 deve reavaliar o hotspot restante a partir do novo tamanho e das dependências reais antes de escolher outra seam. Qualquer próxima extração precisa ser uma fatia independente; mudança metodológica continua fora deste refactor.
