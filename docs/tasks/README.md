@@ -23,9 +23,11 @@ Registros relevantes:
 - [`ADVANCED_ANALYSIS_DECOMPOSITION_PLAN.md`](ADVANCED_ANALYSIS_DECOMPOSITION_PLAN.md) — ordem segura de extração de `analysis/advanced.ts`;
 - [`ADVANCED_CONTINUITY_CHARACTERIZATION.md`](ADVANCED_CONTINUITY_CHARACTERIZATION.md) — contratos de gaps, continuidade e left-censoring;
 - [`ADVANCED_CONTINUITY_OWNER.md`](ADVANCED_CONTINUITY_OWNER.md) — owner de continuidade/qualidade extraído em #236;
-- `src/analysis/statistics.ts` — owner de estatística/combinatória extraído em #243 com reexports públicos preservados.
+- `src/analysis/statistics.ts` — owner de estatística/combinatória extraído em #243 com reexports públicos preservados;
+- [`ADVANCED_STRUCTURE_CHARACTERIZATION.md`](ADVANCED_STRUCTURE_CHARACTERIZATION.md) — contrato estrutural das três loterias e regressão de gaps estabilizado em #249;
+- [`ADVANCED_STRUCTURE_OWNER.md`](ADVANCED_STRUCTURE_OWNER.md) — owner de estrutura/filtros metodológicos concluído em #250.
 
-Próximo foco: avaliar a seam de estrutura/filtros metodológicos apenas se houver characterization suficiente para provar equivalência sem mudança metodológica.
+Próximo foco: reavaliar o hotspot restante depois da extração estrutural antes de escolher outra seam; mudança metodológica continua fora deste refactor.
 
 ## #63 — Observabilidade operacional
 
