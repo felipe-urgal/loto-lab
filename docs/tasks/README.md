@@ -25,9 +25,9 @@ Registros relevantes:
 - [`ADVANCED_CONTINUITY_OWNER.md`](ADVANCED_CONTINUITY_OWNER.md) — owner de continuidade/qualidade extraído em #236;
 - `src/analysis/statistics.ts` — owner de estatística/combinatória extraído em #243 com reexports públicos preservados;
 - [`ADVANCED_STRUCTURE_CHARACTERIZATION.md`](ADVANCED_STRUCTURE_CHARACTERIZATION.md) — contrato estrutural das três loterias e regressão de gaps estabilizado em #249;
-- [`ADVANCED_STRUCTURE_OWNER.md`](ADVANCED_STRUCTURE_OWNER.md) — owner de estrutura/filtros metodológicos em review via PR #250.
+- [`ADVANCED_STRUCTURE_OWNER.md`](ADVANCED_STRUCTURE_OWNER.md) — owner de estrutura/filtros metodológicos concluído em #250.
 
-Próximo foco: revisar/integrar a PR #250 sem alterar metodologia ou expected values; depois reavaliar o hotspot restante antes de escolher outra seam.
+Próximo foco: reavaliar o hotspot restante depois da extração estrutural antes de escolher outra seam; mudança metodológica continua fora deste refactor.
 
 ## #63 — Observabilidade operacional
 
