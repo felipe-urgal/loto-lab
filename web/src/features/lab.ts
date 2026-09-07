@@ -1,8 +1,9 @@
 import { ApiError, api } from "../core/api.js";
+import { isLotteryId } from "../core/mainContext.js";
+import type { LotteryId } from "../core/mainContext.js";
 import { escapeHtml } from "../shared/escaping.js";
 import { formatCurrency, formatPercent } from "../shared/formatters.js";
 
-type LotteryId = "mega-sena" | "lotofacil" | "dia-de-sorte";
 type LabExperiment = "fixed-core" | "score-model" | "external-rules";
 type RankingBasis = "roi" | "prizeRate";
 type MetricKey = "averageHitsPerGame" | "prizeRate" | "roi" | "netResult";
@@ -182,10 +183,6 @@ function errorMessage(error: unknown): string {
 
 function finiteNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function isLotteryId(value: string | null): value is LotteryId {
-  return value !== null && Object.hasOwn(lotteries, value);
 }
 
 function isLabExperiment(value: string): value is LabExperiment {
