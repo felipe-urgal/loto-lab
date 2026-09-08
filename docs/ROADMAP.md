@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline reconciliada em **2026-09-08** sobre `main` + a entrega preparada em #252.
+> Baseline reconciliada em **2026-09-08**, após a entrega de #252.
 >
 > Este documento é a fonte de verdade para **prioridade, dependências e estado atual** das issues estruturais. Detalhes de implementação e histórico pertencem às próprias issues/PRs e a `docs/tasks/`.
 
