@@ -2,7 +2,7 @@
 
 Issue: #62
 
-Status: execução incremental em andamento; continuidade (#236), estatística/combinatória (#243) e estrutura (#250) já estão na `main`. A próxima seam reavaliada é associações, precedida por characterization pública em `test/62-analysis-associations-characterization`.
+Status: execução incremental em andamento; continuidade (#236), estatística/combinatória (#243), estrutura (#250) e characterization de associações (#251) já estão na `main`. A fatia atual extrai o owner de associações em `refactor/62-analysis-associations-owner`.
 
 ## Contexto
 
@@ -10,14 +10,14 @@ Status: execução incremental em andamento; continuidade (#236), estatística/c
 
 Este documento mantém a decomposição em seams pequenas e verificáveis. A regra é preservar o contrato lógico de `buildAdvancedAnalysis`: um PR de decomposição não é oportunidade para mudar score, janelas, thresholds, correção estatística, copy metodológica ou schema público.
 
-Depois da extração estrutural em #250, o hotspot foi reavaliado antes de puxar outra seam. Associações de pares/trincas continuam sendo uma fronteira coesa: dependem do universo da loteria e dos helpers estatísticos já estabilizados, sem tocar continuidade, ranking, ciclos ou rolling validation.
+Depois da extração estrutural em #250, o hotspot foi reavaliado antes de puxar outra seam. Associações de pares/trincas foram confirmadas como fronteira coesa: dependem do universo da loteria e dos helpers estatísticos já estabilizados, sem tocar continuidade, ranking, ciclos ou rolling validation. A characterization de #251 congelou o boundary público antes da movimentação de código.
 
 ## Estado atual
 
 - **PR A — continuidade/qualidade: concluído em #236.** `src/analysis/continuity.ts` é o owner de `isConsecutive`, `splitContinuousSegments`, `latestContinuousSegment` e `buildDataQuality`.
 - **PR B — estatística/combinatória: concluído em #243.** `src/analysis/statistics.ts` é o owner dos helpers matemáticos puros, com reexports públicos históricos preservados por `advanced.ts`.
 - **PR C — estrutura: concluído em #250.** `src/analysis/structure.ts` é o owner de estrutura/filtros metodológicos, protegido pela characterization de #249.
-- **PR D — associações: próxima seam candidata.** Antes da extração, `tests/advancedAssociationsCharacterization.test.ts` congela o boundary público de pares/trincas, inferência e Bonferroni.
+- **PR D — associações: em execução.** `tests/advancedAssociationsCharacterization.test.ts`, entregue em #251, congela pares/trincas, inferência, Bonferroni e highlights; a branch atual move somente esse bloco para `src/analysis/associations.ts`.
 - PRs E–G só avançam se a seam anterior estiver estável e ainda houver ganho claro de ownership.
 
 ## Mapa atual de responsabilidades
@@ -70,6 +70,8 @@ Invariant: um ciclo iniciado antes de uma lacuna não pode ser tratado como conh
 
 ### 6. Associações exploratórias
 
+Owner em extração: `src/analysis/associations.ts`.
+
 Funções: chaves de pares/trincas, `associationStat`, `buildAssociations` e inferência associada.
 
 Dependências: `numberRange` + combinatória/estatística compartilhada.
@@ -110,11 +112,11 @@ Helpers puros extraídos para `src/analysis/statistics.ts`, preservando reexport
 
 Estrutura e filtros metodológicos extraídos para `src/analysis/structure.ts` depois da characterization de #249, sem alterar ranges, baselines, gaps ou expected values.
 
-### PR D — associações — próxima seam candidata
+### PR D — associações — em execução
 
-Antes de mover código, estabilizar characterization pública para as três loterias cobrindo pares, trincas, Bonferroni, highlights e evidence levels.
+Characterization pública entregue em #251 para as três loterias cobrindo pares, trincas, Bonferroni, highlights e evidence levels.
 
-Se a characterization ficar verde, mover pares/trincas e inferência associada para owner próprio. Preservar exatamente teste/correção/evidence levels e não aproveitar o refactor para criar nova inferência.
+A branch atual move pares/trincas e inferência associada para owner próprio. Deve preservar exatamente teste/correção/evidence levels e não aproveitar o refactor para criar nova inferência.
 
 ### PR E — dinâmica/ciclos
 
@@ -156,4 +158,4 @@ Pare e não abra PR quando qualquer um ocorrer:
 
 ## Decisão atual
 
-Depois de #250, a seam de associações foi reavaliada e continua pequena/coesa o suficiente para ser a próxima candidata. A branch `test/62-analysis-associations-characterization` deve primeiro provar o comportamento público atual. Só então a extração do owner de associações pode começar, sem alterar expected values, inferência ou schema.
+#251 estabilizou a seam de associações sem mudança de expected values. A fatia atual extrai esse owner e deve manter a characterization intacta. Depois do merge, ciclos/dinâmica devem ser reavaliados antes de qualquer nova extração, em vez de seguir a ordem apenas por tamanho de arquivo.
