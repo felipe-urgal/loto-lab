@@ -25,9 +25,10 @@ Registros relevantes:
 - [`ADVANCED_CONTINUITY_OWNER.md`](ADVANCED_CONTINUITY_OWNER.md) — owner de continuidade/qualidade extraído em #236;
 - `src/analysis/statistics.ts` — owner de estatística/combinatória extraído em #243 com reexports públicos preservados;
 - [`ADVANCED_STRUCTURE_CHARACTERIZATION.md`](ADVANCED_STRUCTURE_CHARACTERIZATION.md) — contrato estrutural das três loterias e regressão de gaps estabilizado em #249;
-- [`ADVANCED_STRUCTURE_OWNER.md`](ADVANCED_STRUCTURE_OWNER.md) — owner de estrutura/filtros metodológicos concluído em #250.
+- [`ADVANCED_STRUCTURE_OWNER.md`](ADVANCED_STRUCTURE_OWNER.md) — owner de estrutura/filtros metodológicos concluído em #250;
+- [`ADVANCED_ASSOCIATIONS_CHARACTERIZATION.md`](ADVANCED_ASSOCIATIONS_CHARACTERIZATION.md) — characterization pública de pares/trincas e Bonferroni iniciada após a reavaliação do hotspot.
 
-Próximo foco: reavaliar o hotspot restante depois da extração estrutural antes de escolher outra seam; mudança metodológica continua fora deste refactor.
+Próximo foco: validar a characterization de associações e, somente se permanecer verde sem alteração de expected values, extrair o owner coeso de pares/trincas. Mudança metodológica continua fora deste refactor.
 
 ## #63 — Observabilidade operacional
 
