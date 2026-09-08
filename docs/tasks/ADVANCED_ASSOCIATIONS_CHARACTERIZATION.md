@@ -2,9 +2,9 @@
 
 Issue: #62
 
-Branch: `test/62-analysis-associations-characterization`
+Entregue em #251.
 
-Status: em execução para validação antes da extração do owner de associações.
+Status: concluída; a characterization está na `main` e protege a extração do owner de associações.
 
 ## Objetivo
 
@@ -30,10 +30,10 @@ Ela congela:
 
 ## Guardrails
 
-- nenhum helper sai de `advanced.ts` nesta fatia;
+- nenhum helper saiu de `advanced.ts` nesta fatia;
 - nenhuma mudança em score, ranking, weights, estrutura, ciclos, similaridade ou rolling validation;
 - nenhuma mudança de teste estatístico, correção, threshold ou evidence level;
-- nenhum expected value é ajustado para facilitar a futura extração;
+- nenhum expected value foi ajustado para facilitar a futura extração;
 - diferenças entre loterias continuam refletidas pelos seus universos e tamanhos de sorteio reais;
 - o teste protege o resultado público, não funções internas que serão movidas.
 

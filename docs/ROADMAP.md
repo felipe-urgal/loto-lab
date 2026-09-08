@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline reconciliada em **2026-09-06** sobre `main`, após os merges #242–#246.
+> Baseline reconciliada em **2026-09-08**, após a entrega de #252.
 >
 > Este documento é a fonte de verdade para **prioridade, dependências e estado atual** das issues estruturais. Detalhes de implementação e histórico pertencem às próprias issues/PRs e a `docs/tasks/`.
 
@@ -51,19 +51,24 @@ Diretriz permanente:
 - produção possui `prod:resources` + protocolo documentado para baseline comparável antes de tuning;
 - CI funcional, Security e E2E permanecem guardrails proporcionais ao risco.
 
-### Entregas recentes #242–#246
+### Entregas recentes relevantes
 
 - #242 / #60 — apresentação de Execuções extraída para `web/src/features/jobs/presentation.ts`, preservando API/DOM/polling/cancelamento/lifecycle no owner original;
 - #243 / #62 — estatística/combinatória pura extraída para `src/analysis/statistics.ts`, com reexports públicos e characterization preservados;
-- #244 / #63 — runbooks operacionais para CAIXA, jobs, sync, PostgreSQL e OpenAI, descobertos a partir de `docs/OPERATIONS.md`;
-- #245 / #65 — protocolo reproduzível de baseline de CPU/memória, descoberto a partir de `docs/PRODUCTION.md`;
-- #246 / #66 — decisão humana/auditável de hipótese via API, com evidência obrigatória, escrita concorrente segura e `docs/API.md` reconciliado.
+- #244 / #63 — runbooks operacionais para CAIXA, jobs, sync, PostgreSQL e OpenAI;
+- #245 / #65 — protocolo reproduzível de baseline de CPU/memória;
+- #246 / #66 — decisão humana/auditável de hipótese via API, com evidência obrigatória e escrita concorrente segura;
+- #248 / #60 — Laboratório reutiliza o contexto compartilhado de loteria;
+- #249 / #62 — characterization estrutural das três loterias e comportamento com gaps;
+- #250 / #62 — owner de estrutura/filtros metodológicos em `src/analysis/structure.ts`;
+- #251 / #62 — characterization pública de associações de pares/trincas, binomial bilateral exato, Bonferroni e highlights;
+- #252 / #62 — owner de associações em `src/analysis/associations.ts`, preservando a characterization e o schema público.
 
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
 - frontend ainda possui state/lifecycle imperativo e módulos grandes em superfícies restantes (#60);
-- `analysis/advanced.ts` continua hotspot após continuidade e estatística/combinatória terem owners próprios (#62);
+- `analysis/advanced.ts` foi reduzido por owners de continuidade, estatística, estrutura e associações, mas ainda concentra ciclos, dinâmica/ranking, rolling validation, similaridade e composição (#62);
 - métricas e runbooks existem, mas ainda falta baseline observada suficiente para definir poucos SLOs úteis (#63);
 - a jornada contextual ainda pode reduzir troca de contexto em Laboratório/proveniência/IA sem criar estado duplicado (#64);
 - performance continua dependente de séries comparáveis antes/depois; nenhum tuning está autorizado por amostra isolada (#65);
@@ -88,7 +93,8 @@ Entregue recentemente:
 - #222 — guard de boundaries JavaScript import-only;
 - #227 — contrato compartilhado de contexto principal;
 - #234 — Agenda reutiliza identidade tipada de loteria;
-- #242 — apresentação de Execuções separada do lifecycle, sem alterar jornada.
+- #242 — apresentação de Execuções separada do lifecycle, sem alterar jornada;
+- #248 — Laboratório reutiliza o contexto compartilhado de loteria.
 
 **Próximas fatias:**
 
@@ -129,13 +135,17 @@ Entregue:
 - #223 — plano de decomposição de `analysis/advanced.ts`;
 - #228 — characterization de continuidade/gaps/left-censoring;
 - #236 — owner de continuidade/qualidade;
-- #243 — owner de estatística/combinatória compartilhada.
+- #243 — owner de estatística/combinatória compartilhada;
+- #249 — characterization estrutural;
+- #250 — owner de estrutura/filtros metodológicos;
+- #251 — characterization de associações;
+- #252 — owner de associações de pares/trincas.
 
-**Próxima fatia de código:** avaliar a seam de **estrutura** prevista no plano, somente se puder ser extraída sem mover metodologia ou criar ciclos.
+**Próxima ação:** reavaliar **ciclos/dinâmica** antes de abrir nova fatia. Ciclos são a menor candidata; dinâmica/ranking têm fan-out maior e exigem characterization própria antes de qualquer movimentação.
 
-Depois: associações → dinâmica/ciclos → rolling validation → similaridade/composição final.
+Depois, somente se houver ganho claro de ownership e contratos suficientes: rolling validation → similaridade/composição final.
 
-Qualquer mudança de score, threshold, janela, correção estatística ou metodologia deve ser issue/PR separado.
+Qualquer mudança de score, threshold, janela, correção estatística, evidence level ou metodologia deve ser issue/PR separado. Rolling validation continua subordinada ao invariant anti-leakage e não deve ser movida por conveniência de tamanho de arquivo.
 
 ## #64 — Arquitetura de informação e jornada pós-redesign · P2 · em andamento
 
@@ -215,7 +225,7 @@ Controllers de feature HTTP não compõem repositories/managers/providers concre
   ↓
 #65 tuning somente quando a medição justificar
 
-#62 advanced.ts: próxima seam estrutural segura
+#62 advanced.ts: reavaliar ciclos/dinâmica antes da próxima seam
 
 #66 aplicação/resultado real com proveniência canônica
 ```
