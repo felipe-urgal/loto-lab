@@ -2,29 +2,35 @@
 
 Issue: #62
 
-Status: execução incremental em andamento; PR A (continuidade/qualidade) já está na `main` e PR B (estatística/combinatória) é a fatia atual.
+Status: execução incremental em andamento; continuidade (#236), estatística/combinatória (#243) e estrutura (#250) já estão na `main`. A próxima seam reavaliada é associações, precedida por characterization pública em `test/62-analysis-associations-characterization`.
 
 ## Contexto
 
-`src/analysis/advanced.ts` concentra composição e várias responsabilidades estatísticas. Uma extração ampla de estrutura já foi corretamente abortada em uma rodada anterior porque reescrever o hotspot inteiro criaria risco maior que o benefício imediato.
+`src/analysis/advanced.ts` ainda concentra composição e responsabilidades estatísticas relevantes, mas já delega continuidade/qualidade, estatística/combinatória e estrutura a owners próprios.
 
-Este documento transforma o código atual em uma sequência de seams pequenas e verificáveis. A regra é preservar byte a byte o contrato lógico de `buildAdvancedAnalysis`: um PR de decomposição não é oportunidade para mudar score, janelas, thresholds, correção estatística, copy metodológica ou schema público.
+Este documento mantém a decomposição em seams pequenas e verificáveis. A regra é preservar o contrato lógico de `buildAdvancedAnalysis`: um PR de decomposição não é oportunidade para mudar score, janelas, thresholds, correção estatística, copy metodológica ou schema público.
+
+Depois da extração estrutural em #250, o hotspot foi reavaliado antes de puxar outra seam. Associações de pares/trincas continuam sendo uma fronteira coesa: dependem do universo da loteria e dos helpers estatísticos já estabilizados, sem tocar continuidade, ranking, ciclos ou rolling validation.
 
 ## Estado atual
 
-- **PR A — continuidade/qualidade: concluído na `main`.** `src/analysis/continuity.ts` é o owner de `isConsecutive`, `splitContinuousSegments`, `latestContinuousSegment` e `buildDataQuality`, protegido por characterization e teste de ownership.
-- **PR B — estatística/combinatória: fatia atual.** `src/analysis/statistics.ts` recebe apenas helpers matemáticos puros; `advanced.ts` mantém os exports públicos históricos durante a transição.
-- PRs C–G permanecem futuros e só avançam se a extração anterior estiver estável.
+- **PR A — continuidade/qualidade: concluído em #236.** `src/analysis/continuity.ts` é o owner de `isConsecutive`, `splitContinuousSegments`, `latestContinuousSegment` e `buildDataQuality`.
+- **PR B — estatística/combinatória: concluído em #243.** `src/analysis/statistics.ts` é o owner dos helpers matemáticos puros, com reexports públicos históricos preservados por `advanced.ts`.
+- **PR C — estrutura: concluído em #250.** `src/analysis/structure.ts` é o owner de estrutura/filtros metodológicos, protegido pela characterization de #249.
+- **PR D — associações: próxima seam candidata.** Antes da extração, `tests/advancedAssociationsCharacterization.test.ts` congela o boundary público de pares/trincas, inferência e Bonferroni.
+- PRs E–G só avançam se a seam anterior estiver estável e ainda houver ganho claro de ownership.
 
 ## Mapa atual de responsabilidades
 
 ### 1. Estatística/combinatória compartilhada
 
+Owner atual: `src/analysis/statistics.ts`.
+
 Funções: `round`, `mean`, `quantile`, `summarize`, `percentileRank`, `combination`, `hypergeometricDistribution`, tabela/binomial exata, CDF normal e `evidenceLevel`.
 
 Consumidores: estrutura, associações, delays/dinâmica e validação.
 
-Risco especial: `combination`, `hypergeometricDistribution` e `exactBinomialTwoSidedP` são exports públicos e precisam continuar importáveis pelo caminho `src/analysis/advanced.ts` durante a extração.
+Exports públicos históricos `combination`, `hypergeometricDistribution` e `exactBinomialTwoSidedP` continuam importáveis pelo caminho `src/analysis/advanced.ts`.
 
 ### 2. Continuidade e qualidade histórica
 
@@ -32,11 +38,13 @@ Owner atual: `src/analysis/continuity.ts`.
 
 Funções: `isConsecutive`, `splitContinuousSegments`, `latestContinuousSegment`, `buildDataQuality`.
 
-Consumidores: estrutura de repetição, delay/streak, ciclos, similaridade e rolling validation.
+Consumidores: delay/streak, ciclos, similaridade e rolling validation.
 
 Invariant: uma lacuna nunca pode ser atravessada por métrica sequencial; histórico censurado à esquerda continua distinto de histórico contínuo conhecido.
 
 ### 3. Estrutura do sorteio e filtros metodológicos
+
+Owner atual: `src/analysis/structure.ts`.
 
 Funções: `longestConsecutiveRun`, `lotofacilGrid`, `structureForContest`, `structuralMetric`, `methodologyRanges`, `exactFilterCoverage`, `buildStructure`.
 
@@ -62,11 +70,11 @@ Invariant: um ciclo iniciado antes de uma lacuna não pode ser tratado como conh
 
 ### 6. Associações exploratórias
 
-Funções: chaves de pares/trincas, `associationStat`, `buildAssociations` e binomial exata/correção.
+Funções: chaves de pares/trincas, `associationStat`, `buildAssociations` e inferência associada.
 
-Dependências: combinatória + estatística compartilhada.
+Dependências: `numberRange` + combinatória/estatística compartilhada.
 
-Invariants: teste binomial bilateral exato, Bonferroni, número total de comparações e níveis de evidência permanecem idênticos; associação continua explicitamente exploratória.
+Invariants: teste binomial bilateral exato, Bonferroni, número total de comparações, arredondamento e níveis de evidência permanecem idênticos; associação continua explicitamente exploratória.
 
 ### 7. Similaridade histórica
 
@@ -90,35 +98,27 @@ Invariants: cada target usa somente prefixo anterior; warmup permanece 20; janel
 
 ## Ordem dos PRs
 
-### PR A — continuidade/qualidade — concluído
+### PR A — continuidade/qualidade — concluído em #236
 
-Extraído para `src/analysis/continuity.ts` com characterization de histórico contínuo, gaps e ownership. Não repetir esta fatia nem devolver helpers ao hotspot.
+Extraído para `src/analysis/continuity.ts` com characterization de histórico contínuo, gaps e ownership.
 
-### PR B — estatística/combinatória — atual
+### PR B — estatística/combinatória — concluído em #243
 
-Separar helpers puros, preservando reexports públicos a partir de `advanced.ts`. Não alterar arredondamento, algoritmo de probabilidade ou thresholds.
+Helpers puros extraídos para `src/analysis/statistics.ts`, preservando reexports públicos a partir de `advanced.ts` e os valores matemáticos existentes.
 
-Caracterização obrigatória:
+### PR C — estrutura — concluído em #250
 
-- combinações nos limites;
-- distribuição hipergeométrica soma ~1;
-- binomial bilateral nos casos já cobertos;
-- mesmos outputs da análise avançada nas fixtures atuais;
-- teste de ownership impede que os helpers retornem silenciosamente ao hotspot.
+Estrutura e filtros metodológicos extraídos para `src/analysis/structure.ts` depois da characterization de #249, sem alterar ranges, baselines, gaps ou expected values.
 
-### PR C — estrutura
+### PR D — associações — próxima seam candidata
 
-Somente depois de A+B. Mover estrutura e filtro metodológico como bloco, importando continuidade/combinatória já estabilizadas. Evita que um único PR mova helpers e todos os consumidores ao mesmo tempo.
+Antes de mover código, estabilizar characterization pública para as três loterias cobrindo pares, trincas, Bonferroni, highlights e evidence levels.
 
-Caracterização obrigatória por loteria, incluindo grade 5×5 da Lotofácil, repetidas e cobertura exata/histórica.
-
-### PR D — associações
-
-Mover pares/trincas e inferência associada para owner próprio. Preservar exatamente teste/correção/evidence levels e não aproveitar o refactor para criar nova inferência.
+Se a characterization ficar verde, mover pares/trincas e inferência associada para owner próprio. Preservar exatamente teste/correção/evidence levels e não aproveitar o refactor para criar nova inferência.
 
 ### PR E — dinâmica/ciclos
 
-Separar primeiro ciclos, depois ranking/dinâmica se ainda houver ganho claro. `buildDynamics` tem fan-out alto e só deve sair quando os helpers de continuidade/estatística já estiverem estáveis.
+Separar primeiro ciclos, depois ranking/dinâmica se ainda houver ganho claro. `buildDynamics` tem fan-out alto e só deve sair com rede de characterization suficiente.
 
 ### PR F — validação rolling
 
@@ -135,7 +135,7 @@ Extrair similaridade somente se reduzir de fato o hotspot. Depois revisar `build
 | continuidade | gaps, left-censoring, trecho final | atravessar concurso ausente |
 | combinatória | combinações, distribuições, p-values | diferença numérica/rounding |
 | estrutura | 3 loterias, repetição, Lotofácil grid | regra de loteria alterada |
-| associações | pares/trincas, Bonferroni | p-value/evidência diferente |
+| associações | pares/trincas, Bonferroni, highlights | p-value/evidência diferente |
 | dinâmica | ranks, offsets, robustez | ranking/tier diferente |
 | ciclos | segmentos completos/incompletos | ciclo conhecido após gap |
 | validação | prefix-only + janelas | qualquer leakage futuro |
@@ -151,9 +151,9 @@ Pare e não abra PR quando qualquer um ocorrer:
 - o novo módulo cria ciclo de imports ou apenas desloca um arquivo grande para outro;
 - é necessário mudar schema público/expected values para a extração passar;
 - a motivação virou somente reduzir linhas;
-- invariants de gaps/anti-leakage não conseguem ser caracterizados antes da mudança;
+- invariants relevantes não conseguem ser caracterizados antes da mudança;
 - surge mudança metodológica incidental — ela deve virar issue/PR próprio com justificativa científica.
 
 ## Decisão atual
 
-Com continuidade já estabilizada na `main`, a próxima extração segura é **PR B — estatística/combinatória reutilizada**. Estrutura, associações, dinâmica, ciclos, rolling validation e similaridade permanecem fora desta fatia.
+Depois de #250, a seam de associações foi reavaliada e continua pequena/coesa o suficiente para ser a próxima candidata. A branch `test/62-analysis-associations-characterization` deve primeiro provar o comportamento público atual. Só então a extração do owner de associações pode começar, sem alterar expected values, inferência ou schema.
