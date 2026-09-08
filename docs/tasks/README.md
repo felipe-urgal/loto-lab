@@ -27,9 +27,9 @@ Registros relevantes:
 - [`ADVANCED_STRUCTURE_CHARACTERIZATION.md`](ADVANCED_STRUCTURE_CHARACTERIZATION.md) — contrato estrutural das três loterias e regressão de gaps estabilizado em #249;
 - [`ADVANCED_STRUCTURE_OWNER.md`](ADVANCED_STRUCTURE_OWNER.md) — owner de estrutura/filtros metodológicos concluído em #250;
 - [`ADVANCED_ASSOCIATIONS_CHARACTERIZATION.md`](ADVANCED_ASSOCIATIONS_CHARACTERIZATION.md) — pares/trincas, Bonferroni e highlights estabilizados em #251;
-- [`ADVANCED_ASSOCIATIONS_OWNER.md`](ADVANCED_ASSOCIATIONS_OWNER.md) — extração do owner coeso de associações em execução.
+- [`ADVANCED_ASSOCIATIONS_OWNER.md`](ADVANCED_ASSOCIATIONS_OWNER.md) — owner coeso de associações concluído em #252.
 
-Próximo foco: concluir a extração de associações sem alterar expected values e, depois, reavaliar ciclos/dinâmica antes de escolher nova seam. Mudança metodológica continua fora deste refactor.
+Próximo foco: reavaliar ciclos/dinâmica antes de escolher nova seam. Só avançar com characterization suficiente e ganho real de ownership; rolling validation permanece protegida pelo invariant anti-leakage e mudança metodológica continua fora destes refactors.
 
 ## #63 — Observabilidade operacional
 
