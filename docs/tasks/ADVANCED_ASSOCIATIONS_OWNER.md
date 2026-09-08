@@ -2,9 +2,9 @@
 
 Issue: #62
 
-Branch: `refactor/62-analysis-associations-owner`
+Entregue em #252.
 
-Status: em execução após a characterization entregue em #251.
+Status: concluído; `src/analysis/associations.ts` é o owner coeso de associações de pares/trincas.
 
 ## Objetivo
 
@@ -12,14 +12,14 @@ Extrair de `src/analysis/advanced.ts` a responsabilidade coesa de associações 
 
 ## Ownership
 
-- `src/analysis/associations.ts` passa a possuir contagem de pares/trincas, probabilidades esperadas, estatística de associação, teste binomial bilateral exato, correção de Bonferroni e highlights;
+- `src/analysis/associations.ts` possui contagem de pares/trincas, probabilidades esperadas, estatística de associação, teste binomial bilateral exato, correção de Bonferroni e highlights;
 - `src/analysis/statistics.ts` continua owner dos helpers matemáticos compartilhados;
 - `src/analysis/frequency.ts` continua owner do universo válido da loteria via `numberRange`;
-- `src/analysis/advanced.ts` permanece composition root e apenas delega `combinations` ao novo owner.
+- `src/analysis/advanced.ts` permanece composition root e apenas delega `combinations` ao owner de associações.
 
 ## Contratos preservados
 
-A characterization de #251 deve permanecer inalterada para Mega-Sena, Lotofácil e Dia de Sorte:
+A characterization de #251 permaneceu inalterada para Mega-Sena, Lotofácil e Dia de Sorte:
 
 - total de pares e total de comparações de trincas;
 - `observed`, `expected`, `lift`, `zScore`, `pValue`, `adjustedPValue` e `evidence`;
@@ -39,6 +39,10 @@ A characterization de #251 deve permanecer inalterada para Mega-Sena, Lotofácil
 
 ## Validação
 
-Além de `tests/advancedAssociationsCharacterization.test.ts`, esta fatia adiciona um guard de ownership para impedir que a implementação retorne silenciosamente a `advanced.ts` ou ganhe dependências de continuidade/scoring/estrutura.
+Além de `tests/advancedAssociationsCharacterization.test.ts`, #252 adicionou `tests/advancedAssociationsOwnership.test.ts` para impedir que a implementação retorne silenciosamente a `advanced.ts` ou ganhe dependências de continuidade/scoring/estrutura.
 
-O gate canônico permanece `npm run check`. A PR só fica pronta após CI verde no SHA final, pré-review do diff e auto code review final conforme `AGENTS.md`.
+A entrega foi validada pelo gate canônico `npm run check` e por auto code review final no SHA verde do PR, sem threads ou findings bloqueantes.
+
+## Próximo passo
+
+Reavaliar ciclos/dinâmica antes de escolher outra seam. A próxima extração só deve existir se houver characterization suficiente e ganho real de ownership; a ordem do plano não é automática.
