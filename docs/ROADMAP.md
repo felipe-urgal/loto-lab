@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline reconciliada em **2026-09-09**, com a #256/PR #257 em review após a characterization de ciclos de #253/#254.
+> Baseline reconciliada em **2026-09-09**, após o merge da #256/PR #257 e com a #258/PR #259 em characterization de dinâmica/ranking.
 >
 > Este documento é a fonte de verdade para **prioridade, dependências e estado atual** das issues estruturais. Detalhes de implementação e histórico pertencem às próprias issues/PRs e a `docs/tasks/`.
 
@@ -64,13 +64,14 @@ Diretriz permanente:
 - #251 / #62 — characterization pública de associações de pares/trincas, binomial bilateral exato, Bonferroni e highlights;
 - #252 / #62 — owner de associações em `src/analysis/associations.ts`, preservando a characterization e o schema público;
 - #253/#254 / #62 — characterization pública de ciclos e correção mínima de left-censoring, sem alterar dinâmica/ranking;
-- #256/PR #257 / #62 — owner focado de ciclos em `src/analysis/cycles.ts` está em review, preservando a characterization existente e mantendo `advanced.ts` como composition root.
+- #256/#257 / #62 — owner focado de ciclos em `src/analysis/cycles.ts`, preservando a characterization existente e mantendo `advanced.ts` como composition root;
+- #258/PR #259 / #62 — characterization de dinâmica/ranking em execução antes de qualquer nova extração.
 
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
 - frontend ainda possui state/lifecycle imperativo e módulos grandes em superfícies restantes (#60);
-- `analysis/advanced.ts` foi reduzido por owners de continuidade, estatística, estrutura e associações; ciclos estão em extração na #256/PR #257, enquanto dinâmica/ranking, rolling validation, similaridade e composição ainda permanecem no hotspot (#62);
+- `analysis/advanced.ts` foi reduzido por owners de continuidade, estatística, estrutura, associações e ciclos; dinâmica/ranking está sendo caracterizada na #258, enquanto rolling validation, similaridade e composição ainda permanecem no hotspot (#62);
 - métricas e runbooks existem, mas ainda falta baseline observada suficiente para definir poucos SLOs úteis (#63);
 - a jornada contextual ainda pode reduzir troca de contexto em Laboratório/proveniência/IA sem criar estado duplicado (#64);
 - performance continua dependente de séries comparáveis antes/depois; nenhum tuning está autorizado por amostra isolada (#65);
@@ -142,11 +143,12 @@ Entregue:
 - #250 — owner de estrutura/filtros metodológicos;
 - #251 — characterization de associações;
 - #252 — owner de associações de pares/trincas;
-- #253/#254 — characterization de ciclos, gaps, recuperação de fronteira e left-censoring; o primeiro fechamento observado após fronteira desconhecida não é contado como duração completa.
+- #253/#254 — characterization de ciclos, gaps, recuperação de fronteira e left-censoring;
+- #256/#257 — owner de ciclos em `src/analysis/cycles.ts`, com guard de ownership e CI/review final verdes.
 
-**Em review:** #256/PR #257 move somente `buildCycles` para `src/analysis/cycles.ts`, com dependências restritas a universo da loteria, continuidade e sumarização. A characterization #253 deve permanecer verde sem ajuste de expected values.
+**Em execução:** #258/PR #259 caracteriza `result.ranking.dynamics` pelo boundary público sem mover runtime. A rede cobre desempates, offsets 1/5/10/20, movimentos/tendências, movers, tiers recentes, 243 cenários de robustez, delay/streak e fronteiras de gaps.
 
-**Próxima ação após o merge:** caracterizar dinâmica/ranking por boundary público antes de qualquer nova extração. Ranks, desempates, offsets 1/5/10/20, tiers, movimentos, delay/streak e robustez de pesos precisam permanecer congelados antes de mover ownership.
+**Próxima decisão após a #258:** reavaliar se dinâmica/ranking forma uma seam coesa para owner próprio. Não extrair se for necessário misturar scoring, rolling validation, similaridade ou alterar expected values.
 
 Rolling validation continua subordinada ao invariant anti-leakage e não deve ser movida por conveniência de tamanho de arquivo. Similaridade segue descritiva e só deve sair da composition root se houver ganho claro de ownership.
 
@@ -230,9 +232,9 @@ Controllers de feature HTTP não compõem repositories/managers/providers concre
   ↓
 #65 tuning somente quando a medição justificar
 
-#62 advanced.ts: concluir owner de ciclos (#256/#257)
+#62 advanced.ts: caracterizar dinâmica/ranking (#258/#259)
   ↓
-caracterizar dinâmica/ranking antes de nova extração
+reavaliar owner de dinâmica somente após characterization verde
 
 #66 aplicação/resultado real com proveniência canônica
 ```
