@@ -302,7 +302,7 @@ function buildCycles(contests: Contest[], config: LotteryConfig) {
   segments.forEach((segment, segmentIndex) => {
     const seen = new Set<number>();
     let currentLength = 0;
-    let currentKnown = segmentIndex === 0;
+    let currentKnown = segmentIndex === 0 && contests[0]?.number === 1;
     for (const contest of segment) {
       currentLength += 1;
       for (const number of contest.numbers) seen.add(number);
