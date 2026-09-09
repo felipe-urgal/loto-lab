@@ -2,7 +2,7 @@
 
 Issue: #62
 
-Status: execução incremental em andamento. Continuidade (#236), estatística/combinatória (#243), estrutura (#250) e associações (#252) possuem owners próprios; ciclos estão em extração na #256/PR #257 após a characterization e correção de left-censoring de #253/#254.
+Status: execução incremental em andamento. Continuidade (#236), estatística/combinatória (#243), estrutura (#250), associações (#252) e ciclos (#257) possuem owners próprios; dinâmica/ranking está em characterization na #258/PR #259 antes de qualquer nova extração.
 
 ## Contexto
 
@@ -17,8 +17,9 @@ Este plano mantém a decomposição em seams pequenas e verificáveis. Um PR est
 - **PR C — estrutura: concluído em #250.** `src/analysis/structure.ts` é o owner de estrutura/filtros metodológicos, protegido pela characterization de #249.
 - **PR D — associações: concluído em #252.** `src/analysis/associations.ts` é o owner de pares/trincas e inferência associada, protegido pela characterization de #251 e por guard de ownership.
 - **Characterization de ciclos: concluída em #253/#254.** O boundary público cobre histórico contínuo desde `#1`, gaps, recuperação de fronteira e left-censoring.
-- **PR E — owner de ciclos: em review na #256/PR #257.** Move somente `buildCycles` para `src/analysis/cycles.ts`, com guard de ownership e characterization #253 preservada.
-- **Demais seams: não iniciadas.** Dinâmica/ranking exige characterization própria antes de qualquer movimentação; rolling validation e similaridade continuam posteriores.
+- **PR E — owner de ciclos: concluído em #257.** `src/analysis/cycles.ts` possui `buildCycles`, com guard de ownership e characterization #253 preservada.
+- **Characterization de dinâmica/ranking: em execução na #258/PR #259.** Congela ranks, offsets, movimentos, tiers, robustez, delay/streak e comportamento com gaps antes de qualquer movimentação.
+- **Demais seams: não iniciadas.** Um eventual owner de dinâmica/ranking só pode ser reavaliado após a #258; rolling validation e similaridade continuam posteriores.
 
 ## Mapa atual de responsabilidades
 
@@ -58,13 +59,21 @@ Ainda em `src/analysis/advanced.ts`.
 
 Funções: `rankRows`, `rankMap`, `tierMap`, `rawFrequencyMap`, delay/streak, cenários de peso, `robustnessByNumber`, `buildDynamics`.
 
-Invariants: `DEFAULT_WEIGHTS`, desempates por número, offsets 1/5/10/20, janelas 10/20, estabilidade de tiers e significado de movimento não mudam.
+Invariants existentes:
 
-Antes de qualquer extração, esse bloco precisa de characterization própria cobrindo ranks, offsets, tiers, robustez e comportamento nos históricos representativos.
+- `DEFAULT_WEIGHTS` não muda em refactor;
+- desempates de rank permanecem por número crescente;
+- ranks anteriores usam offsets 1/5/10/20;
+- tendência deriva do movimento de 10 concursos com thresholds atuais;
+- snapshots recentes preservam janelas atuais;
+- robustez usa os 243 cenários de multiplicadores de peso e mantém `rankRange`/shares atuais;
+- delay/streak respeitam fronteiras de continuidade e não atravessam gaps.
+
+A #258/PR #259 caracteriza esses contratos pelo boundary público. Nenhum helper deve ser movido enquanto essa rede não estiver verde e revisada.
 
 ### Ciclos
 
-Owner proposto na #256/PR #257: `src/analysis/cycles.ts`.
+Owner: `src/analysis/cycles.ts`, concluído em #257.
 
 Dependências permitidas: universo da loteria (`numberRange`), continuidade (`splitContinuousSegments`) e sumarização (`summarize`).
 
@@ -92,18 +101,19 @@ Invariants: cada target usa somente prefixo anterior; warmup permanece 20; janel
 
 ## Próximas seams candidatas
 
-### Dinâmica/ranking — characterization antes de qualquer owner
+### Dinâmica/ranking — characterization em #258 antes de qualquer owner
 
-Não mover por proximidade textual. Antes de extrair, congelar por boundary público:
+A characterization deve congelar por boundary público:
 
 - ranks atuais e desempates;
 - offsets 1/5/10/20;
 - movimentos e tendência;
 - tiers recentes e estabilidade;
 - cenários de peso/robustez e `rankRange`;
-- delay/streak e janelas de frequência relevantes.
+- delay/streak e fronteiras de gaps;
+- comportamento sem histórico suficiente.
 
-A futura seam só avança se a characterization permanecer verde sem ajuste de expected values e se a extração reduzir responsabilidade real do hotspot sem criar ciclo de imports.
+Depois da #258 verde/revisada, um owner de dinâmica só pode ser reavaliado se a extração permanecer coesa, sem ciclo de imports e sem alterar expected values. A fronteira entre tier por evidência do score e tier por rank usado na robustez deve permanecer explícita; refactor não é oportunidade para unificar semânticas distintas.
 
 ### Validação rolling
 
@@ -122,7 +132,7 @@ Extrair similaridade somente se reduzir de fato responsabilidade da composition 
 | estrutura | 3 loterias, repetição, Lotofácil grid | regra de loteria alterada |
 | associações | pares/trincas, Bonferroni, highlights | p-value/evidência diferente |
 | ciclos | segmentos completos/incompletos, gaps, left-censoring | ciclo conhecido após fronteira desconhecida |
-| dinâmica | ranks, offsets, robustez | ranking/tier diferente |
+| dinâmica | ranks, offsets, movers, robustez, delay/streak, gaps | ranking/tier ou fronteira sequencial diferente |
 | validação | prefix-only + janelas | qualquer leakage futuro |
 | similaridade | overlap/distância | semântica preditiva nova |
 
@@ -141,6 +151,6 @@ Pare e reavalie quando qualquer um ocorrer:
 
 ## Decisão atual
 
-A #256/PR #257 extrai somente ciclos depois da characterization #253/#254, preservando expected values e dependências focadas. Enquanto essa fatia não estiver verde/revisada, não iniciar outra seam no mesmo hotspot.
+A #256/PR #257 foi mergeada e `src/analysis/cycles.ts` é o owner de ciclos. A #258/PR #259 caracteriza dinâmica/ranking sem mover runtime.
 
-Depois do merge, o próximo passo é caracterizar dinâmica/ranking antes de qualquer movimentação. Rolling validation e similaridade continuam posteriores e condicionadas a contratos suficientes e ganho real de ownership.
+Enquanto a #258 não estiver verde e revisada, não iniciar um owner de dinâmica/ranking. Depois, reavaliar a menor seam possível; rolling validation e similaridade continuam posteriores e condicionadas a contratos suficientes e ganho real de ownership.
