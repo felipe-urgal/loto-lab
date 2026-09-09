@@ -6,7 +6,7 @@ A baseline operacional do Loto Lab mantém runtime, tipos, compilador, CI e imag
 
 | Componente | Baseline | Política |
 | --- | --- | --- |
-| Node.js | `24.19.0` | versão exata em desenvolvimento, CI e Docker |
+| Node.js | `24.20.0` | versão exata em desenvolvimento, CI e Docker |
 | `@types/node` | `24.x` | mesma major do runtime Node |
 | TypeScript | `7.x` | toolchain independente; major controlada por PR dedicado |
 
