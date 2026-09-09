@@ -2,7 +2,7 @@
 
 Issue: #62
 
-Status: execução incremental em andamento. Continuidade (#236), estatística/combinatória (#243), estrutura (#250) e associações (#252) possuem owners próprios; as characterizations de estrutura (#249) e associações (#251) preservam os contratos públicos antes/depois das extrações.
+Status: execução incremental em andamento. Continuidade (#236), estatística/combinatória (#243), estrutura (#250) e associações (#252) possuem owners próprios; as characterizations de estrutura (#249), associações (#251) e ciclos (#253) preservam contratos públicos antes de novas extrações.
 
 ## Contexto
 
@@ -16,6 +16,7 @@ Este plano mantém a decomposição em seams pequenas e verificáveis. Um PR est
 - **PR B — estatística/combinatória: concluído em #243.** `src/analysis/statistics.ts` é o owner dos helpers matemáticos puros, com reexports públicos históricos preservados por `advanced.ts`.
 - **PR C — estrutura: concluído em #250.** `src/analysis/structure.ts` é o owner de estrutura/filtros metodológicos, protegido pela characterization de #249.
 - **PR D — associações: concluído em #252.** `src/analysis/associations.ts` é o owner de pares/trincas e inferência associada, protegido pela characterization de #251 e por guard de ownership.
+- **Characterization de ciclos: #253.** O boundary público de ciclos cobre histórico contínuo desde `#1`, gaps, recuperação de fronteira e left-censoring antes de qualquer extração.
 - **PRs E–G: não iniciados.** Devem ser reavaliados um a um; a ordem abaixo é direção, não obrigação.
 
 ## Mapa atual de responsabilidades
@@ -62,7 +63,11 @@ Invariants: `DEFAULT_WEIGHTS`, desempates por número, offsets 1/5/10/20, janela
 
 Ainda em `src/analysis/advanced.ts`.
 
-Invariant: um ciclo iniciado antes de uma lacuna não pode ser tratado como conhecido depois da lacuna.
+Invariants:
+
+- um ciclo iniciado antes de uma lacuna não pode ser tratado como conhecido depois da lacuna;
+- quando o histórico começa depois do concurso `#1`, o primeiro fechamento observado apenas restabelece uma fronteira conhecida e não entra na distribuição histórica;
+- somente durações observadas de uma fronteira conhecida até o fechamento podem alimentar `completedCount`/`historicalLength`.
 
 ### Similaridade histórica
 
@@ -82,15 +87,21 @@ Invariants: cada target usa somente prefixo anterior; warmup permanece 20; janel
 
 ## Próximas seams candidatas
 
-### PR E — ciclos/dinâmica — reavaliar antes de iniciar
+### PR E — owner de ciclos — reavaliar após #253
 
-Ciclos são a menor candidata dentro deste grupo; ranking/dinâmica têm fan-out maior. Não iniciar apenas porque são os próximos blocos no arquivo.
+#253 estabiliza a menor fronteira do grupo e corrige a divergência de left-censoring antes de qualquer movimentação de código.
 
-Pré-condições:
+Se a characterization ficar verde e a extração continuar pequena, o próximo PR pode mover **somente `buildCycles`** para um owner coeso. Não agrupar ranking/dinâmica por proximidade textual.
 
-- characterization suficiente de ciclos, incluindo segmentos contínuos, gaps e estado conhecido/desconhecido;
-- para dinâmica, characterization de ranks, offsets, robustez e tiers;
-- ganho real de ownership sem criar abstração genérica artificial.
+Pré-condições para a extração:
+
+- characterization #253 verde sem ajuste de expected values;
+- dependências limitadas ao universo da loteria, continuidade e sumarização;
+- nenhum schema público novo;
+- nenhum ciclo de imports;
+- ganho real de ownership em `advanced.ts`.
+
+Dinâmica/ranking continuam com pré-condições próprias: characterization de ranks, offsets, robustez e tiers antes de qualquer movimentação.
 
 ### PR F — validação rolling
 
@@ -108,7 +119,7 @@ Extrair similaridade somente se reduzir de fato responsabilidade da composition 
 | combinatória | combinações, distribuições, p-values | diferença numérica/rounding |
 | estrutura | 3 loterias, repetição, Lotofácil grid | regra de loteria alterada |
 | associações | pares/trincas, Bonferroni, highlights | p-value/evidência diferente |
-| ciclos | segmentos completos/incompletos | ciclo conhecido após gap |
+| ciclos | segmentos completos/incompletos, gaps, left-censoring | ciclo conhecido após fronteira desconhecida |
 | dinâmica | ranks, offsets, robustez | ranking/tier diferente |
 | validação | prefix-only + janelas | qualquer leakage futuro |
 | similaridade | overlap/distância | semântica preditiva nova |
@@ -128,4 +139,4 @@ Pare e reavalie quando qualquer um ocorrer:
 
 ## Decisão atual
 
-#252 conclui a seam de associações preservando a characterization de #251. O próximo trabalho da #62 é **reavaliar ciclos/dinâmica antes de codificar**, começando pela menor fronteira que possua characterization suficiente. Rolling validation e similaridade continuam posteriores e condicionadas a ganho real de ownership.
+#253 caracteriza ciclos por boundary público e reconcilia a fronteira censurada à esquerda sem extrair ownership. Depois desta fatia verde, a #62 pode reavaliar um owner **somente de ciclos**. Dinâmica/ranking, rolling validation e similaridade continuam posteriores e condicionadas a characterization e ganho real de ownership.
