@@ -9,7 +9,7 @@ O Loto Lab organiza hipóteses, estratégias e jogos de forma reproduzível. Fre
 | Baseline | Valor |
 | --- | --- |
 | Versão | `0.6.0` |
-| Runtime | Node.js 24.19.0 LTS / linha 24.x |
+| Runtime | Node.js 24.20.0 LTS / linha 24.x |
 | TypeScript | 7.x |
 | Persistência | PostgreSQL 16 |
 | Frontend | HTML + CSS + ES Modules; owners TypeScript incrementais, sem framework |
@@ -155,7 +155,7 @@ Detalhes: [`docs/DATABASE.md`](docs/DATABASE.md) e [`docs/API.md`](docs/API.md).
 
 ## Requisitos
 
-- **Node.js 24.19.0 LTS**;
+- **Node.js 24.20.0 LTS**;
 - npm;
 - Docker;
 - Docker Compose v2;
@@ -168,7 +168,7 @@ nvm use
 node --version
 ```
 
-A versão esperada é `v24.19.0`.
+A versão esperada é `v24.20.0`.
 
 ## Desenvolvimento local
 
