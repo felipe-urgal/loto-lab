@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline reconciliada em **2026-09-08**, após a entrega de #252.
+> Baseline reconciliada em **2026-09-09**, após a entrega da #253.
 >
 > Este documento é a fonte de verdade para **prioridade, dependências e estado atual** das issues estruturais. Detalhes de implementação e histórico pertencem às próprias issues/PRs e a `docs/tasks/`.
 
@@ -62,13 +62,14 @@ Diretriz permanente:
 - #249 / #62 — characterization estrutural das três loterias e comportamento com gaps;
 - #250 / #62 — owner de estrutura/filtros metodológicos em `src/analysis/structure.ts`;
 - #251 / #62 — characterization pública de associações de pares/trincas, binomial bilateral exato, Bonferroni e highlights;
-- #252 / #62 — owner de associações em `src/analysis/associations.ts`, preservando a characterization e o schema público.
+- #252 / #62 — owner de associações em `src/analysis/associations.ts`, preservando a characterization e o schema público;
+- #253 / #62 — characterization pública de ciclos e correção mínima de left-censoring, sem extrair ownership nem alterar dinâmica/ranking.
 
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
 - frontend ainda possui state/lifecycle imperativo e módulos grandes em superfícies restantes (#60);
-- `analysis/advanced.ts` foi reduzido por owners de continuidade, estatística, estrutura e associações, mas ainda concentra ciclos, dinâmica/ranking, rolling validation, similaridade e composição (#62);
+- `analysis/advanced.ts` foi reduzido por owners de continuidade, estatística, estrutura e associações; ciclos agora possuem characterization explícita, mas implementação, dinâmica/ranking, rolling validation, similaridade e composição ainda permanecem no hotspot (#62);
 - métricas e runbooks existem, mas ainda falta baseline observada suficiente para definir poucos SLOs úteis (#63);
 - a jornada contextual ainda pode reduzir troca de contexto em Laboratório/proveniência/IA sem criar estado duplicado (#64);
 - performance continua dependente de séries comparáveis antes/depois; nenhum tuning está autorizado por amostra isolada (#65);
@@ -139,11 +140,12 @@ Entregue:
 - #249 — characterization estrutural;
 - #250 — owner de estrutura/filtros metodológicos;
 - #251 — characterization de associações;
-- #252 — owner de associações de pares/trincas.
+- #252 — owner de associações de pares/trincas;
+- #253 — characterization de ciclos, incluindo gaps, recuperação de fronteira e base censurada à esquerda; o primeiro fechamento observado após fronteira desconhecida não é contado como duração completa.
 
-**Próxima ação:** reavaliar **ciclos/dinâmica** antes de abrir nova fatia. Ciclos são a menor candidata; dinâmica/ranking têm fan-out maior e exigem characterization própria antes de qualquer movimentação.
+**Próxima ação:** reavaliar um owner **somente de ciclos** como próxima seam mínima. A extração só deve avançar se a characterization #253 permanecer verde sem ajuste de expected values e se as dependências continuarem restritas ao universo da loteria, continuidade e sumarização.
 
-Depois, somente se houver ganho claro de ownership e contratos suficientes: rolling validation → similaridade/composição final.
+Dinâmica/ranking continuam separados e exigem characterization própria de ranks, offsets, tiers e robustez antes de qualquer movimentação. Depois, somente se houver ganho claro de ownership e contratos suficientes: rolling validation → similaridade/composição final.
 
 Qualquer mudança de score, threshold, janela, correção estatística, evidence level ou metodologia deve ser issue/PR separado. Rolling validation continua subordinada ao invariant anti-leakage e não deve ser movida por conveniência de tamanho de arquivo.
 
@@ -225,7 +227,7 @@ Controllers de feature HTTP não compõem repositories/managers/providers concre
   ↓
 #65 tuning somente quando a medição justificar
 
-#62 advanced.ts: reavaliar ciclos/dinâmica antes da próxima seam
+#62 advanced.ts: avaliar owner somente de ciclos após #253
 
 #66 aplicação/resultado real com proveniência canônica
 ```
