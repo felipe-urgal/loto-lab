@@ -29,9 +29,10 @@ Registros relevantes:
 - [`ADVANCED_ASSOCIATIONS_CHARACTERIZATION.md`](ADVANCED_ASSOCIATIONS_CHARACTERIZATION.md) — pares/trincas, Bonferroni e highlights estabilizados em #251;
 - [`ADVANCED_ASSOCIATIONS_OWNER.md`](ADVANCED_ASSOCIATIONS_OWNER.md) — owner coeso de associações concluído em #252;
 - [`ADVANCED_CYCLES_CHARACTERIZATION.md`](ADVANCED_CYCLES_CHARACTERIZATION.md) — contratos de ciclo completo/parcial, gaps, recuperação e left-censoring estabilizados na #253/#254;
-- [`ADVANCED_CYCLES_OWNER.md`](ADVANCED_CYCLES_OWNER.md) — owner focado de ciclos proposto na #256/PR #257, preservando a characterization existente.
+- [`ADVANCED_CYCLES_OWNER.md`](ADVANCED_CYCLES_OWNER.md) — owner focado de ciclos concluído em #257;
+- [`ADVANCED_DYNAMICS_CHARACTERIZATION.md`](ADVANCED_DYNAMICS_CHARACTERIZATION.md) — ranks, offsets, movimentos, robustez, delay/streak e gaps em characterization na #258/PR #259.
 
-Próximo foco: concluir a #256/PR #257 e, só depois, caracterizar **dinâmica/ranking** antes de qualquer nova extração. Ranks, offsets, tiers e robustez precisam de contratos próprios; rolling validation permanece protegida pelo invariant anti-leakage e mudança metodológica continua fora destes refactors.
+Próximo foco: concluir a characterization de **dinâmica/ranking** da #258 antes de qualquer nova extração. Um eventual owner só deve ser reavaliado com esses contratos verdes; rolling validation permanece protegida pelo invariant anti-leakage e mudança metodológica continua fora destes refactors.
 
 ## #63 — Observabilidade operacional
 
