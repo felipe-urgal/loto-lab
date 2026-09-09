@@ -28,9 +28,10 @@ Registros relevantes:
 - [`ADVANCED_STRUCTURE_OWNER.md`](ADVANCED_STRUCTURE_OWNER.md) — owner de estrutura/filtros metodológicos concluído em #250;
 - [`ADVANCED_ASSOCIATIONS_CHARACTERIZATION.md`](ADVANCED_ASSOCIATIONS_CHARACTERIZATION.md) — pares/trincas, Bonferroni e highlights estabilizados em #251;
 - [`ADVANCED_ASSOCIATIONS_OWNER.md`](ADVANCED_ASSOCIATIONS_OWNER.md) — owner coeso de associações concluído em #252;
-- [`ADVANCED_CYCLES_CHARACTERIZATION.md`](ADVANCED_CYCLES_CHARACTERIZATION.md) — contratos de ciclo completo/parcial, gaps, recuperação e left-censoring estabilizados na #253 antes de qualquer extração de ownership.
+- [`ADVANCED_CYCLES_CHARACTERIZATION.md`](ADVANCED_CYCLES_CHARACTERIZATION.md) — contratos de ciclo completo/parcial, gaps, recuperação e left-censoring estabilizados na #253/#254;
+- [`ADVANCED_CYCLES_OWNER.md`](ADVANCED_CYCLES_OWNER.md) — owner focado de ciclos proposto na #256/PR #257, preservando a characterization existente.
 
-Próximo foco: após a #253 ficar verde, reavaliar **somente ciclos** como próxima seam mínima. Dinâmica/ranking continuam separados e exigem characterization própria de ranks, offsets, tiers e robustez; rolling validation permanece protegida pelo invariant anti-leakage e mudança metodológica continua fora destes refactors.
+Próximo foco: concluir a #256/PR #257 e, só depois, caracterizar **dinâmica/ranking** antes de qualquer nova extração. Ranks, offsets, tiers e robustez precisam de contratos próprios; rolling validation permanece protegida pelo invariant anti-leakage e mudança metodológica continua fora destes refactors.
 
 ## #63 — Observabilidade operacional
 
@@ -40,7 +41,7 @@ Registros relevantes:
 - [`ANALYSIS_JOB_OBSERVABILITY.md`](ANALYSIS_JOB_OBSERVABILITY.md) — saúde persistida da fila;
 - [`POSTGRES_POOL_METRICS.md`](POSTGRES_POOL_METRICS.md) — pressão do pool PostgreSQL;
 - [`CAIXA_REQUEST_METRICS.md`](CAIXA_REQUEST_METRICS.md) — requests/latência/erros/timeouts da CAIXA;
-- [`OPENAI_REQUEST_METRICS.md`](OPENAI_REQUEST_METRICS.md) — requests/latência/erros/timeouts e uso conhecido da OpenAI; concluído em #235;
+- [`OPENAI_REQUEST_METRICS.md`](OPENAI_REQUEST_METRICS.md) — requests/outcomes/latência/tokens conhecidos da OpenAI; concluído em #235;
 - [`OPERATIONS_INCIDENT_RUNBOOKS.md`](OPERATIONS_INCIDENT_RUNBOOKS.md) — runbooks operacionais derivados dos sinais existentes; concluído em #244.
 
 Próximo foco: observar baseline real e definir poucos SLOs úteis antes de qualquer tuning de timeout/retry/backoff/pool/concorrência.
@@ -52,7 +53,7 @@ Registros relevantes:
 - [`INFORMATION_ARCHITECTURE_JOURNEY.md`](INFORMATION_ARCHITECTURE_JOURNEY.md) — Protótipo A e jornada alvo;
 - [`LAB_CONTEXTUAL_BACKTESTS.md`](LAB_CONTEXTUAL_BACKTESTS.md) — Laboratório → Testes históricos;
 - [`ANALYSIS_CONTEXT_ACTIONS.md`](ANALYSIS_CONTEXT_ACTIONS.md) — Análises → Laboratório/Gerador;
-- [`JOBS_CONTEXT_LINKS.md`](JOBS_CONTEXT_LINKS.md) — Execuções → owners de origem e retorno de backtest concluído por `jobId`, reconciliado em #237/#239.
+- [`JOBS_CONTEXT_LINKS.md`](JOBS_CONTEXT_LINKS.md) — Execuções → owners funcionais e retorno de backtest concluído por `jobId`, reconciliado em #237/#239.
 
 Próximo foco: avaliar retorno contextual do Laboratório e proveniência/IA somente quando existir identidade persistida suficiente, sem estado duplicado.
 
@@ -87,4 +88,4 @@ Ao concluir uma fatia:
 3. criar ou atualizar task doc apenas quando houver contrato/decisão que mereça histórico próprio;
 4. substituir status pré-merge (`em branch`, `pronto para merge`) pelo PR efetivamente entregue;
 5. não duplicar critérios de aceite em README, roadmap, issue e task doc sem necessidade;
-6. documentos concluídos podem permanecer como histórico, mas não devem ser interpretados como backlog ativo.
+6. documentos concluídos podem permanecer como histórico, mas não devem ser interpretados como backlog ativo apenas por permanecerem versionados.
