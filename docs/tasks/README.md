@@ -27,9 +27,10 @@ Registros relevantes:
 - [`ADVANCED_STRUCTURE_CHARACTERIZATION.md`](ADVANCED_STRUCTURE_CHARACTERIZATION.md) — contrato estrutural das três loterias e regressão de gaps estabilizado em #249;
 - [`ADVANCED_STRUCTURE_OWNER.md`](ADVANCED_STRUCTURE_OWNER.md) — owner de estrutura/filtros metodológicos concluído em #250;
 - [`ADVANCED_ASSOCIATIONS_CHARACTERIZATION.md`](ADVANCED_ASSOCIATIONS_CHARACTERIZATION.md) — pares/trincas, Bonferroni e highlights estabilizados em #251;
-- [`ADVANCED_ASSOCIATIONS_OWNER.md`](ADVANCED_ASSOCIATIONS_OWNER.md) — owner coeso de associações concluído em #252.
+- [`ADVANCED_ASSOCIATIONS_OWNER.md`](ADVANCED_ASSOCIATIONS_OWNER.md) — owner coeso de associações concluído em #252;
+- [`ADVANCED_CYCLES_CHARACTERIZATION.md`](ADVANCED_CYCLES_CHARACTERIZATION.md) — contratos de ciclo completo/parcial, gaps, recuperação e left-censoring estabilizados na #253 antes de qualquer extração de ownership.
 
-Próximo foco: reavaliar ciclos/dinâmica antes de escolher nova seam. Só avançar com characterization suficiente e ganho real de ownership; rolling validation permanece protegida pelo invariant anti-leakage e mudança metodológica continua fora destes refactors.
+Próximo foco: após a #253 ficar verde, reavaliar **somente ciclos** como próxima seam mínima. Dinâmica/ranking continuam separados e exigem characterization própria de ranks, offsets, tiers e robustez; rolling validation permanece protegida pelo invariant anti-leakage e mudança metodológica continua fora destes refactors.
 
 ## #63 — Observabilidade operacional
 
