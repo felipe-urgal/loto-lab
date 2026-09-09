@@ -2,7 +2,7 @@
 
 Issue: #62
 
-Status: execução incremental em andamento. Continuidade (#236), estatística/combinatória (#243), estrutura (#250) e associações (#252) possuem owners próprios; as characterizations de estrutura (#249), associações (#251) e ciclos (#253) preservam contratos públicos antes de novas extrações.
+Status: execução incremental em andamento. Continuidade (#236), estatística/combinatória (#243), estrutura (#250) e associações (#252) possuem owners próprios; ciclos estão em extração na #256/PR #257 após a characterization e correção de left-censoring de #253/#254.
 
 ## Contexto
 
@@ -16,8 +16,9 @@ Este plano mantém a decomposição em seams pequenas e verificáveis. Um PR est
 - **PR B — estatística/combinatória: concluído em #243.** `src/analysis/statistics.ts` é o owner dos helpers matemáticos puros, com reexports públicos históricos preservados por `advanced.ts`.
 - **PR C — estrutura: concluído em #250.** `src/analysis/structure.ts` é o owner de estrutura/filtros metodológicos, protegido pela characterization de #249.
 - **PR D — associações: concluído em #252.** `src/analysis/associations.ts` é o owner de pares/trincas e inferência associada, protegido pela characterization de #251 e por guard de ownership.
-- **Characterization de ciclos: #253.** O boundary público de ciclos cobre histórico contínuo desde `#1`, gaps, recuperação de fronteira e left-censoring antes de qualquer extração.
-- **PRs E–G: não iniciados.** Devem ser reavaliados um a um; a ordem abaixo é direção, não obrigação.
+- **Characterization de ciclos: concluída em #253/#254.** O boundary público cobre histórico contínuo desde `#1`, gaps, recuperação de fronteira e left-censoring.
+- **PR E — owner de ciclos: em review na #256/PR #257.** Move somente `buildCycles` para `src/analysis/cycles.ts`, com guard de ownership e characterization #253 preservada.
+- **Demais seams: não iniciadas.** Dinâmica/ranking exige characterization própria antes de qualquer movimentação; rolling validation e similaridade continuam posteriores.
 
 ## Mapa atual de responsabilidades
 
@@ -59,9 +60,13 @@ Funções: `rankRows`, `rankMap`, `tierMap`, `rawFrequencyMap`, delay/streak, ce
 
 Invariants: `DEFAULT_WEIGHTS`, desempates por número, offsets 1/5/10/20, janelas 10/20, estabilidade de tiers e significado de movimento não mudam.
 
+Antes de qualquer extração, esse bloco precisa de characterization própria cobrindo ranks, offsets, tiers, robustez e comportamento nos históricos representativos.
+
 ### Ciclos
 
-Ainda em `src/analysis/advanced.ts`.
+Owner proposto na #256/PR #257: `src/analysis/cycles.ts`.
+
+Dependências permitidas: universo da loteria (`numberRange`), continuidade (`splitContinuousSegments`) e sumarização (`summarize`).
 
 Invariants:
 
@@ -87,27 +92,24 @@ Invariants: cada target usa somente prefixo anterior; warmup permanece 20; janel
 
 ## Próximas seams candidatas
 
-### PR E — owner de ciclos — reavaliar após #253
+### Dinâmica/ranking — characterization antes de qualquer owner
 
-#253 estabiliza a menor fronteira do grupo e corrige a divergência de left-censoring antes de qualquer movimentação de código.
+Não mover por proximidade textual. Antes de extrair, congelar por boundary público:
 
-Se a characterization ficar verde e a extração continuar pequena, o próximo PR pode mover **somente `buildCycles`** para um owner coeso. Não agrupar ranking/dinâmica por proximidade textual.
+- ranks atuais e desempates;
+- offsets 1/5/10/20;
+- movimentos e tendência;
+- tiers recentes e estabilidade;
+- cenários de peso/robustez e `rankRange`;
+- delay/streak e janelas de frequência relevantes.
 
-Pré-condições para a extração:
+A futura seam só avança se a characterization permanecer verde sem ajuste de expected values e se a extração reduzir responsabilidade real do hotspot sem criar ciclo de imports.
 
-- characterization #253 verde sem ajuste de expected values;
-- dependências limitadas ao universo da loteria, continuidade e sumarização;
-- nenhum schema público novo;
-- nenhum ciclo de imports;
-- ganho real de ownership em `advanced.ts`.
-
-Dinâmica/ranking continuam com pré-condições próprias: characterization de ranks, offsets, robustez e tiers antes de qualquer movimentação.
-
-### PR F — validação rolling
+### Validação rolling
 
 Mover por último entre os blocos matemáticos porque carrega o invariant anti-leakage mais crítico. O PR deve provar equivalência prefix-only e não apenas compilar.
 
-### PR G — similaridade/composição final
+### Similaridade/composição final
 
 Extrair similaridade somente se reduzir de fato responsabilidade da composition root. Depois revisar `buildAdvancedAnalysis` como compositor; tamanho de arquivo isolado não é métrica de sucesso.
 
@@ -139,4 +141,6 @@ Pare e reavalie quando qualquer um ocorrer:
 
 ## Decisão atual
 
-#253 caracteriza ciclos por boundary público e reconcilia a fronteira censurada à esquerda sem extrair ownership. Depois desta fatia verde, a #62 pode reavaliar um owner **somente de ciclos**. Dinâmica/ranking, rolling validation e similaridade continuam posteriores e condicionadas a characterization e ganho real de ownership.
+A #256/PR #257 extrai somente ciclos depois da characterization #253/#254, preservando expected values e dependências focadas. Enquanto essa fatia não estiver verde/revisada, não iniciar outra seam no mesmo hotspot.
+
+Depois do merge, o próximo passo é caracterizar dinâmica/ranking antes de qualquer movimentação. Rolling validation e similaridade continuam posteriores e condicionadas a contratos suficientes e ganho real de ownership.
