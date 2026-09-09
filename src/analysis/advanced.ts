@@ -12,6 +12,7 @@ import {
   latestContinuousSegment,
   splitContinuousSegments,
 } from "./continuity.js";
+import { buildCycles } from "./cycles.js";
 import { calculateFrequency, numberRange } from "./frequency.js";
 import { buildNumberAnalysis, DEFAULT_WEIGHTS } from "./scoring.js";
 import {
@@ -285,55 +286,6 @@ function buildDynamics(contests: Contest[], config: LotteryConfig, currentRows: 
         .slice(0, 8)
         .map((item) => ({ number: item.number, movement: item.movements.ten, rank: item.rank })),
     },
-  };
-}
-
-function buildCycles(contests: Contest[], config: LotteryConfig) {
-  const universe = numberRange(config);
-  const completedLengths: number[] = [];
-  const segments = splitContinuousSegments(contests);
-  let current = {
-    available: contests.length > 0,
-    currentLength: 0 as number | null,
-    seen: 0 as number | null,
-    missing: [...universe],
-  };
-
-  segments.forEach((segment, segmentIndex) => {
-    const seen = new Set<number>();
-    let currentLength = 0;
-    let currentKnown = segmentIndex === 0 && contests[0]?.number === 1;
-    for (const contest of segment) {
-      currentLength += 1;
-      for (const number of contest.numbers) seen.add(number);
-      if (seen.size === universe.length) {
-        if (currentKnown) completedLengths.push(currentLength);
-        seen.clear();
-        currentLength = 0;
-        currentKnown = true;
-      }
-    }
-    if (segmentIndex === segments.length - 1) {
-      current = currentKnown
-        ? {
-            available: true,
-            currentLength,
-            seen: seen.size,
-            missing: universe.filter((number) => !seen.has(number)),
-          }
-        : {
-            available: false,
-            currentLength: null,
-            seen: null,
-            missing: [],
-          };
-    }
-  });
-
-  return {
-    ...current,
-    completedCount: completedLengths.length,
-    historicalLength: summarize(completedLengths),
   };
 }
 
