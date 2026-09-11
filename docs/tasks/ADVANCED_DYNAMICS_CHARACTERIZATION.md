@@ -4,7 +4,7 @@ Issue: #258
 
 Refs: #62
 
-Status: em execução antes de qualquer extração de ownership de dinâmica/ranking.
+Status: concluída em #258/PR #259; serve como rede de equivalência para a extração de ownership da #260/PR #261.
 
 ## Objetivo
 
@@ -51,7 +51,6 @@ A fixture com concursos `1, 2, 4, 5` protege que métricas sequenciais não atra
 ## Guardrails
 
 - observar somente o boundary público de `buildAdvancedAnalysis`;
-- não mover helpers nesta issue;
 - não alterar expected values para preparar uma arquitetura desejada;
 - não mudar `DEFAULT_WEIGHTS`, offsets 1/5/10/20, janelas 10/20 ou thresholds de tendência;
 - não misturar ciclos, estrutura, associações, rolling validation ou similaridade;
@@ -60,4 +59,4 @@ A fixture com concursos `1, 2, 4, 5` protege que métricas sequenciais não atra
 
 ## Próxima decisão
 
-Somente depois desta characterization ficar verde e revisada, reavaliar se `buildDynamics` e seus helpers formam uma seam coesa com ganho real de ownership. Se a extração exigir misturar scoring, rolling validation, similaridade ou alterar expected values, abortar/redividir a seam.
+A characterization ficou verde e revisada em #259. A #260/PR #261 aplica a extração para `src/analysis/dynamics.ts`; ela só é válida enquanto estes expected values permanecerem idênticos e nenhuma responsabilidade de rolling validation, similaridade ou metodologia entrar na seam.
