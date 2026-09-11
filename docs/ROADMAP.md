@@ -1,6 +1,6 @@
 # Roadmap técnico e de produto
 
-> Baseline reconciliada em **2026-09-11**, após o merge da #258/PR #259 e com a #260/PR #261 em extração de dinâmica/ranking.
+> Baseline reconciliada em **2026-09-11**, após os merges da #260/PR #261 e #262/PR #263, com a #264/PR #265 em extração da rolling validation.
 >
 > Este documento é a fonte de verdade para **prioridade, dependências e estado atual** das issues estruturais. Detalhes de implementação e histórico pertencem às próprias issues/PRs e a `docs/tasks/`.
 
@@ -66,13 +66,15 @@ Diretriz permanente:
 - #253/#254 / #62 — characterization pública de ciclos e correção mínima de left-censoring, sem alterar dinâmica/ranking;
 - #256/#257 / #62 — owner focado de ciclos em `src/analysis/cycles.ts`, preservando a characterization existente e mantendo `advanced.ts` como composition root;
 - #258/#259 / #62 — characterization pública de dinâmica/ranking concluída, cobrindo ranks, offsets, movers, robustez, delay/streak e gaps;
-- #260/PR #261 / #62 — owner de dinâmica/ranking em extração para `src/analysis/dynamics.ts`, preservando os expected values da #258.
+- #260/#261 / #62 — owner de dinâmica/ranking extraído para `src/analysis/dynamics.ts`, preservando os expected values da #258;
+- #262/#263 / #62 — characterization pública da rolling validation concluída, cobrindo prefix-only, warmup, janelas 100/300/500, gaps e metadata anti-leakage;
+- #264/PR #265 / #62 — owner da rolling validation em extração para `src/analysis/validation.ts`, preservando a characterization da #262.
 
 ### Dívidas ativas reais
 
 - `main` continua sem branch protection obrigatória (#52);
 - frontend ainda possui state/lifecycle imperativo e módulos grandes em superfícies restantes (#60);
-- `analysis/advanced.ts` já delega continuidade, estatística, estrutura, associações e ciclos; dinâmica/ranking está sendo extraída na #260/PR #261, enquanto rolling validation, similaridade e composição ainda permanecem no hotspot (#62);
+- `analysis/advanced.ts` já delega continuidade, estatística, estrutura, associações, ciclos e dinâmica/ranking; rolling validation está sendo extraída na #264/PR #265 e similaridade permanece como última seam candidata relevante (#62);
 - métricas e runbooks existem, mas ainda falta baseline observada suficiente para definir poucos SLOs úteis (#63);
 - a jornada contextual ainda pode reduzir troca de contexto em Laboratório/proveniência/IA sem criar estado duplicado (#64);
 - performance continua dependente de séries comparáveis antes/depois; nenhum tuning está autorizado por amostra isolada (#65);
@@ -146,11 +148,13 @@ Entregue:
 - #252 — owner de associações de pares/trincas;
 - #253/#254 — characterization de ciclos, gaps, recuperação de fronteira e left-censoring;
 - #256/#257 — owner de ciclos em `src/analysis/cycles.ts`, com guard de ownership e CI/review final verdes;
-- #258/#259 — characterization de `result.ranking.dynamics` pelo boundary público, cobrindo desempates, offsets 1/5/10/20, movimentos/tendências, movers, tiers recentes, 243 cenários de robustez, delay/streak e fronteiras de gaps.
+- #258/#259 — characterization de `result.ranking.dynamics` pelo boundary público, cobrindo desempates, offsets 1/5/10/20, movimentos/tendências, movers, tiers recentes, 243 cenários de robustez, delay/streak e fronteiras de gaps;
+- #260/#261 — owner de dinâmica/ranking em `src/analysis/dynamics.ts`, preservando a characterization da #258;
+- #262/#263 — characterization de `result.validation`, provando prefix-only, warmup 20, janelas 100/300/500 e isolamento do trecho contínuo após gaps.
 
-**Em execução:** #260/PR #261 extrai dinâmica/ranking para `src/analysis/dynamics.ts`, mantendo `buildAdvancedAnalysis` como composition root e preservando integralmente a characterization da #258.
+**Em execução:** #264/PR #265 extrai rolling validation para `src/analysis/validation.ts`, mantendo `buildAdvancedAnalysis` como composition root e preservando integralmente a characterization da #262.
 
-**Próxima decisão após a #261:** reavaliar a menor seam restante. Rolling validation continua subordinada ao invariant anti-leakage e não deve ser movida sem characterization suficiente de prefix-only, warmup, janelas e gaps. Similaridade segue descritiva e só deve sair da composition root se houver ganho claro de ownership.
+**Próxima decisão após a #265:** reavaliar similaridade como última seam candidata relevante. Similaridade continua descritiva e só deve sair da composition root se houver ganho claro de ownership, sem introduzir interpretação preditiva.
 
 Qualquer mudança de score, threshold, janela, correção estatística, evidence level ou metodologia deve ser issue/PR separado.
 
@@ -232,9 +236,9 @@ Controllers de feature HTTP não compõem repositories/managers/providers concre
   ↓
 #65 tuning somente quando a medição justificar
 
-#62 advanced.ts: owner de dinâmica/ranking (#260/#261)
+#62 advanced.ts: owner de rolling validation (#264/#265)
   ↓
-reavaliar rolling validation com anti-leakage como invariant crítico
+reavaliar similaridade somente com ganho real de ownership
 
 #66 aplicação/resultado real com proveniência canônica
 ```
