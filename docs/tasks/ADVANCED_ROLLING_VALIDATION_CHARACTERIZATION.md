@@ -2,9 +2,9 @@
 
 Issue: #262
 
-Refs: #62 #260
+Refs: #62 #260 #264
 
-Status: em characterization antes de qualquer extração de ownership da validação rolling.
+Status: concluída na #262/PR #263 e usada como rede pública de equivalência da extração #264/PR #265.
 
 ## Objetivo
 
@@ -58,7 +58,7 @@ Permanecem públicos e caracterizados:
 
 ## Guardrails
 
-- characterization apenas; nenhum runtime é movido nesta issue;
+- characterization apenas; nenhum runtime foi movido na #262;
 - nenhum score, tier, threshold, janela, correção ou evidence level muda;
 - não alterar expected values para facilitar um refactor posterior;
 - não misturar similaridade ou outras seams;
@@ -66,6 +66,6 @@ Permanecem públicos e caracterizados:
 
 ## Próxima decisão
 
-Somente depois da #262 ficar verde e revisada, reavaliar se `aggregateValidation` + `buildRollingValidation` formam owner coeso sem ciclo de imports e sem mudar o schema público.
+A #264/PR #265 extrai `aggregateValidation` + `buildRollingValidation` para `src/analysis/validation.ts` usando esta characterization como contrato de equivalência.
 
-Se a extração exigir alterar qualquer expected value desta characterization, abortar e investigar a diferença antes de seguir.
+Se a extração exigir alterar qualquer expected value desta characterization, abortar e investigar a diferença antes de seguir. Depois da #265, similaridade permanece a única seam candidata relevante e só deve sair da composition root com ganho claro de ownership.
