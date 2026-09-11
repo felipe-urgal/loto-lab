@@ -31,9 +31,11 @@ Registros relevantes:
 - [`ADVANCED_CYCLES_CHARACTERIZATION.md`](ADVANCED_CYCLES_CHARACTERIZATION.md) — contratos de ciclo completo/parcial, gaps, recuperação e left-censoring estabilizados na #253/#254;
 - [`ADVANCED_CYCLES_OWNER.md`](ADVANCED_CYCLES_OWNER.md) — owner focado de ciclos concluído em #257;
 - [`ADVANCED_DYNAMICS_CHARACTERIZATION.md`](ADVANCED_DYNAMICS_CHARACTERIZATION.md) — ranks, offsets, movimentos, robustez, delay/streak e gaps estabilizados em #258/#259;
-- [`ADVANCED_DYNAMICS_OWNER.md`](ADVANCED_DYNAMICS_OWNER.md) — owner de dinâmica/ranking em implementação na #260/PR #261, preservando a characterization existente.
+- [`ADVANCED_DYNAMICS_OWNER.md`](ADVANCED_DYNAMICS_OWNER.md) — owner de dinâmica/ranking concluído em #260/PR #261;
+- [`ADVANCED_ROLLING_VALIDATION_CHARACTERIZATION.md`](ADVANCED_ROLLING_VALIDATION_CHARACTERIZATION.md) — prefix-only, warmup, janelas e gaps estabilizados em #262/PR #263;
+- [`ADVANCED_ROLLING_VALIDATION_OWNER.md`](ADVANCED_ROLLING_VALIDATION_OWNER.md) — owner de rolling validation em implementação na #264/PR #265, preservando a characterization anti-leakage existente.
 
-Próximo foco: concluir/revisar a extração de **dinâmica/ranking** da #260/PR #261. Depois, reavaliar a próxima menor seam; rolling validation permanece protegida pelo invariant anti-leakage e similaridade só deve ser extraída com ganho real de ownership.
+Próximo foco: concluir/revisar a extração da **rolling validation** da #264/PR #265. Depois, reavaliar similaridade como última seam candidata relevante; ela só deve sair da composition root com ganho real de ownership e sem semântica preditiva nova.
 
 ## #63 — Observabilidade operacional
 
