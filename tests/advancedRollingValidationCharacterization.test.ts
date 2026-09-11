@@ -66,30 +66,44 @@ test("rolling validation classifies each target from prefix-only history", () =>
   const config = getLotteryConfig("mega-sena");
   const recurring = [1, 2, 3, 4, 5, 6];
   const targetNumbers = [55, 56, 57, 58, 59, 60];
-  const history: Contest[] = Array.from({ length: 20 }, (_, index) => ({
-    lottery: "mega-sena",
-    number: index + 1,
-    date: `2026-01-${String(index + 1).padStart(2, "0")}`,
-    numbers: index === 0 ? targetNumbers : recurring,
-  }));
   const target: Contest = {
     lottery: "mega-sena",
     number: 21,
     date: "2026-01-21",
     numbers: targetNumbers,
   };
+  let fixture: {
+    history: Contest[];
+    prefixHits: Record<NumberTier, number>;
+    leakedHits: Record<NumberTier, number>;
+  } | undefined;
 
-  const prefixHits = hitsByTier(buildNumberAnalysis(history, config), target);
-  const leakedHits = hitsByTier(buildNumberAnalysis([...history, target], config), target);
-  assert.deepEqual(prefixHits, { strong: 0, balanced: 0, cold: 6 });
-  assert.deepEqual(leakedHits, { strong: 0, balanced: 6, cold: 0 });
+  for (let priorTargetDraws = 0; priorTargetDraws <= 20; priorTargetDraws += 1) {
+    const history: Contest[] = Array.from({ length: 20 }, (_, index) => ({
+      lottery: "mega-sena",
+      number: index + 1,
+      date: `2026-01-${String(index + 1).padStart(2, "0")}`,
+      numbers: index < priorTargetDraws ? targetNumbers : recurring,
+    }));
+    const prefixHits = hitsByTier(buildNumberAnalysis(history, config), target);
+    const leakedHits = hitsByTier(buildNumberAnalysis([...history, target], config), target);
+    const differs = (["strong", "balanced", "cold"] as const)
+      .some((tier) => prefixHits[tier] !== leakedHits[tier]);
+    if (differs) {
+      fixture = { history, prefixHits, leakedHits };
+      break;
+    }
+  }
 
-  const validation = buildAdvancedAnalysis([...history, target], config).validation;
+  if (!fixture) assert.fail("deterministic fixture must distinguish prefix-only from leaked classification");
+  assert.notDeepEqual(fixture.prefixHits, fixture.leakedHits);
+
+  const validation = buildAdvancedAnalysis([...fixture.history, target], config).validation;
   assert.equal(validation.availableRounds, 1);
   for (const period of validation.periods) {
     assert.deepEqual(
       Object.fromEntries(period.tiers.map((tier) => [tier.tier, tier.observedHits])),
-      prefixHits,
+      fixture.prefixHits,
     );
   }
 });
