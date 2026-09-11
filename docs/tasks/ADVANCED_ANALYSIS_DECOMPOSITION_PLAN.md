@@ -2,7 +2,7 @@
 
 Issue: #62
 
-Status: execução incremental em andamento. Continuidade (#236), estatística/combinatória (#243), estrutura (#250), associações (#252) e ciclos (#257) possuem owners próprios; dinâmica/ranking foi caracterizada em #258/#259 e está sendo extraída na #260/PR #261.
+Status: execução incremental em andamento. Continuidade (#236), estatística/combinatória (#243), estrutura (#250), associações (#252), ciclos (#257) e dinâmica/ranking (#260/#261) possuem owners próprios; rolling validation foi caracterizada em #262/#263 e está sendo extraída na #264/PR #265.
 
 ## Contexto
 
@@ -19,8 +19,10 @@ Este plano mantém a decomposição em seams pequenas e verificáveis. Um PR est
 - **Characterization de ciclos: concluída em #253/#254.** O boundary público cobre histórico contínuo desde `#1`, gaps, recuperação de fronteira e left-censoring.
 - **PR E — owner de ciclos: concluído em #257.** `src/analysis/cycles.ts` possui `buildCycles`, com guard de ownership e characterization #253 preservada.
 - **Characterization de dinâmica/ranking: concluída em #258/#259.** Congelou ranks, offsets, movimentos, tiers, robustez, delay/streak e comportamento com gaps.
-- **PR F — owner de dinâmica/ranking: em execução na #260/PR #261.** `buildDynamics` e helpers coesos saem do hotspot sem alterar expected values.
-- **Demais seams: não iniciadas.** Rolling validation e similaridade continuam posteriores e condicionadas a contratos suficientes e ganho real de ownership.
+- **PR F — owner de dinâmica/ranking: concluído em #260/PR #261.** `src/analysis/dynamics.ts` possui `buildDynamics` e helpers coesos, preservando a characterization #258.
+- **Characterization de rolling validation: concluída em #262/PR #263.** Congelou prefix-only, warmup 20, janelas 100/300/500, trecho contínuo mais recente e metadata anti-leakage.
+- **PR G — owner de rolling validation: em execução na #264/PR #265.** `aggregateValidation` e `buildRollingValidation` saem do hotspot sem alterar expected values.
+- **Demais seams: não iniciadas.** Similaridade é a única seam candidata relevante restante e continua condicionada a ganho real de ownership.
 
 ## Mapa atual de responsabilidades
 
@@ -56,11 +58,11 @@ Invariants: número de comparações, arredondamento, teste, correção, evidenc
 
 ### Ranking, dinâmica e robustez
 
-Owner em extração: `src/analysis/dynamics.ts` na #260/PR #261.
+Owner: `src/analysis/dynamics.ts`, concluído em #260/PR #261.
 
 Responsabilidades: `rankRows`, `rankMap`, `tierMap`, `rawFrequencyMap`, delay/streak, cenários de peso, `robustnessByNumber` e `buildDynamics`.
 
-Dependências permitidas: continuidade, frequência, scoring, estatística e tipos de domínio. `tierMap` permanece exportado porque o rolling validation atual consome a mesma classificação produzida por `buildNumberAnalysis`; a validação não é movida nesta fatia.
+Dependências permitidas: continuidade, frequência, scoring, estatística e tipos de domínio.
 
 Invariants:
 
@@ -73,7 +75,7 @@ Invariants:
 - delay/streak respeitam fronteiras de continuidade e não atravessam gaps;
 - tier por evidência do score-v2 continua distinto do tier por rank usado nos cenários de robustez.
 
-A characterization de #258/#259 continua sendo a rede pública de equivalência da extração.
+A characterization de #258/#259 continua sendo a rede pública de equivalência do owner.
 
 ### Ciclos
 
@@ -95,9 +97,15 @@ Invariant: similaridade é descritiva e não deve ganhar semântica preditiva du
 
 ### Validação rolling anti-leakage
 
-Ainda em `src/analysis/advanced.ts`.
+Owner em extração: `src/analysis/validation.ts` na #264/PR #265.
 
-Invariants: cada target usa somente prefixo anterior; warmup permanece 20; janelas permanecem 100/300/500; correção continua cobrindo 3 grupos × 3 janelas; só o trecho contínuo mais recente é elegível.
+Responsabilidades: warmup e janelas, seleção do trecho contínuo mais recente, classificação prefix-only, hits/tamanhos por tier, observed-vs-expected, z-score, Bonferroni, evidence level e metadata metodológica.
+
+Dependências permitidas: tipos de domínio, continuidade, frequência/universo, scoring e estatística compartilhada. O owner não deve depender de dinâmica/ranking, similaridade, ciclos, estrutura, associações ou da composition root.
+
+Invariants: cada target usa somente prefixo anterior; warmup permanece 20; janelas permanecem 100/300/500; correção continua cobrindo 3 grupos × 3 janelas; só o trecho contínuo mais recente é elegível; schema e copy metodológica permanecem idênticos.
+
+A characterization de #262/PR #263 continua sendo a rede pública de equivalência da extração.
 
 ### Composition root
 
@@ -105,15 +113,11 @@ Invariants: cada target usa somente prefixo anterior; warmup permanece 20; janel
 
 ## Próximas seams candidatas
 
-### Dinâmica/ranking — owner em #260/PR #261
+### Rolling validation — owner em #264/PR #265
 
-A extração só é válida se a characterization de #258 permanecer idêntica e verde. O novo owner não pode depender da composition root nem incorporar rolling validation, similaridade, ciclos, estrutura ou associações.
+A extração só é válida se a characterization de #262 permanecer idêntica e verde. O novo owner não pode depender da composition root nem incorporar similaridade, dinâmica, ciclos, estrutura ou associações.
 
-A fronteira entre tier por evidência do score e tier por rank usado na robustez permanece explícita; refactor não é oportunidade para unificar semânticas distintas.
-
-### Validação rolling
-
-Mover por último entre os blocos matemáticos porque carrega o invariant anti-leakage mais crítico. Antes de qualquer owner, reavaliar se a characterization atual prova suficientemente prefix-only, warmup, janelas e gaps; se não provar, criar uma fatia de characterization separada.
+Anti-leakage é finding bloqueante: qualquer target classificado com informação do próprio concurso invalida a mudança.
 
 ### Similaridade/composição final
 
@@ -129,7 +133,7 @@ Extrair similaridade somente se reduzir de fato responsabilidade da composition 
 | associações | pares/trincas, Bonferroni, highlights | p-value/evidência diferente |
 | ciclos | segmentos completos/incompletos, gaps, left-censoring | ciclo conhecido após fronteira desconhecida |
 | dinâmica | ranks, offsets, movers, robustez, delay/streak, gaps | ranking/tier ou fronteira sequencial diferente |
-| validação | prefix-only + janelas | qualquer leakage futuro |
+| validação | prefix-only + warmup + janelas + gaps | qualquer leakage futuro |
 | similaridade | overlap/distância | semântica preditiva nova |
 
 Além dos testes direcionados, cada PR executa `npm run check`. Mudança matemática exige comparação de outputs antes/depois em fixtures representativas; atualizar expected values sem explicar a diferença é finding bloqueante.
@@ -147,6 +151,6 @@ Pare e reavalie quando qualquer um ocorrer:
 
 ## Decisão atual
 
-A #258/PR #259 foi mergeada e congelou o boundary público de dinâmica/ranking. A #260/PR #261 aplica a extração mecânica para `src/analysis/dynamics.ts`, com guard de ownership e sem alterar expected values.
+A #262/PR #263 foi mergeada e congelou o boundary público da rolling validation. A #264/PR #265 aplica a extração mecânica para `src/analysis/validation.ts`, com guard de ownership e sem alterar expected values.
 
-Depois da #261 verde e revisada, reavaliar a próxima menor seam. Rolling validation permanece a fronteira de maior risco por anti-leakage; similaridade continua posterior e só deve sair da composition root com ganho claro de ownership.
+Depois da #265 verde e revisada, reavaliar similaridade como última seam candidata relevante. Ela continua posterior e só deve sair da composition root com ganho claro de ownership e sem semântica preditiva nova.
