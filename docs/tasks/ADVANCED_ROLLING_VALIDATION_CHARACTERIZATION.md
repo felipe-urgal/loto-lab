@@ -23,9 +23,11 @@ A validação rolling é a seam matemática restante de maior risco porque seu c
 
 ### Prefix-only
 
-A fixture Mega-Sena cria 20 concursos nos quais `55..60` pertencem ao tier `cold` no prefixo, mas mudariam para `balanced` se o próprio concurso alvo fosse incluído no cálculo.
+A fixture Mega-Sena procura deterministicamente, dentro de uma família pequena de históricos de 20 concursos, um ponto em que incluir o próprio concurso alvo altera a distribuição de hits por tier.
 
-O resultado público deve registrar os 6 hits do alvo em `cold`. Isso demonstra diretamente que o target não contamina sua própria classificação.
+A fixture primeiro prova que a classificação pelo prefixo e a classificação contaminada pelo alvo são diferentes. Em seguida, `result.validation` deve coincidir exatamente com a classificação calculada apenas sobre o prefixo anterior.
+
+Isso demonstra diretamente que o target não contamina sua própria classificação sem acoplar o teste a um tier específico que possa ser sensível aos thresholds atuais.
 
 ### Janelas
 
