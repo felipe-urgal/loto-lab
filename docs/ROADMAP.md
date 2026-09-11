@@ -1,82 +1,18 @@
 # Roadmap técnico e de produto
 
-> Baseline reconciliada em **2026-09-11**, após o merge da #258/PR #259 e com a #260/PR #261 em extração de dinâmica/ranking.
->
-> Este documento é a fonte de verdade para **prioridade, dependências e estado atual** das issues estruturais. Detalhes de implementação e histórico pertencem às próprias issues/PRs e a `docs/tasks/`.
+> Baseline reconciliada em **2026-09-11**. Este documento registra apenas trabalho estrutural ainda ativo e decisões concluídas que continuam relevantes. Histórico detalhado fica em issues, PRs, commits e testes.
 
 ## North Star
 
 O Loto Lab deve tornar auditável o fluxo:
 
 ```text
-Hipótese
-  ↓
-Estratégia/configuração versionada
-  ↓
-Experimento reproduzível
-  ↓
-Job auditável
-  ↓
-Evidência estatística/financeira
-  ↓
-Comparação com baseline/acaso
-  ↓
-Validação fora da amostra
-  ↓
-IA interpreta a evidência
-  ↓
-Decisão humana auditável
-  ↓
-Eventual geração/aposta real
-  ↓
-Resultado real
-  ↓
-Feedback auditável
+Hipótese → estratégia/configuração versionada → experimento reproduzível
+→ evidência estatística/financeira → decisão humana auditável
+→ eventual aplicação/aposta real → resultado real → feedback
 ```
 
-Diretriz permanente:
-
-> **Algoritmo calcula; IA interpreta.**
-
-## Estado consolidado
-
-### Capacidades já consolidadas
-
-- PostgreSQL é a fonte de verdade operacional, com migrations forward-only, checksum e advisory lock;
-- composition root HTTP centralizado em `src/api/server.ts` (#61 concluída);
-- core estatístico, anti-leakage, geração reproduzível, Strategy Lab e financeiro auditável protegidos por testes;
-- frontend em migração TypeScript incremental, com owners canônicos em `web/src` e boundaries JavaScript migrados import-only;
-- observabilidade operacional cobre HTTP, Analysis Jobs, sync, pool PostgreSQL, CAIXA e OpenAI;
-- pesquisa possui hipótese persistida, evidência canônica de backtest e decisão humana/auditável;
-- produção possui `prod:resources` + protocolo documentado para baseline comparável antes de tuning;
-- CI funcional, Security e E2E permanecem guardrails proporcionais ao risco.
-
-### Entregas recentes relevantes
-
-- #242 / #60 — apresentação de Execuções extraída para `web/src/features/jobs/presentation.ts`, preservando API/DOM/polling/cancelamento/lifecycle no owner original;
-- #243 / #62 — estatística/combinatória pura extraída para `src/analysis/statistics.ts`, com reexports públicos e characterization preservados;
-- #244 / #63 — runbooks operacionais para CAIXA, jobs, sync, PostgreSQL e OpenAI;
-- #245 / #65 — protocolo reproduzível de baseline de CPU/memória;
-- #246 / #66 — decisão humana/auditável de hipótese via API, com evidência obrigatória e escrita concorrente segura;
-- #248 / #60 — Laboratório reutiliza o contexto compartilhado de loteria;
-- #249 / #62 — characterization estrutural das três loterias e comportamento com gaps;
-- #250 / #62 — owner de estrutura/filtros metodológicos em `src/analysis/structure.ts`;
-- #251 / #62 — characterization pública de associações de pares/trincas, binomial bilateral exato, Bonferroni e highlights;
-- #252 / #62 — owner de associações em `src/analysis/associations.ts`, preservando a characterization e o schema público;
-- #253/#254 / #62 — characterization pública de ciclos e correção mínima de left-censoring, sem alterar dinâmica/ranking;
-- #256/#257 / #62 — owner focado de ciclos em `src/analysis/cycles.ts`, preservando a characterization existente e mantendo `advanced.ts` como composition root;
-- #258/#259 / #62 — characterization pública de dinâmica/ranking concluída, cobrindo ranks, offsets, movers, robustez, delay/streak e gaps;
-- #260/PR #261 / #62 — owner de dinâmica/ranking em extração para `src/analysis/dynamics.ts`, preservando os expected values da #258.
-
-### Dívidas ativas reais
-
-- `main` continua sem branch protection obrigatória (#52);
-- frontend ainda possui state/lifecycle imperativo e módulos grandes em superfícies restantes (#60);
-- `analysis/advanced.ts` já delega continuidade, estatística, estrutura, associações e ciclos; dinâmica/ranking está sendo extraída na #260/PR #261, enquanto rolling validation, similaridade e composição ainda permanecem no hotspot (#62);
-- métricas e runbooks existem, mas ainda falta baseline observada suficiente para definir poucos SLOs úteis (#63);
-- a jornada contextual ainda pode reduzir troca de contexto em Laboratório/proveniência/IA sem criar estado duplicado (#64);
-- performance continua dependente de séries comparáveis antes/depois; nenhum tuning está autorizado por amostra isolada (#65);
-- hipótese, evidência e decisão existem; o próximo passo da trilha científica é conectar aplicação/resultado real usando IDs canônicos, sem duplicar evidência (#66).
+Diretriz permanente: **algoritmo calcula; IA interpreta**.
 
 ---
 
@@ -84,194 +20,108 @@ Diretriz permanente:
 
 ## #52 — Governança de `main` · P0 · bloqueada
 
-Revalidado em **2026-09-06**: `main.protected = false` e não há required status checks aplicados pela proteção de branch.
+`main` continua sem proteção obrigatória. Esta issue depende de configuração administrativa no GitHub, não de código.
 
-**Próxima ação:** configuração administrativa no GitHub para exigir PR + `CI / test`, bloquear force-push/exclusão e então revalidar.
+**Próxima ação:** exigir PR + `CI / test`, bloquear force-push/exclusão e revalidar a configuração.
 
-Esta tarefa não precisa de PR de código.
+## #60 — Frontend TypeScript e ownership · P1 · em andamento
 
-## #60 — Frontend TypeScript, módulos e primitives · P1 · em andamento
+A fundação TypeScript, core compartilhado e vários owners funcionais já existem.
 
-Entregue recentemente:
+**Próximo foco:** reduzir state/lifecycle imperativo e decompor módulos grandes somente quando houver responsabilidade real. Sem rewrite/framework por preferência e sem novo redesign visual sem decisão explícita.
 
-- #222 — guard de boundaries JavaScript import-only;
-- #227 — contrato compartilhado de contexto principal;
-- #234 — Agenda reutiliza identidade tipada de loteria;
-- #242 — apresentação de Execuções separada do lifecycle, sem alterar jornada;
-- #248 — Laboratório reutiliza o contexto compartilhado de loteria.
+## #63 — Observabilidade orientada a SLOs · P1 · em andamento
 
-**Próximas fatias:**
+HTTP, jobs, sync, PostgreSQL, CAIXA e OpenAI já possuem sinais e runbooks.
 
-- reduzir state/lifecycle imperativo nas superfícies restantes;
-- decompor novos módulos grandes apenas por responsabilidade real;
-- expandir `web/src/{core,features,shared}` quando houver contrato concreto;
-- manter escaping/`textContent`, cleanup explícito e boundaries finos.
-
-Não reabrir redesign visual nem iniciar rewrite/framework sem evidência.
-
-## #63 — Métricas, SLOs e resposta operacional · P1 · em andamento
-
-Entregue:
-
-- #206 — HTTP por famílias de rota, taxas e p50/p95/p99;
-- #212 — saúde persistida de Analysis Jobs;
-- #217 — snapshot operacional de sync;
-- #224 — pressão do pool PostgreSQL;
-- #230 — requests/outcomes/latência da CAIXA;
-- #235 — requests/outcomes/latência/tokens conhecidos da OpenAI;
-- #244 — runbooks de incidentes usando esses sinais, sem thresholds inventados.
-
-**Próxima fase:** observar baseline real de HTTP, jobs, sync, PostgreSQL, CAIXA e OpenAI e então definir poucos SLOs úteis para disponibilidade HTTP, sync e jobs.
-
-Timeout/retry/backoff/pool/concorrência continuam fora de tuning até existir evidência suficiente.
+**Próximo foco:** coletar baseline real e só então definir poucos SLOs úteis e qualquer tuning de timeout/retry/backoff/pool/concorrência.
 
 ---
 
 # Next
 
-## #62 — Motores e hotspots algorítmicos · P2 · em andamento
+## #64 — Jornada e contexto pós-redesign · P2 · em andamento
 
-Entregue:
+Direção: contexto entre superfícies usando identidades canônicas/deep links, sem estado paralelo.
 
-- #207 — espaços/baselines de planejamento;
-- #208 — reporting/séries do Strategy Lab;
-- #213 — constraints estruturais do gerador;
-- #223 — plano de decomposição de `analysis/advanced.ts`;
-- #228 — characterization de continuidade/gaps/left-censoring;
-- #236 — owner de continuidade/qualidade;
-- #243 — owner de estatística/combinatória compartilhada;
-- #249 — characterization estrutural;
-- #250 — owner de estrutura/filtros metodológicos;
-- #251 — characterization de associações;
-- #252 — owner de associações de pares/trincas;
-- #253/#254 — characterization de ciclos, gaps, recuperação de fronteira e left-censoring;
-- #256/#257 — owner de ciclos em `src/analysis/cycles.ts`, com guard de ownership e CI/review final verdes;
-- #258/#259 — characterization de `result.ranking.dynamics` pelo boundary público, cobrindo desempates, offsets 1/5/10/20, movimentos/tendências, movers, tiers recentes, 243 cenários de robustez, delay/streak e fronteiras de gaps.
+**Próximo foco:** reduzir troca de contexto apenas quando houver identidade persistida suficiente; integrar proveniência/IA sem esconder metodologia nem duplicar owners.
 
-**Em execução:** #260/PR #261 extrai dinâmica/ranking para `src/analysis/dynamics.ts`, mantendo `buildAdvancedAnalysis` como composition root e preservando integralmente a characterization da #258.
+## #65 — Runtime e performance baseada em evidência · P2 · em andamento
 
-**Próxima decisão após a #261:** reavaliar a menor seam restante. Rolling validation continua subordinada ao invariant anti-leakage e não deve ser movida sem characterization suficiente de prefix-only, warmup, janelas e gaps. Similaridade segue descritiva e só deve sair da composition root se houver ganho claro de ownership.
+Hardening estrutural e protocolo de baseline já existem.
 
-Qualquer mudança de score, threshold, janela, correção estatística, evidence level ou metodologia deve ser issue/PR separado.
+**Próximo foco:** coletar séries comparáveis de CPU/memória, Web Vitals, profiling PostgreSQL e comportamento de workers/providers antes de qualquer tuning.
 
-## #64 — Arquitetura de informação e jornada pós-redesign · P2 · em andamento
+## #66 — Hipótese → evidência → decisão → aplicação · P2 · em andamento
 
-Direção: **Protótipo A — contexto sem remoção de rotas**.
+Hipótese persistida, evidência canônica de backtest e decisão humana/auditável já existem.
 
-Entregue:
-
-- #210 — jornada `Entender → Experimentar → Aplicar → Acompanhar → Operar`;
-- #220 — Laboratório → Testes históricos;
-- #225 — Análises → Laboratório/Gerador;
-- #229 — Execuções → owners funcionais;
-- #237 — retorno de backtest concluído por `jobId`;
-- #239 — shape detalhado de backtest reconciliado sem fabricar `roundCount`.
-
-**Próximas fatias:**
-
-- avaliar retorno contextual do Laboratório apenas com identidade persistida suficiente;
-- integrar proveniência da #66 quando isso reduzir troca de contexto sem estado duplicado;
-- integrar IA a evidências/resultados sem esconder metodologia;
-- revisar agrupamento global da navegação somente com evidência de uso.
-
-## #65 — Runtime/Docker/performance baseada em evidência · P2 · em andamento
-
-Guardrails existentes incluem runtime lock, graceful shutdown, hardening de container/rede, profiling PostgreSQL e `prod:resources`.
-
-#245 consolidou o protocolo de baseline comparável: múltiplas observações, workload conhecido, release identificada, amostras brutas preservadas e critério explícito para evidência inconclusiva.
-
-**Próximas decisões:**
-
-- coletar séries reais de `prod:resources` sob cargas comparáveis;
-- medir Web Vitals em ambiente representativo;
-- justificar índices com profiling;
-- medir heap/tempo antes de elevar concorrência;
-- ajustar resiliência CAIXA/OpenAI somente a partir das baselines da #63.
-
-Nenhum limite de CPU/memória, pool, timeout ou concorrência deve nascer apenas do protocolo.
-
-## #66 — Hipótese → experimento → evidência → decisão · P2 · em andamento
-
-Entregue:
-
-- #226 — contrato mínimo de proveniência;
-- #231 — raiz persistida `research_hypotheses`;
-- #238 — vínculo de `backtest_run` como evidência canônica;
-- #246 — decisão humana/auditável com evidência obrigatória e concorrência protegida.
-
-Estado atual:
-
-- hipótese tem ID/lifecycle estáveis;
-- evidência continua no owner canônico `backtest_runs`;
-- API cria/lista/lê hipóteses, associa/lista backtests e registra decisão humana;
-- decisão exige justificativa e não pode ser sobrescrita por corrida concorrente;
-- IA não cria nem decide hipótese e nenhum ranking/p-value promove lifecycle automaticamente.
-
-**Próxima fatia:** conectar eventual aplicação/resultado real à cadeia de pesquisa usando IDs canônicos já existentes, sem criar `experiment_id`/`evidence_id` genérico ou snapshot opaco.
+**Próximo foco:** conectar eventual aplicação/resultado real usando IDs canônicos existentes, sem `experiment_id`/`evidence_id` genérico nem snapshot opaco.
 
 ---
 
 # Concluído estrutural
 
-## #61 — Application use cases e controllers finos · concluída
+## #61 — Application use cases e controllers finos
 
-Controllers de feature HTTP não compõem repositories/managers/providers concretos. `src/api/server.ts` é o composition root HTTP e `src/cli/apiStart.ts` permanece owner do lifecycle de processo/scheduler/recovery/drain.
+Concluída. `src/api/server.ts` é o composition root HTTP; controllers não compõem infraestrutura concreta.
+
+## #62 — Motores e hotspot `analysis/advanced.ts`
+
+Concluída com a #264/PR #265.
+
+Owners canônicos:
+
+- `continuity.ts` — continuidade/gaps/qualidade;
+- `statistics.ts` — estatística/combinatória compartilhada;
+- `structure.ts` — estrutura/filtros metodológicos;
+- `associations.ts` — pares/trincas e inferência;
+- `cycles.ts` — ciclos;
+- `dynamics.ts` — ranking/dinâmica/robustez;
+- `validation.ts` — rolling validation anti-leakage.
+
+`advanced.ts` permanece composition root. A similaridade histórica fica nele de propósito: hoje é composição local, sem consumidor independente ou boundary própria; extrair apenas para reduzir linhas não gera ganho de ownership.
+
+Detalhes duráveis: [`tasks/ADVANCED_ANALYSIS_DECOMPOSITION_PLAN.md`](tasks/ADVANCED_ANALYSIS_DECOMPOSITION_PLAN.md).
 
 ---
 
 # Ordem recomendada
 
 ```text
-#52 branch protection (administrativo, independente)
+#52 branch protection (administrativo)
 
-#60 frontend TS/ownership
+#60 frontend ownership
   ↓
 #64 jornada/contexto
 
-#63 baseline observada → poucos SLOs
+#63 baseline observada
   ↓
-#65 tuning somente quando a medição justificar
-
-#62 advanced.ts: owner de dinâmica/ranking (#260/#261)
-  ↓
-reavaliar rolling validation com anti-leakage como invariant crítico
+#65 tuning somente com evidência
 
 #66 aplicação/resultado real com proveniência canônica
 ```
 
-Trabalhos independentes podem avançar em paralelo quando não compartilham owners/risco.
+Trabalhos independentes podem avançar em paralelo quando não compartilham owner ou risco.
 
-## Critério de pronto para refactor
+## Critério para refactor
 
-Um refactor está pronto quando mantém comportamento salvo mudança explicitamente documentada e melhora pelo menos uma propriedade concreta:
-
-- acoplamento;
-- duplicação;
-- testabilidade;
-- ownership;
-- estado explícito;
-- risco operacional.
-
-Mover arquivos sem ganho verificável não é progresso arquitetural.
+Refactor só vale quando preserva comportamento e melhora uma propriedade concreta: ownership, acoplamento, duplicação, testabilidade, estado explícito ou risco operacional. Mover arquivo apenas para reduzir linhas não é progresso arquitetural.
 
 ## Gate mínimo
-
-Toda mudança versionada passa por:
 
 ```bash
 npm ci
 npm run check
 ```
 
-Validações adicionais seguem o risco conforme `AGENTS.md`. Todo PR próprio exige auto code review final no SHA verde antes do squash merge.
+Validações adicionais seguem `AGENTS.md`. Todo PR próprio exige auto code review final no SHA verde antes do squash merge.
 
 ## Gestão documental
 
-- `AGENTS.md` define invariantes e fluxo operacional estável;
-- `docs/ROADMAP.md` mantém prioridade, estado e dependências atuais;
-- docs técnicos descrevem contratos presentes;
-- `docs/tasks/` preserva planos/decisões/registros de fatias específicas;
-- issue da epic mantém backlog vivo e critérios de aceite;
-- PR registra mudança concreta e validação.
-
-O índice de `docs/tasks/` está em [`docs/tasks/README.md`](tasks/README.md).
+- `AGENTS.md` — invariantes e fluxo operacional estável;
+- `README.md` — visão atual do produto;
+- `docs/ROADMAP.md` — prioridades e estado estrutural atual;
+- docs técnicos — contratos presentes;
+- `docs/tasks/` — somente contratos, planos ativos e guias que continuem úteis após o merge;
+- issues/PRs/commits/testes — histórico de execução.

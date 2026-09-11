@@ -1,152 +1,68 @@
-# Plano de decomposição do hotspot de análise avançada
+# Arquitetura final da análise avançada
 
 Issue: #62
 
-Status: execução incremental em andamento. Continuidade (#236), estatística/combinatória (#243), estrutura (#250), associações (#252) e ciclos (#257) possuem owners próprios; dinâmica/ranking foi caracterizada em #258/#259 e está sendo extraída na #260/PR #261.
+Status: **concluída com a #264/PR #265**. O hotspot `src/analysis/advanced.ts` foi decomposto em owners coesos sem alterar metodologia pública.
 
-## Contexto
+## Composition root
 
-`src/analysis/advanced.ts` continua sendo a composition root da análise avançada, mas já delega responsabilidades coesas a módulos especializados.
+`src/analysis/advanced.ts` permanece responsável por:
 
-Este plano mantém a decomposição em seams pequenas e verificáveis. Um PR estrutural não é oportunidade para mudar score, janelas, thresholds, correção estatística, copy metodológica ou schema público.
+- filtrar e ordenar concursos da loteria;
+- montar o ranking base com `buildNumberAnalysis`;
+- compor os owners especializados;
+- montar heatmap recente;
+- calcular a similaridade histórica usada somente por esta resposta;
+- preservar schema agregado, model metadata e reexports públicos históricos.
 
-## Estado atual
+Ele não deve voltar a absorver implementações matemáticas já extraídas.
 
-- **PR A — continuidade/qualidade: concluído em #236.** `src/analysis/continuity.ts` é o owner de `isConsecutive`, `splitContinuousSegments`, `latestContinuousSegment` e `buildDataQuality`.
-- **PR B — estatística/combinatória: concluído em #243.** `src/analysis/statistics.ts` é o owner dos helpers matemáticos puros, com reexports públicos históricos preservados por `advanced.ts`.
-- **PR C — estrutura: concluído em #250.** `src/analysis/structure.ts` é o owner de estrutura/filtros metodológicos, protegido pela characterization de #249.
-- **PR D — associações: concluído em #252.** `src/analysis/associations.ts` é o owner de pares/trincas e inferência associada, protegido pela characterization de #251 e por guard de ownership.
-- **Characterization de ciclos: concluída em #253/#254.** O boundary público cobre histórico contínuo desde `#1`, gaps, recuperação de fronteira e left-censoring.
-- **PR E — owner de ciclos: concluído em #257.** `src/analysis/cycles.ts` possui `buildCycles`, com guard de ownership e characterization #253 preservada.
-- **Characterization de dinâmica/ranking: concluída em #258/#259.** Congelou ranks, offsets, movimentos, tiers, robustez, delay/streak e comportamento com gaps.
-- **PR F — owner de dinâmica/ranking: em execução na #260/PR #261.** `buildDynamics` e helpers coesos saem do hotspot sem alterar expected values.
-- **Demais seams: não iniciadas.** Rolling validation e similaridade continuam posteriores e condicionadas a contratos suficientes e ganho real de ownership.
+## Owners canônicos
 
-## Mapa atual de responsabilidades
+| Responsabilidade | Owner |
+| --- | --- |
+| continuidade, gaps e qualidade | `src/analysis/continuity.ts` |
+| estatística/combinatória compartilhada | `src/analysis/statistics.ts` |
+| estrutura e filtros metodológicos | `src/analysis/structure.ts` |
+| pares/trincas e inferência associada | `src/analysis/associations.ts` |
+| ciclos | `src/analysis/cycles.ts` |
+| ranking, dinâmica e robustez | `src/analysis/dynamics.ts` |
+| rolling validation anti-leakage | `src/analysis/validation.ts` |
 
-### Estatística/combinatória compartilhada
+## Decisão sobre similaridade
 
-Owner: `src/analysis/statistics.ts`.
+`buildSimilarity` permanece em `advanced.ts` de propósito.
 
-Funções: `round`, `mean`, `quantile`, `summarize`, `percentileRank`, `combination`, `hypergeometricDistribution`, tabela/binomial exata, CDF normal e `evidenceLevel`.
+Hoje ela é uma composição pequena e local do próprio payload avançado, usa `structureForContest` e continuidade apenas para comparar o concurso atual com o histórico, não possui consumidores independentes e não representa uma boundary metodológica separada.
 
-Exports públicos históricos `combination`, `hypergeometricDistribution` e `exactBinomialTwoSidedP` continuam importáveis pelo caminho `src/analysis/advanced.ts`.
+Extrair esse bloco agora reduziria linhas, mas não responsabilidade real. Isso violaria o critério da #62 de não mover código apenas por proximidade textual/tamanho de arquivo.
 
-### Continuidade e qualidade histórica
+Se surgir reutilização, schema próprio, cálculo independente ou necessidade clara de testes/ownership isolados, a extração deve ser uma nova issue.
 
-Owner: `src/analysis/continuity.ts`.
+## Invariants permanentes
 
-Invariant: uma lacuna nunca pode ser atravessada por métrica sequencial; histórico censurado à esquerda continua distinto de histórico contínuo conhecido.
+- anti-leakage: target nunca entra no histórico usado para classificá-lo;
+- gaps não são atravessados por métricas sequenciais;
+- histórico censurado à esquerda não é tratado como completo;
+- score, pesos, tiers, thresholds e desempates só mudam em mudança metodológica explícita;
+- rolling validation mantém warmup 20, janelas 100/300/500, trecho contínuo mais recente e Bonferroni de 9 testes;
+- associações continuam exploratórias e corrigidas por múltiplas comparações;
+- similaridade permanece descritiva, sem semântica preditiva;
+- `buildAdvancedAnalysis` continua composition root, não um novo engine monolítico.
 
-### Estrutura do sorteio e filtros metodológicos
+## Proteção executável
 
-Owner: `src/analysis/structure.ts`.
+Characterization tests preservam os contratos públicos das seams matemáticas. Ownership tests impedem que implementações extraídas retornem silenciosamente ao compositor ou criem dependências invertidas.
 
-Invariants: esperado matemático continua uniforme sem reposição; repetição exige concurso imediatamente anterior; regras específicas por loteria permanecem no domínio; cobertura histórica não usa transições com gaps.
+O gate canônico continua:
 
-### Associações exploratórias
+```bash
+npm ci
+npm run check
+```
 
-Owner: `src/analysis/associations.ts`.
+Mudança matemática exige teste de regressão/characterization e justificativa explícita; atualizar expected values apenas para facilitar refactor é finding bloqueante.
 
-Responsabilidades: chaves e contagem de pares/trincas, expected values, `AssociationStat`, `buildAssociations`, teste binomial bilateral exato, Bonferroni e highlights.
+## Histórico
 
-Dependências: `numberRange` + estatística/combinatória compartilhada.
-
-Invariants: número de comparações, arredondamento, teste, correção, evidence levels e ordenação permanecem idênticos; associação continua explicitamente exploratória e não preditiva.
-
-### Ranking, dinâmica e robustez
-
-Owner em extração: `src/analysis/dynamics.ts` na #260/PR #261.
-
-Responsabilidades: `rankRows`, `rankMap`, `tierMap`, `rawFrequencyMap`, delay/streak, cenários de peso, `robustnessByNumber` e `buildDynamics`.
-
-Dependências permitidas: continuidade, frequência, scoring, estatística e tipos de domínio. `tierMap` permanece exportado porque o rolling validation atual consome a mesma classificação produzida por `buildNumberAnalysis`; a validação não é movida nesta fatia.
-
-Invariants:
-
-- `DEFAULT_WEIGHTS` não muda em refactor;
-- desempates de rank permanecem por número crescente;
-- ranks anteriores usam offsets 1/5/10/20;
-- tendência deriva do movimento de 10 concursos com thresholds atuais;
-- snapshots recentes preservam janelas atuais;
-- robustez usa os 243 cenários de multiplicadores de peso e mantém `rankRange`/shares atuais;
-- delay/streak respeitam fronteiras de continuidade e não atravessam gaps;
-- tier por evidência do score-v2 continua distinto do tier por rank usado nos cenários de robustez.
-
-A characterization de #258/#259 continua sendo a rede pública de equivalência da extração.
-
-### Ciclos
-
-Owner: `src/analysis/cycles.ts`, concluído em #257.
-
-Dependências permitidas: universo da loteria (`numberRange`), continuidade (`splitContinuousSegments`) e sumarização (`summarize`).
-
-Invariants:
-
-- um ciclo iniciado antes de uma lacuna não pode ser tratado como conhecido depois da lacuna;
-- quando o histórico começa depois do concurso `#1`, o primeiro fechamento observado apenas restabelece uma fronteira conhecida e não entra na distribuição histórica;
-- somente durações observadas de uma fronteira conhecida até o fechamento podem alimentar `completedCount`/`historicalLength`.
-
-### Similaridade histórica
-
-Ainda em `src/analysis/advanced.ts`.
-
-Invariant: similaridade é descritiva e não deve ganhar semântica preditiva durante refactor.
-
-### Validação rolling anti-leakage
-
-Ainda em `src/analysis/advanced.ts`.
-
-Invariants: cada target usa somente prefixo anterior; warmup permanece 20; janelas permanecem 100/300/500; correção continua cobrindo 3 grupos × 3 janelas; só o trecho contínuo mais recente é elegível.
-
-### Composition root
-
-`buildAdvancedAnalysis` filtra/ordena a loteria, monta o ranking base e compõe os owners. O schema agregado e o disclaimer público permanecem sob responsabilidade dessa fronteira.
-
-## Próximas seams candidatas
-
-### Dinâmica/ranking — owner em #260/PR #261
-
-A extração só é válida se a characterization de #258 permanecer idêntica e verde. O novo owner não pode depender da composition root nem incorporar rolling validation, similaridade, ciclos, estrutura ou associações.
-
-A fronteira entre tier por evidência do score e tier por rank usado na robustez permanece explícita; refactor não é oportunidade para unificar semânticas distintas.
-
-### Validação rolling
-
-Mover por último entre os blocos matemáticos porque carrega o invariant anti-leakage mais crítico. Antes de qualquer owner, reavaliar se a characterization atual prova suficientemente prefix-only, warmup, janelas e gaps; se não provar, criar uma fatia de characterization separada.
-
-### Similaridade/composição final
-
-Extrair similaridade somente se reduzir de fato responsabilidade da composition root. Depois revisar `buildAdvancedAnalysis` como compositor; tamanho de arquivo isolado não é métrica de sucesso.
-
-## Matriz de validação
-
-| Seam | Caracterização mínima | Risco bloqueante |
-| --- | --- | --- |
-| continuidade | gaps, left-censoring, trecho final | atravessar concurso ausente |
-| combinatória | combinações, distribuições, p-values | diferença numérica/rounding |
-| estrutura | 3 loterias, repetição, Lotofácil grid | regra de loteria alterada |
-| associações | pares/trincas, Bonferroni, highlights | p-value/evidência diferente |
-| ciclos | segmentos completos/incompletos, gaps, left-censoring | ciclo conhecido após fronteira desconhecida |
-| dinâmica | ranks, offsets, movers, robustez, delay/streak, gaps | ranking/tier ou fronteira sequencial diferente |
-| validação | prefix-only + janelas | qualquer leakage futuro |
-| similaridade | overlap/distância | semântica preditiva nova |
-
-Além dos testes direcionados, cada PR executa `npm run check`. Mudança matemática exige comparação de outputs antes/depois em fixtures representativas; atualizar expected values sem explicar a diferença é finding bloqueante.
-
-## Critérios de abortar um refactor
-
-Pare e reavalie quando qualquer um ocorrer:
-
-- a extração exige editar simultaneamente múltiplos blocos não relacionados;
-- o novo módulo cria ciclo de imports ou apenas desloca um arquivo grande para outro;
-- é necessário mudar schema público/expected values para a extração passar;
-- a motivação virou somente reduzir linhas;
-- invariants relevantes não conseguem ser caracterizados antes da mudança;
-- surge mudança metodológica incidental — ela deve virar issue/PR próprio com justificativa científica.
-
-## Decisão atual
-
-A #258/PR #259 foi mergeada e congelou o boundary público de dinâmica/ranking. A #260/PR #261 aplica a extração mecânica para `src/analysis/dynamics.ts`, com guard de ownership e sem alterar expected values.
-
-Depois da #261 verde e revisada, reavaliar a próxima menor seam. Rolling validation permanece a fronteira de maior risco por anti-leakage; similaridade continua posterior e só deve sair da composition root com ganho claro de ownership.
+A decomposição foi executada incrementalmente nas issues/PRs da #62. O histórico detalhado permanece no GitHub e nos testes; documentos temporários de characterization/owner foram removidos para não manter backlog paralelo nem documentação duplicada.

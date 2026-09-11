@@ -16,6 +16,7 @@ test("Analyses 2.0 is lazy-loaded, typed, independently degradable and exposes t
     routes,
     server,
     advanced,
+    validation,
     hardening,
     repository,
     workerClient,
@@ -33,6 +34,7 @@ test("Analyses 2.0 is lazy-loaded, typed, independently degradable and exposes t
     readFile("src/api/routes.ts", "utf8"),
     readFile("src/api/server.ts", "utf8"),
     readFile("src/analysis/advanced.ts", "utf8"),
+    readFile("src/analysis/validation.ts", "utf8"),
     readFile("src/analysis/advancedHardening.ts", "utf8"),
     readFile("src/persistence/contestRepository.ts", "utf8"),
     readFile("src/analysis/advancedWorkerClient.ts", "utf8"),
@@ -85,7 +87,9 @@ test("Analyses 2.0 is lazy-loaded, typed, independently degradable and exposes t
   assert.match(workspaceCss, /repeat\(4/);
 
   assert.match(advanced, /exactBinomialTwoSidedP/);
-  assert.match(advanced, /bonferroni-\$\{VALIDATION_COMPARISONS\}-tests/);
+  assert.match(advanced, /validation: buildRollingValidation\(scoped, config\)/);
+  assert.match(validation, /bonferroni-\$\{VALIDATION_COMPARISONS\}-tests/);
+  assert.match(validation, /leakageProtection: true/);
   assert.match(hardening, /historicalExpected/);
   assert.match(hardening, /leftCensored/);
   assert.match(hardening, /MIN_EVIDENCE_ROUNDS/);
