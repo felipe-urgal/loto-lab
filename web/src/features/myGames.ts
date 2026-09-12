@@ -5,22 +5,16 @@ import { toast } from "../shared/toast.js";
 import { renderBetForm } from "./myGames/betForm.js";
 import { loadComparison } from "./myGames/comparison.js";
 import { latestBetByBatch, renderMyGamesMarkup } from "./myGames/presentation.js";
+import { createMyGamesUiState } from "./myGames/state.js";
 import { errorMessage, requiredElement, requiredPayload } from "./myGames/support.js";
-import type { GameBatchResponse, LotteryId, MyGamesFilter, RealBetResponse } from "./myGames/types.js";
-
-type UiState = {
-  filter: MyGamesFilter;
-  query: string;
-  expandedBatchId: number | null;
-  requestToken: number;
-};
+import type { GameBatchResponse, LotteryId, RealBetResponse } from "./myGames/types.js";
 
 type MountOptions = { preserveExpanded?: number | null };
 
 const root = requiredElement<HTMLElement>("#content");
 const lotterySelect = requiredElement<HTMLSelectElement>("#lottery-select");
 const subtitle = requiredElement<HTMLElement>("#view-subtitle");
-const ui: UiState = { filter: "visible", query: "", expandedBatchId: null, requestToken: 0 };
+const ui = createMyGamesUiState();
 
 function currentLottery(): LotteryId {
   const value = lotterySelect.value;
@@ -30,7 +24,7 @@ function currentLottery(): LotteryId {
 function renderScreen(data: GameBatchResponse, betData: RealBetResponse): void {
   const items = data.items ?? [];
   const betByBatch = latestBetByBatch(betData.items ?? []);
-  root.innerHTML = renderMyGamesMarkup(items, betByBatch, ui);
+  root.innerHTML = renderMyGamesMarkup(items, betByBatch, ui.snapshot());
   bindScreen(data, betData);
 }
 
@@ -40,15 +34,15 @@ function rerender(data: GameBatchResponse, betData: RealBetResponse): void {
 
 async function hideBatch(batchId: number): Promise<void> {
   await api(`/game-batches/${batchId}/hide`, { method: "POST" });
-  if (ui.expandedBatchId === batchId) ui.expandedBatchId = null;
+  if (ui.snapshot().expandedBatchId === batchId) ui.setExpanded(null);
   toast("Lote ocultado. O histórico foi preservado.");
   await mount();
 }
 
 async function showBatch(batchId: number): Promise<void> {
   await api(`/game-batches/${batchId}/show`, { method: "POST" });
-  ui.filter = "visible";
-  ui.expandedBatchId = batchId;
+  ui.setFilter("visible");
+  ui.setExpanded(batchId);
   toast("Lote voltou para a lista principal.");
   await mount({ preserveExpanded: batchId });
 }
@@ -59,22 +53,24 @@ function bindScreen(data: GameBatchResponse, betData: RealBetResponse): void {
 
   root.querySelectorAll<HTMLButtonElement>("[data-mg2-filter]").forEach((button) => button.addEventListener("click", () => {
     const filter = button.dataset.mg2Filter;
-    if (filter === "visible" || filter === "bets" || filter === "generated" || filter === "hidden") ui.filter = filter;
-    ui.expandedBatchId = null;
+    if (filter === "visible" || filter === "bets" || filter === "generated" || filter === "hidden") {
+      ui.setFilter(filter);
+    }
+    ui.setExpanded(null);
     rerender(data, betData);
   }));
 
   root.querySelector<HTMLInputElement>("[data-mg2-search]")?.addEventListener("input", (event) => {
-    ui.query = (event.currentTarget as HTMLInputElement).value;
+    ui.setQuery((event.currentTarget as HTMLInputElement).value);
     rerender(data, betData);
     const input = root.querySelector<HTMLInputElement>("[data-mg2-search]");
+    const query = ui.snapshot().query;
     input?.focus();
-    input?.setSelectionRange(ui.query.length, ui.query.length);
+    input?.setSelectionRange(query.length, query.length);
   });
 
   root.querySelectorAll<HTMLButtonElement>("[data-mg2-toggle]").forEach((button) => button.addEventListener("click", () => {
-    const batchId = Number(button.dataset.mg2Toggle);
-    ui.expandedBatchId = ui.expandedBatchId === batchId ? null : batchId;
+    ui.toggleExpanded(Number(button.dataset.mg2Toggle));
     rerender(data, betData);
   }));
 
@@ -116,7 +112,7 @@ function bindScreen(data: GameBatchResponse, betData: RealBetResponse): void {
     try {
       await api(`/real-bets/${button.dataset.mg2RefreshBet}/check`, { method: "POST" });
       toast("Resultado da aposta atualizado.");
-      await mount({ preserveExpanded: ui.expandedBatchId });
+      await mount({ preserveExpanded: ui.snapshot().expandedBatchId });
     } catch (error) {
       button.disabled = false;
       button.textContent = "Atualizar resultado";
@@ -128,8 +124,8 @@ function bindScreen(data: GameBatchResponse, betData: RealBetResponse): void {
 async function mount(options: MountOptions = {}): Promise<void> {
   if (currentMainView() !== "games") return;
   const lottery = currentLottery();
-  const token = ++ui.requestToken;
-  if (options.preserveExpanded !== undefined) ui.expandedBatchId = options.preserveExpanded;
+  const token = ui.beginRequest();
+  if (options.preserveExpanded !== undefined) ui.setExpanded(options.preserveExpanded);
   subtitle.textContent = "Acompanhe lotes, apostas e resultados sem perder o histórico.";
   root.innerHTML = '<div class="mg2-loading"><span class="spinner"></span><span>Carregando seus jogos...</span></div>';
   try {
@@ -139,10 +135,10 @@ async function mount(options: MountOptions = {}): Promise<void> {
     ]);
     const data = requiredPayload(dataPayload, "carregar lotes");
     const betData = requiredPayload(betPayload, "carregar apostas reais");
-    if (token !== ui.requestToken || currentMainView() !== "games" || currentLottery() !== lottery) return;
+    if (!ui.isCurrentRequest(token) || currentMainView() !== "games" || currentLottery() !== lottery) return;
     renderScreen(data, betData);
   } catch (error) {
-    if (token !== ui.requestToken || currentMainView() !== "games") return;
+    if (!ui.isCurrentRequest(token) || currentMainView() !== "games") return;
     root.innerHTML = `<div class="error-state"><strong>Não foi possível carregar seus jogos</strong><p>${escapeHtml(errorMessage(error))}</p><button class="button" type="button" data-mg2-retry>Tentar novamente</button></div>`;
     root.querySelector<HTMLButtonElement>("[data-mg2-retry]")?.addEventListener("click", () => { void mount(); });
   }
@@ -160,9 +156,7 @@ function scheduleMount(): void {
 
 onViewRendered(scheduleMount);
 lotterySelect.addEventListener("change", () => {
-  ui.filter = "visible";
-  ui.query = "";
-  ui.expandedBatchId = null;
+  ui.resetForLotteryChange();
 });
-document.querySelector<HTMLButtonElement>("#refresh-view")?.addEventListener("click", () => { ui.expandedBatchId = null; });
+document.querySelector<HTMLButtonElement>("#refresh-view")?.addEventListener("click", () => { ui.setExpanded(null); });
 window.addEventListener("loto-lab:data-synced", scheduleMount);
