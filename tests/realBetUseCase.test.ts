@@ -15,6 +15,7 @@ function snapshot(overrides: Partial<RealBetSnapshot> = {}): RealBetSnapshot {
     lottery: "mega-sena",
     contestNumber: 3000,
     status: "checked",
+    researchHypothesisId: null,
     ...overrides,
   };
 }
@@ -88,6 +89,21 @@ test("RealBetUseCase translates legacy creation failures into stable application
       code: "INVALID_PLAYED_AT" as const,
       message: /playedAt is invalid/,
     },
+    {
+      legacy: "RESEARCH_HYPOTHESIS_NOT_FOUND:7",
+      code: "RESEARCH_HYPOTHESIS_NOT_FOUND" as const,
+      message: /Research hypothesis 7 was not found/,
+    },
+    {
+      legacy: "RESEARCH_HYPOTHESIS_NOT_APPLICABLE:7",
+      code: "RESEARCH_HYPOTHESIS_NOT_APPLICABLE" as const,
+      message: /Research hypothesis 7 is not decided for experimental application/,
+    },
+    {
+      legacy: "RESEARCH_HYPOTHESIS_LOTTERY_MISMATCH:7:lotofacil:mega-sena",
+      code: "RESEARCH_HYPOTHESIS_LOTTERY_MISMATCH" as const,
+      message: /Research hypothesis 7 belongs to lotofacil.*real bet belongs to mega-sena/,
+    },
   ];
 
   for (const item of cases) {
@@ -97,6 +113,28 @@ test("RealBetUseCase translates legacy creation failures into stable application
     );
     await assertUseCaseError(() => useCase.create(input), item.code, item.message);
   }
+});
+
+test("RealBetUseCase preserves the canonical research hypothesis link on creation", async () => {
+  const input: CreateRealBetRequest = {
+    batchId: 42,
+    actualCost: 12,
+    researchHypothesisId: 7,
+  };
+  const useCase = new RealBetUseCase(
+    operations({
+      async create(request) {
+        return snapshot({
+          id: 9,
+          researchHypothesisId: request.researchHypothesisId ?? null,
+        });
+      },
+    }),
+    revisions(),
+  );
+
+  const result = await useCase.create(input) as RealBetSnapshot;
+  assert.equal(result.researchHypothesisId, 7);
 });
 
 test("RealBetUseCase owns pending reconciliation and checked-result state transitions", async () => {
