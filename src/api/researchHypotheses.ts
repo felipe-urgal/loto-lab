@@ -150,6 +150,18 @@ export async function serveResearchHypotheses(
       }
     }
 
+    const applicationsMatch = /^\/api\/v1\/research\/hypotheses\/(\d+)\/applications\/real-bets$/.exec(pathname);
+    if (method === "GET" && applicationsMatch) {
+      const hypothesisId = parsePositiveInt(applicationsMatch[1], "hypothesisId");
+      sendJson(
+        response,
+        200,
+        { items: await hypotheses.listRealBetApplications(hypothesisId) },
+        corsOrigin,
+      );
+      return true;
+    }
+
     const itemMatch = /^\/api\/v1\/research\/hypotheses\/(\d+)$/.exec(pathname);
     if (method === "GET" && itemMatch) {
       const id = parsePositiveInt(itemMatch[1], "hypothesisId");
