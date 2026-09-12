@@ -15,6 +15,7 @@ test("view lifecycle normalizes the main hash contract", () => {
   assert.equal(mainViewFromHash("#dashboard"), "dashboard");
   assert.equal(mainViewFromHash("#analysis"), "analysis");
   assert.equal(mainViewFromHash("generate"), "generate");
+  assert.equal(mainViewFromHash("#unknown"), "dashboard");
   assert.equal(VIEW_RENDERED_EVENT, "loto-lab:view-rendered");
 });
 
