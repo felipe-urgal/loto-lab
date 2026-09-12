@@ -18,3 +18,17 @@ test("Laboratório exposes Backtests as a contextual next step without cross-pag
   assert.doesNotMatch(html, /href="\/#backtests\?/);
   assert.match(html, /O Laboratório não copia nem pré-preenche o formulário de Backtests/);
 });
+
+test("Meus Jogos persists optional research provenance in the real bet instead of navigation state", async () => {
+  const [betForm, presentation, types] = await Promise.all([
+    source("web/src/features/myGames/betForm.ts"),
+    source("web/src/features/myGames/presentation.ts"),
+    source("web/src/features/myGames/types.ts"),
+  ]);
+
+  assert.match(betForm, /name="researchHypothesisId"/);
+  assert.match(betForm, /researchHypothesisId/);
+  assert.match(types, /researchHypothesisId\??: number \| null/);
+  assert.match(presentation, /Hipótese #/);
+  assert.doesNotMatch(betForm, /localStorage|location\.hash|URLSearchParams/);
+});
