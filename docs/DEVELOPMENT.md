@@ -13,7 +13,7 @@ Documentos especializados continuam em:
 
 ## Pré-requisitos
 
-- Node.js `24.19.0`;
+- Node.js `24.20.0`;
 - npm;
 - Docker Engine;
 - Docker Compose v2;

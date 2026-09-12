@@ -150,7 +150,7 @@ Fluxo:
 
 ```text
 checkout
--> Node 24.19.0
+-> Node 24.20.0
 -> npm ci
 -> PostgreSQL efêmero
 -> npm run check
