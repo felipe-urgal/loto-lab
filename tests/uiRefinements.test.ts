@@ -41,10 +41,19 @@ test("UI refinement assets are lazy-loaded and typed Backtests bypasses legacy r
   const app = await fetch(`${baseUrl}/assets/app.js`);
   assert.equal(app.status, 200);
   const appSource = await app.text();
-  assert.match(appSource, /new AbortController\(\)/);
+  assert.match(appSource, /createMainRenderState/);
+  assert.match(appSource, /state\.beginRender\(\)/);
   assert.match(appSource, /isCurrentRender/);
   assert.match(appSource, /data-feature-owned="backtests"/);
+  assert.doesNotMatch(appSource, /new AbortController\(\)/);
   assert.doesNotMatch(appSource, /async function renderBacktests/);
+
+  const mainRenderState = await fetch(`${baseUrl}/assets/src/core/mainRenderState.js`);
+  assert.equal(mainRenderState.status, 200);
+  const mainRenderStateSource = await mainRenderState.text();
+  assert.match(mainRenderStateSource, /new AbortController\(\)/);
+  assert.match(mainRenderStateSource, /renderController\?\.abort\(\)/);
+  assert.match(mainRenderStateSource, /isCurrentRender/);
 
   const mainRefinementsBoundary = await fetch(`${baseUrl}/assets/refinements.js`);
   assert.equal(mainRefinementsBoundary.status, 200);
