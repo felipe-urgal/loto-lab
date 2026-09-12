@@ -6,6 +6,7 @@ export interface CreateRealBetRequest {
   gamePositions?: number[];
   actualCost: number;
   playedAt?: string;
+  researchHypothesisId?: number;
 }
 
 export interface RealBetSnapshot {
@@ -13,6 +14,7 @@ export interface RealBetSnapshot {
   lottery: LotteryId;
   contestNumber: number;
   status: string;
+  researchHypothesisId: number | null;
 }
 
 export interface RealBetOperations {
@@ -35,6 +37,9 @@ export type RealBetUseCaseErrorCode =
   | "CONTEST_NUMBER_REQUIRED"
   | "INVALID_GAME_POSITIONS"
   | "INVALID_PLAYED_AT"
+  | "RESEARCH_HYPOTHESIS_NOT_FOUND"
+  | "RESEARCH_HYPOTHESIS_NOT_APPLICABLE"
+  | "RESEARCH_HYPOTHESIS_LOTTERY_MISMATCH"
   | "REAL_BET_NOT_FOUND"
   | "RESULT_NOT_AVAILABLE";
 
@@ -88,6 +93,27 @@ function translateCreateError(error: unknown): RealBetUseCaseError | undefined {
   }
   if (error.message === "INVALID_PLAYED_AT") {
     return new RealBetUseCaseError("INVALID_PLAYED_AT", "playedAt is invalid");
+  }
+  if (error.message.startsWith("RESEARCH_HYPOTHESIS_NOT_FOUND:")) {
+    const id = error.message.split(":")[1];
+    return new RealBetUseCaseError(
+      "RESEARCH_HYPOTHESIS_NOT_FOUND",
+      `Research hypothesis ${id} was not found`,
+    );
+  }
+  if (error.message.startsWith("RESEARCH_HYPOTHESIS_NOT_APPLICABLE:")) {
+    const id = error.message.split(":")[1];
+    return new RealBetUseCaseError(
+      "RESEARCH_HYPOTHESIS_NOT_APPLICABLE",
+      `Research hypothesis ${id} is not decided for experimental application`,
+    );
+  }
+  if (error.message.startsWith("RESEARCH_HYPOTHESIS_LOTTERY_MISMATCH:")) {
+    const [, id, hypothesisLottery, realBetLottery] = error.message.split(":");
+    return new RealBetUseCaseError(
+      "RESEARCH_HYPOTHESIS_LOTTERY_MISMATCH",
+      `Research hypothesis ${id} belongs to ${hypothesisLottery}; the real bet belongs to ${realBetLottery}`,
+    );
   }
   return undefined;
 }
