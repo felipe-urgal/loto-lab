@@ -51,6 +51,11 @@ function batchTrailing(batch: GameBatch, bet: RealBet | undefined): string {
   return `<div class="mg2-trailing-copy"><strong>${money(bet.actualCost)}</strong><span>valor apostado</span></div>`;
 }
 
+function researchProvenanceMarkup(bet: RealBet): string {
+  if (bet.researchHypothesisId === undefined || bet.researchHypothesisId === null) return "";
+  return `<p class="mg2-form-note">Hipótese #${bet.researchHypothesisId} · aplicação experimental rastreável. O vínculo registra proveniência e não altera a probabilidade do jogo.</p>`;
+}
+
 function officialBetMarkup(bet: RealBet | undefined): string {
   if (!bet) return "";
   if (bet.status !== "checked") {
@@ -59,6 +64,7 @@ function officialBetMarkup(bet: RealBet | undefined): string {
         <div><strong>Resultado da aposta</strong><p>Concurso #${bet.contestNumber} · custo real ${money(bet.actualCost)}</p></div>
         <span class="mg2-status is-warning">Aguardando resultado</span>
       </div>
+      ${researchProvenanceMarkup(bet)}
       <div class="mg2-official-pending">
         <p>A conferência financeira só será registrada quando o resultado oficial desse concurso estiver disponível.</p>
         <button class="button" type="button" data-mg2-refresh-bet="${bet.id}">Atualizar resultado</button>
@@ -78,6 +84,7 @@ function officialBetMarkup(bet: RealBet | undefined): string {
       <div><strong>Resultado da aposta · concurso #${bet.contestNumber}</strong><p>${checkedGames.length} jogo${checkedGames.length === 1 ? "" : "s"} efetivamente apostado${checkedGames.length === 1 ? "" : "s"}</p></div>
       <span class="mg2-status is-success">Conferência oficial</span>
     </div>
+    ${researchProvenanceMarkup(bet)}
     <div class="mg2-result-metrics">
       <div><span>Melhor jogo</span><strong>${hitText(best)}</strong></div>
       <div><span>Custo real</span><strong>${money(bet.actualCost)}</strong></div>
