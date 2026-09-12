@@ -15,7 +15,8 @@ Há duas famílias de métricas que usam bases diferentes:
 - usar o rateio oficial do concurso quando disponível;
 - diferenciar prêmio zero de prêmio desconhecido;
 - não tratar aposta real pendente como perda;
-- preservar correções oficiais posteriores em trilha auditável.
+- preservar correções oficiais posteriores em trilha auditável;
+- manter a motivação de pesquisa separada do cálculo financeiro: proveniência não muda chance, custo, prêmio ou ROI.
 
 ## Preços históricos suportados
 
@@ -147,7 +148,17 @@ ROI agregado = soma(netResult) / soma(checkedCost)
 
 Nunca fazer média simples de percentuais individuais.
 
-Detalhes em [`REAL_BETS.md`](REAL_BETS.md).
+### Proveniência experimental opcional
+
+Uma aposta real pode registrar `researchHypothesisId`. Esse campo não participa de nenhum cálculo financeiro. Ele serve somente para responder, de forma auditável: **qual hipótese humana decidida para aplicação experimental motivou esta aposta?**
+
+O vínculo só é aceito quando a hipótese existe, está `decided` como `applied-experimentally` e é compatível com a loteria. A `real_bet` continua sendo o owner canônico de custo, prêmio, resultado líquido e revisões financeiras.
+
+Quando o resultado oficial chega, a mesma `real_bet` é reconciliada e mantém `researchHypothesisId`. Assim, o resultado real pode ser ligado à hipótese e ao backtest original sem copiar valores financeiros para `research_hypotheses` e sem criar uma entidade genérica de experimento.
+
+Ausência de `researchHypothesisId` significa apenas que aquela aposta não está registrada como aplicação de uma hipótese persistida; não significa hipótese negativa, evidência desfavorável nem resultado zero.
+
+Detalhes em [`REAL_BETS.md`](REAL_BETS.md), [`DATABASE.md`](DATABASE.md) e [`API.md`](API.md).
 
 ## Correções oficiais posteriores
 
@@ -158,7 +169,8 @@ Quando uma grade completa nova altera prêmio ou resultado líquido de uma apost
 - o valor é recalculado;
 - o timestamp original de conferência é preservado;
 - a mudança é registrada em `real_bet_financial_revisions`;
-- o KPI passa a refletir o dado oficial revisado.
+- o KPI passa a refletir o dado oficial revisado;
+- qualquer `researchHypothesisId` existente permanece ligado à mesma aposta.
 
 Uma resposta oficial parcial posterior não deve apagar uma grade completa já conhecida.
 
@@ -188,3 +200,5 @@ ROI histórico ou real é uma medida de desempenho financeiro observado. Ele:
 - não altera a probabilidade matemática dos sorteios;
 - não valida sozinho uma estratégia;
 - deve ser interpretado junto de cobertura, período, tamanho da amostra e controles metodológicos.
+
+Da mesma forma, vincular uma aposta a uma hipótese não converte decisão experimental em evidência de previsão ou recomendação probabilística.
