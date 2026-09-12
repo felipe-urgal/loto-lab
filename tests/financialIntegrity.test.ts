@@ -7,6 +7,7 @@ import { normalizeIsoDateTime } from "../src/domain/dateTime.js";
 import { createLotoLabServer } from "../src/api/server.js";
 import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
 import { PostgresGameRepository } from "../src/persistence/gameRepository.js";
+import { PostgresResearchHypothesisRepository } from "../src/persistence/researchHypothesisRepository.js";
 import { RealBetService } from "../src/realBets/service.js";
 import { createIsolatedPostgresDatabase } from "./helpers/postgres.js";
 
@@ -115,6 +116,67 @@ test(
         /INVALID_PLAYED_AT/,
       );
       assert.equal(await service.realBets.findByBatchId(batch.id), undefined);
+    } finally {
+      await database.close();
+    }
+  },
+);
+
+test(
+  "research provenance persists on the real bet and survives official reconciliation",
+  { skip: !process.env.DATABASE_URL },
+  async () => {
+    const database = await createIsolatedPostgresDatabase({ label: "financial-integrity-research-provenance" });
+    const { pool } = database;
+    const contests = new PostgresContestRepository(pool);
+    const batches = new PostgresGameRepository(pool);
+    const hypotheses = new PostgresResearchHypothesisRepository(pool);
+    const service = new RealBetService(pool);
+
+    try {
+      const batch = await batches.saveBatch({
+        lottery: "mega-sena",
+        targetContestNumber: TARGET,
+        generatorOptions: { test: "financial-integrity-research-provenance" },
+        games: [game()],
+      });
+      const hypothesis = await hypotheses.create({
+        title: "Aplicação real rastreável",
+        description: "Persistir a identidade da hipótese até o resultado real.",
+        lottery: "mega-sena",
+      });
+      const decided = await hypotheses.decide(
+        hypothesis.id,
+        "applied-experimentally",
+        "Aplicação controlada para validar a trilha real.",
+      );
+      assert.equal(decided?.decision, "applied-experimentally");
+
+      const bet = await service.create({
+        batchId: batch.id,
+        actualCost: 6,
+        playedAt: "2098-12-31T12:00:00-03:00",
+        researchHypothesisId: hypothesis.id,
+      });
+      assert.equal(bet.researchHypothesisId, hypothesis.id);
+
+      const persisted = await pool.query<{ research_hypothesis_id: string | null }>(
+        "SELECT research_hypothesis_id FROM real_bets WHERE id = $1",
+        [bet.id],
+      );
+      assert.equal(Number(persisted.rows[0]?.research_hypothesis_id), hypothesis.id);
+
+      await contests.upsertMany([officialContest(777)]);
+      const reconciled = await service.reconcile(bet.id);
+      assert.equal(reconciled?.status, "checked");
+      assert.equal(reconciled?.researchHypothesisId, hypothesis.id);
+      assert.equal(reconciled?.totalPrizeValue, 777);
+
+      const applications = await service.realBets.listRealBets(hypothesis.id);
+      assert.equal(applications.length, 1);
+      assert.equal(applications[0]?.id, bet.id);
+      assert.equal(applications[0]?.researchHypothesisId, hypothesis.id);
+      assert.equal(applications[0]?.status, "checked");
     } finally {
       await database.close();
     }
