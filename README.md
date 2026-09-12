@@ -17,20 +17,22 @@ O Loto Lab transforma hipóteses em regras explícitas, executa cálculos determ
 
 ## Estado atual
 
-Baseline reconciliada em **2026-09-11**:
+Baseline reconciliada em **2026-09-12**:
 
 - PostgreSQL é a fonte de verdade operacional, com migrations forward-only, checksum e advisory lock;
 - `src/api/server.ts` é o composition root HTTP e controllers delegam regra a application use cases;
-- o frontend continua sem framework e possui owners canônicos em `web/src` para core, features e primitives compartilhadas;
+- o frontend continua sem framework e possui owners canônicos em `web/src` para core, features, estado/lifecycle e primitives compartilhadas;
 - análises, geração, backtests, Strategy Lab e financeiro preservam reprodutibilidade, anti-leakage e a distinção entre desconhecido e zero conhecido;
-- `research_hypotheses` persiste hipótese humana, pode vincular evidência canônica de `backtest_run` e suporta decisão humana/auditável;
-- observabilidade cobre HTTP, Analysis Jobs, sync, PostgreSQL, CAIXA e OpenAI;
-- produção possui `prod:resources` para baseline comparável antes de tuning;
-- a decomposição do hotspot `src/analysis/advanced.ts` foi concluída na #62: continuidade, estatística, estrutura, associações, ciclos, dinâmica/ranking e rolling validation possuem owners próprios;
+- `research_hypotheses` persiste hipótese humana, reutiliza evidência canônica de `backtest_run`, suporta decisão humana/auditável e pode ser rastreada até uma aplicação/aposta real e seu resultado posterior;
+- `real_bets.research_hypothesis_id` é o vínculo opcional e canônico para uma hipótese decidida como `applied-experimentally`;
+- observabilidade cobre HTTP, Analysis Jobs, sync, PostgreSQL, CAIXA e OpenAI, com runbooks e coleta de baseline antes de tuning;
+- produção possui `prod:resources` para séries comparáveis de CPU/memória e profiling orientado por evidência;
+- a decomposição do hotspot `src/analysis/advanced.ts` está concluída: continuidade, estatística, estrutura, associações, ciclos, dinâmica/ranking e rolling validation possuem owners próprios;
+- o roadmap estrutural atual está encerrado; novos trabalhos devem nascer de problemas observáveis e critérios específicos;
 - `npm run check` é o gate funcional canônico;
-- a `main` ainda não possui branch protection obrigatória; isso permanece como configuração administrativa da #52.
+- a `main` ainda não possui branch protection obrigatória; isso permanece uma configuração administrativa externa ao código, não um estado concluído do repositório.
 
-Prioridade e dependências atuais: [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Baseline e política para próximos ciclos: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Princípios
 
@@ -38,7 +40,7 @@ Prioridade e dependências atuais: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 2. **Anti-leakage.** Um concurso alvo nunca entra nos dados usados para gerar, classificar, calibrar ou decidir antes de seu resultado ser revelado.
 3. **Sem promessa de previsão.** Histórico não vira aumento de probabilidade futura sem modelo e evidência formal válidos.
 4. **IA fora do cálculo crítico.** IA interpreta evidências; matemática, geração, conferência, financeiro e testes permanecem no código.
-5. **Proveniência explícita.** Hipóteses, runs, evidências e decisões reutilizam identidades canônicas.
+5. **Proveniência explícita.** Hipóteses, runs, evidências, decisões e aplicações reutilizam identidades canônicas.
 6. **Desconhecido não é zero.** Ausência de dado e valor `0` possuem semânticas distintas.
 7. **Performance baseada em evidência.** Índice, cache, timeout, concorrência e limite de recurso exigem baseline comparável.
 
@@ -59,7 +61,7 @@ A aplicação principal usa hash routes:
 | Painel | `/#dashboard` | estado, desempenho e atividade |
 | Análises | `/#analysis` | ranking, estrutura, dinâmica, combinações e validação |
 | Gerar jogos | `/#generate` | planejamento, preview, geração e persistência |
-| Meus jogos | `/#games` | lotes, conferência, comparação e apostas reais |
+| Meus jogos | `/#games` | lotes, conferência, comparação, apostas reais e proveniência experimental opcional |
 | Testes históricos | `/#backtests` | execução e histórico de simulações |
 
 Áreas dedicadas:
@@ -108,21 +110,25 @@ A similaridade histórica permanece no compositor porque hoje é composição lo
 
 O frontend continua sem framework. `tsconfig.web.json` cobre `web/src/**/*.ts`; `npm run web:build` emite JavaScript para `web-dist/assets/src`.
 
-`web/src/core/featureLoader.ts` é o owner do lazy loading. Boundaries JavaScript já migrados permanecem finos/import-only. A #60 continua focada em reduzir state/lifecycle imperativo e módulos grandes por responsabilidade real, sem rewrite.
+`web/src/core/featureLoader.ts` é o owner do lazy loading. Boundaries JavaScript já migrados permanecem finos/import-only. Owners de estado/lifecycle existem quando há responsabilidade independente concreta; por exemplo, `web/src/features/myGames/state.ts` concentra filtro, busca, expansão e invalidação de requests da feature sem transformar `myGames.ts` em store global.
+
+Não existe meta de rewrite completo ou migração por contagem de linhas. Novo refactor deve justificar ganho real de ownership, acoplamento, testabilidade ou estado explícito.
 
 Detalhes: [`docs/WEB.md`](docs/WEB.md).
 
 ### Persistência e pesquisa
 
-PostgreSQL é a fonte de verdade operacional. O schema versionado vai até `014_research_backtest_evidence.sql`.
+PostgreSQL é a fonte de verdade operacional. O schema versionado vai até `015_research_real_bet_application.sql`.
 
-- `research_hypotheses` persiste a hipótese humana;
+- `research_hypotheses` persiste a hipótese humana e a decisão;
 - `research_hypothesis_backtest_evidence` aponta para um `backtest_run` canônico;
-- compatibilidade de loteria e lifecycle são defendidos em aplicação e PostgreSQL;
 - decisão humana/auditável exige evidência persistida e justificativa;
-- não existe `evidence_id` genérico nem cópia paralela do resultado.
+- somente uma hipótese `decided` como `applied-experimentally` pode ser vinculada a uma aposta real;
+- `real_bets.research_hypothesis_id` mantém a aplicação e o resultado real no owner financeiro já existente;
+- compatibilidade de loteria e lifecycle são defendidos na aplicação e por FKs/constraints persistidos;
+- não existe `experiment_id`/`evidence_id` genérico nem cópia paralela do resultado.
 
-Detalhes: [`docs/DATABASE.md`](docs/DATABASE.md) e [`docs/API.md`](docs/API.md).
+Detalhes: [`docs/DATABASE.md`](docs/DATABASE.md), [`docs/API.md`](docs/API.md) e [`docs/FINANCIALS.md`](docs/FINANCIALS.md).
 
 ## Requisitos e desenvolvimento local
 
@@ -187,7 +193,7 @@ Famílias principais:
 - `/real-bets`;
 - `/operations` e `/data/status`;
 - `/agenda` e `/notifications`;
-- `/research/hypotheses`, evidências e decisão humana;
+- `/research/hypotheses`, evidências, decisão humana e aplicações reais;
 - `/ai`.
 
 Detalhes: [`docs/API.md`](docs/API.md).
@@ -229,7 +235,7 @@ Baseline read-only de CPU/memória:
 npm run prod:resources
 ```
 
-Uma amostra isolada não define limite nem SLO. Tuning exige comparação antes/depois sob carga equivalente.
+Uma amostra isolada não define limite nem SLO. Tuning exige comparação antes/depois sob carga equivalente. Quando surgir um gargalo concreto, ele deve virar issue própria com baseline e critério de sucesso, não reabrir um epic permanente de performance.
 
 Detalhes: [`docs/PRODUCTION.md`](docs/PRODUCTION.md), [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md), [`docs/RELIABILITY.md`](docs/RELIABILITY.md) e [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
 
@@ -249,7 +255,8 @@ Sem chave, somente novas interpretações ficam indisponíveis. Métricas do pro
 - comparações usam controles reproduzíveis e correção por múltiplas comparações quando aplicável;
 - ROI usa preço histórico suportado e rateios oficiais;
 - prêmio zero conhecido é diferente de dado financeiro desconhecido;
-- aposta real é separada de lote gerado e de simulação histórica.
+- aposta real é separada de lote gerado e de simulação histórica;
+- uma aposta real pode opcionalmente registrar a hipótese experimental que motivou a aplicação, sem alterar cálculo, chance ou owner financeiro.
 
 Leia [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md), [`docs/ANALYSES.md`](docs/ANALYSES.md), [`docs/GENERATION.md`](docs/GENERATION.md), [`docs/STRATEGY_LAB.md`](docs/STRATEGY_LAB.md) e [`docs/FINANCIALS.md`](docs/FINANCIALS.md).
 
@@ -265,7 +272,7 @@ Agentes de IA devem seguir [`AGENTS.md`](AGENTS.md).
 ## Documentação canônica
 
 - [`AGENTS.md`](AGENTS.md) — invariantes e fluxo de engenharia;
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — prioridades e estado estrutural atual;
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — baseline estrutural e política para próximos ciclos;
 - [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) — setup e desenvolvimento;
 - [`docs/WEB.md`](docs/WEB.md) — frontend e lifecycle;
 - [`docs/API.md`](docs/API.md) — API HTTP;
@@ -274,10 +281,10 @@ Agentes de IA devem seguir [`AGENTS.md`](AGENTS.md).
 - [`docs/GENERATION.md`](docs/GENERATION.md) — geração;
 - [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) — metodologia;
 - [`docs/STRATEGY_LAB.md`](docs/STRATEGY_LAB.md) — experimentação;
-- [`docs/FINANCIALS.md`](docs/FINANCIALS.md) — custos, prêmios e ROI;
+- [`docs/FINANCIALS.md`](docs/FINANCIALS.md) — custos, prêmios, ROI e aplicação real;
 - [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — sync e observabilidade;
 - [`docs/PRODUCTION.md`](docs/PRODUCTION.md) — operação em produção;
-- [`docs/tasks/README.md`](docs/tasks/README.md) — contratos/planos duráveis por epic.
+- [`docs/tasks/README.md`](docs/tasks/README.md) — contratos/planos duráveis que ainda agregam valor.
 
 ## Aviso
 

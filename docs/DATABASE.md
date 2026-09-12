@@ -21,7 +21,7 @@ O fluxo canônico de desenvolvimento está em [`DEVELOPMENT.md`](DEVELOPMENT.md)
 
 ## Migrations
 
-As migrations ficam em `db/migrations/` e hoje vão de `001_initial.sql` a `014_research_backtest_evidence.sql`.
+As migrations ficam em `db/migrations/` e hoje vão de `001_initial.sql` a `015_research_real_bet_application.sql`.
 
 O runner:
 
@@ -54,6 +54,7 @@ O runner:
 | `012_domain_contract_alignment.sql` | alinhamento de invariantes TS ↔ PostgreSQL |
 | `013_research_hypotheses.sql` | raiz persistida de hipótese de pesquisa e lifecycle de decisão |
 | `014_research_backtest_evidence.sql` | vínculo auditável entre hipótese e `backtest_run`, com invariantes de lifecycle/loteria |
+| `015_research_real_bet_application.sql` | vínculo opcional da aplicação/aposta real à hipótese decidida experimentalmente |
 
 ## Entidades principais
 
@@ -86,11 +87,24 @@ O runner:
 - hipótese específica de uma loteria só aceita backtest da mesma loteria;
 - a migration `014` repete no PostgreSQL os invariantes críticos usados pelo application use case.
 
-A API ainda não expõe a mutação de decisão. A associação de evidência cria proveniência; não transforma automaticamente o resultado histórico em conclusão metodológica.
+A decisão humana/auditável é persistida na própria hipótese. O application use case exige evidência de backtest previamente ligada, justificativa humana e transição atômica de `open` para `decided`.
+
+A migration `015` completa a cadeia com `real_bets.research_hypothesis_id BIGINT NULL REFERENCES research_hypotheses(id) ON DELETE RESTRICT`. O campo é opcional para preservar apostas normais e histórico existente. Quando usado, o service exige que a hipótese:
+
+- exista;
+- esteja `decided`;
+- tenha decisão `applied-experimentally`;
+- seja transversal ou compatível com a loteria do lote/aposta.
+
+O PostgreSQL preserva a identidade referenciada; o application service preserva o lifecycle e a compatibilidade sem criar tabela intermediária de aplicação.
 
 ### Apostas reais
 
 `real_bets` separa dinheiro efetivamente apostado de geração e backtest. `real_bet_games` preserva snapshot dos jogos apostados. `real_bet_financial_revisions` registra correções oficiais posteriores sem apagar o histórico anterior.
+
+Quando `research_hypothesis_id` está presente, a própria `real_bet` é a aplicação experimental canônica. A reconciliação para `checked` atualiza prêmio/resultado no mesmo registro e mantém o FK; portanto a cadeia hipótese → evidência → decisão → aplicação → resultado pode ser percorrida sem copiar financeiro para a hipótese.
+
+Nenhum índice foi adicionado em `research_hypothesis_id` apenas por antecipação. Se profiling real mostrar necessidade, a otimização deve entrar em migration nova com baseline antes/depois.
 
 ### Operação e agenda
 
@@ -109,6 +123,8 @@ A fila de análises persiste trabalhos `backtest` e `strategy-lab`, incluindo es
 ## Repositories
 
 A camada concreta fica em `src/persistence/` e inclui repositories para concursos, lotes/jogos, backtests, estratégias, apostas reais, Analysis Jobs, operações, Agenda/notificações, AI Insights e hipóteses de pesquisa (`researchHypothesisRepository.ts`).
+
+`PostgresRealBetRepository` é reutilizado tanto pelo fluxo financeiro quanto pela leitura reversa de aplicações de pesquisa; isso evita um owner paralelo para o mesmo fato.
 
 Application use cases dependem de portas mínimas sempre que isso for suficiente. A composição concreta das features HTTP acontece em `src/api/server.ts`.
 
@@ -187,6 +203,6 @@ Procedimento operacional: [`PRODUCTION.md`](PRODUCTION.md). Detalhes de topologi
 
 As suítes PostgreSQL usam database temporário isolado por arquivo de teste, migrations reais e concorrência controlada.
 
-O baseline cobre instalação limpa/idempotência, checksum drift, upgrade de schema, contratos TS ↔ PostgreSQL, concursos/rateios, estratégias/versionamento, lotes/jogos, apostas reais/revisões, jobs/operações, backtests e a trilha de pesquisa hipótese → evidência.
+O baseline cobre instalação limpa/idempotência, checksum drift, upgrade de schema, contratos TS ↔ PostgreSQL, concursos/rateios, estratégias/versionamento, lotes/jogos, apostas reais/revisões, jobs/operações, backtests e a trilha completa pesquisa hipótese → evidência → decisão → aplicação/aposta real → resultado.
 
 Veja [`QUALITY.md`](QUALITY.md).

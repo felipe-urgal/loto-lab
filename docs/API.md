@@ -124,7 +124,27 @@ GET  /api/v1/real-bets/:id/revisions
 
 Apostas reais são separadas de lotes apenas gerados e de testes históricos. O backend impede registro retrospectivo quando o resultado oficial já era conhecido.
 
-Detalhes: [`REAL_BETS.md`](REAL_BETS.md).
+Criação aceita proveniência de pesquisa opcional:
+
+```json
+{
+  "batchId": 42,
+  "contestNumber": 3001,
+  "actualCost": 6.0,
+  "gamePositions": [1, 2],
+  "researchHypothesisId": 7
+}
+```
+
+`researchHypothesisId` é opcional. Quando informado, a hipótese precisa existir, estar `decided` com decisão `applied-experimentally` e ser compatível com a loteria do lote. O vínculo é persistido na própria `real_bet`; a reconciliação posterior preserva o mesmo ID, permitindo rastrear custo, prêmio e resultado real até a hipótese sem snapshot paralelo.
+
+Erros específicos:
+
+- `RESEARCH_HYPOTHESIS_NOT_FOUND` — `404`;
+- `RESEARCH_HYPOTHESIS_NOT_APPLICABLE` — `409`;
+- `RESEARCH_HYPOTHESIS_LOTTERY_MISMATCH` — `409`.
+
+Detalhes: [`REAL_BETS.md`](REAL_BETS.md) e [`FINANCIALS.md`](FINANCIALS.md).
 
 ## Estratégias
 
@@ -194,7 +214,7 @@ Detalhes: [`AGENDA.md`](AGENDA.md).
 
 ## Pesquisa e proveniência
 
-A raiz atual é uma hipótese humana persistida:
+A raiz é uma hipótese humana persistida:
 
 ```http
 POST /api/v1/research/hypotheses
@@ -214,7 +234,7 @@ Criação usa:
 
 `lottery` pode ser omitida/nula para hipótese transversal. A listagem aceita `lottery` e `limit` (máximo 100).
 
-Primeiro tipo de evidência canônica:
+Evidência canônica de backtest:
 
 ```http
 POST /api/v1/research/hypotheses/:id/evidence/backtests
@@ -248,9 +268,17 @@ Body:
 
 `decision` aceita `inconclusive`, `rejected`, `continue-testing` e `applied-experimentally`. A hipótese precisa estar `open`, possuir ao menos uma evidência de backtest persistida e receber uma justificativa de 1 a 4000 caracteres. A transição fecha a hipótese uma única vez; uma segunda decisão concorrente não sobrescreve a primeira.
 
+Aplicações reais vinculadas à hipótese podem ser recuperadas por:
+
+```http
+GET /api/v1/research/hypotheses/:id/applications/real-bets
+```
+
+A resposta lista as `real_bets` canônicas associadas, incluindo o estado de conferência e, quando conhecido, custo/prêmio/resultado. Ausência de aplicações retorna `items: []`; hipótese inexistente retorna `404`. Não existe owner paralelo de aplicação nem cópia financeira na hipótese.
+
 Nenhum ranking, p-value ou texto de IA decide automaticamente. `applied-experimentally` registra uma decisão humana de aplicação experimental e **não** representa comprovação de aumento de probabilidade futura.
 
-Detalhes de persistência: [`DATABASE.md`](DATABASE.md). Registros das fatias: [`tasks/RESEARCH_HYPOTHESIS_ROOT.md`](tasks/RESEARCH_HYPOTHESIS_ROOT.md) e [`tasks/RESEARCH_HYPOTHESIS_DECISION.md`](tasks/RESEARCH_HYPOTHESIS_DECISION.md).
+Detalhes de persistência: [`DATABASE.md`](DATABASE.md).
 
 ## IA
 

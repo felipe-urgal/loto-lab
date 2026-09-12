@@ -65,13 +65,14 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
     return response.text();
   };
 
-  const [app, shellBoundary, shell, refinementsBoundary, refinements, myGames, presentation, auditability, agenda, strategies, jobs, foundation] = await Promise.all([
+  const [app, shellBoundary, shell, refinementsBoundary, refinements, myGames, myGamesState, presentation, auditability, agenda, strategies, jobs, foundation] = await Promise.all([
     fetchSource("app.js"),
     fetchSource("shell.js"),
     fetchSource("src/core/shell.js"),
     fetchSource("refinements.js"),
     fetchSource("src/features/refinements.js"),
     fetchSource("src/features/myGames.js"),
+    fetchSource("src/features/myGames/state.js"),
     fetchSource("src/features/myGames/presentation.js"),
     fetchSource("src/features/myGames/auditability.js"),
     fetchSource("src/features/agenda.js"),
@@ -98,8 +99,11 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
   assert.match(refinements, /latestCache\.delete/);
   assert.match(refinements, /loto-lab:data-synced/);
 
-  assert.match(myGames, /requestToken/);
-  assert.match(myGames, /token !== ui\.requestToken/);
+  assert.match(myGames, /createMyGamesUiState/);
+  assert.match(myGames, /ui\.beginRequest\(\)/);
+  assert.match(myGames, /ui\.isCurrentRequest\(token\)/);
+  assert.match(myGamesState, /requestToken/);
+  assert.match(myGamesState, /isCurrentRequest/);
   assert.match(myGames, /currentMainView\(\) !== "games"/);
   assert.match(myGames, /refresh-view/);
   assert.match(myGames, /loto-lab:data-synced/);

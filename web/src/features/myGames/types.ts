@@ -32,6 +32,7 @@ export type RealBet = {
   id: number;
   batchId: number;
   contestNumber: number;
+  researchHypothesisId?: number | null;
   actualCost?: number | null;
   status: string;
   games?: RealBetGame[];

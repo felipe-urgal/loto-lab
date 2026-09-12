@@ -84,6 +84,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
   const backtests = new PostgresBacktestRepository(options.pool);
   const strategies = new PostgresStrategyRepository(options.pool);
   const researchHypotheses = new PostgresResearchHypothesisRepository(options.pool);
+  const realBetRepository = new PostgresRealBetRepository(options.pool);
   const analysisJobRepository = new PostgresAnalysisJobRepository(options.pool);
   const agendaRepository = new PostgresAgendaRepository(options.pool);
   const notificationRepository = new PostgresNotificationRepository(options.pool);
@@ -142,12 +143,13 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
     ),
     realBets: new RealBetUseCase(
       new RealBetService(options.pool),
-      new PostgresRealBetRepository(options.pool),
+      realBetRepository,
     ),
     researchHypotheses: new ResearchHypothesesUseCase(
       researchHypotheses,
       researchHypotheses,
       backtests,
+      realBetRepository,
     ),
     strategyCatalog: new StrategyCatalogUseCase(strategies),
     runStrategyLab: new RunStrategyLabUseCase(

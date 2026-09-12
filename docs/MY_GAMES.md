@@ -1,6 +1,6 @@
 # Meus Jogos
 
-A tela **Meus Jogos** é o workspace de acompanhamento dos lotes gerados, apostas efetivamente realizadas, resultados oficiais e comparações históricas.
+A tela **Meus Jogos** é o workspace de acompanhamento dos lotes gerados, apostas efetivamente realizadas, resultados oficiais, proveniência experimental opcional e comparações históricas.
 
 O princípio da tela é separar claramente três coisas que não devem ser confundidas:
 
@@ -10,15 +10,21 @@ O princípio da tela é separar claramente três coisas que não devem ser confu
 
 ## Ownership atual da interface
 
-A experiência principal tem implementação canônica em TypeScript. `web/src/features/myGames.ts` concentra state/lifecycle e orquestração; os contratos, apresentação, formulário de aposta, comparação, formatação e auditabilidade ficam decompostos em `web/src/features/myGames/`. `web/my-games-v2.js` permanece apenas como boundary compatível que importa o JavaScript emitido. A base funcional continua em `web/my-games-v2.css` e a apresentação final do Protótipo 1 em `web/my-games-workspace.css`.
+A experiência principal tem implementação canônica em TypeScript.
 
-O controller consome diretamente o client HTTP, o lifecycle compartilhado, escaping e toast de `web/src`, sem depender de `web/runtime.js`. A tela carrega os lotes e apostas reais em paralelo e mantém o estado de filtro, busca e lote expandido no próprio controller tipado.
+- `web/src/features/myGames.ts` é o composition root da feature: coordena API, lifecycle compartilhado, render e eventos;
+- `web/src/features/myGames/state.ts` é o owner de filtro, busca, lote expandido e invalidação de requests stale;
+- `web/src/features/myGames/presentation.ts` monta a apresentação dos lotes/apostas e a proveniência persistida;
+- `web/src/features/myGames/betForm.ts` monta e envia o formulário de aposta real;
+- `web/src/features/myGames/auditability.ts` protege o concurso alvo contra alteração no browser;
+- `comparison.ts`, `formatting.ts`, `support.ts` e `types.ts` mantêm responsabilidades focadas;
+- `web/my-games-v2.js` permanece somente como boundary compatível que importa o JavaScript emitido.
+
+O estado do workspace não é transportado por query/hash/localStorage. Troca de loteria reseta filtro/busca/expansão e invalida requests anteriores por meio do owner `state.ts`.
 
 Os campos financeiros opcionais são representados explicitamente como ausentes/`null`: custo, prêmio ou resultado desconhecido não são convertidos em zero para apresentação. A comparação também escapa texto derivado da API antes de inseri-lo em markup dinâmico.
 
-**Meus Jogos não possui mais fallback funcional legado.** O `feature-loader` carrega apenas os assets canônicos da feature; se eles falharem, a tela apresenta um estado explícito e retryable em vez de reviver `real-bets.js` ou `my-games-management.js`.
-
-A auditabilidade do concurso alvo também pertence ao owner TypeScript, em `web/src/features/myGames/auditability.ts`. Quando um lote possui `targetContestNumber`, o campo fica somente leitura, com `min`/`max` fixados no alvo, `aria-readonly` e proteção de submit contra alteração do DOM. Não há `MutationObserver` nem listeners globais para manter essa regra.
+**Meus Jogos não possui fallback funcional legado.** O feature loader carrega os assets canônicos da feature; se eles falharem, a tela apresenta estado explícito/retryable em vez de reviver implementações paralelas.
 
 ## Estados visíveis
 
@@ -41,7 +47,9 @@ A primeira camada visual usa quatro filtros simples:
 - **Gerados** — lotes visíveis sem aposta real;
 - **Ocultos** — lotes retirados da lista principal.
 
-A busca aceita número do lote e concurso. A lista usa até 200 lotes da loteria selecionada para manter os filtros coerentes sem carregar um histórico ilimitado no browser.
+A busca aceita número do lote e concurso. A lista usa até 200 lotes da loteria selecionada para manter os filtros coerentes sem carregar histórico ilimitado no browser.
+
+Filtro, query, expansão e token de request pertencem a `myGames/state.ts`; o controller não mantém uma segunda cópia desses valores.
 
 ## Progressive disclosure
 
@@ -59,6 +67,7 @@ Ao expandir o lote, aparecem:
 - dezenas de cada jogo;
 - núcleo fixo e Mês da Sorte quando aplicáveis;
 - formulário para registrar aposta real;
+- proveniência da hipótese quando a aposta estiver vinculada;
 - resultado oficial da aposta;
 - comparação histórica do lote;
 - ações de ocultar/mostrar.
@@ -73,19 +82,23 @@ A operação:
 
 - não remove `generated_games`;
 - não remove seed, estratégia ou metadata;
-- não remove `real_bets` nem `real_bet_games`;
+- não remove `real_bets`, `real_bet_games` ou `research_hypothesis_id`;
 - não altera prêmio, custo, ROI ou conferência já persistidos;
 - pode ser revertida por **Mostrar novamente**.
 
-Um lote com aposta real **pode ser ocultado**. A ação é organizacional e não altera a trilha financeira.
+Um lote com aposta real **pode ser ocultado**. A ação é organizacional e não altera a trilha financeira/proveniência.
 
 ## Registrar aposta real
 
-A aposta só é criada por ação explícita do usuário. No formulário é possível selecionar quais jogos do lote foram efetivamente apostados e informar o custo real.
+A aposta só é criada por ação explícita do usuário. No formulário é possível selecionar quais jogos do lote foram efetivamente apostados, informar o custo real e, opcionalmente, informar o ID de uma hipótese de pesquisa aplicada experimentalmente.
 
 Quando o lote possui `targetContestNumber`, a aposta deve usar exatamente esse concurso. A interface fixa esse alvo e bloqueia tamper no submit; o backend continua sendo a autoridade final e também recusa divergências. O backend ainda recusa registrar como aposta real um concurso cujo resultado oficial já esteja conhecido, protegendo o KPI contra hindsight.
 
-Detalhes em [`REAL_BETS.md`](REAL_BETS.md).
+`researchHypothesisId`, quando informado, é persistido na própria aposta real. O backend aceita somente hipótese existente, `decided` como `applied-experimentally` e compatível com a loteria. O campo não muda probabilidade, geração, custo ou conferência.
+
+A UI não mantém esse ID em localStorage/hash/query. A fonte de verdade depois do POST é a `real_bet` persistida retornada pela API.
+
+Detalhes em [`REAL_BETS.md`](REAL_BETS.md) e [`FINANCIALS.md`](FINANCIALS.md).
 
 ## Resultado oficial
 
@@ -95,10 +108,13 @@ Quando o concurso correspondente existe no banco, a aposta pode ser reconciliada
 - custo real;
 - prêmio, quando financeiramente conhecido;
 - resultado líquido, quando financeiramente conhecido;
+- hipótese de origem, quando vinculada;
 - detalhe jogo a jogo;
 - Mês da Sorte quando aplicável.
 
 `Conferido` não significa necessariamente que o financeiro está completo. Se a grade oficial de rateio ainda estiver ausente ou incompleta, prêmio e resultado permanecem `—` até nova reconciliação.
+
+O vínculo da hipótese permanece no mesmo registro durante a reconciliação e em correções oficiais posteriores.
 
 ## Comparar concursos
 
@@ -110,6 +126,7 @@ Essa comparação:
 - não cria nem altera aposta real;
 - não muda o ROI operacional;
 - não altera o lote salvo;
+- não altera o vínculo de pesquisa;
 - não deve ser confundida com teste histórico formal de estratégia.
 
 A UI mostra quantidade de concursos, melhor resultado, melhor concurso e média do melhor jogo, com detalhe por concurso.
@@ -122,11 +139,7 @@ A UI mostra quantidade de concursos, melhor resultado, melhor concurso e média 
 GET /api/v1/game-batches/manage/mega-sena?scope=all&limit=200
 ```
 
-`scope` aceita:
-
-- `active`;
-- `archived`;
-- `all`.
+`scope` aceita `active`, `archived` e `all`.
 
 ### Ocultar
 
@@ -134,11 +147,7 @@ GET /api/v1/game-batches/manage/mega-sena?scope=all&limit=200
 POST /api/v1/game-batches/123/hide
 ```
 
-Alias compatível:
-
-```http
-POST /api/v1/game-batches/123/archive
-```
+Alias compatível: `POST /api/v1/game-batches/123/archive`.
 
 ### Mostrar novamente
 
@@ -146,17 +155,13 @@ POST /api/v1/game-batches/123/archive
 POST /api/v1/game-batches/123/show
 ```
 
-Alias compatível:
+Alias compatível: `POST /api/v1/game-batches/123/restore`.
 
-```http
-POST /api/v1/game-batches/123/restore
-```
+## Persistência e migrations
 
-## Persistência e migration
+O lifecycle de lotes foi introduzido por `003_game_batch_lifecycle.sql`. A proveniência opcional entre hipótese e aposta real é adicionada por `015_research_real_bet_application.sql`.
 
-O lifecycle foi introduzido por `003_game_batch_lifecycle.sql`, que adiciona `archived_at` e índices para listas visíveis/ocultas.
-
-Em uma instalação existente, migrations são aplicadas com:
+Em uma instalação existente:
 
 ```bash
 npm run db:migrate
@@ -165,8 +170,9 @@ npm run db:migrate
 ## Guardrails de UX
 
 - ocultar deve ser reversível;
-- nenhuma ação de organização pode apagar histórico financeiro;
+- nenhuma ação de organização pode apagar histórico financeiro ou proveniência;
 - filtros e busca não alteram dados persistidos;
-- o lote expandido deve manter conferência e comparação no contexto correto;
+- o lote expandido deve manter conferência, proveniência e comparação no contexto correto;
+- nenhuma navegação transporta payload de resultado por query/hash/localStorage;
 - o mobile deve permitir filtrar, buscar, expandir, ocultar e restaurar sem overflow horizontal;
 - texto funcional respeita o piso de 16px e os estados seguem a semântica visual oficial: azul para ação/contexto, verde para sucesso/resultado positivo, âmbar para pendência e vermelho para erro/resultado negativo.

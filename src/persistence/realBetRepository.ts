@@ -18,6 +18,7 @@ export interface CreateRealBetInput {
   actualCost: number;
   playedAt: string;
   games: RealBetGameInput[];
+  researchHypothesisId?: number;
 }
 
 export interface RealBetGameRecord {
@@ -33,6 +34,7 @@ export interface RealBetRecord {
   lottery: LotteryId;
   contestNumber: number;
   status: RealBetStatus;
+  researchHypothesisId: number | null;
   actualCost: number;
   playedAt: string;
   checkedAt?: string;
@@ -73,6 +75,7 @@ interface BetRow {
   lottery: LotteryId;
   contest_number: number;
   status: RealBetStatus;
+  research_hypothesis_id: string | null;
   actual_cost: number;
   played_at: Date;
   checked_at: Date | null;
@@ -154,11 +157,19 @@ export class PostgresRealBetRepository {
       const inserted = await client.query<{ id: string }>(
         `
           INSERT INTO real_bets (
-            batch_id, lottery, contest_number, status, actual_cost, played_at
-          ) VALUES ($1, $2, $3, 'awaiting_result', $4, $5)
+            batch_id, lottery, contest_number, status, actual_cost, played_at,
+            research_hypothesis_id
+          ) VALUES ($1, $2, $3, 'awaiting_result', $4, $5, $6)
           RETURNING id
         `,
-        [input.batchId, input.lottery, input.contestNumber, input.actualCost, input.playedAt],
+        [
+          input.batchId,
+          input.lottery,
+          input.contestNumber,
+          input.actualCost,
+          input.playedAt,
+          input.researchHypothesisId ?? null,
+        ],
       );
       id = Number(inserted.rows[0]!.id);
 
@@ -202,7 +213,7 @@ export class PostgresRealBetRepository {
       this.pool.query<BetRow>(
         `
           SELECT
-            id, batch_id, lottery, contest_number, status,
+            id, batch_id, lottery, contest_number, status, research_hypothesis_id,
             actual_cost::float8 AS actual_cost,
             played_at, checked_at,
             total_prize_value::float8 AS total_prize_value,
@@ -243,6 +254,9 @@ export class PostgresRealBetRepository {
         lottery: row.lottery,
         contestNumber: row.contest_number,
         status: row.status,
+        researchHypothesisId: row.research_hypothesis_id === null
+          ? null
+          : Number(row.research_hypothesis_id),
         actualCost: Number(row.actual_cost),
         playedAt: row.played_at.toISOString(),
         ...(row.checked_at ? { checkedAt: row.checked_at.toISOString() } : {}),
@@ -284,6 +298,20 @@ export class PostgresRealBetRepository {
     return this.findMany(result.rows.map((row) => Number(row.id)));
   }
 
+  async listRealBets(researchHypothesisId: number, limit = 100): Promise<RealBetRecord[]> {
+    const result = await this.pool.query<{ id: string }>(
+      `
+        SELECT id
+        FROM real_bets
+        WHERE research_hypothesis_id = $1
+        ORDER BY played_at DESC, id DESC
+        LIMIT $2
+      `,
+      [researchHypothesisId, limit],
+    );
+    return this.findMany(result.rows.map((row) => Number(row.id)));
+  }
+
   async listPending(lottery?: LotteryId): Promise<RealBetRecord[]> {
     const result = await this.pool.query<{ id: string }>(
       `
@@ -319,9 +347,15 @@ export class PostgresRealBetRepository {
     return result.rows.map((row) => ({
       id: Number(row.id),
       realBetId: Number(row.real_bet_id),
-      ...(row.previous_total_prize_value !== null ? { previousTotalPrizeValue: Number(row.previous_total_prize_value) } : {}),
-      ...(row.new_total_prize_value !== null ? { newTotalPrizeValue: Number(row.new_total_prize_value) } : {}),
-      ...(row.previous_net_result !== null ? { previousNetResult: Number(row.previous_net_result) } : {}),
+      ...(row.previous_total_prize_value !== null
+        ? { previousTotalPrizeValue: Number(row.previous_total_prize_value) }
+        : {}),
+      ...(row.new_total_prize_value !== null
+        ? { newTotalPrizeValue: Number(row.new_total_prize_value) }
+        : {}),
+      ...(row.previous_net_result !== null
+        ? { previousNetResult: Number(row.previous_net_result) }
+        : {}),
       ...(row.new_net_result !== null ? { newNetResult: Number(row.new_net_result) } : {}),
       reason: row.reason,
       createdAt: row.created_at.toISOString(),

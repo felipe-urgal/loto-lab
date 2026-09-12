@@ -15,7 +15,9 @@ function formMarkup(batch: GameBatch): string {
     <div class="mg2-form-grid">
       <label><span>Concurso apostado</span><input name="contestNumber" type="number" min="${minimumContest}" required value="${batch.targetContestNumber ?? ""}" /></label>
       <label><span>Valor gasto</span><input name="actualCost" type="number" min="0.01" step="0.01" required placeholder="Ex.: 12,00" /></label>
+      <label><span>Hipótese de pesquisa (opcional)</span><input name="researchHypothesisId" type="number" min="1" step="1" placeholder="Ex.: 7" /></label>
     </div>
+    <p class="mg2-form-note">Use a hipótese somente quando ela já estiver decidida para aplicação experimental. Esse vínculo serve para auditoria e não altera a probabilidade do jogo.</p>
     ${batch.targetContestNumber ? `<p class="mg2-form-note">A aposta real deve permanecer vinculada ao concurso alvo #${batch.targetContestNumber}.</p>` : ""}
     <div class="mg2-form-actions"><button class="button ghost" type="button" data-mg2-cancel-form>Cancelar</button><button class="button primary" type="submit">Confirmar aposta</button></div>
   </form>`;
@@ -41,12 +43,30 @@ async function saveBet(form: HTMLFormElement, batch: GameBatch, onSaved: () => P
     return;
   }
 
+  const researchHypothesisValue = String(values.get("researchHypothesisId") ?? "").trim();
+  const researchHypothesisId = researchHypothesisValue === ""
+    ? undefined
+    : Number(researchHypothesisValue);
+  if (
+    researchHypothesisId !== undefined
+    && (!Number.isInteger(researchHypothesisId) || researchHypothesisId < 1)
+  ) {
+    toast("Informe um ID de hipótese válido.", "error");
+    return;
+  }
+
   submit.disabled = true;
   submit.textContent = "Salvando...";
   try {
     await api("/real-bets", {
       method: "POST",
-      body: JSON.stringify({ batchId: batch.id, contestNumber, actualCost: Number(values.get("actualCost")), gamePositions }),
+      body: JSON.stringify({
+        batchId: batch.id,
+        contestNumber,
+        actualCost: Number(values.get("actualCost")),
+        gamePositions,
+        ...(researchHypothesisId !== undefined ? { researchHypothesisId } : {}),
+      }),
     });
     toast("Aposta registrada.");
     await onSaved();

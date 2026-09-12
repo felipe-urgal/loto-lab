@@ -1,10 +1,10 @@
 # Roadmap técnico e de produto
 
-> Baseline reconciliada em **2026-09-11**. Este documento registra apenas trabalho estrutural ainda ativo e decisões concluídas que continuam relevantes. Histórico detalhado fica em issues, PRs, commits e testes.
+> Baseline reconciliada em **2026-09-12**. O roadmap estrutural iniciado nas issues #52, #60–#66 está encerrado. Histórico detalhado permanece em issues, PRs, commits e testes; este documento registra a arquitetura resultante e as regras para trabalho futuro.
 
 ## North Star
 
-O Loto Lab deve tornar auditável o fluxo:
+O Loto Lab torna auditável o fluxo:
 
 ```text
 Hipótese → estratégia/configuração versionada → experimento reproduzível
@@ -16,59 +16,65 @@ Diretriz permanente: **algoritmo calcula; IA interpreta**.
 
 ---
 
-# Now
+# Baseline concluída
 
-## #52 — Governança de `main` · P0 · bloqueada
+## Governança de `main` · #52
 
-`main` continua sem proteção obrigatória. Esta issue depende de configuração administrativa no GitHub, não de código.
+A governança por PR + CI continua sendo o fluxo recomendado de engenharia. A leitura administrativa mais recente ainda mostra `main.protected = false`; branch protection depende de configuração do GitHub e não de código deste repositório.
 
-**Próxima ação:** exigir PR + `CI / test`, bloquear force-push/exclusão e revalidar a configuração.
+A issue deixa de fazer parte do roadmap estrutural de código. Se a proteção for habilitada no futuro, a validação deve confirmar `main.protected = true` e o check obrigatório real; não registrar proteção aplicada enquanto isso não for verdade.
 
-## #60 — Frontend TypeScript e ownership · P1 · em andamento
+## Frontend TypeScript e ownership · #60
 
-A fundação TypeScript, core compartilhado e vários owners funcionais já existem.
+A evolução incremental está concluída para o escopo estrutural atual:
 
-**Próximo foco:** reduzir state/lifecycle imperativo e decompor módulos grandes somente quando houver responsabilidade real. Sem rewrite/framework por preferência e sem novo redesign visual sem decisão explícita.
+- core compartilhado tipado para API, contexto principal, shell, lifecycle, lazy loading e render state;
+- features principais possuem owners canônicos em `web/src/features`;
+- boundaries JavaScript migrados permanecem finos/import-only;
+- Meus Jogos separa apresentação, comparação, formulário/auditabilidade e estado de UI; filtro, busca, expansão e stale-request guard pertencem a `myGames/state.ts`;
+- composição de tela continua nos roots existentes quando não há boundary independente que justifique extração.
 
-## #63 — Observabilidade orientada a SLOs · P1 · em andamento
+Não existe objetivo de converter cada arquivo por contagem de linhas. Novo refactor só deve nascer de hotspot concreto de ownership, estado, acoplamento ou testabilidade.
 
-HTTP, jobs, sync, PostgreSQL, CAIXA e OpenAI já possuem sinais e runbooks.
+## Observabilidade operacional · #63
 
-**Próximo foco:** coletar baseline real e só então definir poucos SLOs úteis e qualquer tuning de timeout/retry/backoff/pool/concorrência.
+HTTP, Analysis Jobs, sync, PostgreSQL, CAIXA e OpenAI possuem sinais de baixa cardinalidade e runbooks associados. O trabalho estrutural está concluído.
+
+SLO, timeout, retry, backoff, pool ou concorrência futuros devem nascer de um incidente ou baseline real e virar uma issue específica com evidência observada. Não manter epic aberto aguardando indefinidamente dados de produção.
+
+## Jornada e contexto · #64
+
+As superfícies críticas compartilham contexto por identidades canônicas e deep links, sem copiar resultado por query/hash/localStorage. A proveniência de pesquisa agora alcança a aplicação real pela própria identidade de `real_bets`.
+
+Melhorias futuras de jornada devem nascer de fricção observável, não de um backlog genérico de redesign.
+
+## Runtime e performance · #65
+
+O hardening estrutural, `prod:resources`, profiling de banco, Web Vitals/worker observability e protocolo de baseline formam a capacidade permanente de performance.
+
+Índice, cache, timeout, concorrência e limite de recurso continuam proibidos sem comparação antes/depois sob workload equivalente. Quando uma medição revelar gargalo concreto, abrir uma issue pequena com baseline e critério de sucesso em vez de reabrir um epic permanente.
+
+## Hipótese → evidência → decisão → aplicação → resultado · #66
+
+A cadeia está completa usando owners canônicos:
+
+- `research_hypotheses` — hipótese e decisão humana;
+- `research_hypothesis_backtest_evidence` → `backtest_runs` — evidência reproduzível;
+- decisão `applied-experimentally` — autorização explícita para aplicação controlada;
+- `real_bets.research_hypothesis_id` — aplicação real opcional;
+- reconciliação da mesma `real_bet` — resultado financeiro real posterior.
+
+Não existe `experiment_id`/`evidence_id` genérico nem snapshot paralelo de resultado. Hipóteses não aplicáveis, loterias incompatíveis e IDs inexistentes são rejeitados antes da persistência da aposta.
 
 ---
 
-# Next
-
-## #64 — Jornada e contexto pós-redesign · P2 · em andamento
-
-Direção: contexto entre superfícies usando identidades canônicas/deep links, sem estado paralelo.
-
-**Próximo foco:** reduzir troca de contexto apenas quando houver identidade persistida suficiente; integrar proveniência/IA sem esconder metodologia nem duplicar owners.
-
-## #65 — Runtime e performance baseada em evidência · P2 · em andamento
-
-Hardening estrutural e protocolo de baseline já existem.
-
-**Próximo foco:** coletar séries comparáveis de CPU/memória, Web Vitals, profiling PostgreSQL e comportamento de workers/providers antes de qualquer tuning.
-
-## #66 — Hipótese → evidência → decisão → aplicação · P2 · em andamento
-
-Hipótese persistida, evidência canônica de backtest e decisão humana/auditável já existem.
-
-**Próximo foco:** conectar eventual aplicação/resultado real usando IDs canônicos existentes, sem `experiment_id`/`evidence_id` genérico nem snapshot opaco.
-
----
-
-# Concluído estrutural
+# Decisões estruturais preservadas
 
 ## #61 — Application use cases e controllers finos
 
-Concluída. `src/api/server.ts` é o composition root HTTP; controllers não compõem infraestrutura concreta.
+`src/api/server.ts` é o composition root HTTP; controllers não compõem infraestrutura concreta.
 
 ## #62 — Motores e hotspot `analysis/advanced.ts`
-
-Concluída com a #264/PR #265.
 
 Owners canônicos:
 
@@ -80,31 +86,15 @@ Owners canônicos:
 - `dynamics.ts` — ranking/dinâmica/robustez;
 - `validation.ts` — rolling validation anti-leakage.
 
-`advanced.ts` permanece composition root. A similaridade histórica fica nele de propósito: hoje é composição local, sem consumidor independente ou boundary própria; extrair apenas para reduzir linhas não gera ganho de ownership.
+`advanced.ts` permanece composition root. A similaridade histórica continua nele enquanto for composição local sem consumidor/boundary independente.
 
 Detalhes duráveis: [`tasks/ADVANCED_ANALYSIS_DECOMPOSITION_PLAN.md`](tasks/ADVANCED_ANALYSIS_DECOMPOSITION_PLAN.md).
 
 ---
 
-# Ordem recomendada
+# Política para trabalho futuro
 
-```text
-#52 branch protection (administrativo)
-
-#60 frontend ownership
-  ↓
-#64 jornada/contexto
-
-#63 baseline observada
-  ↓
-#65 tuning somente com evidência
-
-#66 aplicação/resultado real com proveniência canônica
-```
-
-Trabalhos independentes podem avançar em paralelo quando não compartilham owner ou risco.
-
-## Critério para refactor
+Nova issue estrutural deve nascer de um problema observável e possuir owner, evidência e critério de conclusão. Não reabrir epics apenas para manter um backlog permanente.
 
 Refactor só vale quando preserva comportamento e melhora uma propriedade concreta: ownership, acoplamento, duplicação, testabilidade, estado explícito ou risco operacional. Mover arquivo apenas para reduzir linhas não é progresso arquitetural.
 
@@ -121,7 +111,7 @@ Validações adicionais seguem `AGENTS.md`. Todo PR próprio exige auto code rev
 
 - `AGENTS.md` — invariantes e fluxo operacional estável;
 - `README.md` — visão atual do produto;
-- `docs/ROADMAP.md` — prioridades e estado estrutural atual;
+- `docs/ROADMAP.md` — baseline estrutural e política para próximos ciclos;
 - docs técnicos — contratos presentes;
-- `docs/tasks/` — somente contratos, planos ativos e guias que continuem úteis após o merge;
+- `docs/tasks/` — somente contratos/planos duráveis que continuem úteis após o merge;
 - issues/PRs/commits/testes — histórico de execução.
