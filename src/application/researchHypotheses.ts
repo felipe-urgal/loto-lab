@@ -27,6 +27,18 @@ export interface ResearchHypothesisBacktestEvidence {
   createdAt: string;
 }
 
+export interface ResearchHypothesisRealBetApplication {
+  id: number;
+  batchId: number;
+  lottery: LotteryId;
+  contestNumber: number;
+  status: string;
+  researchHypothesisId: number | null;
+  actualCost: number;
+  totalPrizeValue?: number;
+  netResult?: number;
+}
+
 export interface CreateResearchHypothesisCommand {
   title: string;
   description: string;
@@ -64,6 +76,10 @@ export interface ResearchHypothesisBacktestEvidenceStore {
 
 export interface ResearchBacktestEvidenceReader {
   findById(id: number): Promise<{ id: number; lottery: LotteryId } | undefined>;
+}
+
+export interface ResearchHypothesisRealBetApplicationReader {
+  listRealBets(hypothesisId: number): Promise<ResearchHypothesisRealBetApplication[]>;
 }
 
 export class ResearchHypothesisNotFoundError extends Error {
@@ -122,6 +138,7 @@ export class ResearchHypothesesUseCase {
     private readonly hypotheses: ResearchHypothesisStore,
     private readonly evidence: ResearchHypothesisBacktestEvidenceStore,
     private readonly backtests: ResearchBacktestEvidenceReader,
+    private readonly realBetApplications?: ResearchHypothesisRealBetApplicationReader,
   ) {}
 
   create(input: CreateResearchHypothesisCommand): Promise<ResearchHypothesis> {
@@ -184,5 +201,13 @@ export class ResearchHypothesesUseCase {
     const hypothesis = await this.hypotheses.findById(hypothesisId);
     if (!hypothesis) throw new ResearchHypothesisNotFoundError(hypothesisId);
     return this.evidence.listBacktests(hypothesisId);
+  }
+
+  async listRealBetApplications(
+    hypothesisId: number,
+  ): Promise<ResearchHypothesisRealBetApplication[]> {
+    const hypothesis = await this.hypotheses.findById(hypothesisId);
+    if (!hypothesis) throw new ResearchHypothesisNotFoundError(hypothesisId);
+    return this.realBetApplications?.listRealBets(hypothesisId) ?? [];
   }
 }
