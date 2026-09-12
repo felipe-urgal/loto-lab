@@ -9,6 +9,7 @@ import {
   type RealBetRecord,
   type RealBetSummary,
 } from "../persistence/realBetRepository.js";
+import { PostgresResearchHypothesisRepository } from "../persistence/researchHypothesisRepository.js";
 
 export interface CreateRealBetRequest {
   batchId: number;
@@ -16,6 +17,7 @@ export interface CreateRealBetRequest {
   gamePositions?: number[];
   actualCost: number;
   playedAt?: string;
+  researchHypothesisId?: number;
 }
 
 export interface RealBetReconciliationSummary {
@@ -27,11 +29,13 @@ export class RealBetService {
   readonly contests: PostgresContestRepository;
   readonly batches: PostgresGameRepository;
   readonly realBets: PostgresRealBetRepository;
+  readonly hypotheses: PostgresResearchHypothesisRepository;
 
   constructor(private readonly pool: Pool) {
     this.contests = new PostgresContestRepository(pool);
     this.batches = new PostgresGameRepository(pool);
     this.realBets = new PostgresRealBetRepository(pool);
+    this.hypotheses = new PostgresResearchHypothesisRepository(pool);
   }
 
   async create(input: CreateRealBetRequest): Promise<RealBetRecord> {
@@ -40,6 +44,21 @@ export class RealBetService {
 
     const existing = await this.realBets.findByBatchId(input.batchId);
     if (existing) throw new Error(`REAL_BET_ALREADY_EXISTS:${existing.id}`);
+
+    if (input.researchHypothesisId !== undefined) {
+      const hypothesis = await this.hypotheses.findById(input.researchHypothesisId);
+      if (!hypothesis) {
+        throw new Error(`RESEARCH_HYPOTHESIS_NOT_FOUND:${input.researchHypothesisId}`);
+      }
+      if (hypothesis.status !== "decided" || hypothesis.decision !== "applied-experimentally") {
+        throw new Error(`RESEARCH_HYPOTHESIS_NOT_APPLICABLE:${input.researchHypothesisId}`);
+      }
+      if (hypothesis.lottery !== null && hypothesis.lottery !== batch.lottery) {
+        throw new Error(
+          `RESEARCH_HYPOTHESIS_LOTTERY_MISMATCH:${input.researchHypothesisId}:${hypothesis.lottery}:${batch.lottery}`,
+        );
+      }
+    }
 
     const contestNumber = input.contestNumber ?? batch.targetContestNumber;
     if (!contestNumber) throw new Error("CONTEST_NUMBER_REQUIRED");
@@ -75,6 +94,9 @@ export class RealBetService {
         actualCost: input.actualCost,
         playedAt,
         games,
+        ...(input.researchHypothesisId !== undefined
+          ? { researchHypothesisId: input.researchHypothesisId }
+          : {}),
       });
     } catch (error) {
       if (error instanceof Error && error.message === "REAL_BET_ALREADY_EXISTS") {
