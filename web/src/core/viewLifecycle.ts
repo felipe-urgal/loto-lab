@@ -1,4 +1,4 @@
-import { mainViewFromHash } from "./mainContext.js";
+import { mainViewFromHash, type MainView } from "./mainContext.js";
 
 export { mainViewFromHash } from "./mainContext.js";
 
@@ -10,11 +10,11 @@ export type ViewRenderedDetail = {
   token?: number;
 };
 
-export function currentMainView(): string {
+export function currentMainView(): MainView {
   return mainViewFromHash(window.location.hash);
 }
 
-export function onMainViewChanged(callback: (view: string) => void): () => void {
+export function onMainViewChanged(callback: (view: MainView) => void): () => void {
   const listener = () => callback(currentMainView());
   window.addEventListener("hashchange", listener);
   return () => window.removeEventListener("hashchange", listener);

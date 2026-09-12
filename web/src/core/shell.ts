@@ -1,4 +1,10 @@
-import { isLotteryId, isMainView, type MainView } from "./mainContext.js";
+import {
+  isLotteryId,
+  isMainView,
+  mainViewFromHash,
+  requestedMainViewFromHash,
+  type MainView,
+} from "./mainContext.js";
 
 interface NavigationItem {
   key: string;
@@ -41,23 +47,16 @@ const configuredActive = document.body.dataset.activeNav || "dashboard";
 const storedLottery = localStorage.getItem("loto-lab:lottery");
 if (storedLottery && !isLotteryId(storedLottery)) localStorage.removeItem("loto-lab:lottery");
 
-function requestedMainView(): string {
-  return location.hash.replace("#", "");
-}
-
 function normalizeMainHash(): boolean {
   if (!isMainApp) return true;
-  const requested = requestedMainView();
+  const requested = requestedMainViewFromHash(location.hash);
   if (requested && isMainView(requested)) return true;
   location.hash = "dashboard";
   return false;
 }
 
 function currentKey(): string {
-  if (isMainApp) {
-    const requested = requestedMainView();
-    return isMainView(requested) ? requested : "dashboard";
-  }
+  if (isMainApp) return mainViewFromHash(location.hash);
   return configuredActive;
 }
 

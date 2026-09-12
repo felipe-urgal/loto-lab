@@ -17,16 +17,23 @@ test("main shell and lifecycle share one typed view/lottery contract", async () 
   assert.match(context, /LOTTERY_IDS/);
   assert.match(context, /export function isMainView/);
   assert.match(context, /export function isLotteryId/);
-  assert.match(context, /return hash\.replace\(\/\^#\/, ""\) \|\| "dashboard"/);
+  assert.match(context, /export function requestedMainViewFromHash/);
+  assert.match(context, /return hash\.replace\(\/\^#\/, ""\)/);
+  assert.match(context, /return isMainView\(requested\) \? requested : "dashboard"/);
 
   assert.match(shell, /from "\.\/mainContext\.js"/);
   assert.match(shell, /view\?: MainView/);
+  assert.match(shell, /requestedMainViewFromHash\(location\.hash\)/);
+  assert.match(shell, /mainViewFromHash\(location\.hash\)/);
   assert.match(shell, /isMainView\(requested\)/);
   assert.match(shell, /isLotteryId\(storedLottery\)/);
+  assert.doesNotMatch(shell, /location\.hash\.replace/);
   assert.doesNotMatch(shell, /const mainViews = new Set/);
   assert.doesNotMatch(shell, /const lotteries = new Set/);
 
-  assert.match(lifecycle, /from "\.\/mainContext\.js"/);
+  assert.match(lifecycle, /mainViewFromHash, type MainView/);
   assert.match(lifecycle, /export \{ mainViewFromHash \} from "\.\/mainContext\.js"/);
+  assert.match(lifecycle, /currentMainView\(\): MainView/);
+  assert.match(lifecycle, /callback: \(view: MainView\) => void/);
   assert.doesNotMatch(lifecycle, /hash\.replace\(\/\^#\//);
 });
