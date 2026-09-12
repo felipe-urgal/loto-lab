@@ -25,6 +25,7 @@ Uma aposta real é criada explicitamente a partir de um lote gerado e registra:
 - custo efetivamente gasto;
 - data/hora da aposta;
 - status;
+- hipótese de pesquisa aplicada experimentalmente, quando informada;
 - resultado oficial após conferência;
 - prêmio total, quando conhecido;
 - resultado líquido, quando conhecido.
@@ -33,13 +34,13 @@ Uma aposta real é criada explicitamente a partir de um lote gerado e registra:
 
 A persistência principal usa:
 
-- `real_bets` — cabeçalho financeiro e lifecycle;
+- `real_bets` — cabeçalho financeiro, lifecycle e `research_hypothesis_id` opcional;
 - `real_bet_games` — snapshot dos jogos efetivamente apostados e conferência individual;
 - `real_bet_financial_revisions` — trilha de mudanças financeiras causadas por correção oficial posterior.
 
-O snapshot dos jogos evita depender de mudanças futuras no lote de origem para auditar uma aposta já realizada.
+O snapshot dos jogos evita depender de mudanças futuras no lote de origem para auditar uma aposta já realizada. O vínculo de pesquisa não duplica o resultado: a própria `real_bet` é a aplicação canônica.
 
-As estruturas foram introduzidas/evoluídas por migrations dedicadas, incluindo `002_real_bets.sql` e `011_real_bet_financial_revisions.sql`.
+As estruturas foram introduzidas/evoluídas por migrations dedicadas, incluindo `002_real_bets.sql`, `011_real_bet_financial_revisions.sql` e `015_research_real_bet_application.sql`.
 
 ## Status
 
@@ -67,17 +68,44 @@ Ao criar:
 5. se o resultado desse concurso já estiver armazenado, a criação é recusada com `RESULT_ALREADY_KNOWN`;
 6. `playedAt`, quando informado, precisa ser uma data/hora ISO completa válida;
 7. posições de jogos precisam existir no lote;
-8. `actualCost` precisa ser positivo.
+8. `actualCost` precisa ser positivo;
+9. `researchHypothesisId`, quando informado, precisa referenciar hipótese existente, `decided` como `applied-experimentally` e compatível com a loteria.
 
 Comparações retrospectivas pertencem a Testes históricos/Laboratório/Meus Jogos, nunca ao KPI de apostas reais.
 
 Na interface **Meus Jogos**, esse contrato é reforçado pelo owner TypeScript em `web/src/features/myGames/auditability.ts`: o concurso alvo fica somente leitura e o submit bloqueia alteração do DOM antes de chamar a API. Esse guardrail do browser é defesa em profundidade; a validação do backend permanece autoritativa.
 
+## Proveniência de pesquisa
+
+`researchHypothesisId` é opcional. Ele existe somente para aplicações reais de uma hipótese que já passou pelo fluxo de evidência e decisão humana.
+
+Cadeia auditável:
+
+```text
+research_hypotheses
+  ↓ evidência
+backtest_runs
+  ↓ decisão humana applied-experimentally
+real_bets.research_hypothesis_id
+  ↓ reconciliação oficial
+prêmio / netResult / revisões financeiras
+```
+
+O vínculo não altera geração, chance, custo, conferência ou ROI. Também não transforma uma aplicação experimental em comprovação de previsão.
+
+A API de pesquisa permite percorrer a relação no sentido inverso:
+
+```http
+GET /api/v1/research/hypotheses/:id/applications/real-bets
+```
+
+A ausência de vínculo significa apenas que a aposta não foi registrada como aplicação de uma hipótese persistida.
+
 ## Ocultar lote não remove aposta
 
 A organização de **Meus Jogos** é independente da trilha financeira.
 
-Ocultar um lote apenas altera `archived_at` no lote gerado. A aposta real, seus jogos, conferência e revisões permanecem persistidos e continuam disponíveis para resumo financeiro.
+Ocultar um lote apenas altera `archived_at` no lote gerado. A aposta real, seus jogos, conferência, vínculo de pesquisa e revisões permanecem persistidos e continuam disponíveis para resumo financeiro.
 
 Detalhes em [`MY_GAMES.md`](MY_GAMES.md).
 
@@ -105,7 +133,7 @@ O sistema diferencia:
 - **atingiu faixa premiada, mas o rateio necessário não está armazenado** → prêmio desconhecido;
 - **Mês da Sorte acertado sem tier financeiro disponível** → total desconhecido.
 
-Por isso dado ausente não vira `R$ 0,00` e não entra artificialmente no ROI. Esse contrato vale também para o owner TypeScript de **Meus Jogos**: os formatters compartilhados exibem `—` para valores ausentes ou inválidos, preservando **desconhecido != zero**. Os antigos assets funcionais `web/real-bets.js` e `web/my-games-management.js` foram removidos após a consolidação do fluxo canônico.
+Por isso dado ausente não vira `R$ 0,00` e não entra artificialmente no ROI. Esse contrato vale também para o owner TypeScript de **Meus Jogos**: os formatters compartilhados exibem `—` para valores ausentes ou inválidos, preservando **desconhecido != zero**.
 
 ## Reparação de rateios
 
@@ -117,7 +145,8 @@ Quando uma grade oficial completa é atualizada e altera uma aposta já financei
 - `checked_at` original é preservado;
 - uma revisão é registrada atomicamente em `real_bet_financial_revisions`;
 - o motivo atual para correção oficial é `official-prize-refresh`;
-- o histórico de revisão permanece consultável pela API.
+- o histórico de revisão permanece consultável pela API;
+- `research_hypothesis_id`, quando presente, permanece ligado à mesma aposta.
 
 Duas reconciliações simultâneas não devem criar revisões duplicadas do mesmo estado financeiro; a atualização usa serialização transacional da aposta.
 
@@ -137,7 +166,8 @@ Exemplo:
   "batchId": 12,
   "contestNumber": 3047,
   "gamePositions": [1, 2],
-  "actualCost": 12.00
+  "actualCost": 12.00,
+  "researchHypothesisId": 7
 }
 ```
 
@@ -146,6 +176,8 @@ Exemplo:
 `contestNumber` pode ser omitido somente quando o lote já possui concurso alvo.
 
 `playedAt` também é opcional; quando enviado, precisa ser um ISO datetime válido com timezone.
+
+`researchHypothesisId` é opcional e exige uma hipótese elegível para aplicação experimental. Os erros de proveniência usam `RESEARCH_HYPOTHESIS_NOT_FOUND`, `RESEARCH_HYPOTHESIS_NOT_APPLICABLE` e `RESEARCH_HYPOTHESIS_LOTTERY_MISMATCH`.
 
 ### Listar e resumir
 
@@ -233,6 +265,8 @@ O Painel usa essa base financeira conferida para métricas agregadas. Ao agregar
 ## Fluxo recomendado
 
 ```text
+hipótese + evidência + decisão humana (opcional)
+   ↓
 gerar lote
    ↓
 Meus Jogos
@@ -240,6 +274,8 @@ Meus Jogos
 Marcar como apostado antes do resultado
    ↓
 selecionar jogos realmente feitos + informar custo
+   ↓
+registrar hipótese aplicada, quando houver
    ↓
 aguardar resultado oficial
    ↓
@@ -258,4 +294,4 @@ eventual correção oficial → revisão financeira persistida
 
 Apostas reais medem desempenho operacional. Elas não alteram automaticamente pesos, núcleo, filtros ou estratégia.
 
-Mudanças metodológicas continuam sendo avaliadas por Análises, Testes históricos e Laboratório antes de virar decisão de geração.
+Mudanças metodológicas continuam sendo avaliadas por Análises, Testes históricos e Laboratório antes de virar decisão humana de aplicação.
