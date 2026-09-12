@@ -49,11 +49,14 @@ function parsePlayedAt(value: unknown): string | undefined {
 function statusForRealBetError(code: RealBetUseCaseErrorCode): number {
   switch (code) {
     case "BATCH_NOT_FOUND":
+    case "RESEARCH_HYPOTHESIS_NOT_FOUND":
     case "REAL_BET_NOT_FOUND":
       return 404;
     case "REAL_BET_ALREADY_EXISTS":
     case "CONTEST_TARGET_MISMATCH":
     case "RESULT_ALREADY_KNOWN":
+    case "RESEARCH_HYPOTHESIS_NOT_APPLICABLE":
+    case "RESEARCH_HYPOTHESIS_LOTTERY_MISMATCH":
     case "RESULT_NOT_AVAILABLE":
       return 409;
     case "CONTEST_NUMBER_REQUIRED":
@@ -92,12 +95,18 @@ export async function serveRealBets(
       const actualCost = parseActualCost(body.actualCost);
       const gamePositions = parseGamePositions(body.gamePositions);
       const playedAt = parsePlayedAt(body.playedAt);
+      const researchHypothesisId = body.researchHypothesisId === undefined
+        || body.researchHypothesisId === null
+        || body.researchHypothesisId === ""
+        ? undefined
+        : parsePositiveInt(body.researchHypothesisId, "researchHypothesisId");
       const created = await realBets.create({
         batchId,
         actualCost,
         ...(contestNumber !== undefined ? { contestNumber } : {}),
         ...(gamePositions !== undefined ? { gamePositions } : {}),
         ...(playedAt !== undefined ? { playedAt } : {}),
+        ...(researchHypothesisId !== undefined ? { researchHypothesisId } : {}),
       });
       sendJson(response, 201, created, corsOrigin);
       return true;
