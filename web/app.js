@@ -1,4 +1,6 @@
 import { api } from "./src/core/api.js";
+import { isLotteryId, isMainView, mainViewFromHash } from "./src/core/mainContext.js";
+import { createMainRenderState } from "./src/core/mainRenderState.js";
 import { escapeHtml } from "./src/shared/escaping.js";
 import { formatCurrency, formatDateTime, formatPercent } from "./src/shared/formatters.js";
 import { toast } from "./src/shared/toast.js";
@@ -27,13 +29,7 @@ const ICONS = {
   arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 18 6-6-6-6"/></svg>',
 };
 
-const state = {
-  view: location.hash.replace("#", "") || "dashboard",
-  lottery: localStorage.getItem("loto-lab:lottery") || "mega-sena",
-  loading: false,
-  renderToken: 0,
-  renderController: null,
-};
+const state = createMainRenderState(location.hash, localStorage.getItem("loto-lab:lottery"));
 
 const content = document.querySelector("#content");
 const title = document.querySelector("#view-title");
@@ -101,10 +97,7 @@ function errorState(error) {
 }
 
 function isCurrentRender(render) {
-  return !render.signal.aborted
-    && render.token === state.renderToken
-    && render.view === state.view
-    && render.lottery === state.lottery;
+  return state.isCurrentRender(render);
 }
 
 async function checkHealth() {
@@ -120,7 +113,7 @@ async function checkHealth() {
 }
 
 function setView(view) {
-  if (!VIEWS[view]) view = "dashboard";
+  if (!isMainView(view)) view = "dashboard";
   state.view = view;
   location.hash = view;
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("is-active", item.dataset.view === view));
@@ -129,7 +122,7 @@ function setView(view) {
 }
 
 function setLottery(lottery) {
-  if (!LOTTERIES[lottery]) return;
+  if (!isLotteryId(lottery)) return;
   state.lottery = lottery;
   localStorage.setItem("loto-lab:lottery", lottery);
   lotterySelect.value = lottery;
@@ -322,17 +315,8 @@ async function handleCheckBatch(event) {
 }
 
 async function renderCurrentView() {
-  state.renderController?.abort();
-  const controller = new AbortController();
-  state.renderController = controller;
-  const render = {
-    token: ++state.renderToken,
-    view: state.view,
-    lottery: state.lottery,
-    signal: controller.signal,
-  };
+  const render = state.beginRender();
 
-  state.loading = true;
   loading();
   refreshButton.classList.add("is-spinning");
   try {
@@ -346,8 +330,7 @@ async function renderCurrentView() {
   } catch (error) {
     if (error?.name !== "AbortError" && isCurrentRender(render)) errorState(error);
   } finally {
-    if (render.token === state.renderToken) {
-      state.loading = false;
+    if (state.finishRender(render)) {
       refreshButton.classList.remove("is-spinning");
     }
   }
@@ -357,11 +340,11 @@ document.querySelectorAll(".nav-item").forEach((item) => item.addEventListener("
 lotterySelect.addEventListener("change", (event) => setLottery(event.target.value));
 refreshButton.addEventListener("click", renderCurrentView);
 window.addEventListener("hashchange", () => {
-  const next = location.hash.replace("#", "");
-  if (VIEWS[next] && next !== state.view) setView(next);
+  const next = mainViewFromHash(location.hash);
+  if (next !== state.view) setView(next);
 });
 
 lotterySelect.value = state.lottery;
 installIcons();
 checkHealth();
-setView(VIEWS[state.view] ? state.view : "dashboard");
+setView(state.view);
