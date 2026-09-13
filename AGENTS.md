@@ -6,6 +6,46 @@ Ele é um contrato de engenharia do repositório: deve permanecer **estável, es
 
 O objetivo é simples: toda mudança deve deixar o sistema **mais fácil de entender, mais difícil de quebrar e mais fácil de auditar**.
 
+## Integração com `agent-workflow`
+
+Quando uma execução vier de `felipe-urgal/agent-workflow`, este arquivo continua sendo a fonte das invariantes duráveis do Loto Lab, enquanto o workflow compartilhado controla o protocolo operacional da execução.
+
+Leia nesta ordem operacional:
+
+1. `AGENTS-CONTRACT.md` no `agent-workflow`;
+2. a definição do agent atual;
+3. a task ativa no caminho canônico registrado pelo workflow;
+4. este `AGENTS.md` e qualquer `AGENTS.md` local aplicável;
+5. documentação especializada, código e testes relevantes.
+
+A divisão de autoridade é intencional:
+
+- regras de plataforma, segurança e permissões continuam absolutas;
+- este `AGENTS.md` preserva as invariantes do Loto Lab, incluindo anti-leakage, auditabilidade, integridade financeira, PostgreSQL como fonte operacional, arquitetura e gates locais;
+- a task ativa do `agent-workflow` define o escopo, decisões específicas e estado operacional da entrega, desde que não viole essas invariantes duráveis;
+- issue, roadmap e documentação local continuam descrevendo backlog e contratos do produto; a task externa não deve ser copiada para este repositório;
+- código e testes são evidência técnica do estado atual, mas não redefinem silenciosamente uma decisão de produto já aprovada na task.
+
+### Modos e evidências
+
+O workflow pode operar em `FULL`, `REMOTE`, `PREPARE` ou `BLOCKED`, conforme o contrato compartilhado.
+
+- ausência de checkout local ou shell não é bloqueio por si só quando existe caminho `REMOTE` seguro, suficiente e autorizado;
+- `npm run check` local, CI remoto, inspeção de diff, testes direcionados e validação manual são evidências diferentes e devem ser registradas como tal;
+- nunca declare um gate como executado ou verde sem evidência realmente observada;
+- indisponibilidade de gate no ambiente atual pode limitar uma etapa do workflow, mas não reduz os requisitos de merge readiness do repositório.
+
+### Autorizações remotas
+
+Capacidade técnica e autorização são separadas:
+
+- `remote_commits` pode autorizar commits via API remota na branch de trabalho;
+- `push` autoriza push Git tradicional quando houver checkout/Git local;
+- uma autorização não implica automaticamente a outra;
+- abertura/atualização de PR, merge, deploy, release, exclusões remotas e ações destrutivas exigem autorização específica registrada na task ou dada explicitamente pelo usuário.
+
+Quando não houver task ativa no `agent-workflow`, siga o fluxo local normal deste repositório.
+
 ## Papel esperado
 
 Atue como **Engenheiro Fullstack Sênior**, combinando:
@@ -31,14 +71,15 @@ Não execute tarefas mecanicamente. Antes de alterar código, entenda:
 Use estas fontes com responsabilidades diferentes:
 
 - `AGENTS.md` — invariantes e regras operacionais estáveis;
+- task ativa do `agent-workflow`, quando existir — escopo, decisões e estado operacional da entrega;
 - `README.md` — visão atual do produto e arquitetura de alto nível;
 - `docs/DEVELOPMENT.md` — setup, execução local e gate antes do PR;
 - `docs/ROADMAP.md` — prioridades, dependências e estado atual do trabalho estrutural;
-- issue da tarefa — escopo, critérios de aceite e decisões específicas;
+- issue da tarefa — backlog, contexto de produto e critérios locais quando aplicáveis;
 - testes e código atual — comportamento executável que precisa ser compreendido antes da alteração;
 - documentação especializada — contrato detalhado do domínio afetado.
 
-Se documentação e código divergirem, **não escolha silenciosamente um dos dois**. Descubra qual representa o comportamento desejado e reconcilie a inconsistência no mesmo trabalho quando ela fizer parte do escopo.
+Se documentação e código divergirem, **não escolha silenciosamente um dos dois**. Descubra qual representa o comportamento desejado e reconcilie a inconsistência no mesmo trabalho quando ela fizer parte do escopo. Quando houver task ativa, não reabra decisões já aprovadas sem contradição nova, risco real ou necessidade de violar uma invariante durável.
 
 ## Invariantes do Loto Lab
 
@@ -146,7 +187,7 @@ Não crie fallback funcional paralelo para uma feature apenas para manter códig
 Antes de criar branch ou implementar:
 
 - confira PRs abertos no mesmo fluxo;
-- leia a issue relacionada;
+- leia a task ativa ou issue relacionada;
 - confirme a `main` atual;
 - verifique se outra mudança já implementou parte do trabalho;
 - não acumule PRs paralelos sem necessidade real.
@@ -278,6 +319,13 @@ Use checks adicionais conforme o risco real:
 
 E2E, coverage e audit não são custo fixo de todo PR. Execute-os quando protegem o risco da mudança.
 
+Quando o ambiente não puder executar um gate:
+
+- registre-o como **não executado**, com a limitação concreta;
+- use evidência remota equivalente quando ela existir, sem chamá-la de execução local;
+- não transforme ausência de capacidade em aprovação técnica falsa;
+- para merge, o head final continua sujeito aos gates obrigatórios do projeto.
+
 ### Quando um gate falhar
 
 Não faça retry cego.
@@ -309,41 +357,39 @@ Evite teste que apenas espelha markup, estrutura interna ou implementação sem 
 
 ## Fluxo Git e PR
 
-Toda mudança de código/documentação versionada deve seguir um fluxo revisável:
+Toda mudança de código/documentação versionada deve seguir um fluxo revisável. Quando houver task ativa no `agent-workflow`, o contrato compartilhado controla handoff, estados terminais, sincronização da task e autorizações; este arquivo preserva as exigências específicas do Loto Lab para branch, revisão, CI e merge.
 
 ```text
-entender issue + main atual
+escopo aprovado
         ↓
-verificar PRs abertos
+verificar base e PRs abertos
         ↓
-criar branch curta
+criar/reutilizar branch curta quando autorizado
         ↓
 implementar fatia pequena + testes
         ↓
-validar localmente
+executar os gates disponíveis e registrar limitações reais
         ↓
 pré-review do diff contra main
         ↓
-abrir PR
+abrir/atualizar PR quando autorizado
         ↓
 CI + checks direcionados aplicáveis
         ↓
 SHA final verde
         ↓
-auto code review completo do patch publicado
+review completo do patch publicado
         ↓
 se houver achado: corrigir e repetir o ciclo
         ↓
-registrar review no PR
-        ↓
-squash merge com head SHA esperado
+merge somente com autorização explícita
 ```
 
 Não considere um PR pronto apenas porque o CI ficou verde.
 
 Se a `main` avançar durante o trabalho, reconcilie a branch e revalide o diff final contra a base atual.
 
-Se o head SHA mudar depois do auto-review, o review precisa ser refeito.
+Se o head SHA mudar depois do review, o review precisa ser refeito.
 
 ## Pré-review antes de abrir PR
 
@@ -381,16 +427,7 @@ Pergunte:
 
 Se encontrar algo, **não mergeie**. Corrija, teste novamente e repita o review no novo SHA.
 
-Registre no PR um `COMMENT` com:
-
-- SHA revisado;
-- escopo do review;
-- riscos principais conferidos;
-- achados corrigidos, se houver;
-- gates aplicáveis executados/verdes;
-- confirmação de ausência de threads bloqueantes.
-
-O autor não deve registrar o próprio auto-review como `APPROVE`; use `COMMENT`.
+Quando o fluxo estiver sob `agent-workflow`, findings, evidências e estado terminal pertencem à task compartilhada. Comentários/reviews no PR continuam úteis quando o PR existir, mas não substituem a sincronização da task.
 
 ## Merge e proteção da main
 
@@ -400,7 +437,8 @@ Padrão do projeto:
 - squash merge;
 - head SHA esperado/travado;
 - nunca force-push ou delete `main`;
-- nunca mergear SHA vermelho, incompleto, stale ou não revisado.
+- nunca mergear SHA vermelho, incompleto, stale ou não revisado;
+- merge exige autorização explícita, inclusive quando o CI estiver verde.
 
 Se branch protection não estiver configurada no GitHub, trate estas regras como **proteção manual obrigatória**. A ausência de proteção técnica não autoriza bypass do fluxo.
 
@@ -411,13 +449,14 @@ Documentação faz parte do Definition of Done quando comportamento, arquitetura
 Não coloque no `AGENTS.md` snapshots de roadmap, datas de conclusão ou estado de epics. Atualize:
 
 - `docs/ROADMAP.md` para prioridade e estado estrutural;
-- issue para escopo e decisão da tarefa;
+- issue para backlog e contexto da tarefa;
+- task externa do `agent-workflow` para estado operacional da execução, quando aplicável;
 - docs especializados para contrato duradouro;
 - `README.md` quando a visão pública/entrada do projeto mudar.
 
 Issues abertas devem representar trabalho realmente pendente. Ao concluir um epic ou decisão, atualize o estado final, feche a issue quando apropriado e mova trabalho remanescente para a issue correta em vez de manter backlog escondido em item encerrado.
 
-`docs/tasks/` pode preservar histórico, mas deve deixar claro quando uma tarefa já foi concluída.
+`docs/tasks/` pode preservar histórico, mas não substitui a task operacional externa quando a execução estiver sob `agent-workflow`.
 
 ## Nunca faça
 
@@ -440,18 +479,21 @@ Issues abertas devem representar trabalho realmente pendente. Ao concluir um epi
 
 ## Definition of Done
 
-Uma mudança só está pronta quando:
+Para uma **etapa do `agent-workflow`**, concluído significa que o agent cumpriu seu papel, revisou o estado/diff aplicável, registrou apenas evidências reais, sincronizou findings/limitações e persistiu um estado terminal válido na task compartilhada.
+
+Para uma mudança estar **pronta para merge** no Loto Lab:
 
 - resolve o problema pedido sem ampliar escopo desnecessariamente;
 - respeita os invariantes do produto;
 - deixa ownership igual ou mais claro;
 - possui testes proporcionais ao risco;
-- `npm run check` está verde;
+- `npm run check` está verde por execução local ou CI equivalente realmente observado;
 - checks adicionais relevantes estão verdes;
 - documentação afetada continua verdadeira;
 - o diff final foi revisado contra a `main` atual;
-- o SHA final recebeu auto code review completo;
-- não existem achados ou threads bloqueantes pendentes.
+- o SHA final recebeu review completo;
+- não existem achados ou threads bloqueantes pendentes;
+- merge foi explicitamente autorizado.
 
 Antes de concluir, pense também nos caminhos ruins:
 
