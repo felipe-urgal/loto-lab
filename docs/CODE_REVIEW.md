@@ -1,5 +1,7 @@
 # Guia de Code Review
 
+> Este documento define critérios técnicos locais de review. Estado do workflow, handoff, autorizações e próxima etapa pertencem à task canônica do `agent-orchestrator`.
+
 O review prioriza correção, segurança, validade metodológica, clareza, testabilidade e simplicidade.
 
 ## Regra principal
