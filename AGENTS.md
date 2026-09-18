@@ -4,6 +4,16 @@
 
 Trabalhe de forma autônoma, incremental e verificável. Prefira a menor solução completa e de menor manutenção.
 
+## Workflow central
+
+- O workflow, os papéis globais e as tasks operacionais canônicas ficam em `felipe-urgal/agent-workflow-browser`.
+- Este repositório não mantém cópias locais dos papéis; regras específicas do Loto Lab vivem neste `AGENTS.md`.
+- A task central registra estado/handoff da execução; backlog e dependências de produto continuam nas fontes vivas do projeto.
+- Preserve o fluxo `Browser -> web -> src/api -> src/application -> engines/domínio -> adapters concretos`.
+- Em análise, geração e backtest, preserve explicitamente anti-leakage, seed, período, estratégia, versão, inputs e outputs necessários para replay.
+- Desconhecido/`NULL` não vira zero; IA interpreta evidências calculadas e não substitui cálculo crítico.
+- Capacidade local de edição/teste não concede push, PR, merge, deploy, migration operacional ou release.
+
 ## Fluxo
 
 1. Inspecione estado, dados e comportamento atuais.
