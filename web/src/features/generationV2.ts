@@ -12,6 +12,7 @@ import type {
   GenerationConstraints,
   GenerationFilterKey,
   GenerationPlan,
+  GenerationPurpose,
   GenerationPlanPayload,
   GenerationPreviewResponse,
   GenerationRangeEdge,
@@ -103,6 +104,7 @@ function requestPayload(state: GeneratorState, includeSeed = false): GenerationR
     gameCount: state.gameCount,
     fixedCount: state.fixedCount,
     targetContestNumber: state.targetContestNumber,
+    purpose: state.purpose,
     generationMode: "diversified",
     fixedNumbers: [...state.fixed].sort((a, b) => a - b),
     excludedNumbers: [...state.excluded].sort((a, b) => a - b),
@@ -214,9 +216,31 @@ function algorithmSpace(state: GeneratorState): GenerationAlgorithmSpace {
   };
 }
 
+function purposeCopy(purpose: GenerationPurpose): { label: string; description: string; disclaimer: string } {
+  if (purpose === "uniform") {
+    return {
+      label: "Aleatório auditável",
+      description: "Amostragem uniforme do espaço válido com seed reproduzível.",
+      disclaimer: "Frequência, score e tiers históricos não participam da seleção das combinações.",
+    };
+  }
+  if (purpose === "portfolio") {
+    return {
+      label: "Carteira diversificada",
+      description: "Amostra candidatos sem score histórico e prioriza menor sobreposição entre jogos.",
+      disclaimer: "Diversificação amplia cobertura entre os jogos; não aumenta a chance individual de uma combinação.",
+    };
+  }
+  return {
+    label: "Experimental",
+    description: "Mantém as heurísticas históricas atuais para experimentação e backtest.",
+    disclaimer: "Scores e frequências são hipóteses experimentais e não representam aumento comprovado de chance futura.",
+  };
+}
 function planMarkup(state: GeneratorState): string {
   const plan = state.plan;
   const algorithm = algorithmSpace(state);
+  const purpose = purposeCopy(state.purpose);
   const coverage = Math.max(0, Math.min(1, plan.space.overallCoverage));
   const issue = plan.constraintIssues[0];
   return `<div class="g2-card-head"><div><strong>Espaço e funil do motor</strong><span>Matemática global separada do espaço realmente percorrido pelo algoritmo.</span></div></div>
@@ -228,7 +252,7 @@ function planMarkup(state: GeneratorState): string {
     </div>
     <div class="g2-space-bar" aria-hidden="true"><span style="width:${Math.max(.2, coverage * 100)}%"></span></div>
     ${issue ? `<p class="g2-error">${escapeHtml(issue)}</p>` : ""}
-    <p class="g2-disclaimer"><strong>Importante:</strong> o contador elegível descreve o universo matemático. O motor ranqueia um pool menor por pontuação e diversificação; restringir o espaço não aumenta a probabilidade individual de uma combinação ser sorteada.</p>`;
+    <p class="g2-disclaimer"><strong>${escapeHtml(purpose.label)}:</strong> ${escapeHtml(purpose.disclaimer)}</p>`;
 }
 
 function methodologyMarkup(state: GeneratorState): string {
@@ -271,8 +295,13 @@ function workspaceMarkup(state: GeneratorState): string {
     <div class="g2-workspace">
       <div class="g2-main">
         <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>1. Configuração do lote</strong><span>O concurso alvo define o corte histórico usado no plano, nas cores das dezenas e na geração.</span></div></div>
+          <div class="g2-card-head"><div><strong>1. Configuração do lote</strong><span>Escolha a finalidade do algoritmo. O histórico só influencia a seleção no modo Experimental.</span></div></div>
           <div class="g2-form-grid">
+            <div class="g2-field"><label for="g2-purpose">Finalidade</label><select id="g2-purpose">
+              <option value="uniform" ${state.purpose === "uniform" ? "selected" : ""}>Aleatório auditável</option>
+              <option value="portfolio" ${state.purpose === "portfolio" ? "selected" : ""}>Carteira diversificada</option>
+              <option value="experimental" ${state.purpose === "experimental" ? "selected" : ""}>Experimental</option>
+            </select><small>${escapeHtml(purposeCopy(state.purpose).description)}</small></div>
             <div class="g2-field"><label for="g2-game-count">Quantidade de jogos</label><input id="g2-game-count" type="number" min="1" max="10" value="${state.gameCount}" /></div>
             <div class="g2-field"><label for="g2-fixed-count">Núcleo compartilhado</label><select id="g2-fixed-count">${fixedCountOptions(state)}</select></div>
             <div class="g2-field"><label for="g2-target">Concurso alvo</label><input id="g2-target" type="number" min="1" value="${state.targetContestNumber ?? ""}" /></div>
@@ -280,7 +309,7 @@ function workspaceMarkup(state: GeneratorState): string {
         </section>
 
         <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>2. Dezenas</strong><span>Escolha explicitamente a ação e clique nas dezenas. As cores Forte/Intermediária/Fria usam somente o histórico anterior ao alvo.</span></div></div>
+          <div class="g2-card-head"><div><strong>2. Dezenas</strong><span>Escolha explicitamente a ação e clique nas dezenas. As cores históricas são apenas contexto visual nos modos Aleatório e Carteira.</span></div></div>
           ${selectionModesMarkup(state)}
           <div class="g2-number-legend">
             <span><i class="g2-key"></i> Automática</span><span><i class="g2-key is-fixed"></i> Fixada</span><span><i class="g2-key is-excluded"></i> Excluída</span>
@@ -517,6 +546,16 @@ function bindWorkspace(state: GeneratorState): void {
     planTimer = setTimeout(() => void refreshPlan(), 220);
   }
 
+  root?.querySelector<HTMLSelectElement>("#g2-purpose")?.addEventListener("change", (event) => {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    const next = select.value;
+    if (next !== "uniform" && next !== "portfolio" && next !== "experimental") return;
+    state.purpose = next;
+    clearPreview(state);
+    root.innerHTML = workspaceMarkup(state);
+    bindWorkspace(state);
+  });
   root?.querySelector<HTMLInputElement>("#g2-game-count")?.addEventListener("change", (event) => {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
@@ -654,6 +693,7 @@ async function mount(detail: ViewRenderedDetail): Promise<void> {
       fixed: new Set<number>(),
       excluded: new Set<number>(),
       selectionMode: "fix",
+      purpose: "uniform",
       filters: {
         odd: { enabled: false, ...plan.methodology.preferredOdd },
         repeated: { enabled: false, ...plan.methodology.preferredRepeated },

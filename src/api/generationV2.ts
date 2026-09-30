@@ -8,7 +8,11 @@ import type { LotteryId } from "../domain/types.js";
 import type { GenerationConstraints } from "../generator/planning.js";
 import { LOTTERY_CONFIGS } from "../lotteries/config.js";
 import type { ApiServerOptions } from "./app.js";
-import { optionalString, parseGenerationMode } from "./generationInput.js";
+import {
+  optionalString,
+  parseGenerationMode,
+  parseGenerationPurpose,
+} from "./generationInput.js";
 import { generationLimiter, generationPlanLimiter } from "./generationRateLimit.js";
 import {
   ApiError,
@@ -179,6 +183,7 @@ export async function serveGenerationV2(
     });
     const fixedCount = parseV2FixedCount(lottery, body.fixedCount);
     const targetContestNumber = parseOptionalPositiveInt(body.targetContestNumber, "targetContestNumber");
+    const purpose = parseGenerationPurpose(body.purpose);
     const generationMode = parseGenerationMode(body.generationMode);
     const seed = optionalString(body.seed, "seed", 160);
     const selection = parseV2Selection(body, lottery);
@@ -196,6 +201,7 @@ export async function serveGenerationV2(
       gameCount,
       fixedCount,
       ...(targetContestNumber !== undefined ? { targetContestNumber } : {}),
+      purpose,
       generationMode,
       ...(seed !== undefined ? { seed } : {}),
       ...selection,

@@ -1,3 +1,4 @@
+import type { GenerationPurpose } from "../generator/generationPurpose.js";
 import type { GenerationMode } from "../generator/shared.js";
 import { ApiError } from "./http.js";
 
@@ -17,6 +18,19 @@ export function parseGenerationMode(value: unknown): GenerationMode {
   if (value === undefined || value === null || value === "") return "diversified";
   if (value !== "deterministic" && value !== "diversified") {
     throw new ApiError(400, "INVALID_ARGUMENT", "generationMode must be deterministic or diversified");
+  }
+  return value;
+}
+
+
+export function parseGenerationPurpose(value: unknown): GenerationPurpose {
+  if (value === undefined || value === null || value === "") return "uniform";
+  if (value !== "uniform" && value !== "portfolio" && value !== "experimental") {
+    throw new ApiError(
+      400,
+      "INVALID_ARGUMENT",
+      "purpose must be uniform, portfolio or experimental",
+    );
   }
   return value;
 }

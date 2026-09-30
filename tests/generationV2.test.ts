@@ -140,3 +140,47 @@ test("Generator 2.0 saves the frozen preview exactly and is idempotent", async (
     (error: unknown) => Boolean(error && typeof error === "object" && "code" in error && error.code === "PREVIEW_STALE"),
   );
 });
+
+
+test("Generator 2.0 defaults to uniform purpose and keeps legacy ranking explicit as experimental", async () => {
+  const useCase = fakeUseCase(() => megaHistory());
+
+  const uniform = await useCase.execute({
+    lottery: "mega-sena",
+    gameCount: 3,
+    fixedCount: 0,
+    seed: "purpose-uniform",
+  });
+  assert.equal(uniform.generatorOptions.purpose, "uniform");
+  assert.equal(uniform.generatorOptions.experimentalStrategy, undefined);
+
+  const experimental = await useCase.execute({
+    lottery: "mega-sena",
+    gameCount: 2,
+    fixedCount: 3,
+    purpose: "experimental",
+    generationMode: "diversified",
+    seed: "purpose-experimental",
+  });
+  assert.equal(experimental.generatorOptions.purpose, "experimental");
+  assert.deepEqual(experimental.generatorOptions.experimentalStrategy, {
+    id: "legacy-historical-ranking",
+    version: 2,
+    evidenceSource: "backtests",
+  });
+});
+
+test("uniform Generator 2.0 does not require the historical minimum", async () => {
+  const useCase = fakeUseCase(() => megaHistory(3));
+
+  const result = await useCase.execute({
+    lottery: "mega-sena",
+    gameCount: 2,
+    fixedCount: 0,
+    purpose: "uniform",
+    seed: "short-history",
+  });
+
+  assert.equal(result.games.length, 2);
+  assert.equal(result.generatorOptions.purpose, "uniform");
+});
