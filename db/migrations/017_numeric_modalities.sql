@@ -11,7 +11,6 @@ BEGIN
     'real_bets',
     'ai_insights',
     'lottery_agenda',
-    'strategy_versions',
     'generation_previews'
   ]
   LOOP
