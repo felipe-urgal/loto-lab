@@ -65,9 +65,10 @@ export function evaluateGame(game: GeneratedGame, target: Contest): GameCheckRes
     ? canonical(game.luckyMonth) !== undefined && canonical(game.luckyMonth) === canonical(target.luckyMonth)
     : undefined;
   const currentQuote = quoteOfficialBet(game.lottery, game.numbers.length);
-  const ticketCost = currentQuote
-    ? currentQuote.pricePerBetCents / 100
-    : trySimpleBetPriceForContest(target);
+  const historicalSimplePrice = trySimpleBetPriceForContest(target);
+  const ticketCost = historicalSimplePrice !== undefined
+    ? historicalSimplePrice * (currentQuote?.simpleEquivalentCount ?? 1)
+    : undefined;
   const prize = resolvePrizeValue(target, matchedNumbers.length, luckyMonthHit ?? false, 1);
   const secondDrawMatchedNumbers = target.secondDrawNumbers
     ? game.numbers.filter((number) => target.secondDrawNumbers!.includes(number))
