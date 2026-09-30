@@ -9,6 +9,9 @@ const LOTTERIES = {
   "mega-sena": { label: "Mega-Sena", defaultGames: 2, drawSize: 6 },
   lotofacil: { label: "Lotofácil", defaultGames: 4, drawSize: 15 },
   "dia-de-sorte": { label: "Dia de Sorte", defaultGames: 4, drawSize: 7 },
+  quina: { label: "Quina", defaultGames: 4, drawSize: 5 },
+  lotomania: { label: "Lotomania", defaultGames: 2, drawSize: 20 },
+  "dupla-sena": { label: "Dupla Sena", defaultGames: 4, drawSize: 6 },
 };
 
 const VIEWS = {
