@@ -10,10 +10,14 @@ const endpointByLottery: Record<LotteryId, string> = {
   "mega-sena": "megasena",
   lotofacil: "lotofacil",
   "dia-de-sorte": "diadesorte",
+  quina: "quina",
+  lotomania: "lotomania",
+  "dupla-sena": "duplasena",
 };
 
 interface CaixaPrizeTierResponse {
   descricaoFaixa: string;
+  faixa?: number;
   numeroDeGanhadores: number;
   valorPremio: number;
 }
@@ -22,6 +26,7 @@ interface CaixaContestResponse {
   numero: number;
   dataApuracao: string;
   listaDezenas: string[];
+  listaDezenasSegundoSorteio?: string[] | null;
   nomeTimeCoracaoMesSorte?: string | null;
   listaRateioPremio?: CaixaPrizeTierResponse[] | null;
   valorArrecadado?: number | null;
@@ -51,7 +56,10 @@ function sanitizeLuckyMonth(value?: string | null): string | undefined {
   return clean || undefined;
 }
 
-function normalizePrizeTiers(value?: CaixaPrizeTierResponse[] | null): ContestPrizeTier[] | undefined {
+function normalizePrizeTiers(
+  lottery: LotteryId,
+  value?: CaixaPrizeTierResponse[] | null,
+): ContestPrizeTier[] | undefined {
   if (!value?.length) return undefined;
   return value.map((tier) => {
     const description = tier.descricaoFaixa?.trim();
@@ -62,7 +70,15 @@ function normalizePrizeTiers(value?: CaixaPrizeTierResponse[] | null): ContestPr
     if (!Number.isFinite(tier.valorPremio) || tier.valorPremio < 0) {
       throw new Error("Invalid prize-tier value returned by Caixa");
     }
-    return { description, winners: tier.numeroDeGanhadores, prizeValue: tier.valorPremio };
+    const draw = lottery === "dupla-sena"
+      ? (tier.faixa !== undefined && tier.faixa >= 5 ? 2 : 1)
+      : undefined;
+    return {
+      description,
+      winners: tier.numeroDeGanhadores,
+      prizeValue: tier.valorPremio,
+      ...(draw ? { draw } : {}),
+    };
   });
 }
 
@@ -72,7 +88,13 @@ export function normalizeCaixaContest(lottery: LotteryId, payload: CaixaContestR
   assertValidContestNumbers(lottery, numbers);
 
   const luckyMonth = lottery === "dia-de-sorte" ? sanitizeLuckyMonth(payload.nomeTimeCoracaoMesSorte) : undefined;
-  const prizeTiers = normalizePrizeTiers(payload.listaRateioPremio);
+  const secondDrawNumbers = lottery === "dupla-sena"
+    ? (payload.listaDezenasSegundoSorteio ?? []).map(Number).sort((a, b) => a - b)
+    : undefined;
+  if (lottery === "dupla-sena") {
+    assertValidContestNumbers(lottery, secondDrawNumbers ?? []);
+  }
+  const prizeTiers = normalizePrizeTiers(lottery, payload.listaRateioPremio);
   const amountCollected = payload.valorArrecadado !== undefined && payload.valorArrecadado !== null && Number.isFinite(payload.valorArrecadado) && payload.valorArrecadado >= 0
     ? payload.valorArrecadado
     : undefined;
@@ -82,6 +104,7 @@ export function normalizeCaixaContest(lottery: LotteryId, payload: CaixaContestR
     number: payload.numero,
     date: toIsoDate(payload.dataApuracao),
     numbers,
+    ...(secondDrawNumbers ? { secondDrawNumbers } : {}),
     ...(luckyMonth ? { luckyMonth } : {}),
     ...(prizeTiers ? { prizeTiers } : {}),
     ...(amountCollected !== undefined ? { amountCollected } : {}),
