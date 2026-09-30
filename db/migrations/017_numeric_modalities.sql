@@ -30,11 +30,11 @@ END $$;
 
 DO $$
 BEGIN
-  IF to_regclass('public.agenda_notifications') IS NOT NULL THEN
-    ALTER TABLE agenda_notifications
-      DROP CONSTRAINT IF EXISTS agenda_notifications_lottery_check;
-    ALTER TABLE agenda_notifications
-      ADD CONSTRAINT agenda_notifications_lottery_check
+  IF to_regclass('public.notifications') IS NOT NULL THEN
+    ALTER TABLE notifications
+      DROP CONSTRAINT IF EXISTS notifications_lottery_check;
+    ALTER TABLE notifications
+      ADD CONSTRAINT notifications_lottery_check
       CHECK (
         lottery IS NULL OR lottery IN (
           'mega-sena',
