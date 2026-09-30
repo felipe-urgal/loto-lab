@@ -1,4 +1,10 @@
-export type LotteryId = "mega-sena" | "lotofacil" | "dia-de-sorte";
+export type LotteryId =
+  | "mega-sena"
+  | "lotofacil"
+  | "dia-de-sorte"
+  | "quina"
+  | "lotomania"
+  | "dupla-sena";
 export type NumberTier = "strong" | "balanced" | "cold";
 export type SelectionMode = "fix" | "exclude" | "auto";
 export type GenerationPurpose = "uniform" | "portfolio" | "experimental";
@@ -90,6 +96,7 @@ export type GeneratedGame = {
   numbers: number[];
   fixedNumbers: number[];
   variableNumbers: number[];
+  mirrorNumbers?: number[];
   luckyMonth?: string;
   metadata: {
     odd: number;
