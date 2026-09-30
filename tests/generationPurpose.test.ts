@@ -123,3 +123,27 @@ test("Dia de Sorte uniform generation also replays the secondary field", () => {
   );
   assert.ok(generateUniformGames(options).every((game) => Boolean(game.luckyMonth)));
 });
+
+
+test("uniform generation preserves requested multiple-bet cardinality", () => {
+  const games = generateUniformGames({
+    lottery: "mega-sena",
+    gameCount: 3,
+    fixedCount: 0,
+    betSize: 10,
+    seed: "mega-10-numbers",
+  });
+
+  assert.ok(games.every((game) => game.numbers.length === 10));
+  assert.ok(games.every((game) => game.variableNumbers.length === 10));
+  assert.equal(
+    fingerprint(games),
+    fingerprint(generateUniformGames({
+      lottery: "mega-sena",
+      gameCount: 3,
+      fixedCount: 0,
+      betSize: 10,
+      seed: "mega-10-numbers",
+    })),
+  );
+});
