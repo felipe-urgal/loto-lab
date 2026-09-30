@@ -15,6 +15,7 @@ export interface ContestPrizeTier {
   description: string;
   winners: number;
   prizeValue: number;
+  draw?: 1 | 2;
 }
 
 export interface Contest {
