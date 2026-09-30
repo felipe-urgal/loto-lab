@@ -295,7 +295,7 @@ function workspaceMarkup(state: GeneratorState): string {
     <div class="g2-workspace">
       <div class="g2-main">
         <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>1. Configuração do lote</strong><span>O concurso alvo define o corte histórico usado no plano, nas cores das dezenas e na geração.</span></div></div>
+          <div class="g2-card-head"><div><strong>1. Configuração do lote</strong><span>Escolha a finalidade do algoritmo. O histórico só influencia a seleção no modo Experimental.</span></div></div>
           <div class="g2-form-grid">
             <div class="g2-field"><label for="g2-game-count">Quantidade de jogos</label><input id="g2-game-count" type="number" min="1" max="10" value="${state.gameCount}" /></div>
             <div class="g2-field"><label for="g2-fixed-count">Núcleo compartilhado</label><select id="g2-fixed-count">${fixedCountOptions(state)}</select></div>
@@ -304,7 +304,7 @@ function workspaceMarkup(state: GeneratorState): string {
         </section>
 
         <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>2. Dezenas</strong><span>Escolha explicitamente a ação e clique nas dezenas. As cores Forte/Intermediária/Fria usam somente o histórico anterior ao alvo.</span></div></div>
+          <div class="g2-card-head"><div><strong>2. Dezenas</strong><span>Escolha explicitamente a ação e clique nas dezenas. As cores históricas são apenas contexto visual nos modos Aleatório e Carteira.</span></div></div>
           ${selectionModesMarkup(state)}
           <div class="g2-number-legend">
             <span><i class="g2-key"></i> Automática</span><span><i class="g2-key is-fixed"></i> Fixada</span><span><i class="g2-key is-excluded"></i> Excluída</span>
