@@ -9,7 +9,7 @@ import { recordCaixaRequest } from "../observability/caixaMetrics.js";
 const BASE_URL = "https://servicebus2.caixa.gov.br/portaldeloterias/api";
 const DEFAULT_TIMEOUT_MS = 12_000;
 
-export const endpointByProduct = {
+export const endpointByProduct: Partial<Record<LotteryProductId, string>> = {
   "mega-sena": "megasena",
   lotofacil: "lotofacil",
   "dia-de-sorte": "diadesorte",
@@ -21,7 +21,7 @@ export const endpointByProduct = {
   "super-sete": "supersete",
   loteca: "loteca",
   federal: "federal",
-} as const satisfies Partial<Record<LotteryProductId, string>>;
+};
 
 export interface CaixaProductPrizeTierResponse {
   descricaoFaixa: string;
