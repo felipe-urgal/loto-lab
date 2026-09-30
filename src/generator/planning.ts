@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Contest, GeneratedGame, LotteryId, NumberTier } from "../domain/types.js";
+import { getOfficialBetRule, type OfficialBetRuleSnapshot } from "../domain/betRules.js";
 import { buildNumberAnalysis } from "../analysis/scoring.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import {
@@ -44,6 +45,7 @@ export interface GenerationPlan {
   universeSize: number;
   drawSize: number;
   betSize: number;
+  betRule?: OfficialBetRuleSnapshot;
   fixedNumbers: number[];
   excludedNumbers: number[];
   constraints: GenerationConstraints;
@@ -209,6 +211,7 @@ export function buildGenerationPlan(
     (_, index) => config.minNumber + index,
   );
   const betSize = options.betSize ?? config.drawSize;
+  const betRule = getOfficialBetRule(lottery);
   const totalCombinations = combinationCount(universe.length, betSize);
   const variableCount = betSize - fixed.length;
   const remainingCount = universe.length - fixed.length - excluded.length;
@@ -240,6 +243,7 @@ export function buildGenerationPlan(
     universeSize: universe.length,
     drawSize: config.drawSize,
     betSize,
+    ...(betRule ? { betRule } : {}),
     fixedNumbers: fixed,
     excludedNumbers: excluded,
     constraints,
