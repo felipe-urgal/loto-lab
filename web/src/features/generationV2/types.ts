@@ -1,6 +1,7 @@
 export type LotteryId = "mega-sena" | "lotofacil" | "dia-de-sorte";
 export type NumberTier = "strong" | "balanced" | "cold";
 export type SelectionMode = "fix" | "exclude" | "auto";
+export type GenerationPurpose = "uniform" | "portfolio" | "experimental";
 export type GenerationFilterKey = "odd" | "repeated" | "sum";
 export type GenerationRangeEdge = "min" | "max";
 
@@ -132,6 +133,7 @@ export type GenerationRequestPayload = {
   gameCount: number;
   fixedCount: number;
   targetContestNumber?: number;
+  purpose: GenerationPurpose;
   generationMode: "diversified";
   fixedNumbers: number[];
   excludedNumbers: number[];
@@ -155,6 +157,7 @@ export type GeneratorState = {
   fixed: Set<number>;
   excluded: Set<number>;
   selectionMode: SelectionMode;
+  purpose: GenerationPurpose;
   filters: GenerationFilters;
   plan: GenerationPlan;
   preview: GenerationPreviewResponse | null;
