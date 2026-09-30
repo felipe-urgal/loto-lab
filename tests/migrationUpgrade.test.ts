@@ -29,6 +29,7 @@ const CURRENT_UPGRADE_MIGRATIONS = [
   "014_research_backtest_evidence.sql",
   "015_research_real_bet_application.sql",
   "016_lottery_product_results.sql",
+  "017_numeric_modalities.sql",
 ] as const;
 
 test(
