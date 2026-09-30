@@ -43,6 +43,7 @@ export interface GenerationPlan {
   targetContestNumber?: number;
   universeSize: number;
   drawSize: number;
+  betSize: number;
   fixedNumbers: number[];
   excludedNumbers: number[];
   constraints: GenerationConstraints;
@@ -189,6 +190,7 @@ export function buildGenerationPlan(
     fixedNumbers?: number[];
     excludedNumbers?: number[];
     constraints?: GenerationConstraints;
+    betSize?: number;
   } = {},
 ): GenerationPlan {
   const config = getLotteryConfig(lottery);
@@ -206,8 +208,9 @@ export function buildGenerationPlan(
     { length: config.maxNumber - config.minNumber + 1 },
     (_, index) => config.minNumber + index,
   );
-  const totalCombinations = combinationCount(universe.length, config.drawSize);
-  const variableCount = config.drawSize - fixed.length;
+  const betSize = options.betSize ?? config.drawSize;
+  const totalCombinations = combinationCount(universe.length, betSize);
+  const variableCount = betSize - fixed.length;
   const remainingCount = universe.length - fixed.length - excluded.length;
   const afterManualSelection = combinationCount(remainingCount, variableCount);
   const constraintIssues: string[] = [];
@@ -216,7 +219,7 @@ export function buildGenerationPlan(
   }
   const eligibleCombinations = constraintIssues.length > 0
     ? 0
-    : countEligibleGenerationCombinations(lottery, fixed, excluded, referenceContest, constraints);
+    : countEligibleGenerationCombinations(lottery, fixed, excluded, referenceContest, constraints, betSize);
   const methodology = generationMethodology(lottery);
   const analysis = history.length > 0 ? buildNumberAnalysis(history, config) : [];
   const numberTiers: Record<NumberTier, number[]> = {
@@ -224,8 +227,8 @@ export function buildGenerationPlan(
     balanced: analysis.filter((row) => row.tier === "balanced").map((row) => row.number),
     cold: analysis.filter((row) => row.tier === "cold").map((row) => row.number),
   };
-  const lotteryBaseline = buildConditionalBaseline(universe, config.drawSize, [], [], referenceContest, totalCombinations);
-  const baseline = buildConditionalBaseline(universe, config.drawSize, fixed, excluded, referenceContest, totalCombinations);
+  const lotteryBaseline = buildConditionalBaseline(universe, betSize, [], [], referenceContest, totalCombinations);
+  const baseline = buildConditionalBaseline(universe, betSize, fixed, excluded, referenceContest, totalCombinations);
   const previousContestAvailable = scoped.expectedPreviousContestNumber !== undefined && Boolean(referenceContest);
 
   return {
@@ -236,6 +239,7 @@ export function buildGenerationPlan(
     ...(scoped.targetContestNumber !== undefined ? { targetContestNumber: scoped.targetContestNumber } : {}),
     universeSize: universe.length,
     drawSize: config.drawSize,
+    betSize,
     fixedNumbers: fixed,
     excludedNumbers: excluded,
     constraints,
