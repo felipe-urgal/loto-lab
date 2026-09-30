@@ -297,6 +297,11 @@ function workspaceMarkup(state: GeneratorState): string {
         <section class="panel g2-card">
           <div class="g2-card-head"><div><strong>1. Configuração do lote</strong><span>Escolha a finalidade do algoritmo. O histórico só influencia a seleção no modo Experimental.</span></div></div>
           <div class="g2-form-grid">
+            <div class="g2-field"><label for="g2-purpose">Finalidade</label><select id="g2-purpose">
+              <option value="uniform" ${state.purpose === "uniform" ? "selected" : ""}>Aleatório auditável</option>
+              <option value="portfolio" ${state.purpose === "portfolio" ? "selected" : ""}>Carteira diversificada</option>
+              <option value="experimental" ${state.purpose === "experimental" ? "selected" : ""}>Experimental</option>
+            </select><small>${escapeHtml(purposeCopy(state.purpose).description)}</small></div>
             <div class="g2-field"><label for="g2-game-count">Quantidade de jogos</label><input id="g2-game-count" type="number" min="1" max="10" value="${state.gameCount}" /></div>
             <div class="g2-field"><label for="g2-fixed-count">Núcleo compartilhado</label><select id="g2-fixed-count">${fixedCountOptions(state)}</select></div>
             <div class="g2-field"><label for="g2-target">Concurso alvo</label><input id="g2-target" type="number" min="1" value="${state.targetContestNumber ?? ""}" /></div>
