@@ -1,10 +1,14 @@
 import type { GeneratedGame, LotteryId } from "./types.js";
 import { getLotteryConfig } from "../lotteries/config.js";
+import { getOfficialBetRule } from "./betRules.js";
 
 const FIXED_COUNTS: Record<LotteryId, readonly number[]> = {
   "mega-sena": [0, 2, 3],
   lotofacil: [8, 9, 10],
   "dia-de-sorte": [0, 2, 3],
+  quina: [0],
+  lotomania: [0],
+  "dupla-sena": [0],
 };
 
 const LUCKY_MONTHS = new Set([
@@ -38,8 +42,13 @@ export function assertValidContestNumbers(lottery: LotteryId, numbers: number[])
 
 export function assertValidGeneratedGame(game: GeneratedGame): void {
   const config = getLotteryConfig(game.lottery);
-  if (game.numbers.length !== config.drawSize) {
-    throw new Error(`${game.lottery} games must contain exactly ${config.drawSize} numbers`);
+  const officialRule = getOfficialBetRule(game.lottery);
+  const minBetSize = officialRule?.minBetSize ?? config.defaultBetSize;
+  const maxBetSize = officialRule?.maxBetSize ?? config.defaultBetSize;
+  if (game.numbers.length < minBetSize || game.numbers.length > maxBetSize) {
+    throw new Error(
+      `${game.lottery} games must contain between ${minBetSize} and ${maxBetSize} numbers`,
+    );
   }
 
   if (
@@ -73,5 +82,15 @@ export function assertValidGeneratedGame(game: GeneratedGame): void {
     }
   } else if (game.luckyMonth !== undefined) {
     throw new Error(`${game.lottery} games cannot contain a Mês da Sorte`);
+  }
+
+  if (game.lottery === "lotomania") {
+    const universe = Array.from({ length: 100 }, (_, index) => index);
+    const expectedMirror = universe.filter((number) => !game.numbers.includes(number));
+    if (game.mirrorNumbers === undefined || !sameMembers(game.mirrorNumbers, expectedMirror)) {
+      throw new Error("Lotomania games require an explicit 50-number mirror");
+    }
+  } else if (game.mirrorNumbers !== undefined) {
+    throw new Error(`${game.lottery} games cannot contain Lotomania mirror numbers`);
   }
 }
