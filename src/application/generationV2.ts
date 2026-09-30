@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Contest, GeneratedGame, LotteryId } from "../domain/types.js";
+import { quoteOfficialBet } from "../domain/betRules.js";
 import { generateDiaDeSorteGames, type DiaDeSorteFixedCount } from "../generator/diaDeSorte.js";
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { generateMegaSenaGames, type MegaSenaFixedCount } from "../generator/megaSena.js";
@@ -26,6 +27,7 @@ export interface GenerationV2Input {
   lottery: LotteryId;
   gameCount: number;
   fixedCount: number;
+  betSize?: number;
   targetContestNumber?: number;
   purpose?: GenerationPurpose;
   generationMode?: GenerationMode;
@@ -38,6 +40,7 @@ export interface GenerationV2Input {
 
 export interface GenerationV2PlanInput {
   lottery: LotteryId;
+  betSize?: number;
   targetContestNumber?: number;
   fixedNumbers?: number[];
   excludedNumbers?: number[];
@@ -80,6 +83,7 @@ export type GenerationV2PlanExecutor = (
   lottery: LotteryId,
   options: {
     targetContestNumber?: number;
+    betSize?: number;
     fixedNumbers?: number[];
     excludedNumbers?: number[];
     constraints?: GenerationConstraints;
@@ -127,7 +131,7 @@ function normalizedConstraints(constraints: GenerationConstraints | undefined) {
 }
 
 export function generationConfigSignature(
-  input: Pick<GenerationV2Input, "lottery" | "gameCount" | "fixedCount" | "purpose" | "generationMode" | "fixedNumbers" | "excludedNumbers" | "constraints">,
+  input: Pick<GenerationV2Input, "lottery" | "gameCount" | "fixedCount" | "betSize" | "purpose" | "generationMode" | "fixedNumbers" | "excludedNumbers" | "constraints">,
   targetContestNumber?: number,
 ): string {
   return hashText(JSON.stringify({
@@ -135,6 +139,7 @@ export function generationConfigSignature(
     lottery: input.lottery,
     gameCount: input.gameCount,
     fixedCount: input.fixedCount,
+    betSize: input.betSize ?? null,
     targetContestNumber: targetContestNumber ?? null,
     purpose: input.purpose ?? "uniform",
     generationMode: input.generationMode ?? "diversified",
@@ -182,6 +187,7 @@ function planCacheKey(contests: Contest[], input: GenerationV2PlanInput): string
   const historySignature = generationHistorySignature(contests, input.lottery, input.targetContestNumber);
   return `${historySignature}:${hashText(JSON.stringify({
     lottery: input.lottery,
+    betSize: input.betSize ?? null,
     targetContestNumber: input.targetContestNumber ?? null,
     fixedNumbers: sortedNumbers(input.fixedNumbers),
     excludedNumbers: sortedNumbers(input.excludedNumbers),
@@ -256,6 +262,7 @@ export class GenerationV2UseCase {
 
     const promise = this.executePlan(contests, input.lottery, {
       ...(input.targetContestNumber !== undefined ? { targetContestNumber: input.targetContestNumber } : {}),
+      ...(input.betSize !== undefined ? { betSize: input.betSize } : {}),
       fixedNumbers: input.fixedNumbers ?? [],
       excludedNumbers: input.excludedNumbers ?? [],
       ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
@@ -289,6 +296,25 @@ export class GenerationV2UseCase {
     const contests = await this.history.listGenerationHistory(input.lottery);
     const scoped = scopeGenerationHistory(contests, input.lottery, input.targetContestNumber);
     const purpose = input.purpose ?? "uniform";
+    const betQuote = quoteOfficialBet(
+      input.lottery,
+      input.betSize ?? (input.lottery === "lotofacil" ? 15 : input.lottery === "mega-sena" ? 6 : 7),
+      input.gameCount,
+    );
+    if (input.betSize !== undefined && !betQuote) {
+      throw new GenerationV2Error(
+        "INVALID_ARGUMENT",
+        `Official bet cardinality is not available for ${input.lottery}`,
+      );
+    }
+    const effectiveBetSize = betQuote?.betSize
+      ?? (input.lottery === "lotofacil" ? 15 : input.lottery === "mega-sena" ? 6 : 7);
+    if (purpose === "experimental" && effectiveBetSize !== (input.lottery === "lotofacil" ? 15 : input.lottery === "mega-sena" ? 6 : 7)) {
+      throw new GenerationV2Error(
+        "INVALID_ARGUMENT",
+        "Multiple-number bets are available only for uniform or portfolio generation",
+      );
+    }
     if (purpose === "experimental" && scoped.history.length < MIN_GENERATION_HISTORY) {
       throw new InsufficientGenerationHistoryError(input.lottery, scoped.history.length);
     }
@@ -301,6 +327,7 @@ export class GenerationV2UseCase {
       lottery: input.lottery,
       gameCount: input.gameCount,
       fixedCount: input.fixedCount,
+      betSize: effectiveBetSize,
       purpose,
       generationMode,
       fixedNumbers: input.fixedNumbers ?? [],
@@ -370,6 +397,7 @@ export class GenerationV2UseCase {
     try {
       plan = await this.planFromSnapshot(contests, {
         lottery: input.lottery,
+        betSize: effectiveBetSize,
         ...(input.targetContestNumber !== undefined ? { targetContestNumber: input.targetContestNumber } : {}),
         fixedNumbers: input.fixedNumbers ?? [],
         excludedNumbers: input.excludedNumbers ?? [],
@@ -414,6 +442,7 @@ export class GenerationV2UseCase {
           lottery: input.lottery,
           gameCount: input.gameCount,
           fixedCount: input.fixedCount,
+          betSize: effectiveBetSize,
           seed,
           fixedNumbers: input.fixedNumbers ?? [],
           excludedNumbers: input.excludedNumbers ?? [],
@@ -479,6 +508,8 @@ export class GenerationV2UseCase {
       version: 2,
       gameCount: input.gameCount,
       fixedCount: input.fixedCount,
+      betSize: effectiveBetSize,
+      ...(betQuote ? { betQuote } : {}),
       purpose,
       generationMode,
       ...(purpose === "experimental"
