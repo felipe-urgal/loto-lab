@@ -28,16 +28,34 @@ const root = document.querySelector<HTMLElement>("#content");
 let lifecycleToken = 0;
 let cleanupCurrent: (() => void) | null = null;
 
-const LOTTERY_FALLBACK: Record<LotteryId, { label: string; max: number; drawSize: number; defaultGames: number }> = {
-  "mega-sena": { label: "Mega-Sena", max: 60, drawSize: 6, defaultGames: 2 },
-  lotofacil: { label: "Lotofácil", max: 25, drawSize: 15, defaultGames: 4 },
-  "dia-de-sorte": { label: "Dia de Sorte", max: 31, drawSize: 7, defaultGames: 4 },
+const LOTTERY_FALLBACK: Record<LotteryId, {
+  label: string;
+  max: number;
+  drawSize: number;
+  defaultBetSize: number;
+  defaultGames: number;
+}> = {
+  "mega-sena": { label: "Mega-Sena", max: 60, drawSize: 6, defaultBetSize: 6, defaultGames: 2 },
+  lotofacil: { label: "Lotofácil", max: 25, drawSize: 15, defaultBetSize: 15, defaultGames: 4 },
+  "dia-de-sorte": { label: "Dia de Sorte", max: 31, drawSize: 7, defaultBetSize: 7, defaultGames: 4 },
+  quina: { label: "Quina", max: 80, drawSize: 5, defaultBetSize: 5, defaultGames: 4 },
+  lotomania: { label: "Lotomania", max: 99, drawSize: 20, defaultBetSize: 50, defaultGames: 2 },
+  "dupla-sena": { label: "Dupla Sena", max: 50, drawSize: 6, defaultBetSize: 6, defaultGames: 4 },
 };
 
 const NUMBER_TIERS: readonly NumberTier[] = ["strong", "balanced", "cold"];
 
 function isLotteryId(value: string | undefined): value is LotteryId {
-  return value === "mega-sena" || value === "lotofacil" || value === "dia-de-sorte";
+  return value === "mega-sena"
+    || value === "lotofacil"
+    || value === "dia-de-sorte"
+    || value === "quina"
+    || value === "lotomania"
+    || value === "dupla-sena";
+}
+
+function supportsExperimental(lottery: LotteryId): boolean {
+  return lottery === "mega-sena" || lottery === "lotofacil" || lottery === "dia-de-sorte";
 }
 
 function isSelectionMode(value: string | undefined): value is SelectionMode {
@@ -147,7 +165,7 @@ function fixedCountOptions(state: GeneratorState): string {
 
 function betSizeOptions(state: GeneratorState): string {
   const rule = state.plan.betRule;
-  if (!rule) return `<option value="${state.plan.drawSize}" selected>${state.plan.drawSize} dezenas</option>`;
+  if (!rule) return `<option value="${state.plan.betSize}" selected>${state.plan.betSize} dezenas</option>`;
   let html = "";
   for (let value = rule.minBetSize; value <= rule.maxBetSize; value += 1) {
     const equivalent = rule.drawSize === value ? 1 : Math.round(
@@ -321,10 +339,10 @@ function workspaceMarkup(state: GeneratorState): string {
             <div class="g2-field"><label for="g2-purpose">Finalidade</label><select id="g2-purpose">
               <option value="uniform" ${state.purpose === "uniform" ? "selected" : ""}>Aleatório auditável</option>
               <option value="portfolio" ${state.purpose === "portfolio" ? "selected" : ""}>Carteira diversificada</option>
-              <option value="experimental" ${state.purpose === "experimental" ? "selected" : ""}>Experimental</option>
+              <option value="experimental" ${state.purpose === "experimental" ? "selected" : ""} ${supportsExperimental(state.lottery) ? "" : "disabled"}>Experimental</option>
             </select><small>${escapeHtml(purposeCopy(state.purpose).description)}</small></div>
             <div class="g2-field"><label for="g2-game-count">Quantidade de jogos</label><input id="g2-game-count" type="number" min="1" max="10" value="${state.gameCount}" /></div>
-            <div class="g2-field"><label for="g2-bet-size">Dezenas por aposta</label><select id="g2-bet-size" ${state.purpose === "experimental" || !state.plan.betRule ? "disabled" : ""}>${betSizeOptions(state)}</select><small>${state.plan.betRule ? "Limites e preço vêm da regra oficial versionada." : "Cardinalidade oficial ainda não cadastrada para esta modalidade."}</small></div>
+            <div class="g2-field"><label for="g2-bet-size">Dezenas por aposta</label><select id="g2-bet-size" ${state.purpose === "experimental" || !state.plan.betRule ? "disabled" : ""}>${betSizeOptions(state)}</select><small>${state.plan.betRule ? "Limites e preço vêm da regra oficial versionada." : "Cardinalidade fixa desta modalidade."}</small></div>
             <div class="g2-field"><label for="g2-fixed-count">Núcleo compartilhado</label><select id="g2-fixed-count">${fixedCountOptions(state)}</select></div>
             <div class="g2-field"><label for="g2-target">Concurso alvo</label><input id="g2-target" type="number" min="1" value="${state.targetContestNumber ?? ""}" /></div>
           </div>
@@ -541,7 +559,9 @@ function renderDynamicPlan(state: GeneratorState): void {
   }
   const algorithm = algorithmSpace(state);
   const previewButton = root?.querySelector<HTMLButtonElement>("[data-g2-preview]");
-  const invalid = state.plan.space.eligibleCombinations < 1 || algorithm.rawCombinationCapacity < 1 || state.plan.constraintIssues.length > 0;
+  const invalid = state.plan.space.eligibleCombinations < 1
+    || (state.purpose === "experimental" && algorithm.rawCombinationCapacity < 1)
+    || state.plan.constraintIssues.length > 0;
   if (previewButton) previewButton.disabled = invalid;
 }
 
@@ -718,7 +738,7 @@ async function mount(detail: ViewRenderedDetail): Promise<void> {
   try {
     const plan = await postJson<GenerationPlan>("/generation/plan", {
       lottery,
-      betSize: fallback.drawSize,
+      betSize: fallback.defaultBetSize,
       ...(legacyTarget ? { targetContestNumber: legacyTarget } : {}),
       fixedNumbers: [],
       excludedNumbers: [],
