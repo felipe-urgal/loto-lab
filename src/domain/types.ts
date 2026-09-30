@@ -8,6 +8,7 @@ export interface LotteryConfig {
   minNumber: number;
   maxNumber: number;
   drawSize: number;
+  defaultBetSize: number;
 }
 
 export interface ContestPrizeTier {
@@ -21,6 +22,7 @@ export interface Contest {
   number: number;
   date: string;
   numbers: number[];
+  secondDrawNumbers?: number[];
   luckyMonth?: string;
   prizeTiers?: ContestPrizeTier[];
   amountCollected?: number;
@@ -45,6 +47,7 @@ export interface GeneratedGame {
   numbers: number[];
   fixedNumbers: number[];
   variableNumbers: number[];
+  mirrorNumbers?: number[];
   luckyMonth?: string;
   metadata: {
     odd: number;
