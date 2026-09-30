@@ -34,8 +34,16 @@ const GENERATION_V2_PATHS = new Set([
 ]);
 
 function parseV2FixedCount(lottery: LotteryId, value: unknown): number {
-  const allowed = lottery === "lotofacil" ? [8, 9, 10] : [0, 2, 3];
-  const defaultValue = lottery === "lotofacil" ? 8 : 3;
+  const allowed = lottery === "lotofacil"
+    ? [8, 9, 10]
+    : lottery === "mega-sena" || lottery === "dia-de-sorte"
+      ? [0, 2, 3]
+      : [0];
+  const defaultValue = lottery === "lotofacil"
+    ? 8
+    : lottery === "mega-sena" || lottery === "dia-de-sorte"
+      ? 3
+      : 0;
   if (value === undefined || value === null || value === "") return defaultValue;
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || !allowed.includes(parsed)) {
@@ -47,12 +55,22 @@ function parseV2FixedCount(lottery: LotteryId, value: unknown): number {
 function parseV2BetSize(lottery: LotteryId, value: unknown): number {
   const config = LOTTERY_CONFIGS[lottery];
   const rule = getOfficialBetRule(lottery);
-  if (value === undefined || value === null || value === "") return config.drawSize;
-  if (!rule) {
-    throw new ApiError(400, "INVALID_ARGUMENT", `Official bet cardinality is not available for ${lottery}`);
-  }
+  if (value === undefined || value === null || value === "") return config.defaultBetSize;
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < rule.minBetSize || parsed > rule.maxBetSize) {
+  if (!Number.isInteger(parsed)) {
+    throw new ApiError(400, "INVALID_ARGUMENT", "betSize must be an integer");
+  }
+  if (!rule) {
+    if (parsed !== config.defaultBetSize) {
+      throw new ApiError(
+        400,
+        "INVALID_ARGUMENT",
+        `betSize must be ${config.defaultBetSize} for ${lottery}`,
+      );
+    }
+    return parsed;
+  }
+  if (parsed < rule.minBetSize || parsed > rule.maxBetSize) {
     throw new ApiError(
       400,
       "INVALID_ARGUMENT",
@@ -105,16 +123,25 @@ function parseIntegerRange(
   return { min, max };
 }
 
-function parseGenerationConstraints(value: unknown, lottery: LotteryId): GenerationConstraints | undefined {
+function parseGenerationConstraints(
+  value: unknown,
+  lottery: LotteryId,
+  betSize: number,
+): GenerationConstraints | undefined {
   if (value === undefined || value === null) return undefined;
   if (!isRecord(value)) throw new ApiError(400, "INVALID_ARGUMENT", "constraints must be an object");
   const config = LOTTERY_CONFIGS[lottery];
-  const minimumSum = Array.from({ length: config.drawSize }, (_, index) => config.minNumber + index)
+  const minimumSum = Array.from({ length: betSize }, (_, index) => config.minNumber + index)
     .reduce((total, number) => total + number, 0);
-  const maximumSum = Array.from({ length: config.drawSize }, (_, index) => config.maxNumber - index)
+  const maximumSum = Array.from({ length: betSize }, (_, index) => config.maxNumber - index)
     .reduce((total, number) => total + number, 0);
-  const odd = parseIntegerRange(value.odd, "constraints.odd", 0, config.drawSize);
-  const repeated = parseIntegerRange(value.repeated, "constraints.repeated", 0, config.drawSize);
+  const odd = parseIntegerRange(value.odd, "constraints.odd", 0, betSize);
+  const repeated = parseIntegerRange(
+    value.repeated,
+    "constraints.repeated",
+    0,
+    Math.min(betSize, config.drawSize),
+  );
   const sum = parseIntegerRange(value.sum, "constraints.sum", minimumSum, maximumSum);
   if (!odd && !repeated && !sum) return undefined;
   return {
@@ -124,13 +151,17 @@ function parseGenerationConstraints(value: unknown, lottery: LotteryId): Generat
   };
 }
 
-function parseV2Selection(body: Record<string, unknown>, lottery: LotteryId) {
+function parseV2Selection(
+  body: Record<string, unknown>,
+  lottery: LotteryId,
+  betSize: number,
+) {
   const fixedNumbers = parseNumberArray(body.fixedNumbers, "fixedNumbers", lottery);
   const excludedNumbers = parseNumberArray(body.excludedNumbers, "excludedNumbers", lottery);
   if (fixedNumbers.some((number) => excludedNumbers.includes(number))) {
     throw new ApiError(400, "INVALID_ARGUMENT", "A number cannot be fixed and excluded at the same time");
   }
-  const constraints = parseGenerationConstraints(body.constraints, lottery);
+  const constraints = parseGenerationConstraints(body.constraints, lottery, betSize);
   return { fixedNumbers, excludedNumbers, ...(constraints ? { constraints } : {}) };
 }
 
@@ -182,7 +213,7 @@ export async function serveGenerationV2(
       const lottery = parseLottery(body.lottery);
       const targetContestNumber = parseOptionalPositiveInt(body.targetContestNumber, "targetContestNumber");
       const betSize = parseV2BetSize(lottery, body.betSize);
-      const selection = parseV2Selection(body, lottery);
+      const selection = parseV2Selection(body, lottery, betSize);
       const plan = await generationV2.plan({
         lottery,
         betSize,
@@ -208,7 +239,7 @@ export async function serveGenerationV2(
     const purpose = parseGenerationPurpose(body.purpose);
     const generationMode = parseGenerationMode(body.generationMode);
     const seed = optionalString(body.seed, "seed", 160);
-    const selection = parseV2Selection(body, lottery);
+    const selection = parseV2Selection(body, lottery, betSize);
     const persist = pathname === "/api/v1/generation/save";
     if (persist && generationMode === "diversified" && !seed) {
       throw new ApiError(
