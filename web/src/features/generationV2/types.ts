@@ -49,6 +49,19 @@ export type GenerationPlan = {
   targetContestNumber?: number;
   universeSize: number;
   drawSize: number;
+  betSize: number;
+  betRule?: {
+    version: string;
+    effectiveFrom: string;
+    verifiedAt: string;
+    sourceUrl: string;
+    universeSize: number;
+    drawSize: number;
+    minBetSize: number;
+    maxBetSize: number;
+    simplePriceCents: number;
+    topPrizeOneInByBetSize: Record<number, number>;
+  };
   fixedNumbers: number[];
   excludedNumbers: number[];
   constraints: GenerationConstraints;
@@ -132,6 +145,7 @@ export type GenerationRequestPayload = {
   lottery: LotteryId;
   gameCount: number;
   fixedCount: number;
+  betSize: number;
   targetContestNumber?: number;
   purpose: GenerationPurpose;
   generationMode: "diversified";
@@ -143,6 +157,7 @@ export type GenerationRequestPayload = {
 
 export type GenerationPlanPayload = {
   lottery: LotteryId;
+  betSize: number;
   targetContestNumber?: number;
   fixedNumbers: number[];
   excludedNumbers: number[];
@@ -153,6 +168,7 @@ export type GeneratorState = {
   lottery: LotteryId;
   gameCount: number;
   fixedCount: number;
+  betSize: number;
   targetContestNumber?: number;
   fixed: Set<number>;
   excluded: Set<number>;
