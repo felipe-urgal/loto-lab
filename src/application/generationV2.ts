@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Contest, GeneratedGame, LotteryId } from "../domain/types.js";
 import { quoteOfficialBet } from "../domain/betRules.js";
+import { getLotteryConfig } from "../lotteries/config.js";
 import { generateDiaDeSorteGames, type DiaDeSorteFixedCount } from "../generator/diaDeSorte.js";
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { generateMegaSenaGames, type MegaSenaFixedCount } from "../generator/megaSena.js";
@@ -167,7 +168,11 @@ function previewId(
 }
 
 function validateFixedCount(lottery: LotteryId, fixedCount: number): void {
-  const allowed = lottery === "lotofacil" ? [8, 9, 10] : [0, 2, 3];
+  const allowed = lottery === "lotofacil"
+    ? [8, 9, 10]
+    : lottery === "mega-sena" || lottery === "dia-de-sorte"
+      ? [0, 2, 3]
+      : [0];
   if (!Number.isInteger(fixedCount) || !allowed.includes(fixedCount)) {
     throw new GenerationV2Error("INVALID_ARGUMENT", `fixedCount must be one of ${allowed.join(", ")} for ${lottery}`);
   }
@@ -296,23 +301,30 @@ export class GenerationV2UseCase {
     const contests = await this.history.listGenerationHistory(input.lottery);
     const scoped = scopeGenerationHistory(contests, input.lottery, input.targetContestNumber);
     const purpose = input.purpose ?? "uniform";
-    const betQuote = quoteOfficialBet(
-      input.lottery,
-      input.betSize ?? (input.lottery === "lotofacil" ? 15 : input.lottery === "mega-sena" ? 6 : 7),
-      input.gameCount,
-    );
-    if (input.betSize !== undefined && !betQuote) {
+    const config = getLotteryConfig(input.lottery);
+    const effectiveBetSize = input.betSize ?? config.defaultBetSize;
+    const betQuote = quoteOfficialBet(input.lottery, effectiveBetSize, input.gameCount);
+    if (!betQuote && effectiveBetSize !== config.defaultBetSize) {
       throw new GenerationV2Error(
         "INVALID_ARGUMENT",
         `Official bet cardinality is not available for ${input.lottery}`,
       );
     }
-    const effectiveBetSize = betQuote?.betSize
-      ?? (input.lottery === "lotofacil" ? 15 : input.lottery === "mega-sena" ? 6 : 7);
-    if (purpose === "experimental" && effectiveBetSize !== (input.lottery === "lotofacil" ? 15 : input.lottery === "mega-sena" ? 6 : 7)) {
+    if (purpose === "experimental" && effectiveBetSize !== config.defaultBetSize) {
       throw new GenerationV2Error(
         "INVALID_ARGUMENT",
         "Multiple-number bets are available only for uniform or portfolio generation",
+      );
+    }
+    if (
+      purpose === "experimental"
+      && input.lottery !== "mega-sena"
+      && input.lottery !== "lotofacil"
+      && input.lottery !== "dia-de-sorte"
+    ) {
+      throw new GenerationV2Error(
+        "INVALID_ARGUMENT",
+        `Experimental generation is not available for ${input.lottery}`,
       );
     }
     if (purpose === "experimental" && scoped.history.length < MIN_GENERATION_HISTORY) {
@@ -478,7 +490,7 @@ export class GenerationV2UseCase {
           ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
           referenceContestNumber,
         });
-      } else {
+      } else if (input.lottery === "dia-de-sorte") {
         games = generateDiaDeSorteGames(scoped.history, {
           gameCount: input.gameCount,
           fixedCount: input.fixedCount as DiaDeSorteFixedCount,
@@ -489,6 +501,11 @@ export class GenerationV2UseCase {
           ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
           referenceContestNumber,
         });
+      } else {
+        throw new GenerationV2Error(
+          "INVALID_ARGUMENT",
+          `Experimental generation is not available for ${input.lottery}`,
+        );
       }
     } catch (error) {
       if (isExpectedGeneratorFailure(error)) {
