@@ -17,7 +17,17 @@ test("GetDataStatusUseCase reads every supported lottery through its application
       { lottery: "mega-sena", totalContests: 1 },
       { lottery: "lotofacil", totalContests: 2 },
       { lottery: "dia-de-sorte", totalContests: 3 },
+      { lottery: "quina", totalContests: 4 },
+      { lottery: "lotomania", totalContests: 5 },
+      { lottery: "dupla-sena", totalContests: 6 },
     ],
   });
-  assert.deepEqual(calls, ["mega-sena", "lotofacil", "dia-de-sorte"]);
+  assert.deepEqual(calls, [
+    "mega-sena",
+    "lotofacil",
+    "dia-de-sorte",
+    "quina",
+    "lotomania",
+    "dupla-sena",
+  ]);
 });
