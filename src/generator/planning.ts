@@ -113,6 +113,30 @@ const METHODOLOGY: Record<LotteryId, GenerationMethodologyProfile> = {
       "Mês da Sorte é tratado separadamente das sete dezenas.",
     ],
   },
+  quina: {
+    defaultFixedCount: 0,
+    fixedCountOptions: [0],
+    preferredOdd: { min: 0, max: 15 },
+    preferredRepeated: { min: 0, max: 5 },
+    acceptableRepeated: { min: 0, max: 5 },
+    notes: ["Aleatório e carteira não usam frequência histórica para selecionar dezenas."],
+  },
+  lotomania: {
+    defaultFixedCount: 0,
+    fixedCountOptions: [0],
+    preferredOdd: { min: 0, max: 50 },
+    preferredRepeated: { min: 0, max: 20 },
+    acceptableRepeated: { min: 0, max: 20 },
+    notes: ["A aposta contém 50 números; o espelho é o complemento explícito dos outros 50."],
+  },
+  "dupla-sena": {
+    defaultFixedCount: 0,
+    fixedCountOptions: [0],
+    preferredOdd: { min: 0, max: 15 },
+    preferredRepeated: { min: 0, max: 6 },
+    acceptableRepeated: { min: 0, max: 6 },
+    notes: ["A mesma aposta é conferida separadamente contra os dois sorteios do concurso."],
+  },
 };
 
 export function generationMethodology(lottery: LotteryId): GenerationMethodologyProfile {
@@ -170,6 +194,8 @@ export function generationHistorySignature(
     hash.update("|");
     hash.update([...contest.numbers].sort((a, b) => a - b).join(","));
     hash.update("|");
+    hash.update([...(contest.secondDrawNumbers ?? [])].sort((a, b) => a - b).join(","));
+    hash.update("|");
     hash.update(contest.luckyMonth ?? "");
     hash.update(";");
   }
@@ -210,7 +236,7 @@ export function buildGenerationPlan(
     { length: config.maxNumber - config.minNumber + 1 },
     (_, index) => config.minNumber + index,
   );
-  const betSize = options.betSize ?? config.drawSize;
+  const betSize = options.betSize ?? config.defaultBetSize;
   const betRule = getOfficialBetRule(lottery);
   const totalCombinations = combinationCount(universe.length, betSize);
   const variableCount = betSize - fixed.length;

@@ -7,6 +7,7 @@ interface GenerationPlanningWorkerInput {
   lottery: LotteryId;
   options: {
     targetContestNumber?: number;
+    betSize?: number;
     fixedNumbers?: number[];
     excludedNumbers?: number[];
     constraints?: GenerationConstraints;

@@ -68,6 +68,24 @@ export const SIMPLE_BET_PRICE_PERIODS: PricePeriod[] = [
     price: 2.5,
     sourceNote: "CAIXA 2023 repricing effective from contest 753 on 2023-05-03",
   },
+  {
+    lottery: "quina",
+    fromDate: "2026-09-30",
+    price: 3,
+    sourceNote: "CAIXA current simple-bet price verified on 2026-09-30",
+  },
+  {
+    lottery: "lotomania",
+    fromDate: "2026-09-30",
+    price: 3,
+    sourceNote: "CAIXA current 50-number bet price verified on 2026-09-30",
+  },
+  {
+    lottery: "dupla-sena",
+    fromDate: "2026-09-30",
+    price: 3,
+    sourceNote: "CAIXA current simple-bet price verified on 2026-09-30",
+  },
 ];
 
 function applies(period: PricePeriod, contest: Contest): boolean {

@@ -45,6 +45,9 @@ const lotteryLabels: Record<LotteryId, string> = {
   "mega-sena": "Mega-Sena",
   lotofacil: "Lotofácil",
   "dia-de-sorte": "Dia de Sorte",
+  quina: "Quina",
+  lotomania: "Lotomania",
+  "dupla-sena": "Dupla Sena",
 };
 
 const statusLabels: Record<string, string> = {

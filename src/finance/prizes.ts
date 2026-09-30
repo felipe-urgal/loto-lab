@@ -32,11 +32,20 @@ function validPrizeValue(tier?: ContestPrizeTier): number | undefined {
 function numberPrizeExpected(target: Contest, hits: number): boolean {
   if (target.lottery === "mega-sena") return hits >= 4;
   if (target.lottery === "lotofacil") return hits >= 11;
-  return hits >= 4;
+  if (target.lottery === "dia-de-sorte") return hits >= 4;
+  if (target.lottery === "quina") return hits >= 2;
+  if (target.lottery === "lotomania") return hits === 0 || (hits >= 15 && hits <= 20);
+  return hits >= 3;
 }
 
-export function prizeTierForHits(target: Contest, hits: number): ContestPrizeTier | undefined {
-  return target.prizeTiers?.find((tier) => numericHitsFromTier(tier) === hits);
+export function prizeTierForHits(
+  target: Contest,
+  hits: number,
+  draw: 1 | 2 = 1,
+): ContestPrizeTier | undefined {
+  return target.prizeTiers?.find(
+    (tier) => numericHitsFromTier(tier) === hits && (tier.draw ?? 1) === draw,
+  );
 }
 
 export function luckyMonthPrizeTier(target: Contest): ContestPrizeTier | undefined {
@@ -52,18 +61,34 @@ export function hasCompletePrizeSchedule(target: Contest): boolean {
   if (target.lottery === "lotofacil") {
     return [11, 12, 13, 14, 15].every((hits) => tiers.some((tier) => numericHitsFromTier(tier) === hits));
   }
-  return [4, 5, 6, 7].every((hits) => tiers.some((tier) => numericHitsFromTier(tier) === hits))
-    && tiers.some(isLuckyMonthTier);
+  if (target.lottery === "dia-de-sorte") {
+    return [4, 5, 6, 7].every((hits) => tiers.some((tier) => numericHitsFromTier(tier) === hits))
+      && tiers.some(isLuckyMonthTier);
+  }
+  if (target.lottery === "quina") {
+    return [2, 3, 4, 5].every((hits) => tiers.some((tier) => numericHitsFromTier(tier) === hits));
+  }
+  if (target.lottery === "lotomania") {
+    return [0, 15, 16, 17, 18, 19, 20].every(
+      (hits) => tiers.some((tier) => numericHitsFromTier(tier) === hits),
+    );
+  }
+  return [1, 2].every((draw) =>
+    [3, 4, 5, 6].every((hits) =>
+      tiers.some((tier) => numericHitsFromTier(tier) === hits && (tier.draw ?? 1) === draw),
+    ),
+  );
 }
 
 export function resolvePrizeValue(
   target: Contest,
   hits: number,
   luckyMonthHit = false,
+  draw: 1 | 2 = 1,
 ): ResolvedPrize {
   const expectsNumberPrize = numberPrizeExpected(target, hits);
   const numberPrizeValue = expectsNumberPrize
-    ? validPrizeValue(prizeTierForHits(target, hits))
+    ? validPrizeValue(prizeTierForHits(target, hits, draw))
     : 0;
   const numberPrizeKnown = !expectsNumberPrize || numberPrizeValue !== undefined;
 

@@ -70,6 +70,15 @@ export class RunBacktestUseCase {
   ) {}
 
   async execute(input: RunBacktestRequest): Promise<RunBacktestResponse> {
+    if (
+      input.lottery !== "mega-sena"
+      && input.lottery !== "lotofacil"
+      && input.lottery !== "dia-de-sorte"
+    ) {
+      throw new Error(
+        `Legacy backtest is not available for ${input.lottery}; use Generator V2 or modality-compatible analysis`,
+      );
+    }
     const contests = await this.history.list({ lottery: input.lottery, order: "asc" });
     const eligibleRoundCount = contests
       .slice(input.warmupContests)
@@ -109,13 +118,15 @@ export class RunBacktestUseCase {
         ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),
         ...(input.endContest !== undefined ? { endContest: input.endContest } : {}),
       });
-    } else {
+    } else if (input.lottery === "dia-de-sorte") {
       result = backtestDiaDeSorte(contests, {
         gameCount: input.gameCount,
         warmupContests: input.warmupContests,
         ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),
         ...(input.endContest !== undefined ? { endContest: input.endContest } : {}),
       });
+    } else {
+      throw new Error(`Unsupported legacy backtest lottery: ${input.lottery}`);
     }
 
     const summary = result.summary as Record<string, unknown>;

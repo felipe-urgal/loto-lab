@@ -32,6 +32,7 @@ interface GameRow {
   numbers: number[];
   fixed_numbers: number[];
   variable_numbers: number[];
+  mirror_numbers: number[] | null;
   lucky_month: string | null;
   metadata: GeneratedGame["metadata"];
 }
@@ -57,6 +58,7 @@ function mapGame(lottery: LotteryId, row: GameRow): GeneratedGame {
     numbers: row.numbers.map(Number),
     fixedNumbers: row.fixed_numbers.map(Number),
     variableNumbers: row.variable_numbers.map(Number),
+    ...(row.mirror_numbers ? { mirrorNumbers: row.mirror_numbers.map(Number) } : {}),
     ...(row.lucky_month ? { luckyMonth: row.lucky_month } : {}),
     metadata: row.metadata,
   };
@@ -88,8 +90,8 @@ async function insertGames(
     await client.query(
       `
         INSERT INTO generated_games (
-          batch_id, position, numbers, fixed_numbers, variable_numbers, lucky_month, metadata
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+          batch_id, position, numbers, fixed_numbers, variable_numbers, mirror_numbers, lucky_month, metadata
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
       `,
       [
         batchId,
@@ -97,6 +99,7 @@ async function insertGames(
         game.numbers,
         game.fixedNumbers,
         game.variableNumbers,
+        game.mirrorNumbers ?? null,
         game.luckyMonth ?? null,
         JSON.stringify(game.metadata),
       ],
@@ -284,7 +287,7 @@ export class PostgresGameRepository {
       ),
       this.pool.query<GameRow>(
         `
-          SELECT batch_id, numbers, fixed_numbers, variable_numbers, lucky_month, metadata
+          SELECT batch_id, numbers, fixed_numbers, variable_numbers, mirror_numbers, lucky_month, metadata
           FROM generated_games
           WHERE batch_id = ANY($1::bigint[])
           ORDER BY batch_id, position

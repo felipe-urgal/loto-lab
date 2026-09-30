@@ -70,7 +70,11 @@ export class PostgresAgendaRepository {
       ORDER BY CASE lottery
         WHEN 'mega-sena' THEN 1
         WHEN 'lotofacil' THEN 2
-        ELSE 3
+        WHEN 'dia-de-sorte' THEN 3
+        WHEN 'quina' THEN 4
+        WHEN 'lotomania' THEN 5
+        WHEN 'dupla-sena' THEN 6
+        ELSE 99
       END
     `);
     return result.rows.map(mapRow);

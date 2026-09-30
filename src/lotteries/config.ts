@@ -8,6 +8,7 @@ export const LOTTERY_CONFIGS: Record<LotteryId, LotteryConfig> = {
     minNumber: 1,
     maxNumber: 60,
     drawSize: 6,
+    defaultBetSize: 6,
   },
   lotofacil: {
     id: "lotofacil",
@@ -15,6 +16,7 @@ export const LOTTERY_CONFIGS: Record<LotteryId, LotteryConfig> = {
     minNumber: 1,
     maxNumber: 25,
     drawSize: 15,
+    defaultBetSize: 15,
   },
   "dia-de-sorte": {
     id: "dia-de-sorte",
@@ -22,6 +24,31 @@ export const LOTTERY_CONFIGS: Record<LotteryId, LotteryConfig> = {
     minNumber: 1,
     maxNumber: 31,
     drawSize: 7,
+    defaultBetSize: 7,
+  },
+  quina: {
+    id: "quina",
+    name: getLotteryCatalogEntry("quina").name,
+    minNumber: 1,
+    maxNumber: 80,
+    drawSize: 5,
+    defaultBetSize: 5,
+  },
+  lotomania: {
+    id: "lotomania",
+    name: getLotteryCatalogEntry("lotomania").name,
+    minNumber: 0,
+    maxNumber: 99,
+    drawSize: 20,
+    defaultBetSize: 50,
+  },
+  "dupla-sena": {
+    id: "dupla-sena",
+    name: getLotteryCatalogEntry("dupla-sena").name,
+    minNumber: 1,
+    maxNumber: 50,
+    drawSize: 6,
+    defaultBetSize: 6,
   },
 };
 

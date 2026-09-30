@@ -51,7 +51,7 @@ function validateSelection(options: PurposeGenerationOptions): void {
   if (!Number.isInteger(options.gameCount) || options.gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
   }
-  const betSize = options.betSize ?? config.drawSize;
+  const betSize = options.betSize ?? config.defaultBetSize;
   if (!Number.isInteger(betSize) || betSize < config.drawSize || betSize > universe.size) {
     throw new Error("betSize must fit between draw size and lottery universe");
   }
@@ -106,7 +106,7 @@ function sampleCandidate(
     { length: config.maxNumber - config.minNumber + 1 },
     (_, index) => config.minNumber + index,
   ).filter((number) => !excluded.has(number) && !fixedSet.has(number));
-  const betSize = options.betSize ?? config.drawSize;
+  const betSize = options.betSize ?? config.defaultBetSize;
   const variableCount = betSize - sharedCore.length;
   const variableNumbers = sampleWithoutReplacement(candidates, variableCount, random);
   const numbers = [...sharedCore, ...variableNumbers].sort((a, b) => a - b);
@@ -118,11 +118,15 @@ function sampleCandidate(
   const luckyMonth = options.lottery === "dia-de-sorte"
     ? LUCKY_MONTHS[Math.floor(random() * LUCKY_MONTHS.length)]
     : undefined;
+  const mirrorNumbers = options.lottery === "lotomania"
+    ? Array.from({ length: 100 }, (_, index) => index).filter((number) => !numbers.includes(number))
+    : undefined;
   return {
     lottery: options.lottery,
     numbers,
     fixedNumbers: [...sharedCore],
     variableNumbers,
+    ...(mirrorNumbers ? { mirrorNumbers } : {}),
     ...(luckyMonth ? { luckyMonth } : {}),
     metadata,
   };

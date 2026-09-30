@@ -1,4 +1,5 @@
 import type { Contest, GeneratedGame, LotteryId } from "../domain/types.js";
+import { quoteOfficialBet } from "../domain/betRules.js";
 import { trySimpleBetPriceForContest } from "../finance/pricing.js";
 import { resolvePrizeValue } from "../finance/prizes.js";
 
@@ -18,6 +19,10 @@ export interface GameCheckResult {
   luckyMonthPrizeValue?: number;
   totalPrizeValue?: number;
   netResult?: number;
+  secondDrawHits?: number;
+  secondDrawMatchedNumbers?: number[];
+  secondDrawPrizeTier?: string;
+  secondDrawPrizeValue?: number;
 }
 
 function canonical(value?: string): string | undefined {
@@ -35,8 +40,16 @@ export function prizeTierFor(lottery: LotteryId, hits: number): string | undefin
   if (lottery === "lotofacil") {
     return hits >= 11 && hits <= 15 ? `${hits}-acertos` : undefined;
   }
-
-  return hits >= 4 && hits <= 7 ? `${hits}-acertos` : undefined;
+  if (lottery === "dia-de-sorte") {
+    return hits >= 4 && hits <= 7 ? `${hits}-acertos` : undefined;
+  }
+  if (lottery === "quina") {
+    return hits >= 2 && hits <= 5 ? `${hits}-acertos` : undefined;
+  }
+  if (lottery === "lotomania") {
+    return hits === 0 || (hits >= 15 && hits <= 20) ? `${hits}-acertos` : undefined;
+  }
+  return hits >= 3 && hits <= 6 ? `${hits}-acertos` : undefined;
 }
 
 export function evaluateGame(game: GeneratedGame, target: Contest): GameCheckResult {
@@ -51,10 +64,24 @@ export function evaluateGame(game: GeneratedGame, target: Contest): GameCheckRes
   const luckyMonthHit = game.lottery === "dia-de-sorte"
     ? canonical(game.luckyMonth) !== undefined && canonical(game.luckyMonth) === canonical(target.luckyMonth)
     : undefined;
-  const ticketCost = trySimpleBetPriceForContest(target);
-  const prize = resolvePrizeValue(target, matchedNumbers.length, luckyMonthHit ?? false);
-  const netResult = prize.totalPrizeValue !== undefined && ticketCost !== undefined
-    ? prize.totalPrizeValue - ticketCost
+  const currentQuote = quoteOfficialBet(game.lottery, game.numbers.length);
+  const historicalSimplePrice = trySimpleBetPriceForContest(target);
+  const ticketCost = historicalSimplePrice !== undefined
+    ? historicalSimplePrice * (currentQuote?.simpleEquivalentCount ?? 1)
+    : undefined;
+  const prize = resolvePrizeValue(target, matchedNumbers.length, luckyMonthHit ?? false, 1);
+  const secondDrawMatchedNumbers = target.secondDrawNumbers
+    ? game.numbers.filter((number) => target.secondDrawNumbers!.includes(number))
+    : undefined;
+  const secondDrawPrize = target.lottery === "dupla-sena" && secondDrawMatchedNumbers
+    ? resolvePrizeValue(target, secondDrawMatchedNumbers.length, false, 2)
+    : undefined;
+  const combinedPrizeValue = prize.totalPrizeValue !== undefined
+    && (secondDrawPrize === undefined || secondDrawPrize.totalPrizeValue !== undefined)
+    ? prize.totalPrizeValue + (secondDrawPrize?.totalPrizeValue ?? 0)
+    : undefined;
+  const netResult = combinedPrizeValue !== undefined && ticketCost !== undefined
+    ? combinedPrizeValue - ticketCost
     : undefined;
 
   return {
@@ -70,6 +97,17 @@ export function evaluateGame(game: GeneratedGame, target: Contest): GameCheckRes
     ...(luckyMonthHit !== undefined ? { luckyMonthHit } : {}),
     ...(ticketCost !== undefined ? { ticketCost } : {}),
     ...prize,
+    ...(secondDrawMatchedNumbers
+      ? {
+          secondDrawHits: secondDrawMatchedNumbers.length,
+          secondDrawMatchedNumbers,
+          secondDrawPrizeTier: prizeTierFor(game.lottery, secondDrawMatchedNumbers.length),
+          ...(secondDrawPrize?.totalPrizeValue !== undefined
+            ? { secondDrawPrizeValue: secondDrawPrize.totalPrizeValue }
+            : {}),
+        }
+      : {}),
+    ...(combinedPrizeValue !== undefined ? { totalPrizeValue: combinedPrizeValue } : {}),
     ...(netResult !== undefined ? { netResult } : {}),
   };
 }

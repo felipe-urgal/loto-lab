@@ -1,10 +1,13 @@
-export type SupportedLotteryId = "mega-sena" | "lotofacil" | "dia-de-sorte";
+export type SupportedLotteryId =
+  | "mega-sena"
+  | "lotofacil"
+  | "dia-de-sorte"
+  | "quina"
+  | "lotomania"
+  | "dupla-sena";
 
 export type LotteryProductId =
   | SupportedLotteryId
-  | "quina"
-  | "lotomania"
-  | "dupla-sena"
   | "mais-milionaria"
   | "timemania"
   | "super-sete"
@@ -142,7 +145,7 @@ export const LOTTERY_CATALOG = {
     id: "quina",
     name: "Quina",
     family: "number-draw",
-    enabled: false,
+    enabled: true,
     capabilities: capabilities(),
     rules: { version: "2026-09", effectiveFrom: "2026-09-30" },
   },
@@ -150,7 +153,7 @@ export const LOTTERY_CATALOG = {
     id: "lotomania",
     name: "Lotomania",
     family: "number-draw",
-    enabled: false,
+    enabled: true,
     capabilities: capabilities(),
     rules: { version: "2026-09", effectiveFrom: "2026-09-30" },
   },
@@ -158,7 +161,7 @@ export const LOTTERY_CATALOG = {
     id: "dupla-sena",
     name: "Dupla Sena",
     family: "dual-number-draw",
-    enabled: false,
+    enabled: true,
     capabilities: capabilities(),
     rules: { version: "2026-09", effectiveFrom: "2026-09-30" },
   },
@@ -255,5 +258,10 @@ export function supportsLotteryCapability(
 }
 
 export function isSupportedLotteryId(id: LotteryProductId): id is SupportedLotteryId {
-  return id === "mega-sena" || id === "lotofacil" || id === "dia-de-sorte";
+  return id === "mega-sena"
+    || id === "lotofacil"
+    || id === "dia-de-sorte"
+    || id === "quina"
+    || id === "lotomania"
+    || id === "dupla-sena";
 }

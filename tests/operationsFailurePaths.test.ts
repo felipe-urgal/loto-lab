@@ -38,19 +38,44 @@ function contest(lottery: LotteryId, number: number): Contest {
       })),
     };
   }
+  if (lottery === "dia-de-sorte") {
+    return {
+      lottery,
+      number,
+      date: `2026-08-${String(number).padStart(2, "0")}`,
+      numbers: [1, 2, 3, 4, 5, 6, 7],
+      luckyMonth: "Janeiro",
+      prizeTiers: [
+        { description: "7 acertos", winners: 0, prizeValue: 0 },
+        { description: "6 acertos", winners: 0, prizeValue: 0 },
+        { description: "5 acertos", winners: 0, prizeValue: 0 },
+        { description: "4 acertos", winners: 0, prizeValue: 0 },
+        { description: "Mês da Sorte", winners: 0, prizeValue: 0 },
+      ],
+    };
+  }
+  if (lottery === "quina") {
+    return {
+      lottery,
+      number,
+      date: `2026-08-${String(number).padStart(2, "0")}`,
+      numbers: [1, 2, 3, 4, 5],
+    };
+  }
+  if (lottery === "lotomania") {
+    return {
+      lottery,
+      number,
+      date: `2026-08-${String(number).padStart(2, "0")}`,
+      numbers: Array.from({ length: 20 }, (_, index) => index),
+    };
+  }
   return {
     lottery,
     number,
     date: `2026-08-${String(number).padStart(2, "0")}`,
-    numbers: [1, 2, 3, 4, 5, 6, 7],
-    luckyMonth: "Janeiro",
-    prizeTiers: [
-      { description: "7 acertos", winners: 0, prizeValue: 0 },
-      { description: "6 acertos", winners: 0, prizeValue: 0 },
-      { description: "5 acertos", winners: 0, prizeValue: 0 },
-      { description: "4 acertos", winners: 0, prizeValue: 0 },
-      { description: "Mês da Sorte", winners: 0, prizeValue: 0 },
-    ],
+    numbers: [1, 2, 3, 4, 5, 6],
+    secondDrawNumbers: [7, 8, 9, 10, 11, 12],
   };
 }
 
@@ -153,7 +178,7 @@ test(
       retryDelayMs: 0,
     });
     assert.equal(partial.status, "partial");
-    assert.equal(partial.details.successfulLotteries, 3);
+    assert.equal(partial.details.successfulLotteries, 6);
     assert.equal(partial.details.failedLotteries, 0);
     const partialMega = partial.details.lotteries.find((item) => item.lottery === "mega-sena");
     assert.equal(partialMega?.status, "partial");
@@ -180,7 +205,7 @@ test(
     });
     assert.equal(failed.status, "failed");
     assert.equal(failed.details.successfulLotteries, 0);
-    assert.equal(failed.details.failedLotteries, 3);
+    assert.equal(failed.details.failedLotteries, 6);
     assert.ok(failed.details.lotteries.every((item) => item.status === "failed"));
     assert.ok(failed.details.lotteries.every((item) => item.error?.startsWith("source unavailable for ")));
 
@@ -258,7 +283,7 @@ test(
     }
 
     assert.equal(notificationFailure.status, "partial");
-    assert.equal(notificationFailure.details.successfulLotteries, 3);
+    assert.equal(notificationFailure.details.successfulLotteries, 6);
     assert.equal(notificationFailure.details.failedLotteries, 0);
     assert.equal(notificationFailure.details.notificationRefresh, "failed");
     assert.match(notificationFailure.details.notificationError ?? "", /notifications blocked for test/);

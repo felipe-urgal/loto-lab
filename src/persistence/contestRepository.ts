@@ -8,6 +8,7 @@ interface ContestRow {
   contest_number: number;
   draw_date: string;
   numbers: number[];
+  second_draw_numbers: number[] | null;
   lucky_month: string | null;
   amount_collected: number | null;
   prize_tiers: ContestPrizeTier[];
@@ -18,6 +19,7 @@ interface AnalysisContestRow {
   contest_number: number;
   draw_date: string;
   numbers: number[];
+  second_draw_numbers: number[] | null;
 }
 
 interface GenerationContestRow extends AnalysisContestRow {
@@ -33,13 +35,21 @@ interface ContestStatusRow {
 }
 
 function mapContest(row: ContestRow): Contest {
+  const prizeTiers = row.lottery === "dupla-sena"
+    ? row.prize_tiers
+    : row.prize_tiers.map(({ description, winners, prizeValue }) => ({
+        description,
+        winners,
+        prizeValue,
+      }));
   return {
     lottery: row.lottery,
     number: row.contest_number,
     date: row.draw_date,
     numbers: row.numbers.map(Number),
+    ...(row.second_draw_numbers ? { secondDrawNumbers: row.second_draw_numbers.map(Number) } : {}),
     ...(row.lucky_month ? { luckyMonth: row.lucky_month } : {}),
-    ...(row.prize_tiers.length > 0 ? { prizeTiers: row.prize_tiers } : {}),
+    ...(prizeTiers.length > 0 ? { prizeTiers } : {}),
     ...(row.amount_collected !== null ? { amountCollected: Number(row.amount_collected) } : {}),
   };
 }
@@ -50,6 +60,7 @@ function mapAnalysisContest(row: AnalysisContestRow): Contest {
     number: row.contest_number,
     date: row.draw_date,
     numbers: row.numbers.map(Number),
+    ...(row.second_draw_numbers ? { secondDrawNumbers: row.second_draw_numbers.map(Number) } : {}),
   };
 }
 
@@ -95,11 +106,12 @@ export class PostgresContestRepository {
         const result = await client.query<{ id: string }>(
           `
             INSERT INTO contests (
-              lottery, contest_number, draw_date, numbers, lucky_month, amount_collected
-            ) VALUES ($1, $2, $3, $4, $5, $6)
+              lottery, contest_number, draw_date, numbers, second_draw_numbers, lucky_month, amount_collected
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (lottery, contest_number) DO UPDATE SET
               draw_date = EXCLUDED.draw_date,
               numbers = EXCLUDED.numbers,
+              second_draw_numbers = COALESCE(EXCLUDED.second_draw_numbers, contests.second_draw_numbers),
               lucky_month = COALESCE(EXCLUDED.lucky_month, contests.lucky_month),
               amount_collected = COALESCE(EXCLUDED.amount_collected, contests.amount_collected),
               updated_at = NOW()
@@ -110,6 +122,7 @@ export class PostgresContestRepository {
             contest.number,
             contest.date,
             contest.numbers,
+            contest.secondDrawNumbers ?? null,
             contest.luckyMonth ?? null,
             contest.amountCollected ?? null,
           ],
@@ -129,7 +142,8 @@ export class PostgresContestRepository {
                 SELECT
                   description,
                   winners,
-                  prize_value::float8 AS "prizeValue"
+                  prize_value::float8 AS "prizeValue",
+                  draw_number AS "draw"
                 FROM contest_prize_tiers
                 WHERE contest_id = $1
                 ORDER BY id
@@ -150,10 +164,10 @@ export class PostgresContestRepository {
               await client.query(
                 `
                   INSERT INTO contest_prize_tiers (
-                    contest_id, description, winners, prize_value
-                  ) VALUES ($1, $2, $3, $4)
+                    contest_id, description, winners, prize_value, draw_number
+                  ) VALUES ($1, $2, $3, $4, $5)
                 `,
-                [contestId, tier.description, tier.winners, tier.prizeValue],
+                [contestId, tier.description, tier.winners, tier.prizeValue, tier.draw ?? 1],
               );
             }
           }
@@ -189,14 +203,26 @@ export class PostgresContestRepository {
           lottery,
           contest_number,
           draw_date::text AS draw_date,
-          numbers
+          numbers,
+          second_draw_numbers
         FROM contests
         WHERE lottery = $1
         ORDER BY contest_number ASC
       `,
       [lottery],
     );
-    return result.rows.map(mapAnalysisContest);
+    return result.rows.flatMap((row) => {
+      const primary = mapAnalysisContest(row);
+      if (row.lottery !== "dupla-sena" || !row.second_draw_numbers) return [primary];
+      return [
+        { ...primary, secondDrawNumbers: undefined },
+        {
+          ...primary,
+          numbers: row.second_draw_numbers.map(Number),
+          secondDrawNumbers: undefined,
+        },
+      ];
+    });
   }
 
   async listGenerationHistory(lottery: LotteryId): Promise<Contest[]> {
@@ -207,6 +233,7 @@ export class PostgresContestRepository {
           contest_number,
           draw_date::text AS draw_date,
           numbers,
+          second_draw_numbers,
           lucky_month
         FROM contests
         WHERE lottery = $1
@@ -350,6 +377,7 @@ export class PostgresContestRepository {
           c.contest_number,
           c.draw_date::text AS draw_date,
           c.numbers,
+          c.second_draw_numbers,
           c.lucky_month,
           c.amount_collected::float8 AS amount_collected,
           COALESCE(
@@ -357,8 +385,9 @@ export class PostgresContestRepository {
               jsonb_build_object(
                 'description', p.description,
                 'winners', p.winners,
-                'prizeValue', p.prize_value::float8
-              ) ORDER BY p.id
+                'prizeValue', p.prize_value::float8,
+                'draw', p.draw_number
+              ) ORDER BY p.draw_number, p.id
             ) FILTER (WHERE p.id IS NOT NULL),
             '[]'::jsonb
           ) AS prize_tiers

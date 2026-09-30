@@ -16,7 +16,14 @@ import { NotificationService } from "../notifications/service.js";
 import { RealBetService } from "../realBets/service.js";
 import { logEvent } from "../observability/log.js";
 
-const LOTTERIES: LotteryId[] = ["mega-sena", "lotofacil", "dia-de-sorte"];
+const LOTTERIES: LotteryId[] = [
+  "mega-sena",
+  "lotofacil",
+  "dia-de-sorte",
+  "quina",
+  "lotomania",
+  "dupla-sena",
+];
 const SYNC_ADVISORY_LOCK = 1515015;
 const FINANCIAL_REPAIR_WINDOW = 20;
 

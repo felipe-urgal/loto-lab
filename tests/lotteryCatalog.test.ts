@@ -33,7 +33,9 @@ test("lottery catalog exposes every current product family without enabling unsu
   assert.equal(getLotteryCatalogEntry("lotofacil").enabled, true);
   assert.equal(getLotteryCatalogEntry("dia-de-sorte").enabled, true);
 
-  assert.equal(getLotteryCatalogEntry("quina").enabled, false);
+  assert.equal(getLotteryCatalogEntry("quina").enabled, true);
+  assert.equal(getLotteryCatalogEntry("lotomania").enabled, true);
+  assert.equal(getLotteryCatalogEntry("dupla-sena").enabled, true);
   assert.equal(getLotteryCatalogEntry("lotogol").enabled, false);
   assert.equal(getLotteryCatalogEntry("instantanea").enabled, false);
 });
@@ -47,9 +49,12 @@ test("capabilities describe structural differences without checking lottery name
   assert.equal(supportsLotteryCapability("instantanea", "history"), false);
 });
 
-test("supported lottery compatibility remains restricted to the three integrated modalities", () => {
+test("supported lottery compatibility includes integrated numeric modalities", () => {
   assert.equal(isSupportedLotteryId("mega-sena"), true);
-  assert.equal(isSupportedLotteryId("quina"), false);
+  assert.equal(isSupportedLotteryId("quina"), true);
+  assert.equal(isSupportedLotteryId("lotomania"), true);
+  assert.equal(isSupportedLotteryId("dupla-sena"), true);
+  assert.equal(isSupportedLotteryId("lotogol"), false);
 });
 
 test("bet and draw contracts discriminate real product families", () => {
