@@ -184,7 +184,7 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   const payload = (await status.json()) as {
     items: Array<{ contestCount: number; missingContestCount: number; financialCoverage: number }>;
   };
-  assert.equal(payload.items.length, 3);
+  assert.equal(payload.items.length, 6);
   assert.ok(payload.items.every((item) => item.contestCount === 10));
   assert.ok(payload.items.every((item) => item.missingContestCount === 0));
   assert.ok(payload.items.every((item) => item.financialCoverage === 0.8));
