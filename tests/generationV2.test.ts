@@ -184,3 +184,50 @@ test("uniform Generator 2.0 does not require the historical minimum", async () =
   assert.equal(result.games.length, 2);
   assert.equal(result.generatorOptions.purpose, "uniform");
 });
+
+
+test("Generator 2.0 records official multiple-bet quote in preview metadata", async () => {
+  const useCase = fakeUseCase(() => megaHistory());
+  const preview = await useCase.execute({
+    lottery: "mega-sena",
+    gameCount: 2,
+    fixedCount: 0,
+    betSize: 10,
+    purpose: "uniform",
+    seed: "priced-preview",
+  });
+
+  assert.ok(preview.games.every((game) => game.numbers.length === 10));
+  assert.equal(preview.generatorOptions.betSize, 10);
+  assert.deepEqual(preview.generatorOptions.betQuote, {
+    product: "mega-sena",
+    betSize: 10,
+    gameCount: 2,
+    simpleEquivalentCount: 210,
+    pricePerBetCents: 126000,
+    totalPriceCents: 252000,
+    topPrizeOneIn: 238399,
+    rule: {
+      version: "caixa-2026-09-30",
+      effectiveFrom: "2026-09-30",
+      verifiedAt: "2026-09-30",
+      sourceUrl: "https://loterias.caixa.gov.br/Paginas/mega-sena.aspx",
+    },
+  });
+});
+
+test("Generator 2.0 keeps multiple bets out of legacy experimental strategy", async () => {
+  const useCase = fakeUseCase(() => megaHistory());
+
+  await assert.rejects(
+    () => useCase.execute({
+      lottery: "mega-sena",
+      gameCount: 1,
+      fixedCount: 3,
+      betSize: 7,
+      purpose: "experimental",
+      seed: "experimental-multiple",
+    }),
+    /Multiple-number bets are available only for uniform or portfolio generation/,
+  );
+});

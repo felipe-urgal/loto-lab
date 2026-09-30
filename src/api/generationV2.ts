@@ -5,6 +5,7 @@ import {
 } from "../application/generationV2.js";
 import { InsufficientGenerationHistoryError } from "../application/generateGames.js";
 import type { LotteryId } from "../domain/types.js";
+import { getOfficialBetRule } from "../domain/betRules.js";
 import type { GenerationConstraints } from "../generator/planning.js";
 import { LOTTERY_CONFIGS } from "../lotteries/config.js";
 import type { ApiServerOptions } from "./app.js";
@@ -39,6 +40,24 @@ function parseV2FixedCount(lottery: LotteryId, value: unknown): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || !allowed.includes(parsed)) {
     throw new ApiError(400, "INVALID_ARGUMENT", `fixedCount must be one of ${allowed.join(", ")}`);
+  }
+  return parsed;
+}
+
+function parseV2BetSize(lottery: LotteryId, value: unknown): number {
+  const config = LOTTERY_CONFIGS[lottery];
+  const rule = getOfficialBetRule(lottery);
+  if (value === undefined || value === null || value === "") return config.drawSize;
+  if (!rule) {
+    throw new ApiError(400, "INVALID_ARGUMENT", `Official bet cardinality is not available for ${lottery}`);
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < rule.minBetSize || parsed > rule.maxBetSize) {
+    throw new ApiError(
+      400,
+      "INVALID_ARGUMENT",
+      `betSize must be between ${rule.minBetSize} and ${rule.maxBetSize} for ${lottery}`,
+    );
   }
   return parsed;
 }
@@ -162,9 +181,11 @@ export async function serveGenerationV2(
       const body = await readJsonBody(request);
       const lottery = parseLottery(body.lottery);
       const targetContestNumber = parseOptionalPositiveInt(body.targetContestNumber, "targetContestNumber");
+      const betSize = parseV2BetSize(lottery, body.betSize);
       const selection = parseV2Selection(body, lottery);
       const plan = await generationV2.plan({
         lottery,
+        betSize,
         ...(targetContestNumber !== undefined ? { targetContestNumber } : {}),
         ...selection,
       });
@@ -182,6 +203,7 @@ export async function serveGenerationV2(
       defaultValue: defaultGameCount,
     });
     const fixedCount = parseV2FixedCount(lottery, body.fixedCount);
+    const betSize = parseV2BetSize(lottery, body.betSize);
     const targetContestNumber = parseOptionalPositiveInt(body.targetContestNumber, "targetContestNumber");
     const purpose = parseGenerationPurpose(body.purpose);
     const generationMode = parseGenerationMode(body.generationMode);
@@ -200,6 +222,7 @@ export async function serveGenerationV2(
       lottery,
       gameCount,
       fixedCount,
+      betSize,
       ...(targetContestNumber !== undefined ? { targetContestNumber } : {}),
       purpose,
       generationMode,

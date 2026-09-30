@@ -14,6 +14,7 @@ export interface PurposeGenerationOptions {
   lottery: LotteryId;
   gameCount: number;
   fixedCount: number;
+  betSize?: number;
   seed: string;
   fixedNumbers?: number[];
   excludedNumbers?: number[];
@@ -50,8 +51,12 @@ function validateSelection(options: PurposeGenerationOptions): void {
   if (!Number.isInteger(options.gameCount) || options.gameCount < 1) {
     throw new Error("gameCount must be a positive integer");
   }
-  if (!Number.isInteger(options.fixedCount) || options.fixedCount < 0 || options.fixedCount > config.drawSize) {
-    throw new Error("fixedCount must fit inside the draw size");
+  const betSize = options.betSize ?? config.drawSize;
+  if (!Number.isInteger(betSize) || betSize < config.drawSize || betSize > universe.size) {
+    throw new Error("betSize must fit between draw size and lottery universe");
+  }
+  if (!Number.isInteger(options.fixedCount) || options.fixedCount < 0 || options.fixedCount > betSize) {
+    throw new Error("fixedCount must fit inside the bet size");
   }
   if (fixed.length > options.fixedCount) {
     throw new Error("Manual fixed numbers exceed the configured fixed core");
@@ -66,8 +71,8 @@ function validateSelection(options: PurposeGenerationOptions): void {
     throw new Error("A number cannot be fixed and excluded at the same time");
   }
   const remainingCapacity = universe.size - excluded.length;
-  if (remainingCapacity < config.drawSize) {
-    throw new Error("Too many excluded numbers for the lottery draw size");
+  if (remainingCapacity < betSize) {
+    throw new Error("Too many excluded numbers for the requested bet size");
   }
 }
 
@@ -101,7 +106,8 @@ function sampleCandidate(
     { length: config.maxNumber - config.minNumber + 1 },
     (_, index) => config.minNumber + index,
   ).filter((number) => !excluded.has(number) && !fixedSet.has(number));
-  const variableCount = config.drawSize - sharedCore.length;
+  const betSize = options.betSize ?? config.drawSize;
+  const variableCount = betSize - sharedCore.length;
   const variableNumbers = sampleWithoutReplacement(candidates, variableCount, random);
   const numbers = [...sharedCore, ...variableNumbers].sort((a, b) => a - b);
   const metadata = buildMetadata(
