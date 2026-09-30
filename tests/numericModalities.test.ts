@@ -85,6 +85,6 @@ test("Dupla Sena preserves and checks both draws independently", () => {
 
   assert.equal(check.hits, 6);
   assert.equal(check.secondDrawHits, 1);
-  assert.equal(check.prizeTier, "sena");
+  assert.equal(check.prizeTier, "6-acertos");
   assert.equal(check.secondDrawPrizeTier, undefined);
 });
