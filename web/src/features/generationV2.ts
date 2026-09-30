@@ -76,6 +76,11 @@ function formatPercent(value: unknown, digits = 2): string {
   return new Intl.NumberFormat("pt-BR", { style: "percent", minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
 }
 
+function formatCurrencyCents(value: unknown): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value / 100);
+}
+
 function numberLabel(value: number): string {
   return String(value).padStart(2, "0");
 }
@@ -103,6 +108,7 @@ function requestPayload(state: GeneratorState, includeSeed = false): GenerationR
     lottery: state.lottery,
     gameCount: state.gameCount,
     fixedCount: state.fixedCount,
+    betSize: state.betSize,
     targetContestNumber: state.targetContestNumber,
     purpose: state.purpose,
     generationMode: "diversified",
@@ -117,6 +123,7 @@ function planPayload(state: GeneratorState): GenerationPlanPayload {
   const constraints = constraintPayload(state);
   return {
     lottery: state.lottery,
+    betSize: state.betSize,
     targetContestNumber: state.targetContestNumber,
     fixedNumbers: [...state.fixed].sort((a, b) => a - b),
     excludedNumbers: [...state.excluded].sort((a, b) => a - b),
@@ -136,6 +143,20 @@ function fixedCountOptions(state: GeneratorState): string {
   return state.plan.methodology.fixedCountOptions.map((value) =>
     `<option value="${value}" ${value === state.fixedCount ? "selected" : ""} ${value < state.fixed.size ? "disabled" : ""}>${value} fixas</option>`,
   ).join("");
+}
+
+function betSizeOptions(state: GeneratorState): string {
+  const rule = state.plan.betRule;
+  if (!rule) return `<option value="${state.plan.drawSize}" selected>${state.plan.drawSize} dezenas</option>`;
+  let html = "";
+  for (let value = rule.minBetSize; value <= rule.maxBetSize; value += 1) {
+    const equivalent = rule.drawSize === value ? 1 : Math.round(
+      Array.from({ length: rule.drawSize }, (_, index) => (value - index) / (rule.drawSize - index))
+        .reduce((total, factor) => total * factor, 1),
+    );
+    html += `<option value="${value}" ${value === state.betSize ? "selected" : ""}>${value} dezenas · ${formatInteger(equivalent)} apostas simples</option>`;
+  }
+  return html;
 }
 
 function filterMarkup(
@@ -303,6 +324,7 @@ function workspaceMarkup(state: GeneratorState): string {
               <option value="experimental" ${state.purpose === "experimental" ? "selected" : ""}>Experimental</option>
             </select><small>${escapeHtml(purposeCopy(state.purpose).description)}</small></div>
             <div class="g2-field"><label for="g2-game-count">Quantidade de jogos</label><input id="g2-game-count" type="number" min="1" max="10" value="${state.gameCount}" /></div>
+            <div class="g2-field"><label for="g2-bet-size">Dezenas por aposta</label><select id="g2-bet-size" ${state.purpose === "experimental" || !state.plan.betRule ? "disabled" : ""}>${betSizeOptions(state)}</select><small>${state.plan.betRule ? "Limites e preço vêm da regra oficial versionada." : "Cardinalidade oficial ainda não cadastrada para esta modalidade."}</small></div>
             <div class="g2-field"><label for="g2-fixed-count">Núcleo compartilhado</label><select id="g2-fixed-count">${fixedCountOptions(state)}</select></div>
             <div class="g2-field"><label for="g2-target">Concurso alvo</label><input id="g2-target" type="number" min="1" value="${state.targetContestNumber ?? ""}" /></div>
           </div>
@@ -410,6 +432,15 @@ function renderPreview(state: GeneratorState): void {
   const audit = preview.audit;
   const seed = typeof preview.generatorOptions.seed === "string" ? preview.generatorOptions.seed : "—";
   const proof = preview.preview?.id || (typeof preview.generatorOptions.previewId === "string" ? preview.generatorOptions.previewId : "—");
+  const betQuote = preview.generatorOptions.betQuote && typeof preview.generatorOptions.betQuote === "object"
+    ? preview.generatorOptions.betQuote as {
+        betSize?: number;
+        simpleEquivalentCount?: number;
+        totalPriceCents?: number;
+        topPrizeOneIn?: number;
+        rule?: { effectiveFrom?: string; sourceUrl?: string };
+      }
+    : undefined;
   target.innerHTML = `<div class="g2-preview">
     <div class="g2-preview-head"><div><h2>4. Prévia auditável</h2><p>Este lote ainda não foi salvo. O servidor congelou os jogos e as provas da revisão usada para gerá-los.</p></div></div>
     <div class="g2-audit-grid">
@@ -417,6 +448,8 @@ function renderPreview(state: GeneratorState): void {
       <div class="g2-audit"><span>Cobertura do lote</span><strong>${audit.uniqueNumbers.length} dezenas</strong><small>${audit.uniqueVariableNumbers.length} variáveis distintas</small></div>
       <div class="g2-audit"><span>Sobreposição média</span><strong>${formatDecimal(audit.averagePairwiseOverlap)}</strong><small>mín. ${formatDecimal(audit.minimumPairwiseOverlap)} · máx. ${formatDecimal(audit.maximumPairwiseOverlap)}</small></div>
       <div class="g2-audit"><span>Elegíveis matematicamente</span><strong>${formatInteger(audit.plan.space.eligibleCombinations)}</strong><small>${formatPercent(audit.plan.space.overallCoverage)} do universo</small></div>
+      <div class="g2-audit"><span>Cardinalidade</span><strong>${betQuote?.betSize ?? audit.plan.betSize} dezenas</strong><small>${betQuote ? `${formatInteger(betQuote.simpleEquivalentCount)} equivalentes simples` : "Preço oficial desconhecido"}</small></div>
+      <div class="g2-audit"><span>Custo do lote</span><strong>${formatCurrencyCents(betQuote?.totalPriceCents)}</strong><small>${betQuote?.topPrizeOneIn ? `Prêmio principal: 1 em ${formatInteger(betQuote.topPrizeOneIn)} por aposta` : "Probabilidade oficial indisponível"}</small></div>
     </div>
     <div class="g2-game-grid">${preview.games.map(gameMarkup).join("")}</div>
     <div class="g2-seed"><strong>Seed</strong><code>${escapeHtml(seed)}</code></div>
@@ -552,10 +585,18 @@ function bindWorkspace(state: GeneratorState): void {
     const next = select.value;
     if (next !== "uniform" && next !== "portfolio" && next !== "experimental") return;
     state.purpose = next;
+    if (next === "experimental") state.betSize = state.plan.drawSize;
     clearPreview(state);
     root.innerHTML = workspaceMarkup(state);
     bindWorkspace(state);
   });
+  root?.querySelector<HTMLSelectElement>("#g2-bet-size")?.addEventListener("change", (event) => {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    state.betSize = Number(select.value);
+    schedulePlan();
+  });
+
   root?.querySelector<HTMLInputElement>("#g2-game-count")?.addEventListener("change", (event) => {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
@@ -689,6 +730,7 @@ async function mount(detail: ViewRenderedDetail): Promise<void> {
       lottery,
       gameCount: legacyGameCount,
       fixedCount: plan.methodology.defaultFixedCount,
+      betSize: plan.betSize,
       targetContestNumber: plan.targetContestNumber,
       fixed: new Set<number>(),
       excluded: new Set<number>(),
