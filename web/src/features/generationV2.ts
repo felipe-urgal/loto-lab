@@ -216,9 +216,31 @@ function algorithmSpace(state: GeneratorState): GenerationAlgorithmSpace {
   };
 }
 
+function purposeCopy(purpose: GenerationPurpose): { label: string; description: string; disclaimer: string } {
+  if (purpose === "uniform") {
+    return {
+      label: "Aleatório auditável",
+      description: "Amostragem uniforme do espaço válido com seed reproduzível.",
+      disclaimer: "Frequência, score e tiers históricos não participam da seleção das combinações.",
+    };
+  }
+  if (purpose === "portfolio") {
+    return {
+      label: "Carteira diversificada",
+      description: "Amostra candidatos sem score histórico e prioriza menor sobreposição entre jogos.",
+      disclaimer: "Diversificação amplia cobertura entre os jogos; não aumenta a chance individual de uma combinação.",
+    };
+  }
+  return {
+    label: "Experimental",
+    description: "Mantém as heurísticas históricas atuais para experimentação e backtest.",
+    disclaimer: "Scores e frequências são hipóteses experimentais e não representam aumento comprovado de chance futura.",
+  };
+}
 function planMarkup(state: GeneratorState): string {
   const plan = state.plan;
   const algorithm = algorithmSpace(state);
+  const purpose = purposeCopy(state.purpose);
   const coverage = Math.max(0, Math.min(1, plan.space.overallCoverage));
   const issue = plan.constraintIssues[0];
   return `<div class="g2-card-head"><div><strong>Espaço e funil do motor</strong><span>Matemática global separada do espaço realmente percorrido pelo algoritmo.</span></div></div>
@@ -230,7 +252,7 @@ function planMarkup(state: GeneratorState): string {
     </div>
     <div class="g2-space-bar" aria-hidden="true"><span style="width:${Math.max(.2, coverage * 100)}%"></span></div>
     ${issue ? `<p class="g2-error">${escapeHtml(issue)}</p>` : ""}
-    <p class="g2-disclaimer"><strong>Importante:</strong> o contador elegível descreve o universo matemático. O motor ranqueia um pool menor por pontuação e diversificação; restringir o espaço não aumenta a probabilidade individual de uma combinação ser sorteada.</p>`;
+    <p class="g2-disclaimer"><strong>${escapeHtml(purpose.label)}:</strong> ${escapeHtml(purpose.disclaimer)}</p>`;
 }
 
 function methodologyMarkup(state: GeneratorState): string {
