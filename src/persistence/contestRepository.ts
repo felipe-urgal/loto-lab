@@ -35,6 +35,13 @@ interface ContestStatusRow {
 }
 
 function mapContest(row: ContestRow): Contest {
+  const prizeTiers = row.lottery === "dupla-sena"
+    ? row.prize_tiers
+    : row.prize_tiers.map(({ description, winners, prizeValue }) => ({
+        description,
+        winners,
+        prizeValue,
+      }));
   return {
     lottery: row.lottery,
     number: row.contest_number,
@@ -42,7 +49,7 @@ function mapContest(row: ContestRow): Contest {
     numbers: row.numbers.map(Number),
     ...(row.second_draw_numbers ? { secondDrawNumbers: row.second_draw_numbers.map(Number) } : {}),
     ...(row.lucky_month ? { luckyMonth: row.lucky_month } : {}),
-    ...(row.prize_tiers.length > 0 ? { prizeTiers: row.prize_tiers } : {}),
+    ...(prizeTiers.length > 0 ? { prizeTiers } : {}),
     ...(row.amount_collected !== null ? { amountCollected: Number(row.amount_collected) } : {}),
   };
 }
