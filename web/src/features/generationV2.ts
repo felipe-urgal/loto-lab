@@ -718,6 +718,7 @@ async function mount(detail: ViewRenderedDetail): Promise<void> {
   try {
     const plan = await postJson<GenerationPlan>("/generation/plan", {
       lottery,
+      betSize: fallback.drawSize,
       ...(legacyTarget ? { targetContestNumber: legacyTarget } : {}),
       fixedNumbers: [],
       excludedNumbers: [],
