@@ -1,4 +1,6 @@
-export type LotteryId = "mega-sena" | "lotofacil" | "dia-de-sorte";
+import type { SupportedLotteryId } from "./lotteryCatalog.js";
+
+export type LotteryId = SupportedLotteryId;
 
 export interface LotteryConfig {
   id: LotteryId;
