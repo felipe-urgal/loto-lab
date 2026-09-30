@@ -60,6 +60,15 @@ export class GenerateGamesUseCase {
   ) {}
 
   async execute(input: GenerateGamesRequest): Promise<GenerateGamesResponse> {
+    if (
+      input.lottery !== "mega-sena"
+      && input.lottery !== "lotofacil"
+      && input.lottery !== "dia-de-sorte"
+    ) {
+      throw new Error(
+        `Legacy generation is not available for ${input.lottery}; use Generator V2`,
+      );
+    }
     const contests = await this.history.list({ lottery: input.lottery, order: "asc" });
     const latestContest = contests.at(-1);
     const generationHistory = input.targetContestNumber === undefined
@@ -108,7 +117,7 @@ export class GenerateGamesUseCase {
           generationMode,
           ...(seed !== undefined ? { seed } : {}),
         });
-      } else {
+      } else if (input.lottery === "dia-de-sorte") {
         generatedGames = generateDiaDeSorteGames(generationHistory, {
           gameCount: input.gameCount,
           generationMode,
