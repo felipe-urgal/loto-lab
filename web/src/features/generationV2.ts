@@ -546,6 +546,16 @@ function bindWorkspace(state: GeneratorState): void {
     planTimer = setTimeout(() => void refreshPlan(), 220);
   }
 
+  root?.querySelector<HTMLSelectElement>("#g2-purpose")?.addEventListener("change", (event) => {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    const next = select.value;
+    if (next !== "uniform" && next !== "portfolio" && next !== "experimental") return;
+    state.purpose = next;
+    clearPreview(state);
+    root.innerHTML = workspaceMarkup(state);
+    bindWorkspace(state);
+  });
   root?.querySelector<HTMLInputElement>("#g2-game-count")?.addEventListener("change", (event) => {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
@@ -683,6 +693,7 @@ async function mount(detail: ViewRenderedDetail): Promise<void> {
       fixed: new Set<number>(),
       excluded: new Set<number>(),
       selectionMode: "fix",
+      purpose: "uniform",
       filters: {
         odd: { enabled: false, ...plan.methodology.preferredOdd },
         repeated: { enabled: false, ...plan.methodology.preferredRepeated },
