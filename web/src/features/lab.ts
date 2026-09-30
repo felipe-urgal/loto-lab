@@ -145,6 +145,21 @@ const lotteries: Record<LotteryId, LotteryConfig> = {
     defaultGames: 4,
     fixedCopy: "Compara 0, 2 e 3 dezenas fixas sem alterar a lógica do Mês da Sorte.",
   },
+  quina: {
+    label: "Quina",
+    defaultGames: 4,
+    fixedCopy: "O modo experimental histórico ainda não está habilitado para Quina.",
+  },
+  lotomania: {
+    label: "Lotomania",
+    defaultGames: 2,
+    fixedCopy: "O modo experimental histórico ainda não está habilitado para Lotomania.",
+  },
+  "dupla-sena": {
+    label: "Dupla Sena",
+    defaultGames: 4,
+    fixedCopy: "O modo experimental histórico ainda não está habilitado para Dupla Sena.",
+  },
 };
 
 const metrics: Record<MetricKey, MetricConfig> = {
