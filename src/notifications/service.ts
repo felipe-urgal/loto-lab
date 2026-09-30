@@ -6,11 +6,21 @@ import { PostgresNotificationRepository } from "../persistence/notificationRepos
 import { PostgresOperationRepository, type OperationRunRecord } from "../persistence/operationRepository.js";
 import { PostgresRealBetRepository } from "../persistence/realBetRepository.js";
 
-const LOTTERIES: LotteryId[] = ["mega-sena", "lotofacil", "dia-de-sorte"];
+const LOTTERIES: LotteryId[] = [
+  "mega-sena",
+  "lotofacil",
+  "dia-de-sorte",
+  "quina",
+  "lotomania",
+  "dupla-sena",
+];
 const LABELS: Record<LotteryId, string> = {
   "mega-sena": "Mega-Sena",
   lotofacil: "Lotofácil",
   "dia-de-sorte": "Dia de Sorte",
+  quina: "Quina",
+  lotomania: "Lotomania",
+  "dupla-sena": "Dupla Sena",
 };
 
 function money(value: number): string {
