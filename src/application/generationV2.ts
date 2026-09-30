@@ -4,6 +4,11 @@ import { generateDiaDeSorteGames, type DiaDeSorteFixedCount } from "../generator
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { generateMegaSenaGames, type MegaSenaFixedCount } from "../generator/megaSena.js";
 import {
+  generatePortfolioGames,
+  generateUniformGames,
+  type GenerationPurpose,
+} from "../generator/generationPurpose.js";
+import {
   buildGenerationBatchAudit,
   generationHistorySignature,
   scopeGenerationHistory,
@@ -22,6 +27,7 @@ export interface GenerationV2Input {
   gameCount: number;
   fixedCount: number;
   targetContestNumber?: number;
+  purpose?: GenerationPurpose;
   generationMode?: GenerationMode;
   seed?: string;
   fixedNumbers?: number[];
@@ -121,7 +127,7 @@ function normalizedConstraints(constraints: GenerationConstraints | undefined) {
 }
 
 export function generationConfigSignature(
-  input: Pick<GenerationV2Input, "lottery" | "gameCount" | "fixedCount" | "generationMode" | "fixedNumbers" | "excludedNumbers" | "constraints">,
+  input: Pick<GenerationV2Input, "lottery" | "gameCount" | "fixedCount" | "purpose" | "generationMode" | "fixedNumbers" | "excludedNumbers" | "constraints">,
   targetContestNumber?: number,
 ): string {
   return hashText(JSON.stringify({
@@ -130,6 +136,7 @@ export function generationConfigSignature(
     gameCount: input.gameCount,
     fixedCount: input.fixedCount,
     targetContestNumber: targetContestNumber ?? null,
+    purpose: input.purpose ?? "uniform",
     generationMode: input.generationMode ?? "diversified",
     fixedNumbers: sortedNumbers(input.fixedNumbers),
     excludedNumbers: sortedNumbers(input.excludedNumbers),
@@ -283,6 +290,7 @@ export class GenerationV2UseCase {
     }
 
     const currentHistorySignature = generationHistorySignature(contests, input.lottery, input.targetContestNumber);
+    const purpose = input.purpose ?? "uniform";
     const generationMode = input.generationMode ?? "diversified";
     const persist = input.persist ?? false;
     const targetContestNumber = scoped.targetContestNumber;
@@ -290,6 +298,7 @@ export class GenerationV2UseCase {
       lottery: input.lottery,
       gameCount: input.gameCount,
       fixedCount: input.fixedCount,
+      purpose,
       generationMode,
       fixedNumbers: input.fixedNumbers ?? [],
       excludedNumbers: input.excludedNumbers ?? [],
@@ -393,7 +402,21 @@ export class GenerationV2UseCase {
       : null;
     let games: GeneratedGame[];
     try {
-      if (input.lottery === "mega-sena") {
+      if (purpose === "uniform" || purpose === "portfolio") {
+        const generate = purpose === "uniform" ? generateUniformGames : generatePortfolioGames;
+        games = generate({
+          lottery: input.lottery,
+          gameCount: input.gameCount,
+          fixedCount: input.fixedCount,
+          seed,
+          fixedNumbers: input.fixedNumbers ?? [],
+          excludedNumbers: input.excludedNumbers ?? [],
+          ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
+          ...(referenceContestNumber !== null
+            ? { referenceContest: scoped.history.find((contest) => contest.number === referenceContestNumber) }
+            : {}),
+        });
+      } else if (input.lottery === "mega-sena") {
         games = generateMegaSenaGames(scoped.history, {
           gameCount: input.gameCount,
           fixedCount: input.fixedCount as MegaSenaFixedCount,
@@ -443,6 +466,7 @@ export class GenerationV2UseCase {
       version: 2,
       gameCount: input.gameCount,
       fixedCount: input.fixedCount,
+      purpose,
       generationMode,
       seed,
       fixedNumbers: sortedNumbers(input.fixedNumbers),
