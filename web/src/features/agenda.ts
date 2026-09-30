@@ -48,6 +48,9 @@ const labels: Record<LotteryId, string> = {
   "mega-sena": "Mega-Sena",
   lotofacil: "Lotofácil",
   "dia-de-sorte": "Dia de Sorte",
+  quina: "Quina",
+  lotomania: "Lotomania",
+  "dupla-sena": "Dupla Sena",
 };
 
 let filter: AgendaFilter = "all";
