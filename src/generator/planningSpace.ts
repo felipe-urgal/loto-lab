@@ -105,12 +105,14 @@ export function countEligibleGenerationCombinations(
   excluded: number[],
   referenceContest: Contest | undefined,
   constraints: GenerationConstraints,
+  betSize?: number,
 ): number {
   const config = getLotteryConfig(lottery);
   const fixedSet = new Set(fixed);
   const excludedSet = new Set(excluded);
   const referenceSet = new Set(referenceContest?.numbers ?? []);
-  const needed = config.drawSize - fixed.length;
+  const effectiveBetSize = betSize ?? config.drawSize;
+  const needed = effectiveBetSize - fixed.length;
   const candidates = Array.from(
     { length: config.maxNumber - config.minNumber + 1 },
     (_, index) => config.minNumber + index,
