@@ -38,19 +38,44 @@ function contest(lottery: LotteryId, number: number): Contest {
       })),
     };
   }
+  if (lottery === "dia-de-sorte") {
+    return {
+      lottery,
+      number,
+      date: `2026-08-${String(number).padStart(2, "0")}`,
+      numbers: [1, 2, 3, 4, 5, 6, 7],
+      luckyMonth: "Janeiro",
+      prizeTiers: [
+        { description: "7 acertos", winners: 0, prizeValue: 0 },
+        { description: "6 acertos", winners: 0, prizeValue: 0 },
+        { description: "5 acertos", winners: 0, prizeValue: 0 },
+        { description: "4 acertos", winners: 0, prizeValue: 0 },
+        { description: "Mês da Sorte", winners: 0, prizeValue: 0 },
+      ],
+    };
+  }
+  if (lottery === "quina") {
+    return {
+      lottery,
+      number,
+      date: `2026-08-${String(number).padStart(2, "0")}`,
+      numbers: [1, 2, 3, 4, 5],
+    };
+  }
+  if (lottery === "lotomania") {
+    return {
+      lottery,
+      number,
+      date: `2026-08-${String(number).padStart(2, "0")}`,
+      numbers: Array.from({ length: 20 }, (_, index) => index),
+    };
+  }
   return {
     lottery,
     number,
     date: `2026-08-${String(number).padStart(2, "0")}`,
-    numbers: [1, 2, 3, 4, 5, 6, 7],
-    luckyMonth: "Janeiro",
-    prizeTiers: [
-      { description: "7 acertos", winners: 0, prizeValue: 0 },
-      { description: "6 acertos", winners: 0, prizeValue: 0 },
-      { description: "5 acertos", winners: 0, prizeValue: 0 },
-      { description: "4 acertos", winners: 0, prizeValue: 0 },
-      { description: "Mês da Sorte", winners: 0, prizeValue: 0 },
-    ],
+    numbers: [1, 2, 3, 4, 5, 6],
+    secondDrawNumbers: [7, 8, 9, 10, 11, 12],
   };
 }
 
@@ -91,9 +116,9 @@ test(
     const result = await runOperationalSync(pool, { source: new FakeContestSource(), retries: 0, retryDelayMs: 0 });
 
     assert.equal(result.status, "success");
-    assert.equal(result.details.successfulLotteries, 3);
+    assert.equal(result.details.successfulLotteries, 6);
     assert.equal(result.details.failedLotteries, 0);
-    assert.equal(result.details.lotteries.length, 3);
+    assert.equal(result.details.lotteries.length, 6);
     assert.ok(result.details.lotteries.every((item) => item.latestOfficialContest === 2));
     assert.ok(result.details.lotteries.every((item) => item.nextContest === 3));
     assert.ok(result.details.lotteries.every((item) => item.nextDrawDate === "2026-08-20"));
@@ -108,21 +133,21 @@ test(
     }
 
     const agenda = await new PostgresAgendaRepository(pool).list();
-    assert.equal(agenda.length, 3);
+    assert.equal(agenda.length, 6);
     assert.ok(agenda.every((item) => item.nextContest === 3));
 
     const notificationRepository = new PostgresNotificationRepository(pool);
     const notifications = await notificationRepository.list();
-    assert.equal(notifications.filter((item) => item.type === "next-contest").length, 3);
-    assert.equal(await notificationRepository.unreadCount(), 3);
+    assert.equal(notifications.filter((item) => item.type === "next-contest").length, 6);
+    assert.equal(await notificationRepository.unreadCount(), 6);
 
     const first = notifications[0]!;
     await notificationRepository.markRead(first.id);
-    assert.equal(await notificationRepository.unreadCount(), 2);
+    assert.equal(await notificationRepository.unreadCount(), 5);
 
     await runOperationalSync(pool, { source: new FakeContestSource(), retries: 0, retryDelayMs: 0 });
-    assert.equal((await notificationRepository.list()).filter((item) => item.type === "next-contest").length, 3);
-    assert.equal(await notificationRepository.unreadCount(), 2);
+    assert.equal((await notificationRepository.list()).filter((item) => item.type === "next-contest").length, 6);
+    assert.equal(await notificationRepository.unreadCount(), 5);
 
     server = createLotoLabServer({ pool, operationSource: new FakeContestSource() });
     await new Promise<void>((resolve, reject) => {
@@ -136,9 +161,9 @@ test(
     const agendaResponse = await fetch(`${baseUrl}/api/v1/agenda`);
     assert.equal(agendaResponse.status, 200);
     const agendaPayload = (await agendaResponse.json()) as { agenda: unknown[]; notifications: Array<{ id: number }>; unreadCount: number };
-    assert.equal(agendaPayload.agenda.length, 3);
-    assert.equal(agendaPayload.notifications.length, 3);
-    assert.equal(agendaPayload.unreadCount, 2);
+    assert.equal(agendaPayload.agenda.length, 6);
+    assert.equal(agendaPayload.notifications.length, 6);
+    assert.equal(agendaPayload.unreadCount, 5);
 
     const unread = agendaPayload.notifications.find((item) => item.id !== first.id)!;
     const readResponse = await fetch(`${baseUrl}/api/v1/notifications/${unread.id}/read`, { method: "POST" });
@@ -152,6 +177,6 @@ test(
     assert.ok(latest);
     assert.equal(latest.status, "success");
     assert.ok(latest.finishedAt);
-    assert.equal(latest.details.successfulLotteries, 3);
+    assert.equal(latest.details.successfulLotteries, 6);
   },
 );
