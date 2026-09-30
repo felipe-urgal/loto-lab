@@ -1,7 +1,14 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { LotteryId } from "../domain/types.js";
 
-const LOTTERIES: LotteryId[] = ["mega-sena", "lotofacil", "dia-de-sorte"];
+const LOTTERIES: LotteryId[] = [
+  "mega-sena",
+  "lotofacil",
+  "dia-de-sorte",
+  "quina",
+  "lotomania",
+  "dupla-sena",
+];
 const MAX_BODY_BYTES = 1024 * 1024;
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
