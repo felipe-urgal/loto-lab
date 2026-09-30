@@ -219,6 +219,9 @@ function isExpectedGeneratorFailure(error: unknown): boolean {
     "Manual fixed numbers require",
     "fixed-core repeat limit",
     "Too many numbers",
+    "Unable to sample",
+    "Unable to build a diversified portfolio",
+    "Unable to select the requested portfolio size",
   ].some((fragment) => error.message.includes(fragment));
 }
 
@@ -285,12 +288,12 @@ export class GenerationV2UseCase {
 
     const contests = await this.history.listGenerationHistory(input.lottery);
     const scoped = scopeGenerationHistory(contests, input.lottery, input.targetContestNumber);
-    if (scoped.history.length < MIN_GENERATION_HISTORY) {
+    const purpose = input.purpose ?? "uniform";
+    if (purpose === "experimental" && scoped.history.length < MIN_GENERATION_HISTORY) {
       throw new InsufficientGenerationHistoryError(input.lottery, scoped.history.length);
     }
 
     const currentHistorySignature = generationHistorySignature(contests, input.lottery, input.targetContestNumber);
-    const purpose = input.purpose ?? "uniform";
     const generationMode = input.generationMode ?? "diversified";
     const persist = input.persist ?? false;
     const targetContestNumber = scoped.targetContestNumber;
@@ -389,10 +392,13 @@ export class GenerationV2UseCase {
       );
     }
     const algorithmSpace = plan.algorithmSpaces[String(input.fixedCount)];
-    if (!algorithmSpace || algorithmSpace.rawCombinationCapacity < 1) {
+    if (
+      purpose === "experimental"
+      && (!algorithmSpace || algorithmSpace.rawCombinationCapacity < 1)
+    ) {
       throw new GenerationV2Error(
         "ALGORITHM_SPACE_EMPTY",
-        "A configuração não deixa combinações suficientes no espaço que o algoritmo consegue explorar.",
+        "A configuração não deixa combinações suficientes no espaço experimental atual.",
       );
     }
 
@@ -413,7 +419,12 @@ export class GenerationV2UseCase {
           excludedNumbers: input.excludedNumbers ?? [],
           ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
           ...(referenceContestNumber !== null
-            ? { referenceContest: scoped.history.find((contest) => contest.number === referenceContestNumber) }
+            ? (() => {
+                const referenceContest = scoped.history.find(
+                  (contest) => contest.number === referenceContestNumber,
+                );
+                return referenceContest ? { referenceContest } : {};
+              })()
             : {}),
         });
       } else if (input.lottery === "mega-sena") {
@@ -454,7 +465,9 @@ export class GenerationV2UseCase {
       if (isExpectedGeneratorFailure(error)) {
         throw new GenerationV2Error(
           "ALGORITHM_SPACE_UNSATISFIED",
-          "Há combinações matematicamente elegíveis, mas o pool ranqueado atual do algoritmo não atende à configuração. Revise o núcleo, as exclusões ou os filtros.",
+          purpose === "experimental"
+            ? "Há combinações matematicamente elegíveis, mas a estratégia experimental atual não atende à configuração. Revise o núcleo, as exclusões ou os filtros."
+            : "Não foi possível amostrar jogos suficientes no espaço válido. Revise o núcleo, as exclusões ou os filtros.",
         );
       }
       throw error;
@@ -468,6 +481,15 @@ export class GenerationV2UseCase {
       fixedCount: input.fixedCount,
       purpose,
       generationMode,
+      ...(purpose === "experimental"
+        ? {
+            experimentalStrategy: {
+              id: "legacy-historical-ranking",
+              version: 2,
+              evidenceSource: "backtests",
+            },
+          }
+        : {}),
       seed,
       fixedNumbers: sortedNumbers(input.fixedNumbers),
       excludedNumbers: sortedNumbers(input.excludedNumbers),
