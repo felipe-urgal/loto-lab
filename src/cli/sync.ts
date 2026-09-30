@@ -2,7 +2,14 @@ import type { LotteryId } from "../domain/types.js";
 import { CaixaContestSource } from "../data/caixa.js";
 import { syncLatestContest, syncMissingContests } from "../data/sync.js";
 
-const lotteryIds: LotteryId[] = ["mega-sena", "lotofacil", "dia-de-sorte"];
+const lotteryIds: LotteryId[] = [
+  "mega-sena",
+  "lotofacil",
+  "dia-de-sorte",
+  "quina",
+  "lotomania",
+  "dupla-sena",
+];
 
 function parseLottery(value: string | undefined): LotteryId {
   if (!value || !lotteryIds.includes(value as LotteryId)) {
