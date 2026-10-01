@@ -115,7 +115,7 @@ BEGIN
 
   IF to_regclass('public.generated_games') IS NOT NULL THEN
     ALTER TABLE generated_games ADD COLUMN IF NOT EXISTS secondary_selection JSONB;
-    ALTER TABLE generated_games ADD COLUMN IF NOT EXISTS columns SMALLINT[];
+    ALTER TABLE generated_games ADD COLUMN IF NOT EXISTS columns JSONB;
 
     UPDATE generated_games
       SET secondary_selection = jsonb_build_object(
@@ -128,8 +128,8 @@ BEGIN
     ALTER TABLE generated_games DROP CONSTRAINT IF EXISTS generated_games_columns_check;
     ALTER TABLE generated_games ADD CONSTRAINT generated_games_columns_check CHECK (
       columns IS NULL OR (
-        cardinality(columns) = 7
-        AND loto_lab_array_between(columns, 0, 9)
+        jsonb_typeof(columns) = 'array'
+        AND jsonb_array_length(columns) = 7
       )
     );
   END IF;
