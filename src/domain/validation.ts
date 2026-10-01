@@ -46,8 +46,22 @@ export function assertValidContestNumbers(lottery: LotteryId, numbers: number[])
 export function assertValidGeneratedGame(game: GeneratedGame): void {
   const config = getLotteryConfig(game.lottery);
   if (game.lottery === "super-sete") {
-    if (!game.columns || game.columns.length !== 7 || game.columns.some((value) => !Number.isInteger(value) || value < 0 || value > 9)) {
-      throw new Error("Super Sete games require exactly seven column digits between 0 and 9");
+    const totalMarks = game.columns?.reduce((sum, column) => sum + column.length, 0) ?? 0;
+    if (
+      !game.columns
+      || game.columns.length !== 7
+      || game.columns.some((column) =>
+        column.length < 1
+        || column.length > 3
+        || !hasUniqueIntegers(column)
+        || column.some((value) => value < 0 || value > 9)
+      )
+      || totalMarks < 7
+      || totalMarks > 21
+      || (totalMarks <= 14 && game.columns.some((column) => column.length > 2))
+      || (totalMarks >= 15 && game.columns.some((column) => column.length < 2))
+    ) {
+      throw new Error("Super Sete games require a valid 7-column composition with 7 to 21 marks");
     }
     if (game.numbers.length !== 0 || game.fixedNumbers.length !== 0 || game.variableNumbers.length !== 0) {
       throw new Error("Super Sete columns must not be flattened into number selections");
