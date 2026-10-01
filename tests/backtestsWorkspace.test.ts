@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-test("historical-test workspace has typed-only canonical ownership without legacy fallback", async () => {
+test("historical-test implementation remains internal after its route is absorbed by Analyses", async () => {
   const [loader, workspace, boundary, source, app, refinements] = await Promise.all([
     readFile("web/src/core/featureLoader.ts", "utf8"),
     readFile("web/backtests-workspace.css", "utf8"),
@@ -12,15 +12,9 @@ test("historical-test workspace has typed-only canonical ownership without legac
     readFile("web/refinements.js", "utf8"),
   ]);
 
-  const backtestsBranch = loader.indexOf('if (view === "backtests")');
-  const refinementsLoad = loader.indexOf('loadStyledModule("refinements")');
-  const workspaceLoad = loader.indexOf('loadStyle("backtests-workspace")');
-  const moduleLoad = loader.indexOf('loadModule("backtests")');
-  assert.ok(backtestsBranch >= 0, "historical-test view must have an explicit typed-only loader branch");
-  assert.ok(workspaceLoad > backtestsBranch, "Prototype 1 must load before the typed historical-test owner");
-  assert.ok(moduleLoad > workspaceLoad, "typed historical-test owner must mount only after its workspace CSS");
-  assert.ok(refinementsLoad > backtestsBranch, "Backtests must bypass generic legacy refinements");
-  assert.match(loader, /const styleReady = await loadStyle\("backtests-workspace"\);[\s\S]*return styleReady \? loadModule\("backtests"\) : false;/);
+  assert.doesNotMatch(loader, /if \(view === "backtests"\)/);
+  assert.doesNotMatch(loader, /loadStyle\("backtests-workspace"\)/);
+  assert.doesNotMatch(loader, /loadModule\("backtests"\)/);
   assert.match(loader, /\.loading-state:not\(\[data-feature-owned\]\)/);
   assert.match(loader, /featuresReady === false[\s\S]*renderFeatureLoadError\(view\)/);
   assert.match(loader, /FEATURE_LOAD_ERROR/);
@@ -59,7 +53,7 @@ test("historical-test workspace has typed-only canonical ownership without legac
   assert.match(workspace, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
 
-  assert.match(app, /render\.view === "backtests"[\s\S]*data-feature-owned="backtests"/);
+  assert.doesNotMatch(app, /render\.view === "backtests"|data-feature-owned="backtests"/);
   assert.doesNotMatch(app, /async function renderBacktests/);
   assert.doesNotMatch(app, /function backtestRow/);
   assert.doesNotMatch(app, /async function handleBacktest/);
