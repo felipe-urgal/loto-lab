@@ -137,6 +137,30 @@ const METHODOLOGY: Record<LotteryId, GenerationMethodologyProfile> = {
     acceptableRepeated: { min: 0, max: 6 },
     notes: ["A mesma aposta é conferida separadamente contra os dois sorteios do concurso."],
   },
+  "mais-milionaria": {
+    defaultFixedCount: 0,
+    fixedCountOptions: [0],
+    preferredOdd: { min: 0, max: 6 },
+    preferredRepeated: { min: 0, max: 6 },
+    acceptableRepeated: { min: 0, max: 6 },
+    notes: ["Trevos são uma seleção secundária tipada e não entram no conjunto de dezenas."],
+  },
+  timemania: {
+    defaultFixedCount: 0,
+    fixedCountOptions: [0],
+    preferredOdd: { min: 0, max: 10 },
+    preferredRepeated: { min: 0, max: 7 },
+    acceptableRepeated: { min: 0, max: 7 },
+    notes: ["Time do Coração é uma seleção secundária independente das dez dezenas."],
+  },
+  "super-sete": {
+    defaultFixedCount: 0,
+    fixedCountOptions: [0],
+    preferredOdd: { min: 0, max: 7 },
+    preferredRepeated: { min: 0, max: 7 },
+    acceptableRepeated: { min: 0, max: 7 },
+    notes: ["As sete posições são colunas independentes; os dígitos não são dezenas intercambiáveis."],
+  },
 };
 
 export function generationMethodology(lottery: LotteryId): GenerationMethodologyProfile {
@@ -197,6 +221,10 @@ export function generationHistorySignature(
     hash.update([...(contest.secondDrawNumbers ?? [])].sort((a, b) => a - b).join(","));
     hash.update("|");
     hash.update(contest.luckyMonth ?? "");
+    hash.update("|");
+    hash.update(contest.secondary ? JSON.stringify(contest.secondary) : "");
+    hash.update("|");
+    hash.update((contest.columns ?? []).join(","));
     hash.update(";");
   }
   return hash.digest("hex");
