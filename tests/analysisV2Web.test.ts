@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-test("Analyses 2.0 is lazy-loaded, typed, independently degradable and exposes the five modes", async () => {
+test("Analyses is lazy-loaded, typed and exposes one capability-aware number map", async () => {
   const [
     boundary,
     source,
@@ -58,21 +58,28 @@ test("Analyses 2.0 is lazy-loaded, typed, independently degradable and exposes t
   assert.match(loader, /loadStyle\("analysis-workspace"\)/);
   assert.doesNotMatch(loader, /loadStyle\("analysis-v2-hardening"\)/);
   assert.match(loader, /loadModule\("analysis-v2"\)/);
-  assert.match(source, /Classificação/);
-  assert.match(source, /Estrutura/);
-  assert.match(source, /Dinâmica/);
-  assert.match(source, /Combinações/);
-  assert.match(source, /Validação/);
-  assert.match(source, /Observado × esperado/);
-  assert.match(source, /data-a2-number/);
+  assert.match(source, /Mapa das dezenas/);
+  assert.match(source, /Histórico, não previsão/);
+  assert.match(source, /data-a2-number-map/);
+  assert.match(source, /data-a2-map-filter/);
+  assert.match(source, /Comparar dezenas/);
+  assert.match(source, /Indicadores e metodologia/);
+  assert.match(source, /detailsBlock\("Classificação completa"/);
+  assert.match(source, /detailsBlock\("Estrutura e distribuições"/);
+  assert.match(source, /detailsBlock\("Dinâmica histórica"/);
+  assert.match(source, /detailsBlock\("Associações"/);
+  assert.match(source, /detailsBlock\("Validação e metodologia"/);
   assert.match(source, /data-a2-pair-check/);
   assert.match(source, /data-a2-validation-window/);
   assert.match(source, /Atraso e frequência são descrições históricas/);
-  assert.match(source, /role="tablist"/);
+  assert.match(source, /api<LotteryCatalogPayload>\("\/lotteries"\)/);
+  assert.match(source, /FLAT_NUMBER_FAMILIES/);
+  assert.match(source, /column-draw/);
+  assert.match(source, /dual-number-draw/);
+  assert.doesNotMatch(source, /role="tablist"|data-a2-tab|ACTIVE_TAB_KEY/);
   assert.match(source, /<dialog class="a2-detail"/);
   assert.match(source, /showModal\(\)/);
   assert.match(source, /\.close\(\)/);
-  assert.match(source, /ArrowLeft/);
   assert.match(source, /Escape/);
   assert.match(source, /Qualidade do histórico/);
   assert.match(source, /historicalExpected/);
@@ -80,11 +87,11 @@ test("Analyses 2.0 is lazy-loaded, typed, independently degradable and exposes t
   assert.match(source, /\/analysis\/\$\{lottery\}\/advanced/);
   assert.doesNotMatch(source, /const cache = new Map\(\)/);
   assert.doesNotMatch(source, /lotterySelect\?\.addEventListener\("change"/);
-  assert.match(css, /\.a2-tabs/);
   assert.match(css, /\.a2-detail-open/);
   assert.match(css, /:focus-visible/);
+  assert.match(workspaceCss, /\.a2-number-map/);
+  assert.match(workspaceCss, /\.a2-technical-block/);
   assert.match(workspaceCss, /\.a2-detail::backdrop/);
-  assert.match(workspaceCss, /repeat\(4/);
 
   assert.match(advanced, /exactBinomialTwoSidedP/);
   assert.match(advanced, /validation: buildRollingValidation\(scoped, config\)/);
