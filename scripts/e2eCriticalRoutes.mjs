@@ -20,7 +20,7 @@ function dumpDom(path) {
     "--no-sandbox",
     "--disable-gpu",
     "--disable-dev-shm-usage",
-    "--virtual-time-budget=1500",
+    "--virtual-time-budget=2200",
     "--dump-dom",
     `${baseUrl}${path}`,
   ], { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
@@ -33,17 +33,16 @@ function expectIncludes(html, values, route) {
 }
 
 const cases = [
-  ["/lab", ["Laboratório de Estratégias", "lab-random-samples", "data-active-nav=\"lab\""]],
-  ["/jobs", ["Execuções", "score-model", "job-random-samples", "data-active-nav=\"jobs\""]],
-  ["/strategies", ["Estratégias", "data-active-nav=\"strategies\""]],
-  ["/ai", ["data-active-nav=\"ai\""]],
+  ["/lab", ["Análises", "a2-shell"]],
+  ["/strategies", ["Análises", "a2-shell"]],
+  ["/ai", ["Análises", "a2-shell"]],
+  ["/jobs", ["Painel", "dashboard-shell", "Seus jogos"]],
+  ["/agenda", ["Painel", "dashboard-shell", "Resultados recentes"]],
 ];
 
 for (const [route, markers] of cases) {
   const html = dumpDom(route);
   expectIncludes(html, markers, route);
-  // shell.js runs client-side; a populated navigation link is a cheap signal that
-  // module scripts executed instead of only returning the static HTML shell.
-  if (!html.includes('href="/jobs"')) throw new Error(`${route} did not execute the shared shell module`);
-  console.log(`browser smoke ok: ${route}`);
+  if (html.includes("data-nav-more")) throw new Error(`${route} still rendered the removed More navigation`);
+  console.log(`browser redirect smoke ok: ${route}`);
 }

@@ -1,27 +1,23 @@
 import { api } from "../core/api.js";
 import { currentMainView, onMainViewChanged, onViewRendered } from "../core/viewLifecycle.js";
 import { escapeHtml } from "../shared/escaping.js";
-import { formatCurrency, formatDateTime, formatPercent } from "../shared/formatters.js";
+import { formatDateTime } from "../shared/formatters.js";
 import { toast } from "../shared/toast.js";
-import { aggregateRealFinancial, knownNumber, toneFor } from "./dashboardScope/financial.js";
 import {
   LOTTERIES,
-  type AllDashboardData,
-  type BacktestRunDto,
-  type BacktestsPayload,
   type ContestDto,
-  type DashboardEntry,
-  type DashboardScope,
+  type ContestsPayload,
   type FocusedDashboardData,
   type GameBatchesPayload,
+  type LotteryCapabilitiesDto,
+  type LotteryCatalogItemDto,
+  type LotteryCatalogPayload,
   type LotteryId,
+  type RealBetDto,
   type RealBetsPayload,
 } from "./dashboardScope/types.js";
 
-const DASHBOARD_SCOPE_KEY = "loto-lab:dashboard-scope";
 const LOTTERY_KEY = "loto-lab:lottery";
-const LOTTERY_IDS = Object.keys(LOTTERIES) as LotteryId[];
-
 const root = document.querySelector<HTMLElement>("#content");
 const select = document.querySelector<HTMLSelectElement>("#lottery-select");
 const title = document.querySelector<HTMLElement>("#view-title");
@@ -31,7 +27,6 @@ const refreshButton = document.querySelector<HTMLButtonElement>("#refresh-view")
 
 let applyToken = 0;
 let scheduled = false;
-let navigatingFromDashboard = false;
 let syncing = false;
 let loadController: AbortController | null = null;
 
@@ -39,29 +34,41 @@ function validLottery(value: unknown): value is LotteryId {
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(LOTTERIES, value);
 }
 
-function normalizeScope(value: unknown): DashboardScope {
-  return value === "all" || validLottery(value) ? value : "all";
-}
-
-function savedScope(): DashboardScope {
-  return normalizeScope(localStorage.getItem(DASHBOARD_SCOPE_KEY));
-}
-
 function savedLottery(): LotteryId {
   const value = localStorage.getItem(LOTTERY_KEY);
   return validLottery(value) ? value : "mega-sena";
 }
 
-function ensureAllOption(): void {
-  if (!select || select.querySelector('option[value="all"]')) return;
-  const option = document.createElement("option");
-  option.value = "all";
-  option.textContent = "Todas as loterias";
-  select.prepend(option);
+function count(value: unknown): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
 }
 
-function removeAllOption(): void {
-  select?.querySelector('option[value="all"]')?.remove();
+function formatDate(value: unknown): string {
+  if (!value) return "—";
+  const [year, month, day] = String(value).slice(0, 10).split("-");
+  return year && month && day ? `${day}/${month}/${year}` : "—";
+}
+
+function numberLabel(value: unknown): string {
+  return String(value).padStart(2, "0");
+}
+
+function nextContestNumber(value: unknown): number | null {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric + 1 : null;
+}
+
+function resultMarkup(contest: ContestDto): string {
+  if (Array.isArray(contest.numbers) && contest.numbers.length) {
+    return `<div class="draw-numbers dashboard-result-numbers">${contest.numbers.map((value) => `<span class="ball">${numberLabel(value)}</span>`).join("")}</div>`;
+  }
+  return '<p class="dashboard-structured-result">Resultado disponível para esta modalidade.</p>';
+}
+
+function setHeader(lottery: LotteryId): void {
+  if (title) title.textContent = "Painel";
+  if (subtitle) subtitle.textContent = `Resultados, jogos e pendências de ${LOTTERIES[lottery]}.`;
 }
 
 function setRefreshControl(isDashboard: boolean): void {
@@ -87,279 +94,184 @@ function setRefreshControl(isDashboard: boolean): void {
   label?.remove();
 }
 
-function syncScopeControl(): void {
+function syncLotteryControl(): void {
   if (!select) return;
-  const isDashboard = currentMainView() === "dashboard";
-  setRefreshControl(isDashboard);
-
-  if (isDashboard) {
-    ensureAllOption();
-    if (selectLabel) selectLabel.textContent = "Escopo";
-    select.value = savedScope();
-    return;
-  }
-
-  removeAllOption();
+  select.querySelector('option[value="all"]')?.remove();
   if (selectLabel) selectLabel.textContent = "Loteria";
-  select.value = savedLottery();
+  if (currentMainView() === "dashboard") select.value = savedLottery();
+  setRefreshControl(currentMainView() === "dashboard");
 }
 
-function setHeader(scope: DashboardScope): void {
-  if (!title || !subtitle) return;
-  if (scope === "all") {
-    title.textContent = "Painel";
-    subtitle.textContent = "Estado atual, desempenho e atividade das loterias.";
-    return;
-  }
-  title.textContent = `Painel · ${LOTTERIES[scope]}`;
-  subtitle.textContent = "Concurso atual, desempenho e atividade em um só lugar.";
+function supports(
+  catalog: Map<LotteryId, LotteryCatalogItemDto>,
+  lottery: LotteryId,
+  capability: keyof LotteryCapabilitiesDto,
+): boolean {
+  const value = catalog.get(lottery)?.capabilities?.[capability];
+  return value !== false;
 }
 
-function formatDate(value: unknown): string {
-  if (!value) return "—";
-  const [year, month, day] = String(value).slice(0, 10).split("-");
-  return year && month && day ? `${day}/${month}/${year}` : "—";
+function hydrateLotteryOptions(payload: LotteryCatalogPayload, selected: LotteryId): void {
+  if (!select) return;
+  const items = (payload.items || []).filter(
+    (item): item is LotteryCatalogItemDto & { id: LotteryId } =>
+      item.enabled !== false && validLottery(item.id),
+  );
+  if (!items.length) return;
+
+  select.innerHTML = items
+    .map((item) => `<option value="${item.id}">${escapeHtml(item.name || LOTTERIES[item.id])}</option>`)
+    .join("");
+  select.value = items.some((item) => item.id === selected) ? selected : items[0].id;
 }
 
-function number(value: unknown): string {
-  return String(value).padStart(2, "0");
-}
-
-function count(value: unknown): number {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : 0;
-}
-
-function nextContestNumber(value: unknown): number | null {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric + 1 : null;
-}
-
-function balls(numbers: number[] | undefined): string {
-  return (numbers || []).map((value) => `<span class="ball">${number(value)}</span>`).join("");
-}
-
-function dashboardAction(
-  view: string,
+function action(
+  view: "analysis" | "generate",
   lottery: LotteryId,
   label: string,
-  variant = "ghost",
+  variant = "",
 ): string {
-  return `<button class="button compact ${variant}" type="button" data-dashboard-open="${view}" data-dashboard-lottery="${lottery}">${escapeHtml(label)}</button>`;
+  return `<button class="button ${variant}" type="button" data-dashboard-open="${view}" data-dashboard-lottery="${lottery}">${escapeHtml(label)}</button>`;
 }
 
-function metricCard(label: string, value: string, detail: string, tone = ""): string {
-  return `<article class="panel dashboard-metric-card">
-    <span class="dashboard-metric-label">${escapeHtml(label)}</span>
-    <strong class="dashboard-metric-value ${tone}">${value}</strong>
-    <span class="dashboard-metric-detail">${detail}</span>
-  </article>`;
-}
-
-function performanceMetric(label: string, value: string, tone = ""): string {
-  return `<span class="dashboard-performance-metric"><small>${escapeHtml(label)}</small><strong class="${tone}">${value}</strong></span>`;
-}
-
-function batchGameCount(batches: GameBatchesPayload): number {
-  return (batches.items || []).reduce((total, batch) => total + (batch.games?.length || 0), 0);
-}
-
-function latestBacktest(backtests: BacktestsPayload): BacktestRunDto | undefined {
-  return backtests.items?.[0];
-}
-
-function focusedMetrics(
+function hero(
+  lottery: LotteryId,
   contest: ContestDto | null,
-  backtests: BacktestsPayload,
-  realBets: RealBetsPayload,
-  batches: GameBatchesPayload,
+  catalog: Map<LotteryId, LotteryCatalogItemDto>,
 ): string {
-  const backtest = latestBacktest(backtests);
-  const historical = backtest?.summary || {};
-  const real = realBets.summary || {};
-  const net = knownNumber(real.netResult);
-  const batchCount = batches.items?.length || 0;
+  const canGenerate = supports(catalog, lottery, "simulation");
+  const canAnalyze = supports(catalog, lottery, "analysis");
 
-  return `<section class="dashboard-metrics-grid" aria-label="Resumo do painel">
-    ${metricCard("Último concurso", contest ? `#${contest.number}` : "—", contest ? formatDate(contest.date) : "Sem concurso sincronizado")}
-    ${metricCard("Jogos recentes", String(batchGameCount(batches)), `${batchCount} lote(s) carregado(s)`)}
-    ${metricCard("ROI histórico", formatPercent(historical.roi), backtest ? `Teste #${backtest.id}` : "Sem teste histórico", toneFor(historical.roi))}
-    ${metricCard("Resultado real", formatCurrency(net), `${count(real.checkedBets)} conferida(s) · ${count(real.pendingBets)} pendente(s)`, toneFor(net))}
-  </section>`;
-}
-
-function allMetrics(
-  data: AllDashboardData,
-  backtests: Map<LotteryId, BacktestsPayload>,
-  realBets: Map<LotteryId, RealBetsPayload>,
-): string {
-  const updatedLotteries = data.contests.filter(([, contest]) => Boolean(contest)).length;
-  const batches = data.batches.flatMap(([, value]) => value.items || []);
-  const gameCount = batches.reduce((total, batch) => total + (batch.games?.length || 0), 0);
-  const realSummaries = LOTTERY_IDS.map((lottery) => realBets.get(lottery)?.summary || {});
-  const aggregate = aggregateRealFinancial(realSummaries);
-  const historicalEntries = LOTTERY_IDS
-    .map((lottery) => ({ lottery, run: latestBacktest(backtests.get(lottery) || { items: [] }) }))
-    .filter((entry) => knownNumber(entry.run?.summary?.roi) !== undefined);
-  historicalEntries.sort(
-    (a, b) => (knownNumber(b.run?.summary?.roi) || 0) - (knownNumber(a.run?.summary?.roi) || 0),
-  );
-  const bestHistorical = historicalEntries[0];
-  const aggregateDetail = aggregate.checkedCost === undefined
-    ? "Custo conferido indisponível"
-    : aggregate.checkedCost > 0
-      ? `${formatCurrency(aggregate.checkedCost)} em custo conferido`
-      : "Sem apostas conferidas";
-
-  return `<section class="dashboard-metrics-grid" aria-label="Resumo do painel">
-    ${metricCard("Cobertura atual", `${updatedLotteries}/${LOTTERY_IDS.length}`, "loterias com concurso sincronizado")}
-    ${metricCard("Jogos recentes", String(gameCount), `${batches.length} lote(s) carregado(s)`)}
-    ${metricCard("ROI real agregado", formatPercent(aggregate.roi), aggregateDetail, toneFor(aggregate.roi))}
-    ${metricCard("Melhor ROI histórico", bestHistorical ? formatPercent(bestHistorical.run?.summary?.roi) : "—", bestHistorical ? `${LOTTERIES[bestHistorical.lottery]} · teste #${bestHistorical.run?.id}` : "Sem testes históricos", bestHistorical ? toneFor(bestHistorical.run?.summary?.roi) : "")}
-  </section>`;
-}
-
-function focusedLatestCard(lottery: LotteryId, contest: ContestDto | null): string {
   if (!contest) {
-    return `<article class="panel dashboard-latest-card dashboard-latest-empty">
-      <div><h2>Último concurso</h2><p>${LOTTERIES[lottery]}</p></div>
-      <div class="empty-state"><strong>Sem dados de concursos</strong><p>Atualize os dados para carregar o histórico desta loteria.</p></div>
-    </article>`;
+    return `<section class="dashboard-hero">
+      <div class="dashboard-hero-copy">
+        <span class="dashboard-eyebrow">${LOTTERIES[lottery]}</span>
+        <h2>Sem resultado sincronizado</h2>
+        <p>Atualize os dados para carregar o resultado mais recente desta modalidade.</p>
+      </div>
+      <div class="dashboard-hero-actions">
+        ${canGenerate ? action("generate", lottery, "Gerar jogos", "primary") : ""}
+        ${canAnalyze ? action("analysis", lottery, "Ver análises") : ""}
+      </div>
+    </section>`;
   }
 
-  const nextContest = nextContestNumber(contest.number);
-  return `<article class="panel dashboard-latest-card">
-    <div class="dashboard-latest-main">
-      <div class="dashboard-latest-head">
-        <div><span class="dashboard-eyebrow">Concurso atual</span><h2>${LOTTERIES[lottery]}</h2><p>${formatDate(contest.date)}</p></div>
-        <strong class="dashboard-contest-number">#${contest.number}</strong>
-      </div>
-      <div class="draw-numbers">${balls(contest.numbers)}</div>
-      <span class="dashboard-target">Próximo alvo <strong>${nextContest ? `#${nextContest}` : "—"}</strong></span>
+  const next = nextContestNumber(contest.number);
+  return `<section class="dashboard-hero">
+    <div class="dashboard-hero-copy">
+      <span class="dashboard-eyebrow">Último resultado · ${LOTTERIES[lottery]}</span>
+      <div class="dashboard-result-title"><h2>Concurso #${contest.number ?? "—"}</h2><span>${formatDate(contest.date)}</span></div>
+      ${resultMarkup(contest)}
+      <p class="dashboard-next">Próximo concurso <strong>${next ? `#${next}` : "—"}</strong></p>
     </div>
-    ${dashboardAction("generate", lottery, "Gerar jogos", "primary")}
-  </article>`;
+    <div class="dashboard-hero-actions">
+      ${canGenerate ? action("generate", lottery, "Gerar jogos", "primary") : ""}
+      ${canAnalyze ? action("analysis", lottery, "Ver análises") : ""}
+    </div>
+  </section>`;
 }
 
-function realStatusCard(lottery: LotteryId, realBets: RealBetsPayload): string {
-  const real = realBets.summary || {};
-  const checked = count(real.checkedBets);
-  const pending = count(real.pendingBets);
-  const total = checked + pending;
-  const checkedRatio = total > 0 ? checked / total : 0;
-  const angle = Math.round(checkedRatio * 360);
-  const net = knownNumber(real.netResult);
+function summary(realBets: RealBetsPayload, batches: GameBatchesPayload): string {
+  const saved = (batches.items || []).reduce((total, batch) => total + (batch.games?.length || 0), 0);
+  const pending = count(realBets.summary?.pendingBets);
+  const checked = count(realBets.summary?.checkedBets);
 
-  return `<article class="panel dashboard-status-card">
-    <div class="dashboard-status-head"><div><span class="dashboard-eyebrow">Apostas reais</span><h2>Conferência</h2></div>${dashboardAction("games", lottery, "Abrir jogos")}</div>
-    <div class="dashboard-status-body">
-      <div class="dashboard-donut" style="--dashboard-checked-angle:${angle}deg" aria-label="${checked} conferidas de ${total} apostas">
-        <span><strong>${total ? Math.round(checkedRatio * 100) : 0}%</strong><small>conferidas</small></span>
-      </div>
-      <dl class="dashboard-status-list">
-        <div><dt>Conferidas</dt><dd>${checked}</dd></div>
-        <div><dt>Pendentes</dt><dd>${pending}</dd></div>
-        <div><dt>Resultado</dt><dd class="${toneFor(net)}">${formatCurrency(net)}</dd></div>
-      </dl>
-    </div>
-  </article>`;
+  return `<section class="dashboard-summary" aria-label="Resumo de jogos e conferência">
+    <div><span>Jogos salvos</span><strong>${saved}</strong></div>
+    <div><span>Pendentes</span><strong>${pending}</strong></div>
+    <div><span>Conferidos</span><strong>${checked}</strong></div>
+  </section>`;
 }
 
-function focusedPerformance(
+function betStatus(bet: RealBetDto | undefined): { label: string; tone: string } {
+  if (!bet) return { label: "Gerado", tone: "" };
+  if (bet.status === "checked") return { label: "Conferido", tone: "is-success" };
+  return { label: "Aguardando resultado", tone: "is-warning" };
+}
+
+function latestBetByBatch(realBets: RealBetsPayload): Map<number, RealBetDto> {
+  const result = new Map<number, RealBetDto>();
+  for (const bet of realBets.items || []) {
+    const batchId = Number(bet.batchId);
+    if (!Number.isFinite(batchId) || result.has(batchId)) continue;
+    result.set(batchId, bet);
+  }
+  return result;
+}
+
+function savedGames(
   lottery: LotteryId,
-  backtests: BacktestsPayload,
+  batches: GameBatchesPayload,
   realBets: RealBetsPayload,
+  catalog: Map<LotteryId, LotteryCatalogItemDto>,
 ): string {
-  const backtest = latestBacktest(backtests);
-  const summary = backtest?.summary || {};
-  const real = realBets.summary || {};
-  const net = knownNumber(real.netResult);
+  const items = batches.items || [];
+  const betByBatch = latestBetByBatch(realBets);
+  const canCheck = supports(catalog, lottery, "checking");
+
+  const rows = items.length
+    ? items.slice(0, 5).map((batch) => {
+      const batchId = Number(batch.id);
+      const bet = betByBatch.get(batchId);
+      const status = betStatus(bet);
+      const canRefresh = canCheck && bet && bet.status !== "checked" && Number.isFinite(Number(bet.id));
+      return `<div class="dashboard-game-row">
+        <div class="dashboard-game-main">
+          <strong>Lote #${escapeHtml(batch.id)}</strong>
+          <span>${batch.games?.length || 0} jogo(s) · alvo ${batch.targetContestNumber ? `#${batch.targetContestNumber}` : "não definido"}</span>
+        </div>
+        <div class="dashboard-game-meta">
+          <span class="dashboard-status ${status.tone}">${status.label}</span>
+          <small>${formatDateTime(batch.createdAt)}</small>
+          ${canRefresh ? `<button class="dashboard-inline-action" type="button" data-dashboard-check-bet="${bet.id}">Conferir agora</button>` : ""}
+        </div>
+      </div>`;
+    }).join("")
+    : '<div class="dashboard-empty"><strong>Nenhum jogo salvo</strong><span>Gere seus primeiros jogos para acompanhar tudo pelo Painel.</span></div>';
 
   return `<section class="dashboard-section">
     <div class="section-head dashboard-section-head">
-      <div><h2>Desempenho</h2><p>Último teste histórico comparado ao resultado das apostas reais.</p></div>
-      ${dashboardAction("backtests", lottery, "Ver testes históricos")}
+      <div><h2>Seus jogos</h2><p>Jogos salvos e situação da conferência oficial.</p></div>
+      ${supports(catalog, lottery, "simulation") ? action("generate", lottery, "Gerar novos") : ""}
     </div>
-    <div class="panel dashboard-performance-panel">
-      <div class="dashboard-performance-row">
-        <div class="dashboard-performance-label"><strong>Histórico</strong><span>${backtest ? `Teste #${backtest.id}` : "Nenhum teste salvo"}</span></div>
-        ${performanceMetric("ROI", formatPercent(summary.roi), toneFor(summary.roi))}
-        ${performanceMetric("Cobertura", formatPercent(summary.financialCoverage))}
-        ${performanceMetric("Melhor acerto", String(summary.bestHits ?? "—"))}
-        ${performanceMetric("Prêmios", formatCurrency(summary.totalPrizeValue))}
-      </div>
-      <div class="dashboard-performance-row">
-        <div class="dashboard-performance-label"><strong>Real</strong><span>${count(real.checkedBets)} conferida(s) · ${count(real.pendingBets)} pendente(s)</span></div>
-        ${performanceMetric("ROI", formatPercent(real.roi), toneFor(real.roi))}
-        ${performanceMetric("Gasto", formatCurrency(real.actualCost))}
-        ${performanceMetric("Prêmios", formatCurrency(real.totalPrizeValue))}
-        ${performanceMetric("Líquido", formatCurrency(net), toneFor(net))}
-      </div>
-    </div>
+    <div class="dashboard-list">${rows}</div>
   </section>`;
 }
 
-function focusedRecentGames(lottery: LotteryId, batches: GameBatchesPayload): string {
-  const items = batches.items || [];
-  const markup = items.length
-    ? items.slice(0, 4).map((batch) => `<div class="list-row">
-      <div class="list-row-main"><strong>Lote #${batch.id}</strong><p>${batch.games?.length || 0} jogo(s) · alvo ${batch.targetContestNumber ? `#${batch.targetContestNumber}` : "não definido"}</p></div>
-      <div class="list-row-value"><strong>${formatDateTime(batch.createdAt)}</strong></div>
+function recentResults(contests: ContestsPayload): string {
+  const items = contests.items || [];
+  const rows = items.length
+    ? items.slice(0, 5).map((contest) => `<div class="dashboard-result-row">
+      <div><strong>Concurso #${contest.number ?? "—"}</strong><span>${formatDate(contest.date)}</span></div>
+      ${resultMarkup(contest)}
     </div>`).join("")
-    : `<div class="dashboard-inline-empty"><strong>Nenhum lote salvo</strong><span>Gere seus primeiros jogos para começar o histórico.</span></div>`;
+    : '<div class="dashboard-empty"><strong>Sem resultados recentes</strong><span>Atualize os dados para carregar o histórico.</span></div>';
 
   return `<section class="dashboard-section">
-    <div class="section-head dashboard-section-head"><div><h2>Atividade recente</h2><p>Últimos lotes gerados para ${LOTTERIES[lottery]}.</p></div>${dashboardAction("games", lottery, "Ver meus jogos")}</div>
-    <div class="panel list dashboard-recent-list">${markup}</div>
+    <div class="section-head dashboard-section-head"><div><h2>Resultados recentes</h2><p>Últimos concursos disponíveis na base.</p></div></div>
+    <div class="dashboard-list">${rows}</div>
   </section>`;
 }
 
-function latestLotteryCard(lottery: LotteryId, contest: ContestDto | null): string {
-  if (!contest) {
-    return `<article class="panel dashboard-lottery-card"><div class="dashboard-lottery-head"><strong>${LOTTERIES[lottery]}</strong><span>Sem dados</span></div><div class="dashboard-inline-empty"><span>Atualize os dados para carregar esta loteria.</span></div></article>`;
+function pendingSection(realBets: RealBetsPayload): string {
+  const pending = (realBets.items || []).filter((bet) => bet.status !== "checked");
+  if (!pending.length) {
+    return `<section class="dashboard-section dashboard-pending">
+      <div class="section-head dashboard-section-head"><div><h2>Pendências</h2><p>Nenhuma conferência pendente para esta modalidade.</p></div></div>
+    </section>`;
   }
 
-  const nextContest = nextContestNumber(contest.number);
-  return `<article class="panel dashboard-lottery-card">
-    <div class="dashboard-lottery-head"><strong>${LOTTERIES[lottery]}</strong><span>#${contest.number} · ${formatDate(contest.date)}</span></div>
-    <div class="draw-numbers dashboard-lottery-numbers">${balls(contest.numbers)}</div>
-    <div class="dashboard-lottery-footer"><span>Próximo <strong>${nextContest ? `#${nextContest}` : "—"}</strong></span>${dashboardAction("generate", lottery, "Gerar")}</div>
-  </article>`;
+  return `<section class="dashboard-section dashboard-pending">
+    <div class="section-head dashboard-section-head"><div><h2>Pendências</h2><p>${pending.length} aposta(s) aguardando resultado ou atualização.</p></div></div>
+  </section>`;
 }
 
-function allPerformanceRow(
-  lottery: LotteryId,
-  backtests: BacktestsPayload,
-  realBets: RealBetsPayload,
-): string {
-  const backtest = latestBacktest(backtests);
-  const summary = backtest?.summary || {};
-  const real = realBets.summary || {};
-  const net = knownNumber(real.netResult);
-
-  return `<div class="dashboard-performance-row dashboard-performance-row-all">
-    <div class="dashboard-performance-label"><strong>${LOTTERIES[lottery]}</strong><span>${backtest ? `Teste #${backtest.id}` : "Sem teste histórico"}</span></div>
-    ${performanceMetric("ROI histórico", formatPercent(summary.roi), toneFor(summary.roi))}
-    ${performanceMetric("Cobertura", formatPercent(summary.financialCoverage))}
-    ${performanceMetric("ROI real", formatPercent(real.roi), toneFor(real.roi))}
-    ${performanceMetric("Líquido real", formatCurrency(net), toneFor(net))}
-  </div>`;
-}
-
-function combinedBatchesMarkup(entries: DashboardEntry<GameBatchesPayload>[]): string {
-  const batches = entries
-    .flatMap(([lottery, data]) => (data.items || []).map((batch) => ({ ...batch, lottery: batch.lottery || lottery })))
-    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-    .slice(0, 6);
-
-  if (!batches.length) {
-    return `<div class="dashboard-inline-empty"><strong>Nenhum lote salvo</strong><span>Gere seus primeiros jogos para começar o histórico.</span></div>`;
+function catalogMap(payload: LotteryCatalogPayload): Map<LotteryId, LotteryCatalogItemDto> {
+  const result = new Map<LotteryId, LotteryCatalogItemDto>();
+  for (const item of payload.items || []) {
+    if (validLottery(item.id)) result.set(item.id, item);
   }
-
-  return batches.map((batch) => `<div class="list-row">
-    <div class="list-row-main"><strong>${validLottery(batch.lottery) ? LOTTERIES[batch.lottery] : escapeHtml(batch.lottery || "Loteria")} · Lote #${batch.id}</strong><p>${batch.games?.length || 0} jogo(s) · alvo ${batch.targetContestNumber ? `#${batch.targetContestNumber}` : "não definido"}</p></div>
-    <div class="list-row-value"><strong>${formatDateTime(batch.createdAt)}</strong>${validLottery(batch.lottery) ? `<button class="dashboard-row-action" type="button" data-dashboard-open="games" data-dashboard-lottery="${batch.lottery}">Abrir jogos</button>` : ""}</div>
-  </div>`).join("");
+  return result;
 }
 
 async function safeApi<T>(path: string, fallback: T, signal: AbortSignal): Promise<T> {
@@ -372,69 +284,28 @@ async function safeApi<T>(path: string, fallback: T, signal: AbortSignal): Promi
 }
 
 async function loadFocusedData(lottery: LotteryId, signal: AbortSignal): Promise<FocusedDashboardData> {
-  const [contest, backtests, realBets, batches] = await Promise.all([
-    safeApi<ContestDto | null>(`/contests/${lottery}/latest`, null, signal),
-    safeApi<BacktestsPayload>(`/backtests/${lottery}?limit=1`, { items: [] }, signal),
+  const [catalog, contests, realBets, batches] = await Promise.all([
+    safeApi<LotteryCatalogPayload>("/lotteries", { items: [] }, signal),
+    safeApi<ContestsPayload>(`/contests/${lottery}?limit=5`, { items: [] }, signal),
     safeApi<RealBetsPayload>(`/real-bets/${lottery}?limit=50`, { items: [], summary: {} }, signal),
-    safeApi<GameBatchesPayload>(`/game-batches/${lottery}?limit=4`, { items: [] }, signal),
+    safeApi<GameBatchesPayload>(`/game-batches/${lottery}?limit=5`, { items: [] }, signal),
   ]);
-  return { contest, backtests, realBets, batches };
+  return { catalog, contests, realBets, batches };
 }
 
-async function loadAllData(signal: AbortSignal): Promise<AllDashboardData> {
-  const [contests, backtests, realBets, batches] = await Promise.all([
-    Promise.all(LOTTERY_IDS.map(async (lottery): Promise<DashboardEntry<ContestDto | null>> => [
-      lottery,
-      await safeApi<ContestDto | null>(`/contests/${lottery}/latest`, null, signal),
-    ] as const)),
-    Promise.all(LOTTERY_IDS.map(async (lottery): Promise<DashboardEntry<BacktestsPayload>> => [
-      lottery,
-      await safeApi<BacktestsPayload>(`/backtests/${lottery}?limit=1`, { items: [] }, signal),
-    ] as const)),
-    Promise.all(LOTTERY_IDS.map(async (lottery): Promise<DashboardEntry<RealBetsPayload>> => [
-      lottery,
-      await safeApi<RealBetsPayload>(`/real-bets/${lottery}?limit=50`, { items: [], summary: {} }, signal),
-    ] as const)),
-    Promise.all(LOTTERY_IDS.map(async (lottery): Promise<DashboardEntry<GameBatchesPayload>> => [
-      lottery,
-      await safeApi<GameBatchesPayload>(`/game-batches/${lottery}?limit=3`, { items: [] }, signal),
-    ] as const)),
-  ]);
-  return { contests, backtests, realBets, batches };
-}
-
-function renderFocusedDashboard(scope: LotteryId, data: FocusedDashboardData): void {
+function renderDashboard(lottery: LotteryId, data: FocusedDashboardData): void {
   if (!root) return;
-  root.innerHTML = `<div class="dashboard-shell is-focused">
-    ${focusedMetrics(data.contest, data.backtests, data.realBets, data.batches)}
-    <section class="dashboard-overview-grid">
-      ${focusedLatestCard(scope, data.contest)}
-      ${realStatusCard(scope, data.realBets)}
-    </section>
-    ${focusedPerformance(scope, data.backtests, data.realBets)}
-    ${focusedRecentGames(scope, data.batches)}
-  </div>`;
-}
+  const catalog = catalogMap(data.catalog);
+  const latest = data.contests.items?.[0] ?? null;
 
-function renderAllDashboard(data: AllDashboardData): void {
-  if (!root) return;
-  const backtests = new Map<LotteryId, BacktestsPayload>(data.backtests);
-  const realBets = new Map<LotteryId, RealBetsPayload>(data.realBets);
-
-  root.innerHTML = `<div class="dashboard-shell is-all">
-    ${allMetrics(data, backtests, realBets)}
-    <section class="dashboard-section">
-      <div class="section-head dashboard-section-head"><div><h2>Concursos atuais</h2><p>Último resultado sincronizado e próximo alvo por loteria.</p></div></div>
-      <div class="dashboard-lottery-grid">${data.contests.map(([lottery, contest]) => latestLotteryCard(lottery, contest)).join("")}</div>
-    </section>
-    <section class="dashboard-section">
-      <div class="section-head dashboard-section-head"><div><h2>Desempenho por loteria</h2><p>Histórico e resultado real no mesmo quadro.</p></div></div>
-      <div class="panel dashboard-performance-panel">${LOTTERY_IDS.map((lottery) => allPerformanceRow(lottery, backtests.get(lottery) || { items: [] }, realBets.get(lottery) || { items: [], summary: {} })).join("")}</div>
-    </section>
-    <section class="dashboard-section">
-      <div class="section-head dashboard-section-head"><div><h2>Atividade recente</h2><p>Lotes mais recentes entre as três loterias.</p></div></div>
-      <div class="panel list dashboard-recent-list">${combinedBatchesMarkup(data.batches)}</div>
-    </section>
+  root.innerHTML = `<div class="dashboard-shell">
+    ${hero(lottery, latest, catalog)}
+    ${summary(data.realBets, data.batches)}
+    <div class="dashboard-columns">
+      ${savedGames(lottery, data.batches, data.realBets, catalog)}
+      ${recentResults(data.contests)}
+    </div>
+    ${pendingSection(data.realBets)}
   </div>`;
 }
 
@@ -444,32 +315,31 @@ function cancelDashboardLoad(): void {
   loadController = null;
 }
 
-async function applyDashboardScope(): Promise<void> {
+async function applyDashboard(): Promise<void> {
   if (!root || !select || currentMainView() !== "dashboard") return;
 
   loadController?.abort();
   const controller = new AbortController();
   loadController = controller;
   const token = ++applyToken;
-  const scope = normalizeScope(select.value || savedScope());
-  localStorage.setItem(DASHBOARD_SCOPE_KEY, scope);
-  setHeader(scope);
+  const lottery = validLottery(select.value) ? select.value : savedLottery();
+  localStorage.setItem(LOTTERY_KEY, lottery);
+  setHeader(lottery);
 
   try {
-    const data = scope === "all"
-      ? await loadAllData(controller.signal)
-      : await loadFocusedData(scope, controller.signal);
+    const data = await loadFocusedData(lottery, controller.signal);
     if (
       controller.signal.aborted
       || token !== applyToken
       || currentMainView() !== "dashboard"
-      || normalizeScope(select.value) !== scope
+      || select.value !== lottery
     ) return;
 
-    if (scope === "all") renderAllDashboard(data as AllDashboardData);
-    else renderFocusedDashboard(scope, data as FocusedDashboardData);
+    hydrateLotteryOptions(data.catalog, lottery);
+    renderDashboard(lottery, data);
   } catch (error) {
     if (!(error instanceof Error && error.name === "AbortError")) {
+      root.innerHTML = '<div class="error-state"><strong>Não foi possível carregar o Painel</strong><p>Tente atualizar os dados ou carregar a tela novamente.</p></div>';
       toast("Não foi possível atualizar o Painel.", "error");
     }
   } finally {
@@ -482,7 +352,7 @@ function scheduleApply(): void {
   scheduled = true;
   queueMicrotask(() => {
     scheduled = false;
-    void applyDashboardScope();
+    void applyDashboard();
   });
 }
 
@@ -509,9 +379,8 @@ async function syncDashboardData(): Promise<void> {
 }
 
 select?.addEventListener("change", () => {
-  if (currentMainView() !== "dashboard" || navigatingFromDashboard) return;
-  const scope = normalizeScope(select.value);
-  localStorage.setItem(DASHBOARD_SCOPE_KEY, scope);
+  if (currentMainView() !== "dashboard" || !validLottery(select.value)) return;
+  localStorage.setItem(LOTTERY_KEY, select.value);
   scheduleApply();
 });
 
@@ -524,25 +393,38 @@ refreshButton?.addEventListener("click", (event) => {
 
 root?.addEventListener("click", (event) => {
   const target = event.target instanceof Element ? event.target : null;
+  const checkButton = target?.closest<HTMLButtonElement>("[data-dashboard-check-bet]");
+  if (checkButton) {
+    const betId = Number(checkButton.dataset.dashboardCheckBet);
+    if (!Number.isFinite(betId)) return;
+    checkButton.disabled = true;
+    checkButton.textContent = "Conferindo...";
+    void api(`/real-bets/${betId}/check`, { method: "POST" })
+      .then(() => {
+        toast("Resultado atualizado.");
+        scheduleApply();
+      })
+      .catch((error: unknown) => {
+        checkButton.disabled = false;
+        checkButton.textContent = "Conferir agora";
+        toast(error instanceof Error ? error.message : "Não foi possível conferir a aposta.", "error");
+      });
+    return;
+  }
+
   const button = target?.closest<HTMLElement>("[data-dashboard-open]");
-  if (!button) return;
+  if (!button || !select) return;
   const lottery = button.dataset.dashboardLottery;
   const view = button.dataset.dashboardOpen;
-  if (!validLottery(lottery) || !view || !select) return;
+  if (!validLottery(lottery) || (view !== "analysis" && view !== "generate")) return;
 
-  const previousScope = savedScope();
-  navigatingFromDashboard = true;
+  localStorage.setItem(LOTTERY_KEY, lottery);
   select.value = lottery;
-  select.dispatchEvent(new Event("change", { bubbles: true }));
-  navigatingFromDashboard = false;
-  localStorage.setItem(DASHBOARD_SCOPE_KEY, previousScope);
-  queueMicrotask(() => {
-    window.location.hash = view;
-  });
+  window.location.hash = view;
 });
 
 onMainViewChanged((view) => {
-  syncScopeControl();
+  syncLotteryControl();
   if (view === "dashboard") scheduleApply();
   else cancelDashboardLoad();
 });
@@ -551,5 +433,5 @@ onViewRendered(({ view }) => {
   if (view === "dashboard") scheduleApply();
 });
 
-syncScopeControl();
+syncLotteryControl();
 scheduleApply();

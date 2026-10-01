@@ -90,8 +90,7 @@ body {
 }
 
 .nav-item,
-.nav-link,
-.nav-more {
+.nav-link {
   min-height: 44px;
   border-radius: 8px;
   padding-inline: 11px;
@@ -100,16 +99,13 @@ body {
 }
 
 .nav-item:hover,
-.nav-link:hover,
-.nav-more:hover {
+.nav-link:hover {
   background: rgba(255, 255, 255, 0.045);
   color: var(--text);
 }
 
 .nav-item.is-active,
-.nav-link.is-active,
-.nav-more.is-active,
-.nav-more-link.is-active {
+.nav-link.is-active {
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
@@ -346,33 +342,16 @@ td {
 
   .main-nav {
     width: 100%;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 4px;
   }
 
   .nav-item,
-  .nav-link,
-  .nav-more {
+  .nav-link {
     min-height: 46px;
     border-radius: 8px;
     padding: 0;
     justify-content: center;
-  }
-
-  .nav-more-menu {
-    right: 8px;
-    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
-    width: min(300px, calc(100vw - 16px));
-    padding: 8px;
-    border-color: var(--border-strong);
-    border-radius: 12px;
-    background: rgba(15, 27, 41, 0.99);
-    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.4);
-  }
-
-  .nav-more-link {
-    min-height: 48px;
-    border-radius: 8px;
   }
 
   .main-area {

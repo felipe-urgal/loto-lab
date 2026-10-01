@@ -2,11 +2,10 @@ export const MAIN_VIEWS = [
   "dashboard",
   "analysis",
   "generate",
-  "games",
-  "backtests",
 ] as const;
 
-export type MainView = (typeof MAIN_VIEWS)[number];
+export type CanonicalMainView = (typeof MAIN_VIEWS)[number];
+export type MainView = CanonicalMainView | "games" | "backtests";
 
 export const LOTTERY_IDS = [
   "mega-sena",
@@ -25,7 +24,12 @@ export type LotteryId = (typeof LOTTERY_IDS)[number];
 const mainViews = new Set<string>(MAIN_VIEWS);
 const lotteryIds = new Set<string>(LOTTERY_IDS);
 
-export function isMainView(value: string): value is MainView {
+const LEGACY_MAIN_VIEW_REDIRECTS: Readonly<Record<string, CanonicalMainView>> = {
+  games: "dashboard",
+  backtests: "analysis",
+};
+
+export function isMainView(value: string): value is CanonicalMainView {
   return mainViews.has(value);
 }
 
@@ -33,9 +37,10 @@ export function requestedMainViewFromHash(hash: string): string {
   return hash.replace(/^#/, "");
 }
 
-export function mainViewFromHash(hash: string): MainView {
+export function mainViewFromHash(hash: string): CanonicalMainView {
   const requested = requestedMainViewFromHash(hash);
-  return isMainView(requested) ? requested : "dashboard";
+  if (isMainView(requested)) return requested;
+  return LEGACY_MAIN_VIEW_REDIRECTS[requested] ?? "dashboard";
 }
 
 export function isLotteryId(value: string | null | undefined): value is LotteryId {

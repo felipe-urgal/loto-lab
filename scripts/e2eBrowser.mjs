@@ -325,44 +325,49 @@ try {
   await waitFor(client, "!document.querySelector('.a2-shell')", "leave Analyses with modal open");
   await waitFor(client, "!document.body.classList.contains('a2-detail-open')", "dialog navigation cleanup");
 
-  await navigate(client, "/strategies");
-  await waitFor(client, "Boolean(document.querySelector('#strategy-form'))", "strategies form");
-  assert(await evaluate(client, "document.querySelector('h1')?.textContent === 'Estratégias'"), "Strategies page identity mismatch");
+  const mobileNav = await evaluate(client, `(() => {
+    const items = [...document.querySelectorAll('[data-shell-nav] [data-nav-key]')];
+    return {
+      labels: items.map((item) => item.getAttribute('aria-label')),
+      visible: items.filter((item) => getComputedStyle(item).display !== 'none').length,
+      hasMore: Boolean(document.querySelector('[data-nav-more]'))
+    };
+  })()`);
+  assert(mobileNav.visible === 3, `Mobile navigation must expose exactly three destinations: ${JSON.stringify(mobileNav)}`);
+  assert(
+    ["Painel", "Análises", "Gerar jogos"].every((label) => mobileNav.labels.includes(label)),
+    `Mobile navigation is missing canonical destinations: ${JSON.stringify(mobileNav)}`,
+  );
+  assert(!mobileNav.hasMore, "Mobile navigation still exposes a More menu");
 
-  await sleep(120);
-  const mobileMoreVisible = await evaluate(client, `(() => {
-    const button = document.querySelector('[data-nav-more]');
-    return button && getComputedStyle(button).display !== 'none';
-  })()`);
-  assert(mobileMoreVisible, "Mobile More navigation is not visible at 390px");
-  await evaluate(client, "document.querySelector('[data-nav-more]').click(); true");
-  const menu = await evaluate(client, `(() => {
-    const panel = document.querySelector('[data-nav-more-menu]');
-    return { hidden: panel?.hidden, text: panel?.innerText || '' };
-  })()`);
-  assert(menu.hidden === false, "Mobile More panel did not open");
-  assert(menu.text.includes("Estratégias") && menu.text.includes("Execuções"), "Mobile More panel is missing new operational pages");
+  await navigate(client, "/strategies");
+  await waitFor(client, "location.pathname === '/' && location.hash === '#analysis' && Boolean(document.querySelector('.a2-shell'))", "Strategies legacy redirect");
+  assert(
+    await evaluate(client, "document.querySelector('h1')?.textContent === 'Análises'"),
+    "Strategies did not redirect to Analyses",
+  );
 
   await client.send("Emulation.clearDeviceMetricsOverride");
+
   await navigate(client, "/jobs");
-  await waitFor(client, "Boolean(document.querySelector('#job-form'))", "jobs form");
-  assert(await evaluate(client, "document.querySelector('h1')?.textContent === 'Execuções'"), "Jobs page identity mismatch");
-  assert(await evaluate(client, "Boolean(document.querySelector('#job-strategy'))"), "Jobs strategy-version selector is missing");
+  await waitFor(client, "location.pathname === '/' && location.hash === '#dashboard' && Boolean(document.querySelector('.dashboard-shell'))", "Jobs legacy redirect");
+  assert(
+    await evaluate(client, "document.body.innerText.includes('Seus jogos') && document.body.innerText.includes('Resultados recentes')"),
+    "Jobs did not redirect to the central Panel",
+  );
 
   await navigate(client, "/agenda");
-  await waitFor(client, "Boolean(document.querySelector('#agenda-grid'))", "agenda root");
-  assert(await evaluate(client, "document.querySelector('h1')?.textContent === 'Agenda'"), "Agenda page identity mismatch");
+  await waitFor(client, "location.pathname === '/' && location.hash === '#dashboard' && Boolean(document.querySelector('.dashboard-shell'))", "Agenda legacy redirect");
 
   await navigate(client, "/ai");
-  await waitFor(client, "Boolean(document.querySelector('#ai-form'))", "AI form");
-  assert(await evaluate(client, "Boolean(document.querySelector('#ai-force'))"), "AI explicit refresh control is missing");
+  await waitFor(client, "location.pathname === '/' && location.hash === '#analysis' && Boolean(document.querySelector('.a2-shell'))", "AI legacy redirect");
 
   await sleep(200);
   assert(runtimeErrors.length === 0, `Browser runtime exceptions: ${runtimeErrors.join(" | ")}`);
   assert(severeLogs.length === 0, `Browser console errors: ${severeLogs.join(" | ")}`);
   assert(networkErrors.length === 0, `Browser resource/server failures: ${networkErrors.join(" | ")}`);
 
-  console.log("Browser E2E passed: main, hardened Analyses 2.0 desktop/mobile, dialog cleanup, strategies, mobile nav, jobs, agenda and AI");
+  console.log("Browser E2E passed: canonical navigation, central Panel, Analyses desktop/mobile and legacy redirects");
 } finally {
   client?.close();
   await stopBrowser(browser);

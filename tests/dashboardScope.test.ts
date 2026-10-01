@@ -2,23 +2,23 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-test("dashboard scope keeps comparison mode separate from the active lottery", async () => {
+test("dashboard centralizes results, saved games, pending checks and data recovery", async () => {
   const [
     boundary,
     scopeSource,
-    financialSource,
     typesSource,
     loaderSource,
     statusSource,
     scopeCss,
+    apiSource,
   ] = await Promise.all([
     readFile("web/dashboard-scope.js", "utf8"),
     readFile("web/src/features/dashboardScope.ts", "utf8"),
-    readFile("web/src/features/dashboardScope/financial.ts", "utf8"),
     readFile("web/src/features/dashboardScope/types.ts", "utf8"),
     readFile("web/src/core/featureLoader.ts", "utf8"),
     readFile("web/src/features/dataStatus.ts", "utf8"),
     readFile("web/dashboard-scope.css", "utf8"),
+    readFile("src/api/app.ts", "utf8"),
   ]);
 
   assert.equal(boundary, 'import "./src/features/dashboardScope.js";\n');
@@ -27,7 +27,6 @@ test("dashboard scope keeps comparison mode separate from the active lottery", a
   assert.match(scopeSource, /from "\.\.\/shared\/escaping\.js"/);
   assert.match(scopeSource, /from "\.\.\/shared\/formatters\.js"/);
   assert.match(scopeSource, /from "\.\.\/shared\/toast\.js"/);
-  assert.doesNotMatch(scopeSource, /from "\.\/runtime\.js"/);
   assert.doesNotMatch(scopeSource, /location\.hash\.replace/);
   assert.doesNotMatch(scopeSource, /addEventListener\("hashchange"/);
   assert.match(scopeSource, /currentMainView\(\)/);
@@ -36,71 +35,52 @@ test("dashboard scope keeps comparison mode separate from the active lottery", a
   assert.match(scopeSource, /loadController\?\.abort\(\)/);
   assert.match(scopeSource, /controller\.signal\.aborted/);
 
-  assert.match(typesSource, /export type DashboardScope = "all" \| LotteryId/);
-  assert.match(typesSource, /export type RealBetSummaryDto/);
-  assert.match(typesSource, /checkedCost\?: unknown/);
-  assert.match(typesSource, /netResult\?: unknown/);
+  assert.match(typesSource, /"mais-milionaria": "\+Milionária"/);
+  assert.match(typesSource, /"super-sete": "Super Sete"/);
+  assert.match(typesSource, /export type LotteryCapabilitiesDto/);
+  assert.match(typesSource, /export type RealBetDto/);
+  assert.match(typesSource, /batchId\?: unknown/);
 
-  assert.match(scopeSource, /loto-lab:dashboard-scope/);
-  assert.match(scopeSource, /option\.value = "all"/);
-  assert.match(scopeSource, /Todas as loterias/);
-  assert.match(scopeSource, /selectLabel\.textContent = "Escopo"/);
-  assert.match(scopeSource, /selectLabel\.textContent = "Loteria"/);
-  assert.match(scopeSource, /localStorage\.getItem\(LOTTERY_KEY\)/);
-  assert.match(scopeSource, /loadAllData/);
-  assert.match(scopeSource, /loadFocusedData/);
-  assert.match(scopeSource, /nextContestNumber/);
-  assert.match(scopeSource, /Number\.isFinite\(numeric\) \? numeric \+ 1 : null/);
-  assert.match(scopeSource, /\/backtests\/\$\{lottery\}\?limit=1/);
+  assert.match(scopeSource, /\/lotteries/);
+  assert.match(scopeSource, /\/contests\/\$\{lottery\}\?limit=5/);
   assert.match(scopeSource, /\/real-bets\/\$\{lottery\}\?limit=50/);
-  assert.match(scopeSource, /\/game-batches\/\$\{lottery\}\?limit=3/);
-  assert.match(scopeSource, /Painel · \$\{LOTTERIES\[scope\]\}/);
-  assert.match(scopeSource, /navigatingFromDashboard/);
-  assert.match(scopeSource, /const previousScope = savedScope\(\)/);
-  assert.match(scopeSource, /localStorage\.setItem\(DASHBOARD_SCOPE_KEY, previousScope\)/);
+  assert.match(scopeSource, /\/game-batches\/\$\{lottery\}\?limit=5/);
+  assert.doesNotMatch(scopeSource, /\/backtests\//);
+  assert.doesNotMatch(scopeSource, /ROI histórico|Melhor ROI|Desempenho por loteria/);
+
+  assert.match(scopeSource, /function hero/);
+  assert.match(scopeSource, /function savedGames/);
+  assert.match(scopeSource, /function recentResults/);
+  assert.match(scopeSource, /function pendingSection/);
+  assert.match(scopeSource, /Jogos salvos/);
+  assert.match(scopeSource, /Resultados recentes/);
+  assert.match(scopeSource, /Pendências/);
+  assert.match(scopeSource, /data-dashboard-check-bet/);
+  assert.match(scopeSource, /\/real-bets\/\$\{betId\}\/check/);
+  assert.match(scopeSource, /supports\(catalog, lottery, "simulation"\)/);
+  assert.match(scopeSource, /supports\(catalog, lottery, "analysis"\)/);
+  assert.match(scopeSource, /supports\(catalog, lottery, "checking"\)/);
 
   const scopeLoad = loaderSource.indexOf('loadStyledModule("dashboard-scope")');
   const statusLoad = loaderSource.indexOf('loadModule("data-status")');
   assert.ok(scopeLoad >= 0, "dashboard scope module must be lazy-loaded");
   assert.ok(statusLoad > scopeLoad, "dashboard scope must load before operational status");
-  assert.doesNotMatch(loaderSource, /loadStyledModule\("data-status"\)/);
-  assert.doesNotMatch(loaderSource, /loadStyle\("data-status"\)/);
-  await assert.rejects(readFile("web/data-status.css", "utf8"), /ENOENT/);
+  assert.doesNotMatch(loaderSource, /my-games-v2|backtests-workspace|loadModule\("backtests"\)/);
 
-  assert.match(statusSource, /scope === "all" \|\| item\.lottery === scope/);
-  assert.match(statusSource, /data-status-compact/);
-  assert.match(statusSource, /Sincronização em andamento/);
-  assert.doesNotMatch(statusSource, /cobertura média/);
-  assert.doesNotMatch(statusSource, /Sincronizar agora/);
+  assert.match(statusSource, /Dados precisam de atenção/);
+  assert.match(statusSource, /data-status-refresh/);
+  assert.match(statusSource, /refreshButton\?\.click\(\)/);
+  assert.match(statusSource, /"super-sete": "Super Sete"/);
 
-  assert.match(scopeSource, /function focusedMetrics/);
-  assert.match(scopeSource, /function allMetrics/);
-  assert.match(scopeSource, /function realStatusCard/);
-  assert.match(financialSource, /knownNumber\(summary\.checkedCost\)/);
-  assert.match(financialSource, /knownNumber\(summary\.netResult\)/);
-  assert.match(financialSource, /costs\.every/);
-  assert.match(financialSource, /results\.every/);
-  assert.match(financialSource, /checkedCost > 0/);
-  assert.doesNotMatch(scopeSource, /netResult \|\| 0/);
-  assert.doesNotMatch(scopeSource, /actualCost \|\| 0/);
-  assert.doesNotMatch(scopeSource, /totalPrizeValue \|\| 0/);
-  assert.match(scopeSource, /Custo conferido indisponível/);
-  assert.match(scopeSource, /custo conferido/);
-  assert.match(scopeSource, /dashboard-metrics-grid/);
-  assert.match(scopeSource, /dashboard-overview-grid/);
-  assert.match(scopeSource, /dashboard-status-card/);
-  assert.match(scopeSource, /dashboard-donut/);
-  assert.match(scopeSource, /Desempenho por loteria/);
-  assert.match(scopeSource, /Atividade recente/);
+  assert.match(apiSource, /getLotteryCatalogEntry/);
+  assert.match(apiSource, /capabilities: catalog\.capabilities/);
+  assert.match(apiSource, /family: catalog\.family/);
 
-  assert.match(scopeCss, /\.dashboard-metrics-grid/);
-  assert.match(scopeCss, /\.dashboard-overview-grid/);
-  assert.match(scopeCss, /\.dashboard-status-card/);
-  assert.match(scopeCss, /conic-gradient\(var\(--success\)/);
-  assert.match(scopeCss, /\.dashboard-performance-panel/);
-  assert.match(scopeCss, /\.dashboard-lottery-grid/);
-  assert.match(scopeCss, /color: var\(--success-strong\)/);
-  assert.match(scopeCss, /\.data-status-compact/);
-  assert.match(scopeCss, /\.data-status-compact\.is-warning/);
-  assert.match(scopeCss, /@media \(max-width: 620px\)[\s\S]*\.data-status-compact/);
+  assert.match(scopeCss, /\.dashboard-hero/);
+  assert.match(scopeCss, /\.dashboard-summary/);
+  assert.match(scopeCss, /\.dashboard-columns/);
+  assert.match(scopeCss, /\.dashboard-game-row/);
+  assert.match(scopeCss, /\.dashboard-result-row/);
+  assert.match(scopeCss, /\.data-status-action/);
+  assert.match(scopeCss, /@media \(max-width: 680px\)/);
 });

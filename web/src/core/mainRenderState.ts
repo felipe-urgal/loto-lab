@@ -31,7 +31,7 @@ export function createMainRenderState(
   initialHash: string,
   storedLottery: string | null,
 ): MainRenderState {
-  let view = mainViewFromHash(initialHash);
+  let view: MainView = mainViewFromHash(initialHash);
   let lottery = lotteryFromStoredValue(storedLottery);
   let loading = false;
   let renderToken = 0;

@@ -3,14 +3,21 @@ import { currentMainView, onMainViewChanged } from "../core/viewLifecycle.js";
 
 const root = document.querySelector<HTMLElement>("#data-status-bar");
 const lotterySelect = document.querySelector<HTMLSelectElement>("#lottery-select");
+const refreshButton = document.querySelector<HTMLButtonElement>("#refresh-view");
+
 const labels = {
   "mega-sena": "Mega-Sena",
   lotofacil: "Lotofácil",
   "dia-de-sorte": "Dia de Sorte",
+  quina: "Quina",
+  lotomania: "Lotomania",
+  "dupla-sena": "Dupla Sena",
+  "mais-milionaria": "+Milionária",
+  timemania: "Timemania",
+  "super-sete": "Super Sete",
 } as const;
 
 type LotteryId = keyof typeof labels;
-type Scope = "all" | LotteryId;
 
 type DataStatusItem = {
   lottery?: string;
@@ -40,10 +47,6 @@ type StatusCopy = {
   detail: string;
 };
 
-function formatPercent(value: unknown): string {
-  return `${Math.round((Number(value) || 0) * 100)}%`;
-}
-
 function formatAge(minutes: unknown): string {
   if (!Number.isFinite(Number(minutes))) return "sem execução recente";
   const value = Math.max(0, Math.round(Number(minutes)));
@@ -62,24 +65,20 @@ function isLotteryId(value: string | undefined): value is LotteryId {
   return Boolean(value && Object.prototype.hasOwnProperty.call(labels, value));
 }
 
-function currentScope(): Scope {
+function currentLottery(): LotteryId {
   const value = lotterySelect?.value;
-  return value === "all" || isLotteryId(value) ? value : "all";
+  return isLotteryId(value) ? value : "mega-sena";
 }
 
 function statusCopy(
   operations: OperationsStatus | null,
-  items: DataStatusItem[],
-  scope: Scope,
+  item: DataStatusItem | undefined,
 ): StatusCopy {
   const latestStatus = operations?.latest?.status;
   const running = latestStatus === "running";
   const latestFailed = Boolean(latestStatus && !["success", "running"].includes(latestStatus));
   const stale = Boolean(operations?.stale);
-  const missing = items.reduce(
-    (total, item) => total + Number(item.missingContestCount || 0),
-    0,
-  );
+  const missing = Number(item?.missingContestCount || 0);
   const warning = !running && (stale || latestFailed || missing > 0);
   const age = formatAge(operations?.ageMinutes);
   const title = running
@@ -88,30 +87,22 @@ function statusCopy(
       ? "Dados precisam de atenção"
       : `Dados atualizados ${age}`;
 
-  if (scope !== "all") {
-    const item = items[0];
-    if (!item) {
-      return {
-        warning: true,
-        title: "Dados indisponíveis",
-        detail: "Não há cobertura registrada para esta loteria.",
-      };
-    }
-    const continuity = Number(item.missingContestCount || 0) > 0
-      ? `${formatCount(item.missingContestCount)} concurso(s) faltando`
-      : `histórico até #${Number(item.lastContest) || 0}`;
+  if (!item) {
     return {
-      warning,
-      title,
-      detail: `${formatCount(item.contestCount)} concursos · ${continuity} · cobertura ${formatPercent(item.financialCoverage)}`,
+      warning: true,
+      title: "Dados indisponíveis",
+      detail: "Não há cobertura registrada para esta loteria.",
     };
   }
 
-  const contests = items.reduce((total, item) => total + Number(item.contestCount || 0), 0);
+  const continuity = missing > 0
+    ? `${formatCount(missing)} concurso(s) faltando`
+    : `histórico até #${Number(item.lastContest) || 0}`;
+
   return {
     warning,
     title,
-    detail: `${items.length} loterias · ${formatCount(contests)} concursos`,
+    detail: `${formatCount(item.contestCount)} concursos · ${continuity}`,
   };
 }
 
@@ -130,11 +121,9 @@ async function refreshDataStatus(): Promise<void> {
       api<DataStatusPayload>("/data/status"),
       api<OperationsStatus>("/operations/status").catch(() => null),
     ]);
-    const scope = currentScope();
-    const items = (payload?.items || []).filter(
-      (item) => scope === "all" || item.lottery === scope,
-    );
-    const status = statusCopy(operations, items, scope);
+    const lottery = currentLottery();
+    const item = (payload?.items || []).find((candidate) => candidate.lottery === lottery);
+    const status = statusCopy(operations, item);
     const auto = operations?.autoSyncEnabled !== false;
     const interval = Number(operations?.intervalMinutes) || 30;
 
@@ -142,11 +131,17 @@ async function refreshDataStatus(): Promise<void> {
       <span class="data-status-dot"></span>
       <strong>${status.title}</strong>
       <span>${status.detail}</span>
+      ${status.warning ? '<button class="data-status-action" type="button" data-status-refresh>Atualizar dados</button>' : ""}
     </div>`;
   } catch {
-    root.innerHTML = '<div class="data-status-compact is-warning"><span class="data-status-dot"></span><strong>Status indisponível</strong><span>Não foi possível consultar o estado da base.</span></div>';
+    root.innerHTML = '<div class="data-status-compact is-warning"><span class="data-status-dot"></span><strong>Status indisponível</strong><span>Não foi possível consultar o estado da base.</span><button class="data-status-action" type="button" data-status-refresh>Atualizar dados</button></div>';
   }
 }
+
+root?.addEventListener("click", (event) => {
+  const target = event.target instanceof Element ? event.target.closest("[data-status-refresh]") : null;
+  if (target) refreshButton?.click();
+});
 
 onMainViewChanged(() => {
   void refreshDataStatus();
