@@ -45,7 +45,7 @@
   display: block;
   margin-bottom: 8px;
   color: var(--accent-strong);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 750;
 }
 
@@ -116,7 +116,7 @@
 
 .dashboard-summary span {
   color: var(--muted);
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .dashboard-summary strong {
@@ -178,7 +178,7 @@
 .dashboard-game-meta small,
 .dashboard-result-row span {
   color: var(--muted);
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .dashboard-game-meta {
@@ -188,7 +188,7 @@
 
 .dashboard-status {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 750;
 }
 
@@ -228,13 +228,13 @@
 .dashboard-result-row .ball {
   width: 34px;
   height: 34px;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .dashboard-result-row .dashboard-structured-result {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .dashboard-empty {
@@ -272,12 +272,12 @@
   gap: 8px;
   min-width: 0;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .data-status-compact strong {
   color: var(--accent-strong);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 750;
   white-space: nowrap;
 }
@@ -376,7 +376,7 @@
   }
 
   .dashboard-summary span {
-    font-size: 14px;
+    font-size: 16px;
   }
 
   .dashboard-summary strong {
