@@ -279,8 +279,23 @@ async function auditControls(client, label) {
 
 async function auditKeyboardFocus(client, label) {
   await evaluate(client, "document.activeElement?.blur(); true");
+  const focusableCount = await evaluate(client, `(() => {
+    const visible = (el) => {
+      const style = getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      return style.visibility !== 'hidden' && style.display !== 'none' && rect.width > 0 && rect.height > 0;
+    };
+    return [...document.querySelectorAll('a[href],button,input:not([type="hidden"]),select,textarea,summary,[tabindex]')]
+      .filter((el) => visible(el) && !el.disabled && el.getAttribute('tabindex') !== '-1')
+      .length;
+  })()`);
+  const traversalCount = Math.min(4, focusableCount);
+  if (traversalCount < 2) {
+    throw new Error(`${label} exposes fewer than two keyboard-focusable controls: ${focusableCount}`);
+  }
+
   const focused = [];
-  for (let index = 0; index < 4; index += 1) {
+  for (let index = 0; index < traversalCount; index += 1) {
     await client.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
     await client.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
     const focus = await evaluate(client, `(() => {
@@ -294,7 +309,7 @@ async function auditKeyboardFocus(client, label) {
         outlineWidth: Number.parseFloat(style.outlineWidth || '0'),
       };
     })()`);
-    if (!focus) throw new Error(`${label} lost keyboard focus on Tab ${index + 1}`);
+    if (!focus) throw new Error(`${label} lost keyboard focus on Tab ${index + 1} of ${traversalCount}`);
     if (focus.outlineStyle === "none" || focus.outlineWidth < 1.5) {
       throw new Error(`${label} keyboard focus is not visibly outlined: ${JSON.stringify(focus)}`);
     }
