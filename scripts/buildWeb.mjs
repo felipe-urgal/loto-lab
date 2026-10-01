@@ -7,6 +7,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = join(root, "web");
 const outputRoot = join(root, "web-dist");
 const assetRoot = join(outputRoot, "assets");
+const LEGACY_HTML = new Set(["agenda.html", "ai.html", "jobs.html", "lab.html", "strategies.html"]);
 
 async function walk(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -50,6 +51,7 @@ for (const sourceFile of sourceFiles) {
   let output = body;
 
   if (extension === ".html") {
+    if (LEGACY_HTML.has(rel)) continue;
     destination = join(outputRoot, rel);
     output = Buffer.from(withVersion(body.toString("utf8"), version));
   } else if (rel === "favicon.svg") {
