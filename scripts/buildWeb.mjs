@@ -7,6 +7,24 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = join(root, "web");
 const outputRoot = join(root, "web-dist");
 const assetRoot = join(outputRoot, "assets");
+const LEGACY_BUILD_FILES = new Set([
+  "agenda.html",
+  "agenda.js",
+  "agenda-workspace.css",
+  "ai.html",
+  "ai.js",
+  "ai-workspace.css",
+  "jobs.html",
+  "jobs.js",
+  "jobs-workspace.css",
+  "lab.html",
+  "lab.js",
+  "lab-refinements.js",
+  "lab-workspace.css",
+  "strategies.html",
+  "strategies.js",
+  "strategies-workspace.css",
+]);
 
 async function walk(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -48,6 +66,8 @@ for (const sourceFile of sourceFiles) {
   const body = await readFile(sourceFile);
   let destination;
   let output = body;
+
+  if (LEGACY_BUILD_FILES.has(rel)) continue;
 
   if (extension === ".html") {
     destination = join(outputRoot, rel);

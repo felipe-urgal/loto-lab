@@ -54,7 +54,8 @@
     "prod:restore-check": "node --env-file-if-exists=.env.production scripts/verifyBackup.mjs",
     "prod:logs": "docker compose --env-file .env.production -f docker-compose.prod.yml logs -f app",
     "test:e2e:redesign": "node scripts/e2eBrowser.mjs && node scripts/e2eAnalysisLotteries.mjs && node scripts/e2eGeneratorV2.mjs && node scripts/e2eReadability.mjs && node scripts/e2eCriticalRoutes.mjs",
-    "quality:e2e-syntax": "node --check scripts/e2eBrowser.mjs && node --check scripts/e2eAnalysisLotteries.mjs && node --check scripts/e2eGeneratorV2.mjs && node --check scripts/e2eReadability.mjs && node --check scripts/e2eCriticalRoutes.mjs"
+    "test:e2e:seed": "node scripts/seedE2e.mjs",
+    "quality:e2e-syntax": "node --check scripts/seedE2e.mjs && node --check scripts/e2eBrowser.mjs && node --check scripts/e2eAnalysisLotteries.mjs && node --check scripts/e2eGeneratorV2.mjs && node --check scripts/e2eReadability.mjs && node --check scripts/e2eCriticalRoutes.mjs"
   },
   "dependencies": {
     "pg": "^8.23.0"

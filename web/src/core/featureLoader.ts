@@ -51,30 +51,32 @@ function loadModule(name: string): Promise<boolean> {
 }
 
 async function loadStyledModule(name: string): Promise<boolean> {
-  await loadStyle(name);
+  if (!await loadStyle(name)) return false;
   return loadModule(name);
 }
 
-async function ensureViewFeatures(): Promise<boolean | undefined> {
+async function ensureViewFeatures(): Promise<boolean> {
   const view = currentMainView();
   if (view === "dashboard") {
-    await loadStyledModule("dashboard-scope");
-    await loadModule("data-status");
-    return;
+    if (!await loadStyledModule("dashboard-scope")) return false;
+    return loadModule("data-status");
   }
 
   if (view === "analysis") {
-    await loadStyle("analysis-v2");
-    await loadStyle("analysis-workspace");
-    await loadModule("analysis-v2");
-    return;
+    const stylesReady = await Promise.all([
+      loadStyle("analysis-v2"),
+      loadStyle("analysis-workspace"),
+    ]);
+    if (stylesReady.some((ready) => !ready)) return false;
+    return loadModule("analysis-v2");
   }
 
-  await loadStyledModule("refinements");
+  if (!await loadStyledModule("refinements")) return false;
   if (view === "generate") {
-    await loadStyledModule("generation-v2");
-    await loadStyle("generation-workspace");
+    if (!await loadStyledModule("generation-v2")) return false;
+    return loadStyle("generation-workspace");
   }
+  return true;
 }
 
 function isMainRenderPending(): boolean {

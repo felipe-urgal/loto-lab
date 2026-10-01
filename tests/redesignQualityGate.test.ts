@@ -3,13 +3,18 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 
 test("Redesign V2 quality gate remains wired to current product surfaces", async () => {
-  const [packageSource, e2e, template, design, foundation, html] = await Promise.all([
+  const [packageSource, e2e, template, design, foundation, analysisStyles, generatorStyles, styles, html, ci, loader] = await Promise.all([
     readFile("package.json", "utf8"),
     readFile("scripts/e2eReadability.mjs", "utf8"),
     readFile(".github/PULL_REQUEST_TEMPLATE.md", "utf8"),
     readFile("docs/design/REDESIGN_V2.md", "utf8"),
     readFile("web/ui-foundation.css", "utf8"),
+    readFile("web/analysis-v2.css", "utf8"),
+    readFile("web/generation-v2.css", "utf8"),
+    readFile("web/styles.css", "utf8"),
     readFile("web/index.html", "utf8"),
+    readFile(".github/workflows/ci.yml", "utf8"),
+    readFile("web/src/core/featureLoader.ts", "utf8"),
   ]);
 
   const pkg = JSON.parse(packageSource) as { scripts?: Record<string, string> };
@@ -21,8 +26,21 @@ test("Redesign V2 quality gate remains wired to current product surfaces", async
   assert.match(redesignE2e, /e2eCriticalRoutes\.mjs/);
   assert.doesNotMatch(redesignE2e, /e2eMyGamesV2|e2eOperationalFlows/);
   assert.equal(pkg.scripts?.["test:e2e"], "npm run test:e2e:redesign");
+  assert.equal(pkg.scripts?.["test:e2e:seed"], "node scripts/seedE2e.mjs");
   assert.match(pkg.scripts?.["quality:static"] ?? "", /npm run quality:e2e-syntax/);
   assert.match(pkg.scripts?.["quality:e2e-syntax"] ?? "", /node --check scripts\/e2eReadability\.mjs/);
+
+  assert.match(ci, /e2e-redesign:/);
+  assert.match(ci, /name: Redesign V2 browser E2E/);
+  assert.match(ci, /run: npm run test:e2e:redesign/);
+  assert.match(ci, /API_PORT: 3099/);
+  assert.match(ci, /npm run db:migrate/);
+  assert.match(ci, /npm run test:e2e:seed/);
+
+  assert.match(loader, /async function ensureViewFeatures\(\): Promise<boolean>/);
+  assert.match(loader, /if \(!await loadStyle\(name\)\) return false/);
+  assert.match(loader, /stylesReady\.some\(\(ready\) => !ready\)/);
+  assert.match(loader, /featuresReady === false/);
 
   assert.match(e2e, /name: "desktop", width: 1440, height: 900/);
   assert.match(e2e, /name: "tablet", width: 820, height: 1180/);
@@ -34,6 +52,9 @@ test("Redesign V2 quality gate remains wired to current product surfaces", async
   assert.match(e2e, /auditDocumentOverflow/);
   assert.match(e2e, /auditControls/);
   assert.match(e2e, /auditKeyboardFocus/);
+  assert.match(e2e, /focusableCount/);
+  assert.match(e2e, /Math\.min\(4, focusableCount\)/);
+  assert.match(e2e, /if \(focused\.length >= 2\) break/);
   assert.match(e2e, /auditReducedMotion/);
   assert.match(e2e, /auditLiveFeedback/);
   assert.match(e2e, /auditPerformance/);
@@ -41,6 +62,12 @@ test("Redesign V2 quality gate remains wired to current product surfaces", async
 
   assert.match(foundation, /\.button, \.link-button \{ min-height: var\(--control-min-size\)/);
   assert.match(foundation, /\.button\.compact \{ min-height: var\(--control-min-size\)/);
+  assert.match(analysisStyles, /\.a2-ball \{ width: var\(--control-min-size\); height: var\(--control-min-size\); min-width: var\(--control-min-size\); min-height: var\(--control-min-size\)/);
+  assert.match(generatorStyles, /\.g2-filter-toggle \{[\s\S]*min-height: var\(--control-min-size\)/);
+  assert.match(generatorStyles, /\.g2-field input:focus-visible,/);
+  assert.match(styles, /\.select-control select:focus-visible,/);
+  assert.match(styles, /\.field input:focus-visible,/);
+  assert.match(styles, /\.inline-input:focus-visible \{/);
   assert.match(html, /id="content" aria-live="polite"/);
   assert.match(html, /id="data-status-bar" aria-live="polite"/);
   assert.match(html, /id="toast-root" aria-live="assertive"/);

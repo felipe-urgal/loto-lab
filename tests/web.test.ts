@@ -44,12 +44,24 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   const buildVersion = html.match(/\bdata-build="([a-f0-9]{12})"/)?.[1];
   assert.ok(buildVersion);
 
-  for (const route of ["/index.html", "/lab", "/ai", "/agenda"]) {
-    const response = await fetch(`${baseUrl}${route}`);
-    assert.equal(response.status, 200);
-    const source = await response.text();
-    assert.match(source, /data-shell-nav/);
-    assert.match(source, /\/assets\/shell\.js/);
+  const indexPage = await fetch(`${baseUrl}/index.html`);
+  assert.equal(indexPage.status, 200);
+  assert.match(await indexPage.text(), /data-shell-nav/);
+
+  for (const [route, target] of [
+    ["/agenda", "/#dashboard"],
+    ["/jobs", "/#dashboard"],
+    ["/lab", "/#analysis"],
+    ["/strategies", "/#analysis"],
+    ["/ai", "/#analysis"],
+  ] as const) {
+    const redirect = await fetch(`${baseUrl}${route}`, { redirect: "manual" });
+    assert.equal(redirect.status, 308, route);
+    assert.equal(redirect.headers.get("location"), target, route);
+
+    const followed = await fetch(`${baseUrl}${route}`);
+    assert.equal(followed.status, 200, route);
+    assert.match(await followed.text(), /data-shell-nav/);
   }
 
   const shellBoundary = await fetch(`${baseUrl}/assets/shell.js`);
@@ -129,7 +141,6 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
     "src/features/myGames.js",
     "src/features/myGames/betForm.js",
     "src/features/myGames/auditability.js",
-    "lab.js",
     "data-status.js",
     "src/core/shell.js",
     "src/core/featureLoader.js",
@@ -138,7 +149,6 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
     "src/features/backtests.js",
     "styles.css",
     "refinements.css",
-    "lab-workspace.css",
     "dashboard-scope.css",
   ]) {
     const response = await fetch(`${baseUrl}/assets/${asset}`);
@@ -164,6 +174,17 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
     "real-bets.css",
     "my-games-management.js",
     "my-games-management.css",
+    "agenda.js",
+    "agenda-workspace.css",
+    "ai.js",
+    "ai-workspace.css",
+    "jobs.js",
+    "jobs-workspace.css",
+    "lab.js",
+    "lab-refinements.js",
+    "lab-workspace.css",
+    "strategies.js",
+    "strategies-workspace.css",
   ]) {
     const response = await fetch(`${baseUrl}/assets/${removedAsset}`);
     assert.equal(response.status, 404, removedAsset);

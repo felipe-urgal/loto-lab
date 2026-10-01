@@ -94,15 +94,12 @@ test("UI refinement assets are lazy-loaded only by canonical interactive views",
   assert.match(generatorSource, /generationMode: "diversified"/);
   assert.match(generatorSource, /generatorOptions\.seed/);
 
-  const labPage = await fetch(`${baseUrl}/lab`);
-  assert.equal(labPage.status, 200);
-  const labHtml = await labPage.text();
-  assert.match(labHtml, /lab-refinements\.js/);
-  assert.match(labHtml, /refinements\.css/);
+  const labPage = await fetch(`${baseUrl}/lab`, { redirect: "manual" });
+  assert.equal(labPage.status, 308);
+  assert.equal(labPage.headers.get("location"), "/#analysis");
 
   const labRefinementsBoundary = await fetch(`${baseUrl}/assets/lab-refinements.js`);
-  assert.equal(labRefinementsBoundary.status, 200);
-  assert.match(await labRefinementsBoundary.text(), /src\/features\/labRefinements\.js/);
+  assert.equal(labRefinementsBoundary.status, 404);
 
   const labRefinements = await fetch(`${baseUrl}/assets/src/features/labRefinements.js`);
   assert.equal(labRefinements.status, 200);
@@ -111,8 +108,7 @@ test("UI refinement assets are lazy-loaded only by canonical interactive views",
   assert.match(labSource, /averageHitsPerGame/);
 
   const labBoundary = await fetch(`${baseUrl}/assets/lab.js`);
-  assert.equal(labBoundary.status, 200);
-  assert.match(await labBoundary.text(), /src\/features\/lab\.js/);
+  assert.equal(labBoundary.status, 404);
 
   const labApp = await fetch(`${baseUrl}/assets/src/features/lab.js`);
   assert.equal(labApp.status, 200);

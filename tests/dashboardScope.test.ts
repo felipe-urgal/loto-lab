@@ -70,7 +70,10 @@ test("dashboard centralizes results, saved games, pending checks and data recove
   assert.match(statusSource, /Dados precisam de atenção/);
   assert.match(statusSource, /data-status-refresh/);
   assert.match(statusSource, /refreshButton\?\.click\(\)/);
-  assert.match(statusSource, /"super-sete": "Super Sete"/);
+  assert.match(statusSource, /isLotteryId, type LotteryId/);
+  assert.match(statusSource, /continuidade indisponível/);
+  assert.match(statusSource, /último concurso indisponível/);
+  assert.doesNotMatch(statusSource, /Number\(item\.lastContest\) \|\| 0/);
 
   assert.match(apiSource, /getLotteryCatalogEntry/);
   assert.match(apiSource, /capabilities: catalog\.capabilities/);

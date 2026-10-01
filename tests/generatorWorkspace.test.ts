@@ -45,17 +45,24 @@ test("generator workspace follows Redesign V2 while preserving audited generatio
     'import "./src/features/generationV2.js";\nimport "./src/features/generationV2/enhancements.js";\n',
   );
   assert.match(generator, /from "\.\.\/core\/api\.js"/);
+  assert.match(generator, /from "\.\.\/core\/mainContext\.js"/);
   assert.match(generator, /from "\.\.\/core\/viewLifecycle\.js"/);
   assert.match(generator, /from "\.\.\/shared\/escaping\.js"/);
   assert.doesNotMatch(generator, /fetch\(/);
   assert.doesNotMatch(generator, /location\.hash = "games"/);
+  assert.match(types, /from "\.\.\/\.\.\/core\/mainContext\.js"/);
+  assert.match(types, /export type LotteryGenerationConfig/);
   assert.match(types, /export type GenerationPlan/);
   assert.match(types, /export type GeneratorState/);
+  assert.match(generator, /api<\{ items\?: LotteryGenerationConfig\[\] \}>\("\/lotteries"/);
+  assert.match(generator, /betSize: lotteryConfig\.defaultBetSize/);
+  assert.doesNotMatch(generator, /LOTTERY_FALLBACK/);
   assert.match(generator, /postJson<GenerationPlan>\("\/generation\/plan"/);
   assert.match(generator, /postJson<GenerationPreviewResponse>\("\/generation\/preview"/);
   assert.match(generator, /postJson<GenerationSaveResponse>\("\/generation\/save"/);
   assert.match(generator, /includeSeed \? state\.preview\?\.generatorOptions\.seed/);
   assert.match(generator, /state\.preview = null/);
+  assert.match(generator, /state\.purpose === "experimental" \? \(tiers\.get\(value\) \|\| ""\) : ""/);
   assert.match(generator, /Salvar grava exatamente os jogos exibidos abaixo/);
   assert.match(generator, /disponível no Painel/);
   assert.match(explainability, /Isto não é previsão/);

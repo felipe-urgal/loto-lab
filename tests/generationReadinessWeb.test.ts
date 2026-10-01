@@ -46,8 +46,10 @@ test("generator typed enhancements are loaded with Generator 2.0 and expose the 
   assert.match(generatorSource, /state\.preview = null/);
   assert.match(generatorSource, /Salvar grava exatamente os jogos exibidos abaixo/);
   assert.match(generatorSource, /Lote #\$\{response\.batchId\} salvo e disponível no Painel/);
-  assert.match(generatorSource, /lotomania: \{ label: "Lotomania", min: 0, max: 99/);
-  assert.match(generatorSource, /const minimum = LOTTERY_FALLBACK\[state\.lottery\]\.min/);
+  assert.match(generatorSource, /const catalog = await api\("\/lotteries"/);
+  assert.match(generatorSource, /betSize: lotteryConfig\.defaultBetSize/);
+  assert.match(generatorSource, /const minimum = state\.lotteryConfig\.minNumber/);
+  assert.doesNotMatch(generatorSource, /LOTTERY_FALLBACK/);
   assert.match(generatorSource, /state\.targetContestNumber = undefined/);
   assert.match(generatorSource, /state\.lottery === "timemania" && !state\.favoriteTeam\.trim\(\)/);
 

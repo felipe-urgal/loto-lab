@@ -25,13 +25,15 @@ test("Redesign V2 design system is the shared source of truth across web surface
   }
 });
 
-test("built web surfaces ship the fingerprinted Redesign V2 design system", async () => {
-  for (const page of pages) {
-    const html = await source(`web-dist/${page}`);
-    assert.match(
-      html,
-      /\/assets\/design-system\.css\?v=[a-f0-9]{12}/,
-      `${page} must ship the fingerprinted design system`,
-    );
+test("canonical production page ships the fingerprinted Redesign V2 design system", async () => {
+  const html = await source("web-dist/index.html");
+  assert.match(
+    html,
+    /\/assets\/design-system\.css\?v=[a-f0-9]{12}/,
+    "index.html must ship the fingerprinted design system",
+  );
+
+  for (const page of pages.filter((item) => item !== "index.html")) {
+    await assert.rejects(source(`web-dist/${page}`), /ENOENT/, `${page} must not ship as a legacy destination`);
   }
 });

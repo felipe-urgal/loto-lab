@@ -1,23 +1,10 @@
 import { api } from "../core/api.js";
+import { isLotteryId, type LotteryId } from "../core/mainContext.js";
 import { currentMainView, onMainViewChanged } from "../core/viewLifecycle.js";
 
 const root = document.querySelector<HTMLElement>("#data-status-bar");
 const lotterySelect = document.querySelector<HTMLSelectElement>("#lottery-select");
 const refreshButton = document.querySelector<HTMLButtonElement>("#refresh-view");
-
-const labels = {
-  "mega-sena": "Mega-Sena",
-  lotofacil: "Lotofácil",
-  "dia-de-sorte": "Dia de Sorte",
-  quina: "Quina",
-  lotomania: "Lotomania",
-  "dupla-sena": "Dupla Sena",
-  "mais-milionaria": "+Milionária",
-  timemania: "Timemania",
-  "super-sete": "Super Sete",
-} as const;
-
-type LotteryId = keyof typeof labels;
 
 type DataStatusItem = {
   lottery?: string;
@@ -57,12 +44,14 @@ function formatAge(minutes: unknown): string {
   return `há ${Math.floor(hours / 24)} d`;
 }
 
-function formatCount(value: unknown): string {
-  return new Intl.NumberFormat("pt-BR").format(Number(value) || 0);
+function finiteNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
 }
 
-function isLotteryId(value: string | undefined): value is LotteryId {
-  return Boolean(value && Object.prototype.hasOwnProperty.call(labels, value));
+function formatCount(value: number): string {
+  return new Intl.NumberFormat("pt-BR").format(value);
 }
 
 function currentLottery(): LotteryId {
@@ -78,8 +67,8 @@ function statusCopy(
   const running = latestStatus === "running";
   const latestFailed = Boolean(latestStatus && !["success", "running"].includes(latestStatus));
   const stale = Boolean(operations?.stale);
-  const missing = Number(item?.missingContestCount || 0);
-  const warning = !running && (stale || latestFailed || missing > 0);
+  const missing = finiteNumber(item?.missingContestCount);
+  const warning = !running && (stale || latestFailed || (missing !== undefined && missing > 0));
   const age = formatAge(operations?.ageMinutes);
   const title = running
     ? "Sincronização em andamento"
@@ -95,14 +84,23 @@ function statusCopy(
     };
   }
 
-  const continuity = missing > 0
-    ? `${formatCount(missing)} concurso(s) faltando`
-    : `histórico até #${Number(item.lastContest) || 0}`;
+  const lastContest = finiteNumber(item.lastContest);
+  const contestCount = finiteNumber(item.contestCount);
+  const continuity = missing === undefined
+    ? "continuidade indisponível"
+    : missing > 0
+      ? `${formatCount(missing)} concurso(s) faltando`
+      : lastContest === undefined
+        ? "último concurso indisponível"
+        : `histórico até #${formatCount(lastContest)}`;
+  const countCopy = contestCount === undefined
+    ? "quantidade de concursos indisponível"
+    : `${formatCount(contestCount)} concursos`;
 
   return {
     warning,
     title,
-    detail: `${formatCount(item.contestCount)} concursos · ${continuity}`,
+    detail: `${countCopy} · ${continuity}`,
   };
 }
 
