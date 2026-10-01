@@ -150,9 +150,14 @@ export function generationConfigSignature(
   }));
 }
 
-function gameFingerprint(games: Array<{ numbers: number[]; luckyMonth?: string }>): string {
+function gameFingerprint(games: GeneratedGame[]): string {
   return games
-    .map((game) => `${[...game.numbers].sort((a, b) => a - b).join("-")}:${game.luckyMonth ?? ""}`)
+    .map((game) => [
+      [...game.numbers].sort((a, b) => a - b).join("-"),
+      game.luckyMonth ?? "",
+      game.secondary ? JSON.stringify(game.secondary) : "",
+      game.columns?.join("-") ?? "",
+    ].join(":"))
     .sort((a, b) => a.localeCompare(b))
     .join("|");
 }
@@ -233,6 +238,7 @@ function isExpectedGeneratorFailure(error: unknown): boolean {
     "Unable to sample",
     "Unable to build a diversified portfolio",
     "Unable to select the requested portfolio size",
+    "Timemania generation requires a reference contest",
   ].some((fragment) => error.message.includes(fragment));
 }
 
