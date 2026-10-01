@@ -20,6 +20,9 @@ export interface PurposeGenerationOptions {
   excludedNumbers?: number[];
   constraints?: GenerationConstraints;
   referenceContest?: Contest;
+  cloverCount?: number;
+  favoriteTeam?: string;
+  columnMarks?: number[];
 }
 
 function sampleWithoutReplacement(
@@ -101,7 +104,18 @@ function sampleCandidate(
 ): GeneratedGame {
   const config = getLotteryConfig(options.lottery);
   if (options.lottery === "super-sete") {
-    const columns = Array.from({ length: 7 }, () => Math.floor(random() * 10));
+    const marks = options.columnMarks ?? Array(7).fill(1);
+    if (
+      marks.length !== 7
+      || marks.some((count) => !Number.isInteger(count) || count < 1 || count > 3)
+      || (marks.reduce((sum, count) => sum + count, 0) <= 14 && marks.some((count) => count > 2))
+      || (marks.reduce((sum, count) => sum + count, 0) >= 15 && marks.some((count) => count < 2))
+    ) {
+      throw new Error("Invalid Super Sete column-mark composition");
+    }
+    const columns = marks.map((count) =>
+      sampleWithoutReplacement(Array.from({ length: 10 }, (_, digit) => digit), count, random)
+    );
     return {
       lottery: options.lottery,
       numbers: [],
@@ -129,15 +143,15 @@ function sampleCandidate(
   const luckyMonth = options.lottery === "dia-de-sorte"
     ? LUCKY_MONTHS[Math.floor(random() * LUCKY_MONTHS.length)]
     : undefined;
+  const cloverCount = options.cloverCount ?? 2;
   const clovers = options.lottery === "mais-milionaria"
-    ? sampleWithoutReplacement([1, 2, 3, 4, 5, 6], 2, random)
+    ? sampleWithoutReplacement([1, 2, 3, 4, 5, 6], cloverCount, random)
     : undefined;
   const favoriteTeam = options.lottery === "timemania"
-    && options.referenceContest?.secondary?.kind === "favorite-team"
-    ? options.referenceContest.secondary.values[0]
+    ? options.favoriteTeam?.trim()
     : undefined;
   if (options.lottery === "timemania" && !favoriteTeam) {
-    throw new Error("Timemania generation requires a reference contest with Time do Coração");
+    throw new Error("Timemania generation requires an explicit Time do Coração");
   }
   const secondary = options.lottery === "dia-de-sorte" && luckyMonth
     ? { kind: "lucky-month" as const, values: [luckyMonth] }
@@ -166,7 +180,7 @@ function candidateKey(game: GeneratedGame): string {
     game.numbers.join("-"),
     game.luckyMonth ?? "",
     game.secondary ? JSON.stringify(game.secondary) : "",
-    game.columns?.join("-") ?? "",
+    game.columns?.map((column) => column.join(".")).join("-") ?? "",
   ].join(":");
 }
 
