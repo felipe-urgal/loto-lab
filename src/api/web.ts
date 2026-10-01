@@ -6,16 +6,14 @@ import type { ServerResponse } from "node:http";
 const HTML_ROUTES = new Map([
   ["/", "index.html"],
   ["/index.html", "index.html"],
-  ["/lab", "lab.html"],
-  ["/lab/", "lab.html"],
-  ["/strategies", "strategies.html"],
-  ["/strategies/", "strategies.html"],
-  ["/jobs", "jobs.html"],
-  ["/jobs/", "jobs.html"],
-  ["/ai", "ai.html"],
-  ["/ai/", "ai.html"],
-  ["/agenda", "agenda.html"],
-  ["/agenda/", "agenda.html"],
+]);
+
+const LEGACY_REDIRECTS = new Map([
+  ["/agenda", "/#dashboard"],
+  ["/jobs", "/#dashboard"],
+  ["/lab", "/#analysis"],
+  ["/strategies", "/#analysis"],
+  ["/ai", "/#analysis"],
 ]);
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -134,6 +132,16 @@ export async function serveWebAsset(
   response: ServerResponse,
   headOnly = false,
 ): Promise<boolean> {
+  const legacyTarget = LEGACY_REDIRECTS.get(url.pathname.replace(/\/$/, ""));
+  if (legacyTarget) {
+    response.statusCode = 308;
+    response.setHeader("Location", legacyTarget);
+    response.setHeader("Cache-Control", "no-cache");
+    setSecurityHeaders(response);
+    response.end();
+    return true;
+  }
+
   const root = webRoot();
   const candidates = assetCandidates(root, url.pathname);
   if (!candidates) return false;
