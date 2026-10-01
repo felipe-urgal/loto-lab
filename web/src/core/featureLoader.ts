@@ -55,19 +55,9 @@ async function loadStyledModule(name: string): Promise<boolean> {
   return loadModule(name);
 }
 
-async function loadMyGamesFeatures(): Promise<boolean> {
-  const baseStyleReady = await loadStyle("my-games-v2");
-  if (!baseStyleReady) return false;
-  const moduleReady = await loadModule("my-games-v2");
-  if (!moduleReady) return false;
-  return loadStyle("my-games-workspace");
-}
-
 async function ensureViewFeatures(): Promise<boolean | undefined> {
   const view = currentMainView();
   if (view === "dashboard") {
-    // Dashboard scope owns the final presentation, including operational status.
-    // Load the scope first so the status module mounts against its canonical CSS.
     await loadStyledModule("dashboard-scope");
     await loadModule("data-status");
     return;
@@ -75,34 +65,14 @@ async function ensureViewFeatures(): Promise<boolean | undefined> {
 
   if (view === "analysis") {
     await loadStyle("analysis-v2");
-    // Prototype 1 owns the final analysis presentation and its structural
-    // hardening without changing any statistical or interaction contract.
     await loadStyle("analysis-workspace");
     await loadModule("analysis-v2");
     return;
   }
 
-  if (view === "backtests") {
-    // Backtests is now typed-only functional ownership. app.js provides only a
-    // shell handoff marker; failure to load the canonical assets is surfaced
-    // explicitly instead of reviving duplicated legacy behavior.
-    const styleReady = await loadStyle("backtests-workspace");
-    return styleReady ? loadModule("backtests") : false;
-  }
-
-  if (view === "games") {
-    // My Games is typed-only functional ownership. A canonical asset failure is
-    // explicit and retryable; legacy real-bets/management code is never revived.
-    return loadMyGamesFeatures();
-  }
-
   await loadStyledModule("refinements");
   if (view === "generate") {
-    // Generator 2.0 owns the advanced workspace. Its boundary imports the
-    // functional owner plus typed readiness/explainability enhancements under
-    // one shared lifecycle instead of loading independent legacy modules.
     await loadStyledModule("generation-v2");
-    // Prototype 1 owns the final presentation after the functional layers exist.
     await loadStyle("generation-workspace");
   }
 }
@@ -112,16 +82,10 @@ function isMainRenderPending(): boolean {
   return Boolean(content?.querySelector(":scope > .loading-state:not([data-feature-owned])"));
 }
 
-function featureLoadTitle(view: string): string {
-  if (view === "games") return "Não foi possível carregar Meus Jogos";
-  if (view === "backtests") return "Não foi possível carregar Testes históricos";
-  return "Não foi possível carregar esta funcionalidade";
-}
-
 function renderFeatureLoadError(view: string): void {
   const content = document.querySelector<HTMLElement>("#content");
   if (!content || currentMainView() !== view) return;
-  content.innerHTML = `<div class="error-state"><span class="error-code">FEATURE_LOAD_ERROR</span><strong>${featureLoadTitle(view)}</strong><p>Os arquivos da funcionalidade não ficaram disponíveis. Tente carregar a tela novamente.</p><button class="button" type="button" data-feature-retry>Tentar novamente</button></div>`;
+  content.innerHTML = '<div class="error-state"><span class="error-code">FEATURE_LOAD_ERROR</span><strong>Não foi possível carregar esta funcionalidade</strong><p>Os arquivos da funcionalidade não ficaram disponíveis. Tente carregar a tela novamente.</p><button class="button" type="button" data-feature-retry>Tentar novamente</button></div>';
   content.querySelector<HTMLButtonElement>("[data-feature-retry]")?.addEventListener("click", () => {
     document.querySelector<HTMLElement>("#refresh-view")?.click();
   });
