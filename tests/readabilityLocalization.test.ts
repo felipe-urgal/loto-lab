@@ -16,19 +16,22 @@ function assertMinimumExplicitFontSize(css: string, label: string, minimum = 16)
   assert.ok(sizes.every((size) => size >= minimum), `${label} contains font-size below ${minimum}px: ${sizes.filter((size) => size < minimum).join(", ")}`);
 }
 
-test("web build ships canonical styles without global readability or localization layers", async () => {
-  const pages = ["index.html", "agenda.html", "ai.html", "jobs.html", "lab.html", "strategies.html"];
+test("web build ships only the canonical page without global readability or localization layers", async () => {
+  const html = await source("web-dist/index.html");
+  assert.doesNotMatch(html, /\/assets\/readability\.(?:css|js)(?:\?|["'])/, "index.html must not load a readability layer");
+  assert.doesNotMatch(html, /\/assets\/localization\.js(?:\?|["'])/, "index.html must not load localization.js");
 
-  for (const page of pages) {
-    const html = await source(`web-dist/${page}`);
-    assert.doesNotMatch(html, /\/assets\/readability\.(?:css|js)(?:\?|["'])/, `${page} must not load a readability layer`);
-    assert.doesNotMatch(html, /\/assets\/localization\.js(?:\?|["'])/, `${page} must not load localization.js`);
+  for (const page of ["agenda.html", "ai.html", "jobs.html", "lab.html", "strategies.html"]) {
+    await assert.rejects(source(`web-dist/${page}`), /ENOENT/, `${page} must not ship in the canonical build`);
   }
 
   const assets = await readdir("web-dist/assets");
   assert.equal(assets.includes("readability.css"), false, "built assets must not contain readability.css");
   assert.equal(assets.includes("readability.js"), false, "built assets must not contain readability.js");
   assert.equal(assets.includes("localization.js"), false, "built assets must not contain localization.js");
+  for (const asset of ["agenda.js", "ai.js", "jobs.js", "lab.js", "strategies.js"]) {
+    assert.equal(assets.includes(asset), false, `${asset} must not ship as a legacy page entrypoint`);
+  }
 });
 
 test("canonical web source owns the 16px functional typography floor", async () => {
