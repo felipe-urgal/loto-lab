@@ -498,7 +498,7 @@ function updateNumberButtons(state: GeneratorState): void {
   root?.querySelectorAll<HTMLButtonElement>("[data-g2-number]").forEach((button) => {
     const value = Number(button.dataset.g2Number);
     const selection = state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
-    const tier = tiers.get(value) || "";
+    const tier = state.purpose === "experimental" ? (tiers.get(value) || "") : "";
     button.dataset.selection = selection;
     button.classList.toggle("is-fixed", selection === "fixed");
     button.classList.toggle("is-excluded", selection === "excluded");
