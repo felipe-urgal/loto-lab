@@ -91,9 +91,11 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.match(javascript.headers.get("content-type") ?? "", /^text\/javascript/);
   assert.match(javascript.headers.get("cache-control") ?? "", /immutable/);
   const source = await javascript.text();
-  assert.match(source, /\.\/src\/core\/api\.js/);
-  assert.match(source, /games\/generate/);
+  assert.match(source, /\.\/src\/core\/mainContext\.js/);
   assert.match(source, /data-feature-owned="dashboard"/);
+  assert.match(source, /data-feature-owned="analysis"/);
+  assert.match(source, /data-feature-owned="generate"/);
+  assert.doesNotMatch(source, /games\/generate|generation\/preview|generation\/save/);
   assert.doesNotMatch(source, /setView\("games"\)|render\.view === "backtests"/);
 
   const typedApi = await fetch(`${baseUrl}/assets/src/core/api.js`);

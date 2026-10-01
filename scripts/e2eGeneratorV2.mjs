@@ -194,6 +194,12 @@ try {
   await Promise.all([client.send("Page.enable"), client.send("Runtime.enable"), client.send("Network.enable")]);
 
   await navigate(client, "/#generate");
+  await waitFor(client, "Boolean(document.querySelector('.g2-shell'))", "Generator redesign shell");
+  const flow = await evaluate(client, `[...document.querySelectorAll('[data-g2-flow-step]')].map((node) => node.textContent.trim())`);
+  assert(
+    ["1Configurar", "2Gerar prévia", "3Revisar", "4Salvar"].every((label) => flow.includes(label)),
+    `Generator flow steps are incomplete: ${JSON.stringify(flow)}`,
+  );
 
   for (const lottery of lotteries) {
     await evaluate(client, `(() => {
@@ -241,26 +247,61 @@ try {
     await sleep(450);
     await waitFor(client, "!document.querySelector('[data-g2-preview]')?.disabled", `${lottery.id} eligible preview`);
 
-    const antiLeakage = await evaluate(client, `(() => ({
+    const configuration = await evaluate(client, `(() => ({
       hasTieredNumbers: document.querySelectorAll('.g2-number.is-strong,.g2-number.is-balanced,.g2-number.is-cold').length > 0,
       funnel: document.querySelector('[data-g2-plan]')?.textContent || '',
       baseline: document.querySelector('[data-g2-baseline]')?.textContent || '',
-      target: Number(document.querySelector('#g2-target')?.value || 0)
+      target: Number(document.querySelector('#g2-target')?.value || 0),
+      purpose: document.querySelector('#g2-purpose')?.value || ''
     }))()`);
-    assert(antiLeakage.hasTieredNumbers, `${lottery.id} has no target-scoped number tiers`);
-    assert(antiLeakage.target === 9041, `${lottery.id} did not use the deterministic target #9041: ${JSON.stringify(antiLeakage)}`);
-    assert(antiLeakage.funnel.includes("Pool explorado pelo motor"), `${lottery.id} does not expose algorithm space`);
-    assert(antiLeakage.baseline.includes("Referência condicionada"), `${lottery.id} does not expose the conditioned reference in Portuguese: ${JSON.stringify(antiLeakage)}`);
+    assert(configuration.purpose === "uniform", `${lottery.id} did not default to auditable random generation: ${JSON.stringify(configuration)}`);
+    assert(!configuration.hasTieredNumbers, `${lottery.id} exposed historical ranking tiers in the default uniform flow`);
+    assert(configuration.target === 9041, `${lottery.id} did not use the deterministic target #9041: ${JSON.stringify(configuration)}`);
+    assert(configuration.funnel.includes("Pool explorado pelo motor"), `${lottery.id} does not expose algorithm space`);
+    assert(configuration.baseline.includes("Referência condicionada"), `${lottery.id} does not expose the conditioned reference in Portuguese: ${JSON.stringify(configuration)}`);
 
     await evaluate(client, "document.querySelector('[data-g2-preview]').click(); true");
     await waitFor(client, "Boolean(document.querySelector('.g2-preview'))", `${lottery.id} auditable preview`, 400);
-    const preview = await evaluate(client, `(() => ({
+    let preview = await evaluate(client, `(() => ({
       games: [...document.querySelectorAll('.g2-game')].map((game) => [...game.querySelectorAll('.ball')].map((node) => node.textContent.trim()).join('-')).sort().join('|'),
       seed: document.querySelectorAll('.g2-seed code')[0]?.textContent || '',
-      previewId: document.querySelectorAll('.g2-seed code')[1]?.textContent || ''
+      previewId: document.querySelectorAll('.g2-seed code')[1]?.textContent || '',
+      stage: document.querySelector('[data-g2-shell]')?.dataset.g2Stage || '',
+      copy: document.querySelector('.g2-preview')?.textContent || ''
     }))()`);
     assert(preview.seed.length > 8, `${lottery.id} preview has no seed`);
     assert(preview.previewId.length === 64, `${lottery.id} preview has no SHA-256 preview id`);
+    assert(preview.stage === "review", `${lottery.id} preview did not enter review stage: ${JSON.stringify(preview)}`);
+    assert(preview.copy.includes("Revise antes de salvar") && preview.copy.includes("Custo do lote"), `${lottery.id} review summary is incomplete`);
+
+    if (lottery.id === "mega-sena") {
+      const originalCount = await evaluate(client, "Number(document.querySelector('#g2-game-count')?.value || 1)");
+      await evaluate(client, `(() => {
+        const input = document.querySelector('#g2-game-count');
+        input.value = String(Math.min(10, Number(input.value || 1) + 1));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      })()`);
+      await waitFor(
+        client,
+        "!document.querySelector('.g2-preview') && document.querySelector('[data-g2-shell]')?.dataset.g2Stage === 'configure'",
+        "configuration change invalidates preview",
+      );
+      await evaluate(client, `(() => {
+        const input = document.querySelector('#g2-game-count');
+        input.value = String(${originalCount});
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      })()`);
+      await waitFor(client, "!document.querySelector('[data-g2-preview]')?.disabled", "preview enabled after restoring configuration");
+      await evaluate(client, "document.querySelector('[data-g2-preview]').click(); true");
+      await waitFor(client, "Boolean(document.querySelector('.g2-preview'))", "regenerated auditable preview", 400);
+      preview = await evaluate(client, `(() => ({
+        games: [...document.querySelectorAll('.g2-game')].map((game) => [...game.querySelectorAll('.ball')].map((node) => node.textContent.trim()).join('-')).sort().join('|'),
+        seed: document.querySelectorAll('.g2-seed code')[0]?.textContent || '',
+        previewId: document.querySelectorAll('.g2-seed code')[1]?.textContent || ''
+      }))()`);
+    }
 
     const afterPreviewCount = await evaluate(client, `(async () => {
       const response = await fetch('/api/v1/game-batches/${lottery.id}?limit=200');
@@ -282,8 +323,13 @@ try {
     })()`);
     assert(persisted === preview.games, `${lottery.id} saved games differ from the audited preview`);
 
-    await evaluate(client, "location.hash = 'games'; true");
-    await waitFor(client, `document.body.innerText.includes('Lote #${batchId}')`, `${lottery.id} saved batch in My Games`);
+    await waitFor(client, "Boolean(document.querySelector('[data-g2-open-dashboard]:not([hidden])'))", `${lottery.id} Panel action after save`);
+    await evaluate(client, "document.querySelector('[data-g2-open-dashboard]').click(); true");
+    await waitFor(
+      client,
+      `location.hash === '#dashboard' && document.body.innerText.includes('Lote #${batchId}')`,
+      `${lottery.id} saved batch in Panel`,
+    );
     await evaluate(client, "location.hash = 'generate'; true");
     await waitFor(client, `document.querySelector('#lottery-select')?.value === ${JSON.stringify(lottery.id)} && Boolean(document.querySelector('.g2-shell'))`, `${lottery.id} return to generator`);
   }
@@ -304,7 +350,7 @@ try {
 
   assert(runtimeErrors.length === 0, `Generator browser runtime exceptions: ${runtimeErrors.join(" | ")}`);
   assert(serverErrors.length === 0, `Generator browser server failures: ${serverErrors.join(" | ")}`);
-  console.log("Generator 2.0 E2E passed: three lotteries, target-scoped tiers, explicit fix/exclude, frozen preview, exact save and mobile layout");
+  console.log("Generator E2E passed: configure, preview invalidation, review, exact save to Panel and mobile layout");
 } finally {
   client?.close();
   await stopBrowser(browser);

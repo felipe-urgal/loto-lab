@@ -7,20 +7,22 @@ async function appSource(): Promise<string> {
   return readFile(resolve(process.cwd(), "web/app.js"), "utf8");
 }
 
-test("legacy app consumes canonical shared primitives instead of redefining them", async () => {
+test("main app stays a thin shell while canonical features own data access", async () => {
   const app = await appSource();
 
-  assert.match(app, /import \{ api \} from "\.\/src\/core\/api\.js"/);
   assert.match(app, /from "\.\/src\/core\/mainContext\.js"/);
   assert.match(app, /import \{ createMainRenderState \} from "\.\/src\/core\/mainRenderState\.js"/);
   assert.match(app, /import \{ escapeHtml \} from "\.\/src\/shared\/escaping\.js"/);
   assert.match(app, /data-feature-owned="dashboard"/);
   assert.match(app, /data-feature-owned="analysis"/);
-  assert.match(app, /import \{ toast \} from "\.\/src\/shared\/toast\.js"/);
-  assert.match(app, /async function safeApi/);
+  assert.match(app, /data-feature-owned="generate"/);
   assert.match(app, /state\.beginRender\(\)/);
   assert.match(app, /state\.finishRender\(render\)/);
 
+  assert.doesNotMatch(app, /import \{ api \}/);
+  assert.doesNotMatch(app, /import \{ toast \}/);
+  assert.doesNotMatch(app, /async function safeApi/);
+  assert.doesNotMatch(app, /games\/generate|generation\/preview|generation\/save/);
   assert.doesNotMatch(app, /const API = "\/api\/v1"/);
   assert.doesNotMatch(app, /function escapeHtml\(/);
   assert.doesNotMatch(app, /async function api\(/);

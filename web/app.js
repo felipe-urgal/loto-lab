@@ -1,17 +1,6 @@
-import { api } from "./src/core/api.js";
 import { isLotteryId, isMainView, mainViewFromHash } from "./src/core/mainContext.js";
 import { createMainRenderState } from "./src/core/mainRenderState.js";
 import { escapeHtml } from "./src/shared/escaping.js";
-import { toast } from "./src/shared/toast.js";
-
-const LOTTERIES = {
-  "mega-sena": { label: "Mega-Sena", defaultGames: 2, drawSize: 6 },
-  lotofacil: { label: "Lotofácil", defaultGames: 4, drawSize: 15 },
-  "dia-de-sorte": { label: "Dia de Sorte", defaultGames: 4, drawSize: 7 },
-  quina: { label: "Quina", defaultGames: 4, drawSize: 5 },
-  lotomania: { label: "Lotomania", defaultGames: 2, drawSize: 20 },
-  "dupla-sena": { label: "Dupla Sena", defaultGames: 4, drawSize: 6 },
-};
 
 const VIEWS = {
   dashboard: ["Painel", "Resultados, jogos e pendências em um só lugar."],
@@ -43,24 +32,6 @@ function installIcons(root = document) {
     const icon = ICONS[node.dataset.icon];
     if (icon) node.innerHTML = icon;
   });
-}
-
-async function safeApi(path, options = {}) {
-  try { return await api(path, options); } catch (error) {
-    if (error?.name === "AbortError") throw error;
-    return null;
-  }
-}
-
-function number(value) { return String(value).padStart(2, "0"); }
-function lotteryLabel(id) { return LOTTERIES[id]?.label || id; }
-
-function balls(numbers, options = {}) {
-  const fixed = new Set(options.fixed || []);
-  const tier = options.tier || "";
-  return (numbers || []).map((value) =>
-    `<span class="ball ${fixed.has(value) ? "is-fixed" : ""} ${tier ? `is-${tier}` : ""}">${number(value)}</span>`,
-  ).join("");
 }
 
 function loading() {
@@ -117,67 +88,8 @@ async function renderAnalysis() {
   content.innerHTML = '<div class="loading-state" data-feature-owned="analysis"><span class="spinner"></span><span>Carregando Análises...</span></div>';
 }
 
-async function renderGenerate(render) {
-  const latest = await safeApi(`/contests/${render.lottery}/latest`, { signal: render.signal });
-  if (!isCurrentRender(render)) return;
-  const config = LOTTERIES[render.lottery];
-  if (!config) {
-    content.innerHTML = '<div class="loading-state" data-feature-owned="generate"><span class="spinner"></span><span>Carregando Gerador...</span></div>';
-    return;
-  }
-  content.innerHTML = `<div class="stack">
-    <section><div class="section-head"><div><h2>Configurar lote</h2><p>O algoritmo usa somente dados anteriores ao concurso alvo.</p></div></div>
-      <form class="panel form-panel" id="generate-form">
-        <div class="form-grid">
-          <div class="field"><label>Loteria</label><input value="${escapeHtml(config.label)}" disabled /></div>
-          <div class="field"><label for="game-count">Quantidade de jogos</label><input id="game-count" name="gameCount" type="number" min="1" max="10" value="${config.defaultGames}" /></div>
-          <div class="field" id="fixed-field" ${render.lottery !== "lotofacil" ? 'style="display:none"' : ""}><label for="fixed-count">Núcleo fixo</label><select id="fixed-count" name="fixedCount"><option value="8">8 dezenas</option><option value="9">9 dezenas</option><option value="10">10 dezenas</option></select></div>
-          <div class="field"><label for="target-contest">Concurso alvo</label><input id="target-contest" name="targetContestNumber" type="number" min="1" value="${latest ? latest.number + 1 : ""}" placeholder="Automático" /></div>
-        </div>
-        <div class="form-actions"><div><label class="checkbox"><input type="checkbox" name="persist" checked /> Salvar lote no Painel</label><div class="form-note">As dezenas são calculadas pelo core. O frontend apenas envia a configuração.</div></div><button class="button primary" type="submit"><span class="button-icon" data-icon="spark"></span>Gerar jogos</button></div>
-      </form>
-    </section>
-    <section id="generated-result">${emptyState("Pronto para gerar", "Configure a quantidade e execute o motor. O núcleo compartilhado será destacado em verde.")}</section>
-  </div>`;
-  installIcons(content);
-  content.querySelector("#generate-form").addEventListener("submit", handleGenerate);
-}
-
-async function handleGenerate(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const button = form.querySelector("button[type=submit]");
-  const result = content.querySelector("#generated-result");
-  const data = new FormData(form);
-  const body = {
-    lottery: state.lottery,
-    gameCount: Number(data.get("gameCount")),
-    persist: data.get("persist") === "on",
-  };
-  const target = data.get("targetContestNumber");
-  if (target) body.targetContestNumber = Number(target);
-  if (state.lottery === "lotofacil") body.fixedCount = Number(data.get("fixedCount"));
-
-  button.disabled = true;
-  button.innerHTML = '<span class="spinner" style="width:14px;height:14px"></span>Gerando...';
-  try {
-    const generated = await api("/games/generate", { method: "POST", body: JSON.stringify(body) });
-    result.innerHTML = `<div class="section-head"><div><h2>Lote gerado</h2><p>${generated.batchId ? `Lote #${generated.batchId} salvo` : "Prévia não persistida"} · alvo ${generated.targetContestNumber ? `#${generated.targetContestNumber}` : "automático"}</p></div>${generated.batchId ? '<button class="link-button" data-open-dashboard>Ver no Painel</button>' : ""}</div><div class="game-grid">${generated.games.map((game, index) => gameCard(game, index)).join("")}</div>`;
-    result.querySelector("[data-open-dashboard]")?.addEventListener("click", () => setView("dashboard"));
-    toast(`${generated.games.length} jogo(s) gerado(s) com sucesso.`);
-  } catch (error) {
-    result.innerHTML = `<div class="error-state"><span class="error-code">${escapeHtml(error.code)}</span><strong>Falha ao gerar jogos</strong><p>${escapeHtml(error.message)}</p></div>`;
-    toast(error.message, "error");
-  } finally {
-    button.disabled = false;
-    button.innerHTML = '<span class="button-icon" data-icon="spark"></span>Gerar jogos';
-    installIcons(button);
-  }
-}
-
-function gameCard(game, index) {
-  const repeated = game.metadata?.repeatedFromLastContest?.length ?? 0;
-  return `<article class="panel game-card"><div class="game-head"><strong>Jogo ${index + 1}</strong><span>${game.fixedNumbers.length} fixas · ${game.variableNumbers.length} variáveis</span></div><div class="draw-numbers">${balls(game.numbers, { fixed: game.fixedNumbers })}</div><div class="game-meta"><span>Pares <strong>${game.metadata?.even ?? "—"}</strong></span><span>Ímpares <strong>${game.metadata?.odd ?? "—"}</strong></span><span>Soma <strong>${game.metadata?.sum ?? "—"}</strong></span><span>Repetidas <strong>${repeated}</strong></span></div>${game.luckyMonth ? `<div class="game-month">Mês da Sorte · ${escapeHtml(game.luckyMonth)}</div>` : ""}</article>`;
+async function renderGenerate() {
+  content.innerHTML = '<div class="loading-state" data-feature-owned="generate"><span class="spinner"></span><span>Carregando Gerador...</span></div>';
 }
 
 async function renderCurrentView() {
@@ -188,7 +100,7 @@ async function renderCurrentView() {
   try {
     if (render.view === "dashboard") await renderDashboard();
     else if (render.view === "analysis") await renderAnalysis();
-    else if (render.view === "generate") await renderGenerate(render);
+    else if (render.view === "generate") await renderGenerate();
   } catch (error) {
     if (error?.name !== "AbortError" && isCurrentRender(render)) errorState(error);
   } finally {

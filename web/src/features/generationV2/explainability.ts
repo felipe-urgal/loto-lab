@@ -3,56 +3,51 @@ function explanationCard(title: string, copy: string, tone = "neutral"): string 
 }
 
 function installStepper(shell: HTMLElement): void {
-  if (shell.querySelector("[data-g2-explain-stepper]")) return;
-
-  const stepper = document.createElement("section");
-  stepper.className = "g2-explain-stepper";
-  stepper.dataset.g2ExplainStepper = "true";
-  stepper.setAttribute("aria-label", "Como o lote é construído");
-  stepper.innerHTML = `
-    <div class="g2-explain-step is-active"><span>1</span><strong>Análise</strong><small>Dados e contexto</small></div>
-    <i>→</i>
-    <div class="g2-explain-step"><span>2</span><strong>Núcleo fixo</strong><small>Convicção compartilhada</small></div>
-    <i>→</i>
-    <div class="g2-explain-step"><span>3</span><strong>Variáveis</strong><small>Cobertura e diversidade</small></div>
-    <i>→</i>
-    <div class="g2-explain-step"><span>4</span><strong>Restrições</strong><small>Estrutura do lote</small></div>
-    <i>→</i>
-    <div class="g2-explain-step"><span>5</span><strong>Auditoria</strong><small>Entenda o resultado</small></div>`;
-  shell.insertBefore(stepper, shell.firstChild);
+  // The four-step product journey is rendered by the functional owner.
+  // Keep this hook so the explainability layer never creates a competing technical stepper.
+  if (shell.querySelector(".g2-flow")) return;
 }
 
 function installEducation(shell: HTMLElement): void {
   if (shell.querySelector("[data-g2-education]")) return;
+  const slot = shell.querySelector<HTMLElement>("[data-g2-explainability-slot]");
+  if (!slot) return;
 
-  const education = document.createElement("section");
-  education.className = "g2-education-grid";
+  const education = document.createElement("details");
+  education.className = "g2-help";
   education.dataset.g2Education = "true";
   education.innerHTML = `
-    ${explanationCard("Isto não é previsão", "O Loto Lab organiza escolhas e mede hipóteses. Frequência, atraso e pontuação não mudam a probabilidade matemática individual de uma combinação válida.", "danger")}
-    ${explanationCard("Quando a pontuação influencia", "A Pontuação v2 ordena preferências usando desvios em relação ao esperado, levando o tamanho da amostra em conta. Ela continua sendo um sinal exploratório e pode ser testada contra Pontuação v1 e sem pontuação no Laboratório.", "info")}
-    ${explanationCard("Quando a cobertura domina", "O motor penaliza reutilização e mistura perfis para reduzir concentração entre jogos. O objetivo é ampliar a cobertura do lote, não criar dezenas mais prováveis.", "accent")}`;
-  shell.append(education);
+    <summary>Como interpretar este gerador</summary>
+    <div class="g2-education-grid">
+      ${explanationCard("Isto não é previsão", "O Loto Lab organiza escolhas e mede hipóteses. Frequência, atraso e pontuação não mudam a probabilidade matemática individual de uma combinação válida.", "danger")}
+      ${explanationCard("Aleatório auditável", "Amostragem uniforme usa seed reproduzível e não usa frequência ou pontuação histórica para preferir dezenas.", "info")}
+      ${explanationCard("Carteira e Experimental", "Carteira reduz concentração entre jogos. Experimental pode usar sinais históricos explicitamente identificados e deve ser interpretado como hipótese.", "accent")}
+    </div>`;
+  slot.append(education);
 }
 
 function installWhyPanel(shell: HTMLElement): void {
-  const side = shell.querySelector<HTMLElement>(".g2-side");
-  if (!side || side.querySelector("[data-g2-why]")) return;
+  if (shell.querySelector("[data-g2-why]")) return;
+  const slot = shell.querySelector<HTMLElement>("[data-g2-explainability-slot]");
+  if (!slot) return;
 
-  const panel = document.createElement("section");
-  panel.className = "panel g2-card g2-why";
+  const purpose = shell.querySelector<HTMLSelectElement>("#g2-purpose")?.value;
+  const purposeCopy = purpose === "experimental"
+    ? "A estratégia experimental pode usar evidência histórica; versão e auditoria continuam registradas na prévia."
+    : purpose === "portfolio"
+      ? "A carteira parte de candidatos válidos e reduz sobreposição entre jogos sem usar score histórico."
+      : "A geração aleatória é uniforme dentro do espaço válido e reproduzível pela seed.";
+
+  const panel = document.createElement("details");
+  panel.className = "g2-help";
   panel.dataset.g2Why = "true";
   panel.innerHTML = `
-    <div class="g2-card-head"><div><strong>Por que este lote será gerado assim?</strong><span>As decisões do motor ficam explícitas antes da prévia.</span></div></div>
-    <ol class="g2-why-list">
-      <li><strong>Pontuação v2</strong><span>Compara cada janela com o que seria esperado e reduz a força de diferenças sustentadas por amostras pequenas.</span></li>
-      <li><strong>Núcleo compartilhado</strong><span>As fixas combinam perfis complementares; escolhas manuais continuam visíveis e auditáveis.</span></li>
-      <li><strong>Variáveis estratificadas</strong><span>O conjunto reserva espaço para fortes, intermediárias e frias, evitando depender apenas do topo da classificação.</span></li>
-      <li><strong>Diversidade do lote</strong><span>Reutilização de variáveis é penalizada para aumentar cobertura entre os cartões.</span></li>
-      <li><strong>Filtros são estrutura</strong><span>Paridade, repetição e soma servem para compor cenários; não aumentam a chance individual de um jogo.</span></li>
-    </ol>
-    <a class="button compact" href="/lab">Validar hipótese no Laboratório</a>`;
-  side.prepend(panel);
+    <summary>Como o motor usa esta configuração</summary>
+    <div class="g2-help-body">
+      <p>${purposeCopy}</p>
+      <p>Fixadas, excluídas e filtros estruturais restringem o espaço de combinações; não aumentam a probabilidade individual de um jogo válido.</p>
+    </div>`;
+  slot.append(panel);
 }
 
 function repeatedCount(gameCard: Element): number | null {
@@ -138,13 +133,20 @@ function decoratePreview(shell: HTMLElement): void {
 
   installLotofacilReadiness(preview);
 
+  const purpose = shell.querySelector<HTMLSelectElement>("#g2-purpose")?.value;
+  const selectionRationale = purpose === "experimental"
+    ? "A seleção respeitou a estratégia experimental declarada e sua evidência versionada."
+    : purpose === "portfolio"
+      ? "A seleção priorizou diversidade entre jogos sem score histórico."
+      : "A seleção foi uniforme dentro do espaço válido, sem score histórico.";
+
   const rationale = document.createElement("section");
   rationale.className = "panel g2-card g2-preview-rationale";
   rationale.innerHTML = `
     <div class="g2-card-head"><div><strong>Por que este lote foi aceito?</strong><span>A prévia passou pelo mesmo funil que será persistido.</span></div></div>
     <div class="g2-rationale-grid">
       <div><strong>✓ Núcleo</strong><span>Compartilhado conforme a configuração escolhida.</span></div>
-      <div><strong>✓ Variáveis</strong><span>Selecionadas por pontuação + diversidade, com penalização de reutilização.</span></div>
+      <div><strong>✓ Seleção</strong><span>${selectionRationale}</span></div>
       <div><strong>✓ Restrições</strong><span>Todos os jogos respeitam os filtros habilitados e o perfil padrão aplicável.</span></div>
       <div><strong>✓ Auditoria</strong><span>Semente, histórico e assinatura permitem reproduzir exatamente a prévia.</span></div>
     </div>`;
@@ -154,7 +156,7 @@ function decoratePreview(shell: HTMLElement): void {
 export function installGenerationExplainability(shell: HTMLElement): () => void {
   const principle = shell.querySelector<HTMLElement>(".g2-principle");
   if (principle) {
-    principle.innerHTML = "<strong>Gerar Jogos</strong><span>O sistema compõe jogos com metodologia, cobertura e diversificação controlada. Não é previsão: cada etapa abaixo mostra como o lote foi construído e o que ela significa.</span>";
+    principle.innerHTML = "<strong>Gerar jogos</strong><span>Configure, gere uma prévia, revise e salve. Auditoria e metodologia ficam disponíveis sob demanda.</span>";
   }
 
   installStepper(shell);

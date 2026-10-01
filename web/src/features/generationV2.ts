@@ -30,20 +30,21 @@ let cleanupCurrent: (() => void) | null = null;
 
 const LOTTERY_FALLBACK: Record<LotteryId, {
   label: string;
+  min: number;
   max: number;
   drawSize: number;
   defaultBetSize: number;
   defaultGames: number;
 }> = {
-  "mega-sena": { label: "Mega-Sena", max: 60, drawSize: 6, defaultBetSize: 6, defaultGames: 2 },
-  lotofacil: { label: "Lotofácil", max: 25, drawSize: 15, defaultBetSize: 15, defaultGames: 4 },
-  "dia-de-sorte": { label: "Dia de Sorte", max: 31, drawSize: 7, defaultBetSize: 7, defaultGames: 4 },
-  quina: { label: "Quina", max: 80, drawSize: 5, defaultBetSize: 5, defaultGames: 4 },
-  lotomania: { label: "Lotomania", max: 99, drawSize: 20, defaultBetSize: 50, defaultGames: 2 },
-  "dupla-sena": { label: "Dupla Sena", max: 50, drawSize: 6, defaultBetSize: 6, defaultGames: 4 },
-  "mais-milionaria": { label: "+Milionária", max: 50, drawSize: 6, defaultBetSize: 6, defaultGames: 4 },
-  timemania: { label: "Timemania", max: 80, drawSize: 7, defaultBetSize: 10, defaultGames: 4 },
-  "super-sete": { label: "Super Sete", max: 9, drawSize: 7, defaultBetSize: 7, defaultGames: 4 },
+  "mega-sena": { label: "Mega-Sena", min: 1, max: 60, drawSize: 6, defaultBetSize: 6, defaultGames: 2 },
+  lotofacil: { label: "Lotofácil", min: 1, max: 25, drawSize: 15, defaultBetSize: 15, defaultGames: 4 },
+  "dia-de-sorte": { label: "Dia de Sorte", min: 1, max: 31, drawSize: 7, defaultBetSize: 7, defaultGames: 4 },
+  quina: { label: "Quina", min: 1, max: 80, drawSize: 5, defaultBetSize: 5, defaultGames: 4 },
+  lotomania: { label: "Lotomania", min: 0, max: 99, drawSize: 20, defaultBetSize: 50, defaultGames: 2 },
+  "dupla-sena": { label: "Dupla Sena", min: 1, max: 50, drawSize: 6, defaultBetSize: 6, defaultGames: 4 },
+  "mais-milionaria": { label: "+Milionária", min: 1, max: 50, drawSize: 6, defaultBetSize: 6, defaultGames: 4 },
+  timemania: { label: "Timemania", min: 1, max: 80, drawSize: 7, defaultBetSize: 10, defaultGames: 4 },
+  "super-sete": { label: "Super Sete", min: 0, max: 9, drawSize: 7, defaultBetSize: 7, defaultGames: 4 },
 };
 
 const NUMBER_TIERS: readonly NumberTier[] = ["strong", "balanced", "cold"];
@@ -254,10 +255,12 @@ function numberGridMarkup(state: GeneratorState): string {
     return `<div class="g2-columns-note">Super Sete usa 7 colunas posicionais. Os dígitos são gerados e exibidos por coluna, sem serem tratados como dezenas.</div>`;
   }
   const tiers = tierByNumber(state.plan);
+  const minimum = LOTTERY_FALLBACK[state.lottery].min;
   let html = "";
-  for (let value = 1; value <= state.plan.universeSize; value += 1) {
+  for (let offset = 0; offset < state.plan.universeSize; offset += 1) {
+    const value = minimum + offset;
     const selection = state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
-    const tier = tiers.get(value) || "";
+    const tier = state.purpose === "experimental" ? (tiers.get(value) || "") : "";
     const selectionLabel = selection === "fixed" ? "fixada" : selection === "excluded" ? "excluída" : "automática";
     html += `<button type="button" class="g2-number ${tier ? `is-${tier}` : ""} ${selection !== "auto" ? `is-${selection}` : ""}" data-g2-number="${value}" data-selection="${selection}" aria-label="Dezena ${numberLabel(value)}: ${selectionLabel}">${numberLabel(value)}</button>`;
   }
@@ -360,13 +363,112 @@ function structuredFieldsMarkup(state: GeneratorState): string {
   return "";
 }
 
+function activeFilterCount(state: GeneratorState): number {
+  return Object.values(state.filters).filter((filter) => filter.enabled).length;
+}
+
+function structuredSummary(state: GeneratorState): string {
+  if (state.lottery === "mais-milionaria") return `${state.cloverCount} trevos por aposta`;
+  if (state.lottery === "timemania") return state.favoriteTeam.trim() ? `Time: ${escapeHtml(state.favoriteTeam.trim())}` : "Time do Coração pendente";
+  if (state.lottery === "super-sete") return `${state.columnMarks.reduce((sum, value) => sum + value, 0)} marcações em 7 colunas`;
+  return "";
+}
+
+function configurationSummaryMarkup(state: GeneratorState): string {
+  const purpose = purposeCopy(state.purpose);
+  const extra = structuredSummary(state);
+  const filters = activeFilterCount(state);
+  return `<div class="g2-summary-list">
+    <div><span>Finalidade</span><strong>${escapeHtml(purpose.label)}</strong></div>
+    <div><span>Jogos</span><strong>${state.gameCount}</strong></div>
+    <div><span>${state.lottery === "super-sete" ? "Estrutura" : "Aposta"}</span><strong>${state.lottery === "super-sete" ? "7 colunas" : `${state.betSize} dezenas`}</strong></div>
+    <div><span>Núcleo</span><strong>${state.fixedCount ? `${state.fixedCount} compartilhadas` : "Sem núcleo"}</strong></div>
+    <div><span>Concurso alvo</span><strong>${state.targetContestNumber ? `#${state.targetContestNumber}` : "Automático"}</strong></div>
+    <div><span>Filtros</span><strong>${filters ? `${filters} ativo(s)` : "Nenhum"}</strong></div>
+    ${extra ? `<div class="g2-summary-wide"><span>Modalidade</span><strong>${extra}</strong></div>` : ""}
+    <div class="g2-summary-wide"><span>Custo</span><strong>Confirmado na prévia</strong></div>
+  </div>`;
+}
+
+function flowMarkup(): string {
+  return `<ol class="g2-flow" aria-label="Etapas para gerar jogos">
+    <li data-g2-flow-step="configure"><span>1</span><strong>Configurar</strong></li>
+    <li data-g2-flow-step="preview"><span>2</span><strong>Gerar prévia</strong></li>
+    <li data-g2-flow-step="review"><span>3</span><strong>Revisar</strong></li>
+    <li data-g2-flow-step="save"><span>4</span><strong>Salvar</strong></li>
+  </ol>`;
+}
+
+type GenerationFlowStage = "configure" | "preview" | "review" | "save" | "saved";
+
+function updateFlowState(stage: GenerationFlowStage): void {
+  const shell = root?.querySelector<HTMLElement>("[data-g2-shell]");
+  if (!shell) return;
+  shell.dataset.g2Stage = stage;
+  const order: Array<Exclude<GenerationFlowStage, "saved">> = ["configure", "preview", "review", "save"];
+  const effective = stage === "saved" ? "save" : stage;
+  const activeIndex = order.indexOf(effective);
+  shell.querySelectorAll<HTMLElement>("[data-g2-flow-step]").forEach((step) => {
+    const key = step.dataset.g2FlowStep as Exclude<GenerationFlowStage, "saved"> | undefined;
+    const index = key ? order.indexOf(key) : -1;
+    const complete = stage === "saved" || (index >= 0 && index < activeIndex);
+    const active = stage !== "saved" && index === activeIndex;
+    step.classList.toggle("is-complete", complete);
+    step.classList.toggle("is-active", active);
+    if (active) step.setAttribute("aria-current", "step");
+    else step.removeAttribute("aria-current");
+  });
+}
+
+function renderConfigurationSummary(state: GeneratorState): void {
+  const target = root?.querySelector<HTMLElement>("[data-g2-config-summary]");
+  if (target) target.innerHTML = configurationSummaryMarkup(state);
+}
+
 function workspaceMarkup(state: GeneratorState): string {
-  return `<div class="g2-shell" data-g2-shell>
-    <div class="g2-principle"><strong>Algoritmo calcula; você audita.</strong><span>Configure o lote, veja o universo matemático e o espaço realmente explorado, gere uma prévia congelada e só então salve.</span></div>
+  const experimental = state.purpose === "experimental";
+  return `<div class="g2-shell" data-g2-shell data-g2-stage="configure">
+    <div class="g2-principle"><strong>Gerar jogos</strong><span>Configure a aposta, gere uma prévia, revise os jogos e salve somente o que você aprovou.</span></div>
+    ${flowMarkup()}
     <div class="g2-workspace">
       <div class="g2-main">
-        <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>1. Configuração do lote</strong><span>Escolha a finalidade do algoritmo. O histórico só influencia a seleção no modo Experimental.</span></div></div>
+        <section class="panel g2-card g2-build-card">
+          <div class="g2-card-head"><div><strong>${state.lottery === "super-sete" ? "Monte as colunas" : "Monte suas escolhas"}</strong><span>${state.lottery === "super-sete" ? "As marcações permanecem posicionais por coluna." : "Fixe, exclua ou deixe o motor escolher automaticamente."}</span></div></div>
+          ${state.lottery === "super-sete" ? "" : selectionModesMarkup(state)}
+          ${state.lottery === "super-sete" ? "" : `<div class="g2-number-legend">
+            <span><i class="g2-key"></i> Automática</span><span><i class="g2-key is-fixed"></i> Fixada</span><span><i class="g2-key is-excluded"></i> Excluída</span>
+            ${experimental ? '<span><i class="g2-key is-strong"></i> Forte</span><span><i class="g2-key is-balanced"></i> Intermediária</span><span><i class="g2-key is-cold"></i> Fria</span>' : ""}
+          </div>`}
+          <div class="g2-number-grid" data-g2-number-grid>${numberGridMarkup(state)}</div>
+          <div class="g2-selection-summary" data-g2-selection-summary></div>
+        </section>
+
+        <details class="g2-advanced" data-g2-advanced>
+          <summary><span>Filtros e auditoria</span><small>Opcional · fechado por padrão</small></summary>
+          <div class="g2-advanced-body">
+            <section>
+              <div class="g2-card-head"><div><strong>Filtros estruturais</strong><span>${state.lottery === "super-sete" ? "Filtros de dezenas não se aplicam a esta modalidade." : "Desligados por padrão. Use somente quando quiser restringir a composição."}</span></div></div>
+              <div class="g2-filter-list" data-g2-filters>${state.lottery === "super-sete" ? '<p class="g2-disclaimer">A composição é controlada pelas marcações de cada coluna.</p>' : filtersMarkup(state)}</div>
+            </section>
+            <details class="g2-subdetails">
+              <summary>Metodologia</summary>
+              <div class="g2-subdetails-body">${methodologyMarkup(state)}</div>
+            </details>
+            <details class="g2-subdetails">
+              <summary>Espaço combinatório e referências</summary>
+              <div class="g2-technical-grid">
+                <section class="g2-technical-panel" data-g2-plan>${planMarkup(state)}</section>
+                <section class="g2-technical-panel" data-g2-baseline>${baselineMarkup(state)}</section>
+              </div>
+            </details>
+            <div data-g2-explainability-slot></div>
+          </div>
+        </details>
+      </div>
+
+      <aside class="g2-side">
+        <section class="panel g2-card g2-config-card">
+          <div class="g2-card-head"><div><strong>Configuração</strong><span>Somente o necessário para gerar a prévia.</span></div></div>
           <div class="g2-form-grid">
             <div class="g2-field"><label for="g2-purpose">Finalidade</label><select id="g2-purpose">
               <option value="uniform" ${state.purpose === "uniform" ? "selected" : ""}>Aleatório auditável</option>
@@ -374,46 +476,26 @@ function workspaceMarkup(state: GeneratorState): string {
               <option value="experimental" ${state.purpose === "experimental" ? "selected" : ""} ${supportsExperimental(state.lottery) ? "" : "disabled"}>Experimental</option>
             </select><small>${escapeHtml(purposeCopy(state.purpose).description)}</small></div>
             <div class="g2-field"><label for="g2-game-count">Quantidade de jogos</label><input id="g2-game-count" type="number" min="1" max="10" value="${state.gameCount}" /></div>
-            <div class="g2-field"><label for="g2-bet-size">${state.lottery === "mais-milionaria" ? "Números por aposta" : state.lottery === "super-sete" ? "Estrutura" : "Dezenas por aposta"}</label><select id="g2-bet-size" ${state.purpose === "experimental" || (!state.plan.betRule && state.lottery !== "mais-milionaria") ? "disabled" : ""}>${betSizeOptions(state)}</select><small>${state.plan.betRule || state.lottery === "mais-milionaria" ? "Limites e preço vêm da regra oficial versionada." : "Cardinalidade fixa desta modalidade."}</small></div>
+            <div class="g2-field"><label for="g2-bet-size">${state.lottery === "mais-milionaria" ? "Números por aposta" : state.lottery === "super-sete" ? "Estrutura" : "Dezenas por aposta"}</label><select id="g2-bet-size" ${state.purpose === "experimental" || (!state.plan.betRule && state.lottery !== "mais-milionaria") ? "disabled" : ""}>${betSizeOptions(state)}</select></div>
             <div class="g2-field"><label for="g2-fixed-count">Núcleo compartilhado</label><select id="g2-fixed-count">${fixedCountOptions(state)}</select></div>
             <div class="g2-field"><label for="g2-target">Concurso alvo</label><input id="g2-target" type="number" min="1" value="${state.targetContestNumber ?? ""}" /></div>
             ${structuredFieldsMarkup(state)}
           </div>
         </section>
 
-        <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>2. ${state.lottery === "super-sete" ? "Colunas" : "Dezenas"}</strong><span>${state.lottery === "super-sete" ? "A estrutura da aposta permanece por coluna; nenhuma marcação é convertida em dezena." : "Escolha explicitamente a ação e clique nas dezenas. As cores históricas são apenas contexto visual nos modos Aleatório e Carteira."}</span></div></div>
-          ${state.lottery === "super-sete" ? "" : selectionModesMarkup(state)}
-          ${state.lottery === "super-sete" ? "" : `<div class="g2-number-legend">
-            <span><i class="g2-key"></i> Automática</span><span><i class="g2-key is-fixed"></i> Fixada</span><span><i class="g2-key is-excluded"></i> Excluída</span>
-            <span><i class="g2-key is-strong"></i> Forte</span><span><i class="g2-key is-balanced"></i> Intermediária</span><span><i class="g2-key is-cold"></i> Fria</span>
-          </div>`}
-          <div class="g2-number-grid" data-g2-number-grid>${numberGridMarkup(state)}</div>
-          <div class="g2-selection-summary" data-g2-selection-summary></div>
+        <section class="panel g2-card g2-summary-card">
+          <div class="g2-card-head"><div><strong>Resumo</strong><span>Revise a configuração antes de gerar.</span></div></div>
+          <div data-g2-config-summary>${configurationSummaryMarkup(state)}</div>
         </section>
 
-        <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>3. Filtros estruturais</strong><span>${state.lottery === "super-sete" ? "Filtros de dezenas não se aplicam ao modelo posicional do Super Sete." : "Desligados por padrão. As referências abaixo são condicionadas às dezenas manuais atuais."}</span></div></div>
-          <div class="g2-filter-list" data-g2-filters>${state.lottery === "super-sete" ? '<p class="g2-disclaimer">A composição é controlada exclusivamente pelas marcações de cada coluna.</p>' : filtersMarkup(state)}</div>
-          <div style="margin-top:14px">${methodologyMarkup(state)}</div>
-        </section>
-
-        <section class="panel g2-card">
-          <div class="g2-actions">
-            <div class="g2-actions-copy">A prévia fica congelada por até 24 horas com hash do histórico, configuração, fingerprint dos jogos e chave idempotente. Se o histórico mudar, o save é recusado.</div>
-            <button class="button primary" type="button" data-g2-preview>Gerar prévia auditável</button>
-          </div>
+        <section class="panel g2-card g2-action-card">
+          <p>A prévia não salva nada. Você verá os jogos e o custo antes de confirmar.</p>
+          <button class="button primary" type="button" data-g2-preview>Gerar prévia</button>
           <div class="g2-error" data-g2-error hidden></div>
         </section>
-
-        <section data-g2-result></section>
-      </div>
-
-      <aside class="g2-side">
-        <section class="panel g2-card" data-g2-plan>${planMarkup(state)}</section>
-        <section class="panel g2-card" data-g2-baseline>${baselineMarkup(state)}</section>
       </aside>
     </div>
+    <section class="g2-result" data-g2-result></section>
   </div>`;
 }
 
@@ -455,6 +537,8 @@ function clearPreview(state: GeneratorState): void {
   state.preview = null;
   const target = root?.querySelector<HTMLElement>("[data-g2-result]");
   if (target) target.innerHTML = "";
+  updateFlowState("configure");
+  renderConfigurationSummary(state);
 }
 
 function setError(message = ""): void {
@@ -503,28 +587,47 @@ function renderPreview(state: GeneratorState): void {
         rule?: { effectiveFrom?: string; sourceUrl?: string };
       }
     : undefined;
+  const purpose = purposeCopy(state.purpose);
+  const cardinality = state.lottery === "super-sete" ? "7 colunas" : `${betQuote?.betSize ?? audit.plan.betSize} dezenas`;
+
   target.innerHTML = `<div class="g2-preview">
-    <div class="g2-preview-head"><div><h2>4. Prévia auditável</h2><p>Este lote ainda não foi salvo. O servidor congelou os jogos e as provas da revisão usada para gerá-los.</p></div></div>
-    <div class="g2-audit-grid">
-      <div class="g2-audit"><span>Núcleo compartilhado</span><strong>${audit.sharedCore.map(numberLabel).join(" · ") || "Sem núcleo"}</strong><small>${audit.sharedCore.length} dezenas em todos os jogos</small></div>
-      <div class="g2-audit"><span>Cobertura do lote</span><strong>${audit.uniqueNumbers.length} dezenas</strong><small>${audit.uniqueVariableNumbers.length} variáveis distintas</small></div>
-      <div class="g2-audit"><span>Sobreposição média</span><strong>${formatDecimal(audit.averagePairwiseOverlap)}</strong><small>mín. ${formatDecimal(audit.minimumPairwiseOverlap)} · máx. ${formatDecimal(audit.maximumPairwiseOverlap)}</small></div>
-      <div class="g2-audit"><span>Elegíveis matematicamente</span><strong>${formatInteger(audit.plan.space.eligibleCombinations)}</strong><small>${formatPercent(audit.plan.space.overallCoverage)} do universo</small></div>
-      <div class="g2-audit"><span>Cardinalidade</span><strong>${betQuote?.betSize ?? audit.plan.betSize} dezenas</strong><small>${betQuote ? `${formatInteger(betQuote.simpleEquivalentCount)} equivalentes simples` : "Preço oficial desconhecido"}</small></div>
-      <div class="g2-audit"><span>Custo do lote</span><strong>${formatCurrencyCents(betQuote?.totalPriceCents)}</strong><small>${betQuote?.topPrizeOneIn ? `Prêmio principal: 1 em ${formatInteger(betQuote.topPrizeOneIn)} por aposta` : "Probabilidade oficial indisponível"}</small></div>
+    <div class="g2-preview-head"><div><span class="g2-preview-kicker">Prévia gerada</span><h2>Revise antes de salvar</h2><p>Este lote ainda não foi persistido. Salvar grava exatamente os jogos exibidos abaixo.</p></div></div>
+    <div class="g2-review-summary">
+      <div><span>Jogos</span><strong>${preview.games.length}</strong></div>
+      <div><span>Configuração</span><strong>${cardinality}</strong></div>
+      <div><span>Finalidade</span><strong>${escapeHtml(purpose.label)}</strong></div>
+      <div><span>Custo do lote</span><strong>${formatCurrencyCents(betQuote?.totalPriceCents)}</strong></div>
     </div>
     <div class="g2-game-grid">${preview.games.map(gameMarkup).join("")}</div>
-    <div class="g2-seed"><strong>Seed</strong><code>${escapeHtml(seed)}</code></div>
-    <div class="g2-seed"><strong>Preview ID</strong><code>${escapeHtml(proof)}</code></div>
+    <details class="g2-preview-audit">
+      <summary>Ver auditoria da prévia</summary>
+      <div class="g2-preview-audit-body">
+        <div class="g2-audit-grid">
+          <div class="g2-audit"><span>Núcleo compartilhado</span><strong>${audit.sharedCore.map(numberLabel).join(" · ") || "Sem núcleo"}</strong><small>${audit.sharedCore.length} dezenas em todos os jogos</small></div>
+          <div class="g2-audit"><span>Cobertura do lote</span><strong>${audit.uniqueNumbers.length} dezenas</strong><small>${audit.uniqueVariableNumbers.length} variáveis distintas</small></div>
+          <div class="g2-audit"><span>Sobreposição média</span><strong>${formatDecimal(audit.averagePairwiseOverlap)}</strong><small>mín. ${formatDecimal(audit.minimumPairwiseOverlap)} · máx. ${formatDecimal(audit.maximumPairwiseOverlap)}</small></div>
+          <div class="g2-audit"><span>Elegíveis matematicamente</span><strong>${formatInteger(audit.plan.space.eligibleCombinations)}</strong><small>${formatPercent(audit.plan.space.overallCoverage)} do universo</small></div>
+          <div class="g2-audit"><span>Cardinalidade</span><strong>${cardinality}</strong><small>${betQuote ? `${formatInteger(betQuote.simpleEquivalentCount)} equivalentes simples` : "Preço oficial desconhecido"}</small></div>
+          <div class="g2-audit"><span>Probabilidade oficial</span><strong>${betQuote?.topPrizeOneIn ? `1 em ${formatInteger(betQuote.topPrizeOneIn)}` : "—"}</strong><small>por aposta, quando disponível</small></div>
+        </div>
+        <div class="g2-seed"><strong>Seed</strong><code>${escapeHtml(seed)}</code></div>
+        <div class="g2-seed"><strong>Preview ID</strong><code>${escapeHtml(proof)}</code></div>
+      </div>
+    </details>
     <div class="g2-result-actions">
       <button class="button" type="button" data-g2-another>Gerar outra prévia</button>
-      <button class="button primary" type="button" data-g2-save>Salvar exatamente este lote</button>
+      <button class="button primary" type="button" data-g2-save>Salvar jogos</button>
+      <button class="button" type="button" data-g2-open-dashboard hidden>Ver no Painel</button>
       <span class="g2-saved" data-g2-saved hidden></span>
     </div>
   </div>`;
 
+  updateFlowState("review");
   target.querySelector<HTMLButtonElement>("[data-g2-another]")?.addEventListener("click", () => void generatePreview(state));
   target.querySelector<HTMLButtonElement>("[data-g2-save]")?.addEventListener("click", () => void savePreview(state));
+  target.querySelector<HTMLButtonElement>("[data-g2-open-dashboard]")?.addEventListener("click", () => {
+    window.location.hash = "dashboard";
+  });
 }
 
 async function generatePreview(state: GeneratorState): Promise<void> {
@@ -533,11 +636,13 @@ async function generatePreview(state: GeneratorState): Promise<void> {
   if (button) button.disabled = true;
   if (another) another.disabled = true;
   setError("");
+  updateFlowState("preview");
   try {
     state.preview = await postJson<GenerationPreviewResponse>("/generation/preview", requestPayload(state), state.controller.signal);
     renderPreview(state);
     root?.querySelector<HTMLElement>("[data-g2-result]")?.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
+    updateFlowState("configure");
     setError(error instanceof Error ? error.message : "Falha ao gerar a prévia");
   } finally {
     if (button?.isConnected) button.disabled = false;
@@ -550,14 +655,19 @@ async function savePreview(state: GeneratorState): Promise<void> {
   const button = root?.querySelector<HTMLButtonElement>("[data-g2-save]");
   const saved = root?.querySelector<HTMLElement>("[data-g2-saved]");
   if (button) button.disabled = true;
+  updateFlowState("save");
   try {
     const response = await postJson<GenerationSaveResponse>("/generation/save", requestPayload(state, true), state.controller.signal);
     if (saved) {
       saved.hidden = false;
-      saved.textContent = response.alreadySaved ? `Lote #${response.batchId} já estava salvo.` : `Lote #${response.batchId} salvo em Meus jogos.`;
+      saved.textContent = response.alreadySaved ? `Lote #${response.batchId} já estava salvo e está disponível no Painel.` : `Lote #${response.batchId} salvo e disponível no Painel.`;
     }
-    if (button) button.textContent = "Lote salvo";
+    const dashboardButton = root?.querySelector<HTMLButtonElement>("[data-g2-open-dashboard]");
+    if (dashboardButton) dashboardButton.hidden = false;
+    if (button) button.textContent = "Jogos salvos";
+    updateFlowState("saved");
   } catch (error) {
+    updateFlowState("review");
     setError(error instanceof Error ? error.message : "Falha ao salvar o lote");
     if (button) button.disabled = false;
   }
@@ -583,6 +693,7 @@ function updateRange(
 }
 
 function renderDynamicPlan(state: GeneratorState): void {
+  renderConfigurationSummary(state);
   const planTarget = root?.querySelector<HTMLElement>("[data-g2-plan]");
   if (planTarget) planTarget.innerHTML = planMarkup(state);
   const baselineTarget = root?.querySelector<HTMLElement>("[data-g2-baseline]");
@@ -605,7 +716,8 @@ function renderDynamicPlan(state: GeneratorState): void {
   const previewButton = root?.querySelector<HTMLButtonElement>("[data-g2-preview]");
   const invalid = state.plan.space.eligibleCombinations < 1
     || (state.purpose === "experimental" && algorithm.rawCombinationCapacity < 1)
-    || state.plan.constraintIssues.length > 0;
+    || state.plan.constraintIssues.length > 0
+    || (state.lottery === "timemania" && !state.favoriteTeam.trim());
   if (previewButton) previewButton.disabled = invalid;
 }
 
@@ -653,6 +765,7 @@ function bindWorkspace(state: GeneratorState): void {
     clearPreview(state);
     root.innerHTML = workspaceMarkup(state);
     bindWorkspace(state);
+    updateFlowState("configure");
   });
   root?.querySelector<HTMLSelectElement>("#g2-bet-size")?.addEventListener("change", (event) => {
     const select = event.target;
@@ -672,6 +785,7 @@ function bindWorkspace(state: GeneratorState): void {
     if (!(input instanceof HTMLInputElement)) return;
     state.favoriteTeam = input.value;
     clearPreview(state);
+    renderDynamicPlan(state);
   });
   root?.querySelectorAll<HTMLSelectElement>("[data-g2-column-mark]").forEach((select) => select.addEventListener("change", () => {
     const index = Number(select.dataset.g2ColumnMark);
@@ -706,7 +820,13 @@ function bindWorkspace(state: GeneratorState): void {
   root?.querySelector<HTMLInputElement>("#g2-target")?.addEventListener("change", (event) => {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
-    const next = Number(input.value);
+    const raw = input.value.trim();
+    if (!raw) {
+      state.targetContestNumber = undefined;
+      schedulePlan();
+      return;
+    }
+    const next = Number(raw);
     if (Number.isInteger(next) && next > 0) {
       state.targetContestNumber = next;
       schedulePlan();
@@ -786,14 +906,13 @@ async function mount(detail: ViewRenderedDetail): Promise<void> {
   cleanupCurrent = null;
   if (!root || currentMainView() !== "generate") return;
   const legacyForm = root.querySelector<HTMLFormElement>("#generate-form");
-  if (!legacyForm) return;
 
   const lotteryValue = detail.lottery || document.querySelector<HTMLSelectElement>("#lottery-select")?.value || "mega-sena";
   if (!isLotteryId(lotteryValue)) return;
   const lottery = lotteryValue;
   const fallback = LOTTERY_FALLBACK[lottery];
-  const legacyGameCount = Number(legacyForm.querySelector<HTMLInputElement>("#game-count")?.value) || fallback.defaultGames;
-  const legacyTargetValue = Number(legacyForm.querySelector<HTMLInputElement>("#target-contest")?.value);
+  const legacyGameCount = Number(legacyForm?.querySelector<HTMLInputElement>("#game-count")?.value) || fallback.defaultGames;
+  const legacyTargetValue = Number(legacyForm?.querySelector<HTMLInputElement>("#target-contest")?.value);
   const legacyTarget = legacyTargetValue || undefined;
   const controller = new AbortController();
 

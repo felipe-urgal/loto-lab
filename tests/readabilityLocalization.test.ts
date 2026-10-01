@@ -101,7 +101,7 @@ test("Generator 2.0 owns its conditioned reference copy in Portuguese", async ()
   const generator = await source("web/src/features/generationV2.ts");
 
   assert.match(generator, />Referência condicionada</);
-  assert.match(generator, /As referências abaixo são condicionadas/);
+  assert.match(generator, /Referências após fixadas\/excluídas/);
   assert.doesNotMatch(generator, />Baseline condicionado</);
   assert.doesNotMatch(generator, /Os baselines abaixo são condicionados/);
 });
