@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluateGame } from "../src/checker/evaluate.js";
+import { evaluateGame, maisMilionariaPrizeTier } from "../src/checker/evaluate.js";
 import { normalizeCaixaContest } from "../src/data/caixa.js";
 import { assertValidGeneratedGame } from "../src/domain/validation.js";
 import { generateUniformGames } from "../src/generator/generationPurpose.js";
@@ -158,4 +158,21 @@ test("structured generators preserve field cardinality across deterministic seed
     assert.deepEqual(game?.columns?.map((column) => column.length), marks);
     assertValidGeneratedGame(game!);
   }
+});
+
+
+test("+Milionaria classifies the ten official prize bands by numbers and clovers", () => {
+  assert.equal(maisMilionariaPrizeTier(6, 2), "faixa-1");
+  assert.equal(maisMilionariaPrizeTier(6, 1), "faixa-2");
+  assert.equal(maisMilionariaPrizeTier(6, 0), "faixa-2");
+  assert.equal(maisMilionariaPrizeTier(5, 2), "faixa-3");
+  assert.equal(maisMilionariaPrizeTier(5, 0), "faixa-4");
+  assert.equal(maisMilionariaPrizeTier(4, 2), "faixa-5");
+  assert.equal(maisMilionariaPrizeTier(4, 0), "faixa-6");
+  assert.equal(maisMilionariaPrizeTier(3, 2), "faixa-7");
+  assert.equal(maisMilionariaPrizeTier(3, 1), "faixa-8");
+  assert.equal(maisMilionariaPrizeTier(2, 2), "faixa-9");
+  assert.equal(maisMilionariaPrizeTier(2, 1), "faixa-10");
+  assert.equal(maisMilionariaPrizeTier(3, 0), undefined);
+  assert.equal(maisMilionariaPrizeTier(2, 0), undefined);
 });
