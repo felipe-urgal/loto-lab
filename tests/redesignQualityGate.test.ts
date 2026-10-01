@@ -3,12 +3,13 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 
 test("Redesign V2 quality gate remains wired to current product surfaces", async () => {
-  const [packageSource, e2e, template, design, foundation, html, ci, loader] = await Promise.all([
+  const [packageSource, e2e, template, design, foundation, analysisStyles, html, ci, loader] = await Promise.all([
     readFile("package.json", "utf8"),
     readFile("scripts/e2eReadability.mjs", "utf8"),
     readFile(".github/PULL_REQUEST_TEMPLATE.md", "utf8"),
     readFile("docs/design/REDESIGN_V2.md", "utf8"),
     readFile("web/ui-foundation.css", "utf8"),
+    readFile("web/analysis-v2.css", "utf8"),
     readFile("web/index.html", "utf8"),
     readFile(".github/workflows/ci.yml", "utf8"),
     readFile("web/src/core/featureLoader.ts", "utf8"),
@@ -56,6 +57,7 @@ test("Redesign V2 quality gate remains wired to current product surfaces", async
 
   assert.match(foundation, /\.button, \.link-button \{ min-height: var\(--control-min-size\)/);
   assert.match(foundation, /\.button\.compact \{ min-height: var\(--control-min-size\)/);
+  assert.match(analysisStyles, /\.a2-ball \{ width: var\(--control-min-size\); height: var\(--control-min-size\); min-width: var\(--control-min-size\); min-height: var\(--control-min-size\)/);
   assert.match(html, /id="content" aria-live="polite"/);
   assert.match(html, /id="data-status-bar" aria-live="polite"/);
   assert.match(html, /id="toast-root" aria-live="assertive"/);
