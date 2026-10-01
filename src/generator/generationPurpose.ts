@@ -100,6 +100,17 @@ function sampleCandidate(
   random: () => number,
 ): GeneratedGame {
   const config = getLotteryConfig(options.lottery);
+  if (options.lottery === "super-sete") {
+    const columns = Array.from({ length: 7 }, () => Math.floor(random() * 10));
+    return {
+      lottery: options.lottery,
+      numbers: [],
+      fixedNumbers: [],
+      variableNumbers: [],
+      columns,
+      metadata: { odd: 0, even: 0, sum: 0, repeatedFromLastContest: [] },
+    };
+  }
   const excluded = new Set(options.excludedNumbers ?? []);
   const fixedSet = new Set(sharedCore);
   const candidates = Array.from(
@@ -118,6 +129,12 @@ function sampleCandidate(
   const luckyMonth = options.lottery === "dia-de-sorte"
     ? LUCKY_MONTHS[Math.floor(random() * LUCKY_MONTHS.length)]
     : undefined;
+  const clovers = options.lottery === "mais-milionaria"
+    ? sampleWithoutReplacement([1, 2, 3, 4, 5, 6], 2, random)
+    : undefined;
+  const favoriteTeam = options.lottery === "timemania"
+    ? options.referenceContest?.favoriteTeam ?? "Time do Coração"
+    : undefined;
   const mirrorNumbers = options.lottery === "lotomania"
     ? Array.from({ length: 100 }, (_, index) => index).filter((number) => !numbers.includes(number))
     : undefined;
@@ -128,12 +145,20 @@ function sampleCandidate(
     variableNumbers,
     ...(mirrorNumbers ? { mirrorNumbers } : {}),
     ...(luckyMonth ? { luckyMonth } : {}),
+    ...(clovers ? { clovers } : {}),
+    ...(favoriteTeam ? { favoriteTeam } : {}),
     metadata,
   };
 }
 
 function candidateKey(game: GeneratedGame): string {
-  return `${game.numbers.join("-")}:${game.luckyMonth ?? ""}`;
+  return [
+    game.numbers.join("-"),
+    game.luckyMonth ?? "",
+    game.clovers?.join("-") ?? "",
+    game.favoriteTeam ?? "",
+    game.columns?.join("-") ?? "",
+  ].join(":");
 }
 
 function overlap(left: GeneratedGame, right: GeneratedGame): number {
