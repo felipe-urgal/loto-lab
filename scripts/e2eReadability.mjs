@@ -234,7 +234,7 @@ async function auditControls(client, label) {
         if (text) return text;
       }
       if (el.id) {
-        const explicit = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+        const explicit = document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
         if (explicit?.textContent?.trim()) return explicit.textContent.trim();
       }
       const parent = el.closest('label');
