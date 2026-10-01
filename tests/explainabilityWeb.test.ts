@@ -7,7 +7,7 @@ async function source(path: string): Promise<string> {
   return readFile(resolve(process.cwd(), path), "utf8");
 }
 
-test("Generator explainability layer exposes the five-step flow and methodology guardrails", async () => {
+test("Generator explainability supports the four-step product flow without competing navigation", async () => {
   const explainability = await source("web/src/features/generationV2/explainability.ts");
   const enhancements = await source("web/src/features/generationV2/enhancements.ts");
   const boundary = await source("web/generation-v2.js");
@@ -18,24 +18,19 @@ test("Generator explainability layer exposes the five-step flow and methodology 
   assert.doesNotMatch(loader, /loadModule\("generation-explainability"\)/);
   assert.doesNotMatch(loader, /loadModule\("generation-readiness"\)/);
   assert.doesNotMatch(loader, /generation-diversity/);
-  assert.match(explainability, /Análise/);
-  assert.match(explainability, /Núcleo fixo/);
-  assert.match(explainability, /Variáveis/);
-  assert.match(explainability, /Restrições/);
-  assert.match(explainability, /Auditoria/);
+
+  assert.match(explainability, /four-step product journey/);
   assert.match(explainability, /Isto não é previsão/);
-  assert.match(explainability, /Pontuação v2/);
-  assert.match(explainability, /topo da classificação/);
-  assert.match(explainability, /Selecionadas por pontuação \+ diversidade/);
+  assert.match(explainability, /Aleatório auditável/);
+  assert.match(explainability, /Carteira e Experimental/);
+  assert.match(explainability, /Como o motor usa esta configuração/);
+  assert.match(explainability, /Fixadas, excluídas e filtros estruturais/);
+  assert.match(explainability, /Auditoria do lote/);
+  assert.match(explainability, /Como ler este jogo/);
   assert.match(explainability, /Semente, histórico e assinatura/);
-  assert.match(explainability, /regra de proteção ampla/);
   assert.match(explainability, /Por que este lote foi aceito/);
-  assert.match(explainability, /Validar hipótese no Laboratório/);
-  assert.doesNotMatch(explainability, /\bScore v2\b/);
-  assert.doesNotMatch(explainability, /\bscore\b/);
-  assert.doesNotMatch(explainability, /topo do ranking/);
-  assert.doesNotMatch(explainability, /\bguardrail\b/);
-  assert.doesNotMatch(explainability, /Seed, histórico e fingerprint/);
+  assert.doesNotMatch(explainability, /Validar hipótese no Laboratório/);
+  assert.doesNotMatch(explainability, /\bScore v2\b|topo do ranking|Seed, histórico e fingerprint/);
 
   assert.equal(
     boundary,
@@ -47,17 +42,23 @@ test("Generator explainability layer exposes the five-step flow and methodology 
   assert.match(enhancements, /onMainViewChanged/);
   assert.doesNotMatch(enhancements, /location\.hash/);
   assert.doesNotMatch(enhancements, /addEventListener\("hashchange"/);
+
+  assert.match(generator, /data-g2-flow-step="configure"/);
+  assert.match(generator, /data-g2-flow-step="preview"/);
+  assert.match(generator, /data-g2-flow-step="review"/);
+  assert.match(generator, /data-g2-flow-step="save"/);
   assert.match(generator, /generationMode: "diversified"/);
   assert.match(generator, /generatorOptions\.seed/);
+
   await assert.rejects(source("web/generation-diversity.js"), /ENOENT/);
   await assert.rejects(source("web/generation-explainability.js"), /ENOENT/);
   await assert.rejects(source("web/generation-readiness.js"), /ENOENT/);
   await assert.rejects(source("web/generation-explainability.css"), /ENOENT/);
 
-  assert.match(workspace, /g2-explain-stepper/);
-  assert.match(workspace, /g2-education-grid/);
-  assert.match(workspace, /g2-preview-explain-title/);
-  assert.match(workspace, /g2-game-reason/);
+  assert.match(workspace, /\.g2-flow/);
+  assert.match(workspace, /\.g2-education-grid/);
+  assert.match(workspace, /\.g2-preview-explain-title/);
+  assert.match(workspace, /\.g2-game-reason/);
 });
 
 test("Strategy Lab UI exposes score-model, inference resolution and predictive validation", async () => {
