@@ -23,6 +23,9 @@ const LOTTERIES: LotteryId[] = [
   "quina",
   "lotomania",
   "dupla-sena",
+  "mais-milionaria",
+  "timemania",
+  "super-sete",
 ];
 const SYNC_ADVISORY_LOCK = 1515015;
 const FINANCIAL_REPAIR_WINDOW = 20;
