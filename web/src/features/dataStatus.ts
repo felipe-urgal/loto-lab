@@ -1,23 +1,10 @@
 import { api } from "../core/api.js";
+import { isLotteryId, type LotteryId } from "../core/mainContext.js";
 import { currentMainView, onMainViewChanged } from "../core/viewLifecycle.js";
 
 const root = document.querySelector<HTMLElement>("#data-status-bar");
 const lotterySelect = document.querySelector<HTMLSelectElement>("#lottery-select");
 const refreshButton = document.querySelector<HTMLButtonElement>("#refresh-view");
-
-const labels = {
-  "mega-sena": "Mega-Sena",
-  lotofacil: "Lotofácil",
-  "dia-de-sorte": "Dia de Sorte",
-  quina: "Quina",
-  lotomania: "Lotomania",
-  "dupla-sena": "Dupla Sena",
-  "mais-milionaria": "+Milionária",
-  timemania: "Timemania",
-  "super-sete": "Super Sete",
-} as const;
-
-type LotteryId = keyof typeof labels;
 
 type DataStatusItem = {
   lottery?: string;
@@ -65,10 +52,6 @@ function finiteNumber(value: unknown): number | undefined {
 
 function formatCount(value: number): string {
   return new Intl.NumberFormat("pt-BR").format(value);
-}
-
-function isLotteryId(value: string | undefined): value is LotteryId {
-  return Boolean(value && Object.prototype.hasOwnProperty.call(labels, value));
 }
 
 function currentLottery(): LotteryId {
