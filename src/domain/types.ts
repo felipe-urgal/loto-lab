@@ -25,6 +25,9 @@ export interface Contest {
   numbers: number[];
   secondDrawNumbers?: number[];
   luckyMonth?: string;
+  clovers?: number[];
+  favoriteTeam?: string;
+  columns?: number[];
   prizeTiers?: ContestPrizeTier[];
   amountCollected?: number;
 }
@@ -50,6 +53,9 @@ export interface GeneratedGame {
   variableNumbers: number[];
   mirrorNumbers?: number[];
   luckyMonth?: string;
+  clovers?: number[];
+  favoriteTeam?: string;
+  columns?: number[];
   metadata: {
     odd: number;
     even: number;
