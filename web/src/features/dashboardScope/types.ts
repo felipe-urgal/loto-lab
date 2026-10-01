@@ -2,10 +2,33 @@ export const LOTTERIES = {
   "mega-sena": "Mega-Sena",
   lotofacil: "Lotofácil",
   "dia-de-sorte": "Dia de Sorte",
+  quina: "Quina",
+  lotomania: "Lotomania",
+  "dupla-sena": "Dupla Sena",
+  "mais-milionaria": "+Milionária",
+  timemania: "Timemania",
+  "super-sete": "Super Sete",
 } as const;
 
 export type LotteryId = keyof typeof LOTTERIES;
-export type DashboardScope = "all" | LotteryId;
+
+export type LotteryCapabilitiesDto = {
+  analysis?: boolean;
+  checking?: boolean;
+  simulation?: boolean;
+};
+
+export type LotteryCatalogItemDto = {
+  id?: string;
+  name?: string;
+  enabled?: boolean;
+  family?: string;
+  capabilities?: LotteryCapabilitiesDto;
+};
+
+export type LotteryCatalogPayload = {
+  items?: LotteryCatalogItemDto[];
+};
 
 export type ContestDto = {
   number?: unknown;
@@ -13,20 +36,8 @@ export type ContestDto = {
   numbers?: number[];
 };
 
-export type BacktestSummaryDto = {
-  roi?: unknown;
-  financialCoverage?: unknown;
-  bestHits?: unknown;
-  totalPrizeValue?: unknown;
-};
-
-export type BacktestRunDto = {
-  id?: unknown;
-  summary?: BacktestSummaryDto;
-};
-
-export type BacktestsPayload = {
-  items?: BacktestRunDto[];
+export type ContestsPayload = {
+  items?: ContestDto[];
 };
 
 export type RealBetSummaryDto = {
@@ -39,8 +50,17 @@ export type RealBetSummaryDto = {
   roi?: unknown;
 };
 
+export type RealBetDto = {
+  id?: unknown;
+  batchId?: unknown;
+  contestNumber?: unknown;
+  status?: string;
+  netResult?: unknown;
+  totalPrizeValue?: unknown;
+};
+
 export type RealBetsPayload = {
-  items?: unknown[];
+  items?: RealBetDto[];
   summary?: RealBetSummaryDto;
 };
 
@@ -57,17 +77,8 @@ export type GameBatchesPayload = {
 };
 
 export type FocusedDashboardData = {
-  contest: ContestDto | null;
-  backtests: BacktestsPayload;
+  catalog: LotteryCatalogPayload;
+  contests: ContestsPayload;
   realBets: RealBetsPayload;
   batches: GameBatchesPayload;
-};
-
-export type DashboardEntry<T> = readonly [LotteryId, T];
-
-export type AllDashboardData = {
-  contests: DashboardEntry<ContestDto | null>[];
-  backtests: DashboardEntry<BacktestsPayload>[];
-  realBets: DashboardEntry<RealBetsPayload>[];
-  batches: DashboardEntry<GameBatchesPayload>[];
 };
