@@ -15,6 +15,8 @@ test("view lifecycle normalizes the main hash contract", () => {
   assert.equal(mainViewFromHash("#dashboard"), "dashboard");
   assert.equal(mainViewFromHash("#analysis"), "analysis");
   assert.equal(mainViewFromHash("generate"), "generate");
+  assert.equal(mainViewFromHash("#games"), "dashboard");
+  assert.equal(mainViewFromHash("#backtests"), "analysis");
   assert.equal(mainViewFromHash("#unknown"), "dashboard");
   assert.equal(VIEW_RENDERED_EVENT, "loto-lab:view-rendered");
 });
@@ -27,7 +29,7 @@ test("runtime keeps lifecycle compatibility while implementation moves to TypeSc
   assert.doesNotMatch(runtimeSource, /export function onViewRendered/);
 });
 
-test("feature loader boundary delegates to the typed core owner", () => {
+test("feature loader boundary delegates to the three canonical views", () => {
   assert.equal(featureLoaderBoundarySource.trim(), 'import "./src/core/featureLoader.js";');
   assert.match(
     featureLoaderSource,
@@ -36,7 +38,9 @@ test("feature loader boundary delegates to the typed core owner", () => {
   assert.match(featureLoaderSource, /new Map<string, Promise<boolean>>\(\)/);
   assert.match(featureLoaderSource, /emitViewRendered\(\{ view, lottery, token \}\)/);
   assert.match(featureLoaderSource, /loadStyledModule\("dashboard-scope"\)/);
-  assert.match(featureLoaderSource, /loadModule\("my-games-v2"\)/);
+  assert.match(featureLoaderSource, /loadModule\("analysis-v2"\)/);
+  assert.match(featureLoaderSource, /loadStyledModule\("generation-v2"\)/);
+  assert.doesNotMatch(featureLoaderSource, /my-games-v2|backtests-workspace|loadModule\("backtests"\)/);
   assert.doesNotMatch(featureLoaderSource, /new CustomEvent\("loto-lab:view-rendered"/);
   assert.doesNotMatch(featureLoaderSource, /location\.hash\.replace\("#", ""\)/);
   assert.doesNotMatch(featureLoaderBoundarySource, /currentMainView|emitViewRendered|hashchange|loadModule|loadStyle/);
