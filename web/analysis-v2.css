@@ -29,7 +29,7 @@
 .a2-tier-list { display: grid; gap: 10px; }
 .a2-tier-panel { padding: 15px; }
 .a2-ball-cloud { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
-.a2-ball { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); font-size: 16px; font-weight: 800; cursor: pointer; }
+.a2-ball { width: var(--control-min-size); height: var(--control-min-size); min-width: var(--control-min-size); min-height: var(--control-min-size); border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); font-size: 16px; font-weight: 800; cursor: pointer; }
 .a2-ball:hover { transform: translateY(-1px); border-color: var(--accent); }
 .a2-ball.is-strong { background: var(--accent-soft); color: var(--accent-strong); border-color: rgba(101,214,164,.32); }
 .a2-ball.is-balanced { background: var(--warning-soft); color: var(--warning); border-color: rgba(240,189,102,.28); }
