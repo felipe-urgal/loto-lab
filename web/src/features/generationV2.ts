@@ -41,6 +41,9 @@ const LOTTERY_FALLBACK: Record<LotteryId, {
   quina: { label: "Quina", max: 80, drawSize: 5, defaultBetSize: 5, defaultGames: 4 },
   lotomania: { label: "Lotomania", max: 99, drawSize: 20, defaultBetSize: 50, defaultGames: 2 },
   "dupla-sena": { label: "Dupla Sena", max: 50, drawSize: 6, defaultBetSize: 6, defaultGames: 4 },
+  "mais-milionaria": { label: "+Milionária", max: 50, drawSize: 6, defaultBetSize: 6, defaultGames: 4 },
+  timemania: { label: "Timemania", max: 80, drawSize: 7, defaultBetSize: 10, defaultGames: 4 },
+  "super-sete": { label: "Super Sete", max: 9, drawSize: 7, defaultBetSize: 7, defaultGames: 4 },
 };
 
 const NUMBER_TIERS: readonly NumberTier[] = ["strong", "balanced", "cold"];
@@ -51,7 +54,10 @@ function isLotteryId(value: string | undefined): value is LotteryId {
     || value === "dia-de-sorte"
     || value === "quina"
     || value === "lotomania"
-    || value === "dupla-sena";
+    || value === "dupla-sena"
+    || value === "mais-milionaria"
+    || value === "timemania"
+    || value === "super-sete";
 }
 
 function supportsExperimental(lottery: LotteryId): boolean {
@@ -234,6 +240,9 @@ function filtersMarkup(state: GeneratorState): string {
 }
 
 function numberGridMarkup(state: GeneratorState): string {
+  if (state.lottery === "super-sete") {
+    return `<div class="g2-columns-note">Super Sete usa 7 colunas posicionais. Os dígitos são gerados e exibidos por coluna, sem serem tratados como dezenas.</div>`;
+  }
   const tiers = tierByNumber(state.plan);
   let html = "";
   for (let value = 1; value <= state.plan.universeSize; value += 1) {
@@ -433,13 +442,24 @@ function setError(message = ""): void {
 
 function gameMarkup(game: GeneratedGame, index: number): string {
   const fixed = new Set(game.fixedNumbers || []);
-  const balls = (game.numbers || []).map((value) => `<span class="ball ${fixed.has(value) ? "is-fixed" : ""}">${numberLabel(value)}</span>`).join("");
+  const balls = game.columns
+    ? game.columns.map((value, column) => `<span class="ball" title="Coluna ${column + 1}">C${column + 1}:${value}</span>`).join("")
+    : (game.numbers || []).map((value) => `<span class="ball ${fixed.has(value) ? "is-fixed" : ""}">${numberLabel(value)}</span>`).join("");
   const repeated = game.metadata?.repeatedFromLastContest?.length ?? 0;
+  const secondary = game.secondary?.kind === "clovers"
+    ? `Trevos · ${game.secondary.values.join(" · ")}`
+    : game.secondary?.kind === "favorite-team"
+      ? `Time do Coração · ${escapeHtml(game.secondary.values[0] ?? "")}`
+      : game.secondary?.kind === "lucky-month"
+        ? `Mês da Sorte · ${escapeHtml(game.secondary.values[0] ?? "")}`
+        : game.luckyMonth
+          ? `Mês da Sorte · ${escapeHtml(game.luckyMonth)}`
+          : "";
   return `<article class="panel g2-game">
     <div class="g2-game-head"><strong>Jogo ${index + 1}</strong><span>${game.fixedNumbers?.length ?? 0} núcleo · ${game.variableNumbers?.length ?? 0} variáveis</span></div>
     <div class="draw-numbers">${balls}</div>
     <div class="g2-game-meta"><span>Pares <strong>${game.metadata?.even ?? "—"}</strong></span><span>Ímpares <strong>${game.metadata?.odd ?? "—"}</strong></span><span>Soma <strong>${game.metadata?.sum ?? "—"}</strong></span><span>Repetidas <strong>${repeated}</strong></span></div>
-    ${game.luckyMonth ? `<div class="g2-game-month">Mês da Sorte · ${escapeHtml(game.luckyMonth)}</div>` : ""}
+    ${secondary ? `<div class="g2-game-month">${secondary}</div>` : ""}
   </article>`;
 }
 
