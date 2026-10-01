@@ -1,5 +1,6 @@
 import { createServer, type RequestListener, type Server } from "node:http";
 import type { Pool } from "pg";
+import { getLotteryCatalogEntry } from "../domain/lotteryCatalog.js";
 import { LOTTERY_CONFIGS } from "../lotteries/config.js";
 import {
   ApiError,
@@ -48,7 +49,18 @@ export function createApiRequestHandler(options: ApiServerOptions): RequestListe
       }
 
       if (method === "GET" && pathname === "/api/v1/lotteries") {
-        sendJson(response, 200, { items: Object.values(LOTTERY_CONFIGS) }, corsOrigin);
+        sendJson(response, 200, {
+          items: Object.values(LOTTERY_CONFIGS).map((config) => {
+            const catalog = getLotteryCatalogEntry(config.id);
+            return {
+              ...config,
+              family: catalog.family,
+              enabled: catalog.enabled,
+              capabilities: catalog.capabilities,
+              rules: catalog.rules,
+            };
+          }),
+        }, corsOrigin);
         return;
       }
 
