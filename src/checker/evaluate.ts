@@ -70,7 +70,7 @@ export function evaluateGame(game: GeneratedGame, target: Contest): GameCheckRes
       throw new Error("Super Sete checking requires seven ordered columns");
     }
     const matchedColumns = gameColumns
-      .map((value, index) => value === targetColumns[index] ? index + 1 : undefined)
+      .map((values, index) => values.includes(targetColumns[index]!) ? index + 1 : undefined)
       .filter((value): value is number => value !== undefined);
     return {
       lottery: game.lottery,
