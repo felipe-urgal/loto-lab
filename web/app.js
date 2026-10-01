@@ -121,6 +121,10 @@ async function renderGenerate(render) {
   const latest = await safeApi(`/contests/${render.lottery}/latest`, { signal: render.signal });
   if (!isCurrentRender(render)) return;
   const config = LOTTERIES[render.lottery];
+  if (!config) {
+    content.innerHTML = '<div class="loading-state" data-feature-owned="generate"><span class="spinner"></span><span>Carregando Gerador...</span></div>';
+    return;
+  }
   content.innerHTML = `<div class="stack">
     <section><div class="section-head"><div><h2>Configurar lote</h2><p>O algoritmo usa somente dados anteriores ao concurso alvo.</p></div></div>
       <form class="panel form-panel" id="generate-form">
