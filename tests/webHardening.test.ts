@@ -81,18 +81,15 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
     fetchSource("ui-foundation.css"),
   ]);
 
-  assert.match(app, /function sumKnownMoney\(items, field\)/);
-  assert.match(app, /const prize = sumKnownMoney\(result\.checks, "totalPrizeValue"\)/);
-  assert.match(app, /const cost = sumKnownMoney\(result\.checks, "ticketCost"\)/);
-  assert.match(app, /const net = prize !== undefined && cost !== undefined \? prize - cost : undefined/);
-  assert.match(app, /formatCurrency\(check\.totalPrizeValue\)/);
-  assert.doesNotMatch(app, /check\.totalPrizeValue \|\| 0/);
-  assert.doesNotMatch(app, /check\.ticketCost \|\| 0/);
+  assert.match(app, /data-feature-owned="dashboard"/);
+  assert.doesNotMatch(app, /setView\("games"\)/);
+  assert.doesNotMatch(app, /render\.view === "backtests"/);
 
   assert.match(shellBoundary, /\.\/src\/core\/shell\.js/);
   assert.match(shell, /normalizeMainHash/);
   assert.match(shell, /localStorage\.removeItem\("loto-lab:lottery"\)/);
-  assert.match(shell, /matchMedia\("\(max-width: 680px\)"\)/);
+  assert.match(shell, /LEGACY_PATH_REDIRECTS/);
+  assert.doesNotMatch(shell, /nav-more|Mais opções/);
 
   assert.match(refinementsBoundary, /src\/features\/refinements\.js/);
   assert.match(refinements, /analysisRefined === "loading"/);
