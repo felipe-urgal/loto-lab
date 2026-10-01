@@ -50,6 +50,30 @@ export const LOTTERY_CONFIGS: Record<LotteryId, LotteryConfig> = {
     drawSize: 6,
     defaultBetSize: 6,
   },
+  "mais-milionaria": {
+    id: "mais-milionaria",
+    name: getLotteryCatalogEntry("mais-milionaria").name,
+    minNumber: 1,
+    maxNumber: 50,
+    drawSize: 6,
+    defaultBetSize: 6,
+  },
+  timemania: {
+    id: "timemania",
+    name: getLotteryCatalogEntry("timemania").name,
+    minNumber: 1,
+    maxNumber: 80,
+    drawSize: 7,
+    defaultBetSize: 10,
+  },
+  "super-sete": {
+    id: "super-sete",
+    name: getLotteryCatalogEntry("super-sete").name,
+    minNumber: 0,
+    maxNumber: 9,
+    drawSize: 7,
+    defaultBetSize: 7,
+  },
 };
 
 export function getLotteryConfig(id: LotteryId): LotteryConfig {
