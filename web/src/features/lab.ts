@@ -160,6 +160,21 @@ const lotteries: Record<LotteryId, LotteryConfig> = {
     defaultGames: 4,
     fixedCopy: "O modo experimental histórico ainda não está habilitado para Dupla Sena.",
   },
+  "mais-milionaria": {
+    label: "+Milionária",
+    defaultGames: 4,
+    fixedCopy: "O modo experimental histórico ainda não está habilitado para +Milionária.",
+  },
+  timemania: {
+    label: "Timemania",
+    defaultGames: 4,
+    fixedCopy: "O modo experimental histórico ainda não está habilitado para Timemania.",
+  },
+  "super-sete": {
+    label: "Super Sete",
+    defaultGames: 4,
+    fixedCopy: "O modo experimental histórico ainda não está habilitado para Super Sete.",
+  },
 };
 
 const metrics: Record<MetricKey, MetricConfig> = {
