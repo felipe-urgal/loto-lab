@@ -23,6 +23,9 @@ export interface GameCheckResult {
   secondDrawMatchedNumbers?: number[];
   secondDrawPrizeTier?: string;
   secondDrawPrizeValue?: number;
+  secondaryHits?: number;
+  secondaryHit?: boolean;
+  matchedColumns?: number[];
 }
 
 function canonical(value?: string): string | undefined {
@@ -49,12 +52,38 @@ export function prizeTierFor(lottery: LotteryId, hits: number): string | undefin
   if (lottery === "lotomania") {
     return hits === 0 || (hits >= 15 && hits <= 20) ? `${hits}-acertos` : undefined;
   }
-  return hits >= 3 && hits <= 6 ? `${hits}-acertos` : undefined;
+  if (lottery === "dupla-sena") return hits >= 3 && hits <= 6 ? `${hits}-acertos` : undefined;
+  if (lottery === "timemania") return hits >= 3 && hits <= 7 ? `${hits}-acertos` : undefined;
+  if (lottery === "super-sete") return hits >= 3 && hits <= 7 ? `${hits}-acertos` : undefined;
+  return undefined;
 }
 
 export function evaluateGame(game: GeneratedGame, target: Contest): GameCheckResult {
   if (game.lottery !== target.lottery) {
     throw new Error(`Game lottery ${game.lottery} does not match target ${target.lottery}`);
+  }
+
+  if (game.lottery === "super-sete") {
+    const gameColumns = game.columns ?? [];
+    const targetColumns = target.columns ?? target.numbers;
+    if (gameColumns.length !== 7 || targetColumns.length !== 7) {
+      throw new Error("Super Sete checking requires seven ordered columns");
+    }
+    const matchedColumns = gameColumns
+      .map((value, index) => value === targetColumns[index] ? index + 1 : undefined)
+      .filter((value): value is number => value !== undefined);
+    return {
+      lottery: game.lottery,
+      contest: target.number,
+      hits: matchedColumns.length,
+      matchedNumbers: [],
+      fixedHits: 0,
+      fixedMatchedNumbers: [],
+      variableHits: 0,
+      variableMatchedNumbers: [],
+      matchedColumns,
+      prizeTier: prizeTierFor(game.lottery, matchedColumns.length),
+    };
   }
 
   const targetSet = new Set(target.numbers);
@@ -63,6 +92,16 @@ export function evaluateGame(game: GeneratedGame, target: Contest): GameCheckRes
   const variableMatchedNumbers = game.variableNumbers.filter((number) => targetSet.has(number));
   const luckyMonthHit = game.lottery === "dia-de-sorte"
     ? canonical(game.luckyMonth) !== undefined && canonical(game.luckyMonth) === canonical(target.luckyMonth)
+    : undefined;
+  const secondaryHits = game.lottery === "mais-milionaria"
+    && game.secondary?.kind === "clovers"
+    && target.secondary?.kind === "clovers"
+    ? game.secondary.values.filter((value) => target.secondary!.values.includes(value)).length
+    : undefined;
+  const secondaryHit = game.lottery === "timemania"
+    && game.secondary?.kind === "favorite-team"
+    && target.secondary?.kind === "favorite-team"
+    ? canonical(game.secondary.values[0]) === canonical(target.secondary.values[0])
     : undefined;
   const currentQuote = quoteOfficialBet(game.lottery, game.numbers.length);
   const historicalSimplePrice = trySimpleBetPriceForContest(target);
@@ -95,6 +134,8 @@ export function evaluateGame(game: GeneratedGame, target: Contest): GameCheckRes
     variableMatchedNumbers,
     prizeTier: prizeTierFor(game.lottery, matchedNumbers.length),
     ...(luckyMonthHit !== undefined ? { luckyMonthHit } : {}),
+    ...(secondaryHits !== undefined ? { secondaryHits } : {}),
+    ...(secondaryHit !== undefined ? { secondaryHit } : {}),
     ...(ticketCost !== undefined ? { ticketCost } : {}),
     ...prize,
     ...(secondDrawMatchedNumbers
