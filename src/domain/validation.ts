@@ -9,6 +9,9 @@ const FIXED_COUNTS: Record<LotteryId, readonly number[]> = {
   quina: [0],
   lotomania: [0],
   "dupla-sena": [0],
+  "mais-milionaria": [0],
+  timemania: [0],
+  "super-sete": [0],
 };
 
 const LUCKY_MONTHS = new Set([
@@ -35,13 +38,22 @@ export function assertValidContestNumbers(lottery: LotteryId, numbers: number[])
   if (numbers.some((number) => !Number.isInteger(number) || number < config.minNumber || number > config.maxNumber)) {
     throw new Error(`Invalid drawn number returned by Caixa for ${lottery}`);
   }
-  if (new Set(numbers).size !== numbers.length) {
+  if (lottery !== "super-sete" && new Set(numbers).size !== numbers.length) {
     throw new Error(`Duplicated drawn number returned by Caixa for ${lottery}`);
   }
 }
 
 export function assertValidGeneratedGame(game: GeneratedGame): void {
   const config = getLotteryConfig(game.lottery);
+  if (game.lottery === "super-sete") {
+    if (!game.columns || game.columns.length !== 7 || game.columns.some((value) => !Number.isInteger(value) || value < 0 || value > 9)) {
+      throw new Error("Super Sete games require exactly seven column digits between 0 and 9");
+    }
+    if (game.numbers.length !== 0 || game.fixedNumbers.length !== 0 || game.variableNumbers.length !== 0) {
+      throw new Error("Super Sete columns must not be flattened into number selections");
+    }
+    return;
+  }
   const officialRule = getOfficialBetRule(game.lottery);
   const minBetSize = officialRule?.minBetSize ?? config.defaultBetSize;
   const maxBetSize = officialRule?.maxBetSize ?? config.defaultBetSize;
@@ -74,6 +86,20 @@ export function assertValidGeneratedGame(game: GeneratedGame): void {
 
   if (!FIXED_COUNTS[game.lottery].includes(game.fixedNumbers.length)) {
     throw new Error(`${game.lottery} fixed count ${game.fixedNumbers.length} is not supported`);
+  }
+
+  if (game.lottery === "mais-milionaria") {
+    if (!game.clovers || game.clovers.length !== 2 || !hasUniqueIntegers(game.clovers) || game.clovers.some((value) => value < 1 || value > 6)) {
+      throw new Error("+Milionária games require exactly two unique trevos between 1 and 6");
+    }
+  } else if (game.clovers !== undefined) {
+    throw new Error(`${game.lottery} games cannot contain trevos`);
+  }
+
+  if (game.lottery === "timemania") {
+    if (!game.favoriteTeam?.trim()) throw new Error("Timemania games require a Time do Coração");
+  } else if (game.favoriteTeam !== undefined) {
+    throw new Error(`${game.lottery} games cannot contain a Time do Coração`);
   }
 
   if (game.lottery === "dia-de-sorte") {
