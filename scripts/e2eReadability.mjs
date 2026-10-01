@@ -6,13 +6,30 @@ import { join } from "node:path";
 const baseUrl = process.env.E2E_BASE_URL || "http://127.0.0.1:3099";
 const debugPort = Number(process.env.E2E_READABILITY_CHROME_PORT || 9226);
 const MIN_FONT_PX = 16;
-const MOBILE_WIDTH = 390;
-const MOBILE_HEIGHT = 844;
+const MIN_CONTROL_PX = 44;
+const MAX_CLS = 0.25;
+const MAX_DOM_READY_MS = 5000;
+
+const VIEWPORTS = [
+  { name: "desktop", width: 1440, height: 900 },
+  { name: "tablet", width: 820, height: 1180 },
+  { name: "mobile", width: 390, height: 844 },
+];
+
+const CHECKS = [
+  { path: "/#dashboard", ready: "Boolean(document.querySelector('.dashboard-shell'))" },
+  { path: "/#analysis", ready: "Boolean(document.querySelector('.a2-shell'))" },
+  { path: "/#generate", ready: "Boolean(document.querySelector('.g2-shell'))" },
+];
 
 function findChrome() {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
   for (const candidate of ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser"]) {
-    try { return execFileSync("which", [candidate], { encoding: "utf8" }).trim(); } catch { /* next */ }
+    try {
+      return execFileSync("which", [candidate], { encoding: "utf8" }).trim();
+    } catch {
+      // Try next executable.
+    }
   }
   throw new Error("Chrome/Chromium executable was not found on the runner");
 }
@@ -25,7 +42,9 @@ async function waitForJson(url, attempts = 200) {
     try {
       const response = await fetch(url);
       if (response.ok) return response.json();
-    } catch (error) { lastError = error; }
+    } catch (error) {
+      lastError = error;
+    }
     await sleep(100);
   }
   throw lastError || new Error(`Timed out waiting for ${url}`);
@@ -34,8 +53,14 @@ async function waitForJson(url, attempts = 200) {
 function waitForProcessExit(child, timeoutMs) {
   if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
   return new Promise((resolve) => {
-    const timer = setTimeout(() => { child.removeListener("exit", onExit); resolve(false); }, timeoutMs);
-    const onExit = () => { clearTimeout(timer); resolve(true); };
+    const timer = setTimeout(() => {
+      child.removeListener("exit", onExit);
+      resolve(false);
+    }, timeoutMs);
+    const onExit = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
     child.once("exit", onExit);
   });
 }
@@ -55,6 +80,7 @@ class CdpClient {
     this.pending = new Map();
     this.listeners = new Map();
   }
+
   async open() {
     await new Promise((resolve, reject) => {
       this.socket.addEventListener("open", resolve, { once: true });
@@ -73,6 +99,7 @@ class CdpClient {
       for (const listener of this.listeners.get(message.method) || []) listener(message.params || {});
     });
   }
+
   send(method, params = {}) {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
@@ -80,16 +107,23 @@ class CdpClient {
       this.socket.send(JSON.stringify({ id, method, params }));
     });
   }
+
   on(method, listener) {
     const list = this.listeners.get(method) || [];
     list.push(listener);
     this.listeners.set(method, list);
   }
-  close() { this.socket.close(); }
+
+  close() {
+    this.socket.close();
+  }
 }
 
 async function createPage() {
-  const response = await fetch(`http://127.0.0.1:${debugPort}/json/new?${encodeURIComponent("about:blank")}`, { method: "PUT" });
+  const response = await fetch(
+    `http://127.0.0.1:${debugPort}/json/new?${encodeURIComponent("about:blank")}`,
+    { method: "PUT" },
+  );
   if (!response.ok) throw new Error(`Chrome refused a new tab: HTTP ${response.status}`);
   const page = await response.json();
   const client = new CdpClient(page.webSocketDebuggerUrl);
@@ -98,8 +132,14 @@ async function createPage() {
 }
 
 async function evaluate(client, expression) {
-  const result = await client.send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
-  if (result.exceptionDetails) throw new Error(result.exceptionDetails.text || "Browser evaluation failed");
+  const result = await client.send("Runtime.evaluate", {
+    expression,
+    awaitPromise: true,
+    returnByValue: true,
+  });
+  if (result.exceptionDetails) {
+    throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text || "Browser evaluation failed");
+  }
   return result.result?.value;
 }
 
@@ -125,12 +165,15 @@ async function auditReadableText(client, label) {
   const offenders = await evaluate(client, `(() => {
     const minimum = ${MIN_FONT_PX};
     const results = [];
-    const controls = 'button,input,select,textarea,option';
+    const controls = 'button,input,select,textarea,option,summary';
     const skip = new Set(['SCRIPT','STYLE','SVG','PATH','DEFS','TEMPLATE']);
     const hasDirectText = (el) => [...el.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
     const visible = (el) => {
       const style = getComputedStyle(el);
-      return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity || 1) !== 0 && el.getClientRects().length > 0;
+      return style.display !== 'none'
+        && style.visibility !== 'hidden'
+        && Number(style.opacity || 1) !== 0
+        && el.getClientRects().length > 0;
     };
     const describe = (el, size, pseudo = '') => ({
       tag: el.tagName.toLowerCase() + pseudo,
@@ -138,6 +181,7 @@ async function auditReadableText(client, label) {
       size,
       text: (el.textContent || el.getAttribute('placeholder') || '').trim().replace(/\\s+/g, ' ').slice(0, 100),
     });
+
     for (const el of document.body.querySelectorAll('*')) {
       if (skip.has(el.tagName) || !visible(el)) continue;
       if (el.matches(controls) || hasDirectText(el)) {
@@ -147,7 +191,7 @@ async function auditReadableText(client, label) {
       for (const pseudo of ['::before', '::after']) {
         const style = getComputedStyle(el, pseudo);
         const content = style.content;
-        if (!content || content === 'none' || content === 'normal' || content === '\"\"' || content === \"''\") continue;
+        if (!content || content === 'none' || content === 'normal' || content === '""' || content === "''") continue;
         const size = Number.parseFloat(style.fontSize || '0');
         if (Number.isFinite(size) && size > 0 && size < minimum - 0.01) results.push(describe(el, size, pseudo));
       }
@@ -155,7 +199,9 @@ async function auditReadableText(client, label) {
     }
     return results;
   })()`);
-  if (offenders.length) throw new Error(`${label} contains visible text below ${MIN_FONT_PX}px: ${JSON.stringify(offenders)}`);
+  if (offenders.length) {
+    throw new Error(`${label} contains visible text below ${MIN_FONT_PX}px: ${JSON.stringify(offenders)}`);
+  }
 }
 
 async function auditDocumentOverflow(client, label) {
@@ -165,29 +211,98 @@ async function auditDocumentOverflow(client, label) {
     bodyWidth: document.body.scrollWidth,
   }))()`);
   if (dimensions.documentWidth > dimensions.viewport + 1 || dimensions.bodyWidth > dimensions.viewport + 1) {
-    throw new Error(`${label} overflows the mobile document: ${JSON.stringify(dimensions)}`);
+    throw new Error(`${label} has structural horizontal overflow: ${JSON.stringify(dimensions)}`);
   }
+}
+
+async function auditControls(client, label) {
+  const problems = await evaluate(client, `(() => {
+    const minimum = ${MIN_CONTROL_PX};
+    const visible = (el) => {
+      const style = getComputedStyle(el);
+      return style.display !== 'none'
+        && style.visibility !== 'hidden'
+        && Number(style.opacity || 1) !== 0
+        && el.getClientRects().length > 0;
+    };
+    const labelFor = (el) => {
+      const aria = el.getAttribute('aria-label')?.trim();
+      if (aria) return aria;
+      const labelledBy = el.getAttribute('aria-labelledby');
+      if (labelledBy) {
+        const text = labelledBy.split(/\\s+/).map((id) => document.getElementById(id)?.textContent || '').join(' ').trim();
+        if (text) return text;
+      }
+      if (el.id) {
+        const explicit = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+        if (explicit?.textContent?.trim()) return explicit.textContent.trim();
+      }
+      const parent = el.closest('label');
+      if (parent?.textContent?.trim()) return parent.textContent.trim();
+      return (el.textContent || el.getAttribute('title') || el.getAttribute('placeholder') || '').trim();
+    };
+    const nodes = [...document.querySelectorAll(
+      'button,input:not([type="hidden"]),select,textarea,summary,a.button,[data-nav-key]'
+    )].filter(visible);
+    const issues = [];
+    for (const el of nodes) {
+      const name = labelFor(el);
+      if (!name) issues.push({ kind: 'accessible-name', tag: el.tagName, id: el.id, className: String(el.className).slice(0, 100) });
+
+      const type = el instanceof HTMLInputElement ? el.type : '';
+      const target = (type === 'checkbox' || type === 'radio') ? el.closest('label') || el : el;
+      const rect = target.getBoundingClientRect();
+      if (rect.height + 0.5 < minimum || rect.width + 0.5 < minimum) {
+        issues.push({
+          kind: 'target-size',
+          tag: el.tagName,
+          id: el.id,
+          className: String(el.className).slice(0, 100),
+          width: Math.round(rect.width * 10) / 10,
+          height: Math.round(rect.height * 10) / 10,
+          name: name.slice(0, 80),
+        });
+      }
+
+      if (
+        (el instanceof HTMLButtonElement || el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)
+        && el.getAttribute('aria-disabled') === 'true'
+        && !el.disabled
+      ) {
+        issues.push({ kind: 'aria-disabled-without-native-disabled', tag: el.tagName, id: el.id, name: name.slice(0, 80) });
+      }
+      if (issues.length >= 30) break;
+    }
+    return issues;
+  })()`);
+  if (problems.length) throw new Error(`${label} has inaccessible controls: ${JSON.stringify(problems)}`);
 }
 
 async function auditKeyboardFocus(client, label) {
   await evaluate(client, "document.activeElement?.blur(); true");
-  await client.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
-  await client.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
-  const focus = await evaluate(client, `(() => {
-    const active = document.activeElement;
-    if (!active || active === document.body || active === document.documentElement) return null;
-    const style = getComputedStyle(active);
-    return {
-      tag: active.tagName.toLowerCase(),
-      text: (active.textContent || active.getAttribute('aria-label') || active.getAttribute('placeholder') || '').trim().replace(/\\s+/g, ' ').slice(0, 100),
-      outlineStyle: style.outlineStyle,
-      outlineWidth: Number.parseFloat(style.outlineWidth || '0'),
-      outlineOffset: Number.parseFloat(style.outlineOffset || '0'),
-    };
-  })()`);
-  if (!focus) throw new Error(`${label} did not expose a keyboard-focusable control after Tab`);
-  if (focus.outlineStyle === "none" || focus.outlineWidth < 1.5) {
-    throw new Error(`${label} keyboard focus is not visibly outlined: ${JSON.stringify(focus)}`);
+  const focused = [];
+  for (let index = 0; index < 4; index += 1) {
+    await client.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
+    await client.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
+    const focus = await evaluate(client, `(() => {
+      const active = document.activeElement;
+      if (!active || active === document.body || active === document.documentElement) return null;
+      const style = getComputedStyle(active);
+      return {
+        tag: active.tagName.toLowerCase(),
+        name: (active.textContent || active.getAttribute('aria-label') || active.getAttribute('placeholder') || '').trim().replace(/\\s+/g, ' ').slice(0, 100),
+        outlineStyle: style.outlineStyle,
+        outlineWidth: Number.parseFloat(style.outlineWidth || '0'),
+      };
+    })()`);
+    if (!focus) throw new Error(`${label} lost keyboard focus on Tab ${index + 1}`);
+    if (focus.outlineStyle === "none" || focus.outlineWidth < 1.5) {
+      throw new Error(`${label} keyboard focus is not visibly outlined: ${JSON.stringify(focus)}`);
+    }
+    focused.push(`${focus.tag}:${focus.name}`);
+  }
+  if (new Set(focused).size < 2) {
+    throw new Error(`${label} keyboard traversal did not advance through controls: ${JSON.stringify(focused)}`);
   }
 }
 
@@ -220,18 +335,36 @@ async function auditReducedMotion(client, label) {
   }
 }
 
-const checks = [
-  { path: "/#dashboard", ready: "Boolean(document.querySelector('#content')) && !document.querySelector('.loading-state')" },
-  { path: "/#analysis", ready: "Boolean(document.querySelector('.a2-shell'))" },
-  { path: "/#generate", ready: "Boolean(document.querySelector('#content')) && !document.querySelector('.loading-state')" },
-  { path: "/#games", ready: "location.hash === '#dashboard' && Boolean(document.querySelector('.dashboard-shell'))" },
-  { path: "/#backtests", ready: "location.hash === '#analysis' && Boolean(document.querySelector('.a2-shell'))" },
-  { path: "/jobs", ready: "location.pathname === '/' && location.hash === '#dashboard' && Boolean(document.querySelector('.dashboard-shell'))" },
-  { path: "/strategies", ready: "location.pathname === '/' && location.hash === '#analysis' && Boolean(document.querySelector('.a2-shell'))" },
-  { path: "/ai", ready: "location.pathname === '/' && location.hash === '#analysis' && Boolean(document.querySelector('.a2-shell'))" },
-  { path: "/lab", ready: "location.pathname === '/' && location.hash === '#analysis' && Boolean(document.querySelector('.a2-shell'))" },
-  { path: "/agenda", ready: "location.pathname === '/' && location.hash === '#dashboard' && Boolean(document.querySelector('.dashboard-shell'))" },
-];
+async function auditLiveFeedback(client, label) {
+  const state = await evaluate(client, `(() => ({
+    contentLive: document.querySelector('#content')?.getAttribute('aria-live') || '',
+    toastLive: document.querySelector('#toast-root')?.getAttribute('aria-live') || '',
+    dataStatusLive: document.querySelector('#data-status-bar')?.getAttribute('aria-live') || '',
+  }))()`);
+  if (!state.contentLive || !state.toastLive || !state.dataStatusLive) {
+    throw new Error(`${label} is missing asynchronous live-region feedback: ${JSON.stringify(state)}`);
+  }
+}
+
+async function auditPerformance(client, label) {
+  await sleep(150);
+  const state = await evaluate(client, `(() => {
+    const nav = performance.getEntriesByType('navigation')[0];
+    return {
+      cls: Number(window.__lotoLabCls || 0),
+      clsSupported: window.__lotoLabClsSupported !== false,
+      domReadyMs: nav ? nav.domContentLoadedEventEnd : 0,
+      loadMs: nav ? nav.loadEventEnd : 0,
+    };
+  })()`);
+  if (state.clsSupported && state.cls > MAX_CLS) {
+    throw new Error(`${label} exceeded CLS baseline ${MAX_CLS}: ${JSON.stringify(state)}`);
+  }
+  if (state.domReadyMs > MAX_DOM_READY_MS) {
+    throw new Error(`${label} exceeded DOM-ready baseline ${MAX_DOM_READY_MS}ms: ${JSON.stringify(state)}`);
+  }
+  return state;
+}
 
 const chrome = findChrome();
 const userDataDir = await mkdtemp(join(tmpdir(), "loto-lab-readability-"));
@@ -253,38 +386,66 @@ try {
   client = await createPage();
   const runtimeErrors = [];
   const serverErrors = [];
-  client.on("Runtime.exceptionThrown", ({ exceptionDetails }) => runtimeErrors.push(exceptionDetails?.exception?.description || exceptionDetails?.text || "Runtime exception"));
-  client.on("Network.responseReceived", ({ response }) => { if (Number(response?.status || 0) >= 500) serverErrors.push(`${response.status} ${response.url}`); });
-  await Promise.all([client.send("Page.enable"), client.send("Runtime.enable"), client.send("Network.enable")]);
-
-  for (const check of checks) {
-    await navigate(client, check.path);
-    await waitFor(client, check.ready, `${check.path} desktop readiness`);
-    await auditReadableText(client, `${check.path} desktop`);
-    await auditKeyboardFocus(client, `${check.path} desktop`);
-  }
-
-  await client.send("Emulation.setDeviceMetricsOverride", {
-    width: MOBILE_WIDTH,
-    height: MOBILE_HEIGHT,
-    deviceScaleFactor: 1,
-    mobile: false,
+  client.on("Runtime.exceptionThrown", ({ exceptionDetails }) => {
+    runtimeErrors.push(exceptionDetails?.exception?.description || exceptionDetails?.text || "Runtime exception");
+  });
+  client.on("Network.responseReceived", ({ response }) => {
+    if (Number(response?.status || 0) >= 500) serverErrors.push(`${response.status} ${response.url}`);
+  });
+  await Promise.all([
+    client.send("Page.enable"),
+    client.send("Runtime.enable"),
+    client.send("Network.enable"),
+  ]);
+  await client.send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `
+      window.__lotoLabCls = 0;
+      window.__lotoLabClsSupported = true;
+      try {
+        new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            if (!entry.hadRecentInput) window.__lotoLabCls += entry.value;
+          }
+        }).observe({ type: 'layout-shift', buffered: true });
+      } catch {
+        window.__lotoLabClsSupported = false;
+      }
+    `,
   });
 
-  for (const check of checks) {
-    await navigate(client, check.path);
-    await waitFor(client, check.ready, `${check.path} mobile readiness`);
-    await auditReadableText(client, `${check.path} mobile`);
-    await auditDocumentOverflow(client, check.path);
-    await auditKeyboardFocus(client, `${check.path} mobile`);
-    await auditReducedMotion(client, check.path);
+  const performanceResults = [];
+  for (const viewport of VIEWPORTS) {
+    await client.send("Emulation.setDeviceMetricsOverride", {
+      width: viewport.width,
+      height: viewport.height,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+
+    for (const check of CHECKS) {
+      const label = `${check.path} ${viewport.name} ${viewport.width}x${viewport.height}`;
+      await navigate(client, check.path);
+      await waitFor(client, check.ready, `${label} readiness`);
+      await auditReadableText(client, label);
+      await auditDocumentOverflow(client, label);
+      await auditControls(client, label);
+      await auditKeyboardFocus(client, label);
+      await auditReducedMotion(client, label);
+      await auditLiveFeedback(client, label);
+      performanceResults.push({ label, ...(await auditPerformance(client, label)) });
+    }
   }
 
   await client.send("Emulation.clearDeviceMetricsOverride");
 
   if (runtimeErrors.length) throw new Error(`Browser runtime exceptions: ${runtimeErrors.join(" | ")}`);
   if (serverErrors.length) throw new Error(`Browser API/server failures: ${serverErrors.join(" | ")}`);
-  console.log(`Visual/a11y E2E passed: ${MIN_FONT_PX}px readability, keyboard focus, reduced motion and ${MOBILE_WIDTH}px no-overflow across all workspaces`);
+
+  console.log(
+    `Redesign quality gate passed: ${VIEWPORTS.map((item) => `${item.name} ${item.width}x${item.height}`).join(", ")}; `
+    + `${MIN_FONT_PX}px text; ${MIN_CONTROL_PX}px controls; keyboard focus; live feedback; reduced motion; no structural overflow.\n`
+    + `Performance samples: ${JSON.stringify(performanceResults)}`,
+  );
 } finally {
   client?.close();
   await stopBrowser(browser);
