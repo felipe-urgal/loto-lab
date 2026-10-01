@@ -105,7 +105,7 @@ export type GeneratedGame = {
     | { kind: "lucky-month"; values: string[] }
     | { kind: "clovers"; values: number[] }
     | { kind: "favorite-team"; values: string[] };
-  columns?: number[];
+  columns?: number[][];
   metadata: {
     odd: number;
     even: number;
@@ -168,6 +168,9 @@ export type GenerationRequestPayload = {
   excludedNumbers: number[];
   constraints?: GenerationConstraints;
   seed?: string;
+  cloverCount?: number;
+  favoriteTeam?: string;
+  columnMarks?: number[];
 };
 
 export type GenerationPlanPayload = {
@@ -193,5 +196,8 @@ export type GeneratorState = {
   plan: GenerationPlan;
   preview: GenerationPreviewResponse | null;
   controller: AbortController;
+  cloverCount: number;
+  favoriteTeam: string;
+  columnMarks: number[];
   cleanup: (() => void) | null;
 };
