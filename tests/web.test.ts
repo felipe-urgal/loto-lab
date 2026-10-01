@@ -59,15 +59,13 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   const typedShell = await fetch(`${baseUrl}/assets/src/core/shell.js`);
   assert.equal(typedShell.status, 200);
   const shellSource = await typedShell.text();
-  assert.match(shellSource, /nav-more/);
-  assert.match(shellSource, /Testes históricos/);
-  assert.match(shellSource, /Laboratório/);
-  assert.match(shellSource, /Agenda/);
-  assert.match(shellSource, /aria-label="\$\{item\.label\}"/);
-  assert.match(shellSource, /aria-label="Mais opções"/);
-  assert.match(shellSource, /aria-controls="nav-more-panel"/);
-  assert.match(shellSource, /data-agenda-nav-badge/);
-  assert.doesNotMatch(shellSource, /role="menu"/);
+  assert.match(shellSource, /label: "Painel"/);
+  assert.match(shellSource, /label: "Análises"/);
+  assert.match(shellSource, /label: "Gerar jogos"/);
+  assert.match(shellSource, /LEGACY_PATH_REDIRECTS/);
+  assert.match(shellSource, /"\/agenda": "dashboard"/);
+  assert.match(shellSource, /"\/lab": "analysis"/);
+  assert.doesNotMatch(shellSource, /nav-more|Mais opções|Testes históricos|Laboratório|Execuções|Agenda|Meus jogos/);
 
   const loaderBoundary = await fetch(`${baseUrl}/assets/feature-loader.js`);
   assert.equal(loaderBoundary.status, 200);
@@ -79,12 +77,9 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.match(loaderSource, /import\(asset/);
   assert.match(loaderSource, /generation-v2/);
   assert.doesNotMatch(loaderSource, /loadStyledModule\("generation-diversity"\)/);
-  assert.match(loaderSource, /loadModule\("my-games-v2"\)/);
-  assert.match(loaderSource, /loadStyle\("my-games-workspace"\)/);
-  assert.match(loaderSource, /view === "games"/);
-  assert.match(loaderSource, /return loadMyGamesFeatures\(\)/);
-  assert.match(loaderSource, /backtests-workspace/);
-  assert.match(loaderSource, /loadModule\("backtests"\)/);
+  assert.match(loaderSource, /loadStyledModule\("dashboard-scope"\)/);
+  assert.match(loaderSource, /loadModule\("analysis-v2"\)/);
+  assert.doesNotMatch(loaderSource, /my-games-v2|my-games-workspace|view === "games"|backtests-workspace|loadModule\("backtests"\)/);
   assert.match(loaderSource, /styleLoads/);
   assert.match(loaderSource, /loadStyledModule/);
   assert.match(loaderSource, /addEventListener\("load"/);
@@ -98,8 +93,8 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   const source = await javascript.text();
   assert.match(source, /\.\/src\/core\/api\.js/);
   assert.match(source, /games\/generate/);
-  assert.match(source, /data-feature-owned="backtests"/);
-  assert.doesNotMatch(source, /backtests\/run/);
+  assert.match(source, /data-feature-owned="dashboard"/);
+  assert.doesNotMatch(source, /setView\("games"\)|render\.view === "backtests"/);
 
   const typedApi = await fetch(`${baseUrl}/assets/src/core/api.js`);
   assert.equal(typedApi.status, 200);
@@ -177,7 +172,8 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   const foundationSource = await foundation.text();
   assert.match(foundationSource, /:focus-visible/);
   assert.match(foundationSource, /prefers-reduced-motion/);
-  assert.match(foundationSource, /nav-more-menu/);
+  assert.match(foundationSource, /grid-template-columns: repeat\(3, 1fr\)/);
+  assert.doesNotMatch(foundationSource, /nav-more-menu/);
 
   const status = await fetch(`${baseUrl}/api/v1/data/status`);
   assert.equal(status.status, 200);
