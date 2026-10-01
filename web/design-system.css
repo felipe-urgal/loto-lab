@@ -10,9 +10,9 @@
   --text: #edf5ff;
   --muted: #91a4ba;
   --muted-2: #687e96;
-  --accent: #1689ff;
-  --accent-soft: rgba(22, 137, 255, 0.14);
-  --accent-strong: #66b5ff;
+  --accent: #7c3aed;
+  --accent-soft: rgba(124, 58, 237, 0.16);
+  --accent-strong: #c4b5fd;
   --success: #24c77d;
   --success-soft: rgba(36, 199, 125, 0.14);
   --success-strong: #67dfa6;
@@ -27,6 +27,17 @@
   --radius-sm: 8px;
   --sidebar-width: 220px;
   --shell-header-height: 72px;
+  --content-max-width: 1280px;
+  --content-reading-width: 760px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --control-min-size: 44px;
 }
 
 html,
@@ -261,7 +272,7 @@ body {
 .ball.is-fixed,
 .ball.is-strong {
   background: var(--accent-soft);
-  border-color: rgba(22, 137, 255, 0.34);
+  border-color: rgba(124, 58, 237, 0.42);
   color: var(--accent-strong);
 }
 
