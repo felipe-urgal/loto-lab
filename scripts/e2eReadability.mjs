@@ -249,8 +249,7 @@ async function auditControls(client, label) {
       const name = labelFor(el);
       if (!name) issues.push({ kind: 'accessible-name', tag: el.tagName, id: el.id, className: String(el.className).slice(0, 100) });
 
-      const type = el instanceof HTMLInputElement ? el.type : '';
-      const target = (type === 'checkbox' || type === 'radio') ? el.closest('label') || el : el;
+      const target = el.closest('label') || el;
       const rect = target.getBoundingClientRect();
       if (rect.height + 0.5 < minimum || rect.width + 0.5 < minimum) {
         issues.push({
