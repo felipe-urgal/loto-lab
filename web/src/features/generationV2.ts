@@ -237,7 +237,7 @@ function numberGridMarkup(state: GeneratorState): string {
   for (let offset = 0; offset < state.plan.universeSize; offset += 1) {
     const value = minimum + offset;
     const selection = state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
-    const tier = state.purpose === "experimental" ? (tiers.get(value) || "") : "";
+    const tier = tiers.get(value) || "";
     const selectionLabel = selection === "fixed" ? "fixada" : selection === "excluded" ? "excluída" : "automática";
     html += `<button type="button" class="g2-number ${tier ? `is-${tier}` : ""} ${selection !== "auto" ? `is-${selection}` : ""}" data-g2-number="${value}" data-selection="${selection}" aria-label="Dezena ${numberLabel(value)}: ${selectionLabel}">${numberLabel(value)}</button>`;
   }
@@ -403,7 +403,7 @@ function renderConfigurationSummary(state: GeneratorState): void {
 }
 
 function workspaceMarkup(state: GeneratorState): string {
-  const experimental = state.purpose === "experimental";
+  const hasHistoricalTiers = NUMBER_TIERS.some((tier) => (state.plan.numberTiers[tier] || []).length > 0);
   return `<div class="g2-shell" data-g2-shell data-g2-stage="configure">
     <div class="g2-principle"><strong>Gerar jogos</strong><span>Configure a aposta, gere uma prévia, revise os jogos e salve somente o que você aprovou.</span></div>
     ${flowMarkup()}
@@ -414,7 +414,7 @@ function workspaceMarkup(state: GeneratorState): string {
           ${state.lottery === "super-sete" ? "" : selectionModesMarkup(state)}
           ${state.lottery === "super-sete" ? "" : `<div class="g2-number-legend">
             <span><i class="g2-key"></i> Automática</span><span><i class="g2-key is-fixed"></i> Fixada</span><span><i class="g2-key is-excluded"></i> Excluída</span>
-            ${experimental ? '<span><i class="g2-key is-strong"></i> Forte</span><span><i class="g2-key is-balanced"></i> Intermediária</span><span><i class="g2-key is-cold"></i> Fria</span>' : ""}
+            ${hasHistoricalTiers ? '<span><i class="g2-key is-strong"></i> Forte histórica</span><span><i class="g2-key is-balanced"></i> Intermediária histórica</span><span><i class="g2-key is-cold"></i> Fria histórica</span>' : ""}
           </div>`}
           <div class="g2-number-grid" data-g2-number-grid>${numberGridMarkup(state)}</div>
           <div class="g2-selection-summary" data-g2-selection-summary></div>
@@ -498,7 +498,7 @@ function updateNumberButtons(state: GeneratorState): void {
   root?.querySelectorAll<HTMLButtonElement>("[data-g2-number]").forEach((button) => {
     const value = Number(button.dataset.g2Number);
     const selection = state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
-    const tier = state.purpose === "experimental" ? (tiers.get(value) || "") : "";
+    const tier = tiers.get(value) || "";
     button.dataset.selection = selection;
     button.classList.toggle("is-fixed", selection === "fixed");
     button.classList.toggle("is-excluded", selection === "excluded");
