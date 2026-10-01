@@ -101,8 +101,10 @@ export type GeneratedGame = {
   variableNumbers: number[];
   mirrorNumbers?: number[];
   luckyMonth?: string;
-  clovers?: number[];
-  favoriteTeam?: string;
+  secondary?:
+    | { kind: "lucky-month"; values: string[] }
+    | { kind: "clovers"; values: number[] }
+    | { kind: "favorite-team"; values: string[] };
   columns?: number[];
   metadata: {
     odd: number;
