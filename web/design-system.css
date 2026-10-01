@@ -99,13 +99,13 @@ body {
 }
 
 .nav-item:hover,
-.nav-link:hover:hover {
+.nav-link:hover {
   background: rgba(255, 255, 255, 0.045);
   color: var(--text);
 }
 
 .nav-item.is-active,
-.nav-link.is-active.is-active-link.is-active {
+.nav-link.is-active {
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
@@ -347,8 +347,7 @@ td {
   }
 
   .nav-item,
-  .nav-link,
-  .nav-more {
+  .nav-link {
     min-height: 46px;
     border-radius: 8px;
     padding: 0;
