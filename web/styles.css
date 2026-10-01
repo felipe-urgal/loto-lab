@@ -82,6 +82,13 @@ a { color: inherit; }
 .select-control span { color: var(--muted-2); font-size: 16px; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; }
 .select-control select { color: var(--text); border: 0; outline: 0; background: transparent; font-size: 16px; font-weight: 700; cursor: pointer; }
 .select-control option { background: var(--surface); color: var(--text); }
+.select-control select:focus-visible,
+.field input:focus-visible,
+.field select:focus-visible,
+.inline-input:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 3px;
+}
 .icon-button {
   width: 46px; height: 46px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface);
   display: grid; place-items: center; cursor: pointer; color: var(--muted); transition: 140ms ease;
