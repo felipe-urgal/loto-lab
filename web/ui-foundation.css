@@ -7,11 +7,11 @@ body *::before, body *::after { font-size: inherit; }
 .brand-copy strong { font-size: 18px; }
 .brand-copy small,
 .nav-item,
-.nav-link-link,
+.nav-link,
 .sidebar-footer p,
 .status-row { font-size: 16px; line-height: 1.45; }
 
-.nav-link, .nav-more {
+.nav-link {
   appearance: none;
   border: 0;
   background: transparent;
