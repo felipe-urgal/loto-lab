@@ -1,7 +1,7 @@
 # Redesign V2 — contrato visual e arquitetura de informação
 
-Status: aprovado para rollout  
-Issue: #297  
+Status: aprovado para rollout
+Issue: #297
 Atualizado em: 2026-10-01
 
 ## Objetivo
