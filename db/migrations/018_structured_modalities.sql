@@ -116,6 +116,7 @@ BEGIN
   IF to_regclass('public.generated_games') IS NOT NULL THEN
     ALTER TABLE generated_games ADD COLUMN IF NOT EXISTS secondary_selection JSONB;
     ALTER TABLE generated_games ADD COLUMN IF NOT EXISTS columns JSONB;
+    ALTER TABLE generated_games DROP CONSTRAINT IF EXISTS generated_games_numbers_not_empty;
 
     UPDATE generated_games
       SET secondary_selection = jsonb_build_object(
