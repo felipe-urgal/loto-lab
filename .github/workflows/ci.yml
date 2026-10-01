@@ -51,3 +51,74 @@ jobs:
 
       - name: Quality gate
         run: npm run check
+
+
+  e2e-redesign:
+    name: Redesign V2 browser E2E
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16.15-alpine3.24@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+        env:
+          POSTGRES_DB: loto_lab_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d loto_lab_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/loto_lab_test
+      API_HOST: 127.0.0.1
+      API_PORT: 3099
+      OPS_AUTO_SYNC: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.20.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Start E2E server
+        shell: bash
+        run: |
+          node --env-file-if-exists=.env dist/src/cli/apiStart.js > /tmp/loto-lab-e2e.log 2>&1 &
+          echo $! > /tmp/loto-lab-e2e.pid
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3099/health/ready > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/loto-lab-e2e.log
+          exit 1
+
+      - name: Run Redesign V2 browser gate
+        run: npm run test:e2e:redesign
+
+      - name: Show E2E server log on failure
+        if: failure()
+        run: cat /tmp/loto-lab-e2e.log || true
+
+      - name: Stop E2E server
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/loto-lab-e2e.pid ]; then
+            kill "$(cat /tmp/loto-lab-e2e.pid)" 2>/dev/null || true
+          fi
