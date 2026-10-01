@@ -1,4 +1,4 @@
-import type { SupportedLotteryId } from "./lotteryCatalog.js";
+import type { SecondarySelection, SupportedLotteryId } from "./lotteryCatalog.js";
 
 export type LotteryId = SupportedLotteryId;
 
@@ -24,9 +24,9 @@ export interface Contest {
   date: string;
   numbers: number[];
   secondDrawNumbers?: number[];
+  /** @deprecated Compatibility field; use secondary for new code. */
   luckyMonth?: string;
-  clovers?: number[];
-  favoriteTeam?: string;
+  secondary?: SecondarySelection;
   columns?: number[];
   prizeTiers?: ContestPrizeTier[];
   amountCollected?: number;
@@ -52,9 +52,9 @@ export interface GeneratedGame {
   fixedNumbers: number[];
   variableNumbers: number[];
   mirrorNumbers?: number[];
+  /** @deprecated Compatibility field; use secondary for new code. */
   luckyMonth?: string;
-  clovers?: number[];
-  favoriteTeam?: string;
+  secondary?: SecondarySelection;
   columns?: number[];
   metadata: {
     odd: number;
