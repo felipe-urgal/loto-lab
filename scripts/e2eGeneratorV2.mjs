@@ -249,13 +249,20 @@ try {
 
     const configuration = await evaluate(client, `(() => ({
       hasTieredNumbers: document.querySelectorAll('.g2-number.is-strong,.g2-number.is-balanced,.g2-number.is-cold').length > 0,
+      tierLegend: document.querySelector('.g2-number-legend')?.textContent || '',
       funnel: document.querySelector('[data-g2-plan]')?.textContent || '',
       baseline: document.querySelector('[data-g2-baseline]')?.textContent || '',
       target: Number(document.querySelector('#g2-target')?.value || 0),
       purpose: document.querySelector('#g2-purpose')?.value || ''
     }))()`);
     assert(configuration.purpose === "uniform", `${lottery.id} did not default to auditable random generation: ${JSON.stringify(configuration)}`);
-    assert(!configuration.hasTieredNumbers, `${lottery.id} exposed historical ranking tiers in the default uniform flow`);
+    assert(configuration.hasTieredNumbers, `${lottery.id} did not expose descriptive historical tiers in the default uniform flow`);
+    assert(
+      configuration.tierLegend.includes("Forte histórica")
+        && configuration.tierLegend.includes("Intermediária histórica")
+        && configuration.tierLegend.includes("Fria histórica"),
+      `${lottery.id} historical tier legend is incomplete: ${JSON.stringify(configuration)}`,
+    );
     assert(configuration.target === 9041, `${lottery.id} did not use the deterministic target #9041: ${JSON.stringify(configuration)}`);
     assert(configuration.funnel.includes("Pool explorado pelo motor"), `${lottery.id} does not expose algorithm space`);
     assert(configuration.baseline.includes("Referência condicionada"), `${lottery.id} does not expose the conditioned reference in Portuguese: ${JSON.stringify(configuration)}`);
