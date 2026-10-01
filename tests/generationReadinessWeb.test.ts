@@ -36,6 +36,21 @@ test("generator typed enhancements are loaded with Generator 2.0 and expose the 
   assert.equal(boundary.status, 200);
   assert.match(await boundary.text(), /generationV2\/enhancements\.js/);
 
+  const generator = await fetch(`${baseUrl}/assets/src/features/generationV2.js`);
+  assert.equal(generator.status, 200);
+  const generatorSource = await generator.text();
+  assert.match(generatorSource, /data-g2-flow-step="configure"/);
+  assert.match(generatorSource, /data-g2-flow-step="preview"/);
+  assert.match(generatorSource, /data-g2-flow-step="review"/);
+  assert.match(generatorSource, /data-g2-flow-step="save"/);
+  assert.match(generatorSource, /state\.preview = null/);
+  assert.match(generatorSource, /Salvar grava exatamente os jogos exibidos abaixo/);
+  assert.match(generatorSource, /Lote #\$\{response\.batchId\} salvo e disponível no Painel/);
+  assert.match(generatorSource, /lotomania: \{ label: "Lotomania", min: 0, max: 99/);
+  assert.match(generatorSource, /const minimum = LOTTERY_FALLBACK\[state\.lottery\]\.min/);
+  assert.match(generatorSource, /state\.targetContestNumber = undefined/);
+  assert.match(generatorSource, /state\.lottery === "timemania" && !state\.favoriteTeam\.trim\(\)/);
+
   const readiness = await fetch(`${baseUrl}/assets/src/features/generationV2/readiness.js`);
   assert.equal(readiness.status, 200);
   const readinessSource = await readiness.text();
