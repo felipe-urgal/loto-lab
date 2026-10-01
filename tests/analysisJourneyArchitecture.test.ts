@@ -15,8 +15,9 @@ test("Analysis next steps reuse canonical routes without cross-feature state or 
   assert.match(boundary, /src\/features\/analysisV2\.js/);
   assert.match(boundary, /src\/features\/analysisV2\/journey\.js/);
 
-  assert.match(journey, /actionLink\("\/lab", "Experimentar no Laboratório"\)/);
+  assert.doesNotMatch(journey, /\/lab|Experimentar no Laboratório/);
   assert.match(journey, /actionLink\("\/#generate", "Gerar jogos"\)/);
+  assert.match(journey, /sem transformar indicadores históricos em previsão/);
   assert.match(journey, /currentMainView/);
   assert.match(journey, /onViewRendered/);
   assert.match(journey, /onMainViewChanged/);
