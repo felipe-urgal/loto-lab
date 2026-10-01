@@ -23,6 +23,7 @@ test("Redesign V2 quality gate remains wired to current product surfaces", async
   assert.match(redesignE2e, /e2eCriticalRoutes\.mjs/);
   assert.doesNotMatch(redesignE2e, /e2eMyGamesV2|e2eOperationalFlows/);
   assert.equal(pkg.scripts?.["test:e2e"], "npm run test:e2e:redesign");
+  assert.equal(pkg.scripts?.["test:e2e:seed"], "node scripts/seedE2e.mjs");
   assert.match(pkg.scripts?.["quality:static"] ?? "", /npm run quality:e2e-syntax/);
   assert.match(pkg.scripts?.["quality:e2e-syntax"] ?? "", /node --check scripts\/e2eReadability\.mjs/);
 
@@ -30,6 +31,8 @@ test("Redesign V2 quality gate remains wired to current product surfaces", async
   assert.match(ci, /name: Redesign V2 browser E2E/);
   assert.match(ci, /run: npm run test:e2e:redesign/);
   assert.match(ci, /API_PORT: 3099/);
+  assert.match(ci, /npm run db:migrate/);
+  assert.match(ci, /npm run test:e2e:seed/);
 
   assert.match(loader, /async function ensureViewFeatures\(\): Promise<boolean>/);
   assert.match(loader, /if \(!await loadStyle\(name\)\) return false/);
