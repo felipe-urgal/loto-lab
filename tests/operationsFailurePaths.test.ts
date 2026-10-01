@@ -205,7 +205,7 @@ test(
       retryDelayMs: 0,
     });
     assert.equal(partial.status, "partial");
-    assert.equal(partial.details.successfulLotteries, 6);
+    assert.equal(partial.details.successfulLotteries, 9);
     assert.equal(partial.details.failedLotteries, 0);
     const partialMega = partial.details.lotteries.find((item) => item.lottery === "mega-sena");
     assert.equal(partialMega?.status, "partial");
@@ -232,7 +232,7 @@ test(
     });
     assert.equal(failed.status, "failed");
     assert.equal(failed.details.successfulLotteries, 0);
-    assert.equal(failed.details.failedLotteries, 6);
+    assert.equal(failed.details.failedLotteries, 9);
     assert.ok(failed.details.lotteries.every((item) => item.status === "failed"));
     assert.ok(failed.details.lotteries.every((item) => item.error?.startsWith("source unavailable for ")));
 
@@ -310,7 +310,7 @@ test(
     }
 
     assert.equal(notificationFailure.status, "partial");
-    assert.equal(notificationFailure.details.successfulLotteries, 6);
+    assert.equal(notificationFailure.details.successfulLotteries, 9);
     assert.equal(notificationFailure.details.failedLotteries, 0);
     assert.equal(notificationFailure.details.notificationRefresh, "failed");
     assert.match(notificationFailure.details.notificationError ?? "", /notifications blocked for test/);
