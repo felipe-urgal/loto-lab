@@ -52,12 +52,6 @@ async function safeApi(path, options = {}) {
   }
 }
 
-function formatDate(value) {
-  if (!value) return "—";
-  const [year, month, day] = value.slice(0, 10).split("-");
-  return `${day}/${month}/${year}`;
-}
-
 function number(value) { return String(value).padStart(2, "0"); }
 function lotteryLabel(id) { return LOTTERIES[id]?.label || id; }
 
@@ -119,29 +113,8 @@ async function renderDashboard() {
   content.innerHTML = '<div class="loading-state" data-feature-owned="dashboard"><span class="spinner"></span><span>Carregando Painel...</span></div>';
 }
 
-async function renderAnalysis(render) {
-  const data = await api(`/analysis/${render.lottery}`, { signal: render.signal });
-  if (!isCurrentRender(render)) return;
-  const latest = data.latestContest;
-  const ranked = [...data.numbers].sort((a, b) => b.score - a.score).slice(0, 18);
-
-  const group = (key, label, description) => `<article class="panel analysis-group"><div class="analysis-group-head"><strong>${label}</strong><span>${description}</span></div><div class="number-cloud">${balls(data.tiers[key], { tier: key })}</div></article>`;
-  const rows = ranked.map((row) => `<tr>
-    <td><strong>${number(row.number)}</strong></td><td><span class="badge ${row.tier === "strong" ? "positive" : row.tier === "cold" ? "" : "warning"}">${row.tier}</span></td>
-    <td class="score-cell"><div class="score-line"><div class="score-track"><div class="score-fill" style="width:${Math.max(0, Math.min(100, row.score))}%"></div></div><span class="score-number">${row.score.toFixed(1)}</span></div></td>
-    <td>${row.year.toFixed(0)}</td><td>${row.month.toFixed(0)}</td><td>${row.recent10.toFixed(0)}</td><td>${row.recent20.toFixed(0)}</td><td>${row.historical.toFixed(0)}</td>
-  </tr>`).join("");
-
-  content.innerHTML = `<div class="stack">
-    <div class="grid cols-4">
-      ${metric("Concurso de referência", latest ? `#${latest.number}` : "—", latest ? formatDate(latest.date) : "Sem histórico")}
-      ${metric("Fortes", data.tiers.strong.length, "Terço superior da classificação", "positive")}
-      ${metric("Intermediárias", data.tiers.balanced.length, "Centro da distribuição", "warning")}
-      ${metric("Frias", data.tiers.cold.length, "Terço inferior da classificação")}
-    </div>
-    <section><div class="section-head"><div><h2>Classificação das dezenas</h2><p>Classificação relativa dentro da loteria selecionada.</p></div></div><div class="analysis-groups">${group("strong", "Fortes", "maior pontuação combinada")}${group("balanced", "Intermediárias", "faixa central")}${group("cold", "Frias", "menor pontuação combinada")}</div></section>
-    <section><div class="section-head"><div><h2>Dezenas com maior pontuação</h2><p>Componentes normalizados de 0 a 100.</p></div></div><div class="panel table-wrap"><table><thead><tr><th>Dezena</th><th>Grupo</th><th>Pontuação</th><th>Ano</th><th>Mês</th><th>10 últimos</th><th>20 últimos</th><th>Histórico</th></tr></thead><tbody>${rows}</tbody></table></div></section>
-  </div>`;
+async function renderAnalysis() {
+  content.innerHTML = '<div class="loading-state" data-feature-owned="analysis"><span class="spinner"></span><span>Carregando Análises...</span></div>';
 }
 
 async function renderGenerate(render) {
@@ -210,7 +183,7 @@ async function renderCurrentView() {
   refreshButton.classList.add("is-spinning");
   try {
     if (render.view === "dashboard") await renderDashboard();
-    else if (render.view === "analysis") await renderAnalysis(render);
+    else if (render.view === "analysis") await renderAnalysis();
     else if (render.view === "generate") await renderGenerate(render);
   } catch (error) {
     if (error?.name !== "AbortError" && isCurrentRender(render)) errorState(error);
