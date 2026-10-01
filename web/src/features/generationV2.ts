@@ -30,20 +30,21 @@ let cleanupCurrent: (() => void) | null = null;
 
 const LOTTERY_FALLBACK: Record<LotteryId, {
   label: string;
+  min: number;
   max: number;
   drawSize: number;
   defaultBetSize: number;
   defaultGames: number;
 }> = {
-  "mega-sena": { label: "Mega-Sena", max: 60, drawSize: 6, defaultBetSize: 6, defaultGames: 2 },
-  lotofacil: { label: "Lotofácil", max: 25, drawSize: 15, defaultBetSize: 15, defaultGames: 4 },
-  "dia-de-sorte": { label: "Dia de Sorte", max: 31, drawSize: 7, defaultBetSize: 7, defaultGames: 4 },
-  quina: { label: "Quina", max: 80, drawSize: 5, defaultBetSize: 5, defaultGames: 4 },
-  lotomania: { label: "Lotomania", max: 99, drawSize: 20, defaultBetSize: 50, defaultGames: 2 },
-  "dupla-sena": { label: "Dupla Sena", max: 50, drawSize: 6, defaultBetSize: 6, defaultGames: 4 },
-  "mais-milionaria": { label: "+Milionária", max: 50, drawSize: 6, defaultBetSize: 6, defaultGames: 4 },
-  timemania: { label: "Timemania", max: 80, drawSize: 7, defaultBetSize: 10, defaultGames: 4 },
-  "super-sete": { label: "Super Sete", max: 9, drawSize: 7, defaultBetSize: 7, defaultGames: 4 },
+  "mega-sena": { label: "Mega-Sena", min: 1, max: 60, drawSize: 6, defaultBetSize: 6, defaultGames: 2 },
+  lotofacil: { label: "Lotofácil", min: 1, max: 25, drawSize: 15, defaultBetSize: 15, defaultGames: 4 },
+  "dia-de-sorte": { label: "Dia de Sorte", min: 1, max: 31, drawSize: 7, defaultBetSize: 7, defaultGames: 4 },
+  quina: { label: "Quina", min: 1, max: 80, drawSize: 5, defaultBetSize: 5, defaultGames: 4 },
+  lotomania: { label: "Lotomania", min: 0, max: 99, drawSize: 20, defaultBetSize: 50, defaultGames: 2 },
+  "dupla-sena": { label: "Dupla Sena", min: 1, max: 50, drawSize: 6, defaultBetSize: 6, defaultGames: 4 },
+  "mais-milionaria": { label: "+Milionária", min: 1, max: 50, drawSize: 6, defaultBetSize: 6, defaultGames: 4 },
+  timemania: { label: "Timemania", min: 1, max: 80, drawSize: 7, defaultBetSize: 10, defaultGames: 4 },
+  "super-sete": { label: "Super Sete", min: 0, max: 9, drawSize: 7, defaultBetSize: 7, defaultGames: 4 },
 };
 
 const NUMBER_TIERS: readonly NumberTier[] = ["strong", "balanced", "cold"];
@@ -254,8 +255,10 @@ function numberGridMarkup(state: GeneratorState): string {
     return `<div class="g2-columns-note">Super Sete usa 7 colunas posicionais. Os dígitos são gerados e exibidos por coluna, sem serem tratados como dezenas.</div>`;
   }
   const tiers = tierByNumber(state.plan);
+  const minimum = LOTTERY_FALLBACK[state.lottery].min;
   let html = "";
-  for (let value = 1; value <= state.plan.universeSize; value += 1) {
+  for (let offset = 0; offset < state.plan.universeSize; offset += 1) {
+    const value = minimum + offset;
     const selection = state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
     const tier = state.purpose === "experimental" ? (tiers.get(value) || "") : "";
     const selectionLabel = selection === "fixed" ? "fixada" : selection === "excluded" ? "excluída" : "automática";
@@ -713,7 +716,8 @@ function renderDynamicPlan(state: GeneratorState): void {
   const previewButton = root?.querySelector<HTMLButtonElement>("[data-g2-preview]");
   const invalid = state.plan.space.eligibleCombinations < 1
     || (state.purpose === "experimental" && algorithm.rawCombinationCapacity < 1)
-    || state.plan.constraintIssues.length > 0;
+    || state.plan.constraintIssues.length > 0
+    || (state.lottery === "timemania" && !state.favoriteTeam.trim());
   if (previewButton) previewButton.disabled = invalid;
 }
 
@@ -781,6 +785,7 @@ function bindWorkspace(state: GeneratorState): void {
     if (!(input instanceof HTMLInputElement)) return;
     state.favoriteTeam = input.value;
     clearPreview(state);
+    renderDynamicPlan(state);
   });
   root?.querySelectorAll<HTMLSelectElement>("[data-g2-column-mark]").forEach((select) => select.addEventListener("change", () => {
     const index = Number(select.dataset.g2ColumnMark);
@@ -815,7 +820,13 @@ function bindWorkspace(state: GeneratorState): void {
   root?.querySelector<HTMLInputElement>("#g2-target")?.addEventListener("change", (event) => {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
-    const next = Number(input.value);
+    const raw = input.value.trim();
+    if (!raw) {
+      state.targetContestNumber = undefined;
+      schedulePlan();
+      return;
+    }
+    const next = Number(raw);
     if (Number.isInteger(next) && next > 0) {
       state.targetContestNumber = next;
       schedulePlan();
