@@ -140,7 +140,7 @@ function normalizedConstraints(constraints: GenerationConstraints | undefined) {
 }
 
 export function generationConfigSignature(
-  input: Pick<GenerationV2Input, "lottery" | "gameCount" | "fixedCount" | "betSize" | "purpose" | "generationMode" | "fixedNumbers" | "excludedNumbers" | "constraints">,
+  input: Pick<GenerationV2Input, "lottery" | "gameCount" | "fixedCount" | "betSize" | "purpose" | "generationMode" | "fixedNumbers" | "excludedNumbers" | "constraints" | "cloverCount" | "favoriteTeam" | "columnMarks">,
   targetContestNumber?: number,
 ): string {
   return hashText(JSON.stringify({
