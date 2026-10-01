@@ -31,6 +31,10 @@ let lifecycleToken = 0;
 let cleanupCurrent: (() => void) | null = null;
 
 const DEFAULT_GAME_COUNT = 4;
+const DEFAULT_GAME_COUNTS: Partial<Record<LotteryId, number>> = {
+  "mega-sena": 2,
+  lotomania: 2,
+};
 
 const NUMBER_TIERS: readonly NumberTier[] = ["strong", "balanced", "cold"];
 
@@ -879,7 +883,9 @@ async function mount(detail: ViewRenderedDetail): Promise<void> {
   const lotteryValue = detail.lottery || document.querySelector<HTMLSelectElement>("#lottery-select")?.value || "mega-sena";
   if (!isLotteryId(lotteryValue)) return;
   const lottery = lotteryValue;
-  const legacyGameCount = Number(legacyForm?.querySelector<HTMLInputElement>("#game-count")?.value) || DEFAULT_GAME_COUNT;
+  const legacyGameCount = Number(legacyForm?.querySelector<HTMLInputElement>("#game-count")?.value)
+    || DEFAULT_GAME_COUNTS[lottery]
+    || DEFAULT_GAME_COUNT;
   const legacyTargetValue = Number(legacyForm?.querySelector<HTMLInputElement>("#target-contest")?.value);
   const legacyTarget = legacyTargetValue || undefined;
   const controller = new AbortController();
