@@ -58,6 +58,17 @@ export type SecondarySelection =
   | { kind: "clovers"; values: number[] }
   | { kind: "favorite-team"; values: string[] };
 
+export type SportsOutcome = "home" | "draw" | "away";
+
+export interface SportsMatchResult {
+  sequence: number;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number;
+  awayScore: number;
+  outcome: SportsOutcome;
+}
+
 export type BetSpec =
   | { family: "number-draw"; numbers: number[] }
   | { family: "number-draw-secondary"; numbers: number[]; secondary: SecondarySelection }
@@ -66,7 +77,7 @@ export type BetSpec =
   | {
       family: "sports-prediction";
       mode: "result";
-      predictions: Array<"home" | "draw" | "away">;
+      predictions: SportsOutcome[][];
     }
   | {
       family: "sports-prediction";
@@ -84,7 +95,8 @@ export type DrawResult =
   | {
       family: "sports-prediction";
       mode: "result";
-      outcomes: Array<"home" | "draw" | "away">;
+      outcomes: SportsOutcome[];
+      matches?: SportsMatchResult[];
     }
   | {
       family: "sports-prediction";
@@ -193,7 +205,7 @@ export const LOTTERY_CATALOG = {
     id: "loteca",
     name: "Loteca",
     family: "sports-prediction",
-    enabled: false,
+    enabled: true,
     capabilities: capabilities({
       simulation: false,
       analysis: false,
@@ -219,7 +231,7 @@ export const LOTTERY_CATALOG = {
     id: "federal",
     name: "Loteria Federal",
     family: "ticket-draw",
-    enabled: false,
+    enabled: true,
     capabilities: capabilities({
       simulation: false,
       analysis: false,
@@ -232,7 +244,7 @@ export const LOTTERY_CATALOG = {
     id: "instantanea",
     name: "Instantânea",
     family: "instant-product",
-    enabled: false,
+    enabled: true,
     capabilities: capabilities({
       history: false,
       agenda: false,

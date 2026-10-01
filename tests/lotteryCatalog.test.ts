@@ -39,8 +39,10 @@ test("lottery catalog exposes every current product family without enabling unsu
   assert.equal(getLotteryCatalogEntry("mais-milionaria").enabled, true);
   assert.equal(getLotteryCatalogEntry("timemania").enabled, true);
   assert.equal(getLotteryCatalogEntry("super-sete").enabled, true);
+  assert.equal(getLotteryCatalogEntry("loteca").enabled, true);
+  assert.equal(getLotteryCatalogEntry("federal").enabled, true);
+  assert.equal(getLotteryCatalogEntry("instantanea").enabled, true);
   assert.equal(getLotteryCatalogEntry("lotogol").enabled, false);
-  assert.equal(getLotteryCatalogEntry("instantanea").enabled, false);
 });
 
 test("capabilities describe structural differences without checking lottery names", () => {
@@ -73,7 +75,7 @@ test("bet and draw contracts discriminate real product families", () => {
     },
     { family: "dual-number-draw", numbers: [1, 2, 3, 4, 5, 6] },
     { family: "column-draw", columns: [1, 2, 3, 4, 5, 6, 7] },
-    { family: "sports-prediction", mode: "result", predictions: ["home", "draw", "away"] },
+    { family: "sports-prediction", mode: "result", predictions: [["home"], ["draw", "away"], ["home", "draw", "away"]] },
     { family: "ticket-draw", ticketNumber: "12345" },
     { family: "instant-product", productCode: "sample" },
   ];
