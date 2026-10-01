@@ -38,6 +38,10 @@ const DEFAULT_GAME_COUNTS: Partial<Record<LotteryId, number>> = {
 
 const NUMBER_TIERS: readonly NumberTier[] = ["strong", "balanced", "cold"];
 
+function supportsExperimental(lottery: LotteryId): boolean {
+  return lottery === "mega-sena" || lottery === "lotofacil" || lottery === "dia-de-sorte";
+}
+
 function isSelectionMode(value: string | undefined): value is SelectionMode {
   return value === "fix" || value === "exclude" || value === "auto";
 }
