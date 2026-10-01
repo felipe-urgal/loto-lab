@@ -18,8 +18,6 @@ import {
 } from "./dashboardScope/types.js";
 
 const LOTTERY_KEY = "loto-lab:lottery";
-const LOTTERY_IDS = Object.keys(LOTTERIES) as LotteryId[];
-
 const root = document.querySelector<HTMLElement>("#content");
 const select = document.querySelector<HTMLSelectElement>("#lottery-select");
 const title = document.querySelector<HTMLElement>("#view-title");
