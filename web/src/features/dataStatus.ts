@@ -57,8 +57,14 @@ function formatAge(minutes: unknown): string {
   return `há ${Math.floor(hours / 24)} d`;
 }
 
-function formatCount(value: unknown): string {
-  return new Intl.NumberFormat("pt-BR").format(Number(value) || 0);
+function finiteNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
+function formatCount(value: number): string {
+  return new Intl.NumberFormat("pt-BR").format(value);
 }
 
 function isLotteryId(value: string | undefined): value is LotteryId {
@@ -78,8 +84,8 @@ function statusCopy(
   const running = latestStatus === "running";
   const latestFailed = Boolean(latestStatus && !["success", "running"].includes(latestStatus));
   const stale = Boolean(operations?.stale);
-  const missing = Number(item?.missingContestCount || 0);
-  const warning = !running && (stale || latestFailed || missing > 0);
+  const missing = finiteNumber(item?.missingContestCount);
+  const warning = !running && (stale || latestFailed || (missing !== undefined && missing > 0));
   const age = formatAge(operations?.ageMinutes);
   const title = running
     ? "Sincronização em andamento"
@@ -95,14 +101,23 @@ function statusCopy(
     };
   }
 
-  const continuity = missing > 0
-    ? `${formatCount(missing)} concurso(s) faltando`
-    : `histórico até #${Number(item.lastContest) || 0}`;
+  const lastContest = finiteNumber(item.lastContest);
+  const contestCount = finiteNumber(item.contestCount);
+  const continuity = missing === undefined
+    ? "continuidade indisponível"
+    : missing > 0
+      ? `${formatCount(missing)} concurso(s) faltando`
+      : lastContest === undefined
+        ? "último concurso indisponível"
+        : `histórico até #${formatCount(lastContest)}`;
+  const countCopy = contestCount === undefined
+    ? "quantidade de concursos indisponível"
+    : `${formatCount(contestCount)} concursos`;
 
   return {
     warning,
     title,
-    detail: `${formatCount(item.contestCount)} concursos · ${continuity}`,
+    detail: `${countCopy} · ${continuity}`,
   };
 }
 
