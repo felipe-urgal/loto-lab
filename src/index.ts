@@ -28,6 +28,7 @@ export * from "./notifications/service.js";
 export * from "./finance/pricing.js";
 export * from "./finance/prizes.js";
 export * from "./checker/evaluate.js";
+export * from "./checker/productEvaluate.js";
 export * from "./backtest/shared.js";
 export * from "./backtest/megaSena.js";
 export * from "./backtest/lotofacil.js";
