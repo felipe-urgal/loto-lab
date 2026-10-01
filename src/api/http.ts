@@ -8,6 +8,9 @@ const LOTTERIES: LotteryId[] = [
   "quina",
   "lotomania",
   "dupla-sena",
+  "mais-milionaria",
+  "timemania",
+  "super-sete",
 ];
 const MAX_BODY_BYTES = 1024 * 1024;
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);

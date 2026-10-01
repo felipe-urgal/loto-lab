@@ -20,6 +20,9 @@ export interface PurposeGenerationOptions {
   excludedNumbers?: number[];
   constraints?: GenerationConstraints;
   referenceContest?: Contest;
+  cloverCount?: number;
+  favoriteTeam?: string;
+  columnMarks?: number[];
 }
 
 function sampleWithoutReplacement(
@@ -54,6 +57,9 @@ function validateSelection(options: PurposeGenerationOptions): void {
   const betSize = options.betSize ?? config.defaultBetSize;
   if (!Number.isInteger(betSize) || betSize < config.drawSize || betSize > universe.size) {
     throw new Error("betSize must fit between draw size and lottery universe");
+  }
+  if (options.lottery === "mais-milionaria" && betSize > 12) {
+    throw new Error("+Milionaria betSize must be between 6 and 12");
   }
   if (!Number.isInteger(options.fixedCount) || options.fixedCount < 0 || options.fixedCount > betSize) {
     throw new Error("fixedCount must fit inside the bet size");
@@ -100,6 +106,28 @@ function sampleCandidate(
   random: () => number,
 ): GeneratedGame {
   const config = getLotteryConfig(options.lottery);
+  if (options.lottery === "super-sete") {
+    const marks = options.columnMarks ?? Array(7).fill(1);
+    if (
+      marks.length !== 7
+      || marks.some((count) => !Number.isInteger(count) || count < 1 || count > 3)
+      || (marks.reduce((sum, count) => sum + count, 0) <= 14 && marks.some((count) => count > 2))
+      || (marks.reduce((sum, count) => sum + count, 0) >= 15 && marks.some((count) => count < 2))
+    ) {
+      throw new Error("Invalid Super Sete column-mark composition");
+    }
+    const columns = marks.map((count) =>
+      sampleWithoutReplacement(Array.from({ length: 10 }, (_, digit) => digit), count, random)
+    );
+    return {
+      lottery: options.lottery,
+      numbers: [],
+      fixedNumbers: [],
+      variableNumbers: [],
+      columns,
+      metadata: { odd: 0, even: 0, sum: 0, repeatedFromLastContest: [] },
+    };
+  }
   const excluded = new Set(options.excludedNumbers ?? []);
   const fixedSet = new Set(sharedCore);
   const candidates = Array.from(
@@ -118,6 +146,23 @@ function sampleCandidate(
   const luckyMonth = options.lottery === "dia-de-sorte"
     ? LUCKY_MONTHS[Math.floor(random() * LUCKY_MONTHS.length)]
     : undefined;
+  const cloverCount = options.cloverCount ?? 2;
+  const clovers = options.lottery === "mais-milionaria"
+    ? sampleWithoutReplacement([1, 2, 3, 4, 5, 6], cloverCount, random)
+    : undefined;
+  const favoriteTeam = options.lottery === "timemania"
+    ? options.favoriteTeam?.trim()
+    : undefined;
+  if (options.lottery === "timemania" && !favoriteTeam) {
+    throw new Error("Timemania generation requires an explicit Time do Coração");
+  }
+  const secondary = options.lottery === "dia-de-sorte" && luckyMonth
+    ? { kind: "lucky-month" as const, values: [luckyMonth] }
+    : clovers
+      ? { kind: "clovers" as const, values: clovers }
+      : favoriteTeam
+        ? { kind: "favorite-team" as const, values: [favoriteTeam] }
+        : undefined;
   const mirrorNumbers = options.lottery === "lotomania"
     ? Array.from({ length: 100 }, (_, index) => index).filter((number) => !numbers.includes(number))
     : undefined;
@@ -128,12 +173,18 @@ function sampleCandidate(
     variableNumbers,
     ...(mirrorNumbers ? { mirrorNumbers } : {}),
     ...(luckyMonth ? { luckyMonth } : {}),
+    ...(secondary ? { secondary } : {}),
     metadata,
   };
 }
 
 function candidateKey(game: GeneratedGame): string {
-  return `${game.numbers.join("-")}:${game.luckyMonth ?? ""}`;
+  return [
+    game.numbers.join("-"),
+    game.luckyMonth ?? "",
+    game.secondary ? JSON.stringify(game.secondary) : "",
+    game.columns?.map((column) => column.join(".")).join("-") ?? "",
+  ].join(":");
 }
 
 function overlap(left: GeneratedGame, right: GeneratedGame): number {

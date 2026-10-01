@@ -36,6 +36,9 @@ test("lottery catalog exposes every current product family without enabling unsu
   assert.equal(getLotteryCatalogEntry("quina").enabled, true);
   assert.equal(getLotteryCatalogEntry("lotomania").enabled, true);
   assert.equal(getLotteryCatalogEntry("dupla-sena").enabled, true);
+  assert.equal(getLotteryCatalogEntry("mais-milionaria").enabled, true);
+  assert.equal(getLotteryCatalogEntry("timemania").enabled, true);
+  assert.equal(getLotteryCatalogEntry("super-sete").enabled, true);
   assert.equal(getLotteryCatalogEntry("lotogol").enabled, false);
   assert.equal(getLotteryCatalogEntry("instantanea").enabled, false);
 });
@@ -54,6 +57,9 @@ test("supported lottery compatibility includes integrated numeric modalities", (
   assert.equal(isSupportedLotteryId("quina"), true);
   assert.equal(isSupportedLotteryId("lotomania"), true);
   assert.equal(isSupportedLotteryId("dupla-sena"), true);
+  assert.equal(isSupportedLotteryId("mais-milionaria"), true);
+  assert.equal(isSupportedLotteryId("timemania"), true);
+  assert.equal(isSupportedLotteryId("super-sete"), true);
   assert.equal(isSupportedLotteryId("lotogol"), false);
 });
 

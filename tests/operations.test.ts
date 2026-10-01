@@ -70,6 +70,33 @@ function contest(lottery: LotteryId, number: number): Contest {
       numbers: Array.from({ length: 20 }, (_, index) => index),
     };
   }
+  if (lottery === "mais-milionaria") {
+    return {
+      lottery,
+      number,
+      date: `2026-08-${String(number).padStart(2, "0")}`,
+      numbers: [1, 2, 3, 4, 5, 6],
+      secondary: { kind: "clovers", values: [1, 2] },
+    };
+  }
+  if (lottery === "timemania") {
+    return {
+      lottery,
+      number,
+      date: `2026-08-${String(number).padStart(2, "0")}`,
+      numbers: [1, 2, 3, 4, 5, 6, 7],
+      secondary: { kind: "favorite-team", values: ["SANTOS /SP"] },
+    };
+  }
+  if (lottery === "super-sete") {
+    return {
+      lottery,
+      number,
+      date: `2026-08-${String(number).padStart(2, "0")}`,
+      numbers: [1, 2, 3, 4, 5, 6, 7],
+      columns: [1, 2, 3, 4, 5, 6, 7],
+    };
+  }
   return {
     lottery,
     number,
@@ -116,9 +143,9 @@ test(
     const result = await runOperationalSync(pool, { source: new FakeContestSource(), retries: 0, retryDelayMs: 0 });
 
     assert.equal(result.status, "success");
-    assert.equal(result.details.successfulLotteries, 6);
+    assert.equal(result.details.successfulLotteries, 9);
     assert.equal(result.details.failedLotteries, 0);
-    assert.equal(result.details.lotteries.length, 6);
+    assert.equal(result.details.lotteries.length, 9);
     assert.ok(result.details.lotteries.every((item) => item.latestOfficialContest === 2));
     assert.ok(result.details.lotteries.every((item) => item.nextContest === 3));
     assert.ok(result.details.lotteries.every((item) => item.nextDrawDate === "2026-08-20"));
@@ -133,21 +160,21 @@ test(
     }
 
     const agenda = await new PostgresAgendaRepository(pool).list();
-    assert.equal(agenda.length, 6);
+    assert.equal(agenda.length, 9);
     assert.ok(agenda.every((item) => item.nextContest === 3));
 
     const notificationRepository = new PostgresNotificationRepository(pool);
     const notifications = await notificationRepository.list();
-    assert.equal(notifications.filter((item) => item.type === "next-contest").length, 6);
-    assert.equal(await notificationRepository.unreadCount(), 6);
+    assert.equal(notifications.filter((item) => item.type === "next-contest").length, 9);
+    assert.equal(await notificationRepository.unreadCount(), 9);
 
     const first = notifications[0]!;
     await notificationRepository.markRead(first.id);
-    assert.equal(await notificationRepository.unreadCount(), 5);
+    assert.equal(await notificationRepository.unreadCount(), 8);
 
     await runOperationalSync(pool, { source: new FakeContestSource(), retries: 0, retryDelayMs: 0 });
-    assert.equal((await notificationRepository.list()).filter((item) => item.type === "next-contest").length, 6);
-    assert.equal(await notificationRepository.unreadCount(), 5);
+    assert.equal((await notificationRepository.list()).filter((item) => item.type === "next-contest").length, 9);
+    assert.equal(await notificationRepository.unreadCount(), 8);
 
     server = createLotoLabServer({ pool, operationSource: new FakeContestSource() });
     await new Promise<void>((resolve, reject) => {
@@ -161,9 +188,9 @@ test(
     const agendaResponse = await fetch(`${baseUrl}/api/v1/agenda`);
     assert.equal(agendaResponse.status, 200);
     const agendaPayload = (await agendaResponse.json()) as { agenda: unknown[]; notifications: Array<{ id: number }>; unreadCount: number };
-    assert.equal(agendaPayload.agenda.length, 6);
-    assert.equal(agendaPayload.notifications.length, 6);
-    assert.equal(agendaPayload.unreadCount, 5);
+    assert.equal(agendaPayload.agenda.length, 9);
+    assert.equal(agendaPayload.notifications.length, 9);
+    assert.equal(agendaPayload.unreadCount, 8);
 
     const unread = agendaPayload.notifications.find((item) => item.id !== first.id)!;
     const readResponse = await fetch(`${baseUrl}/api/v1/notifications/${unread.id}/read`, { method: "POST" });
@@ -177,6 +204,6 @@ test(
     assert.ok(latest);
     assert.equal(latest.status, "success");
     assert.ok(latest.finishedAt);
-    assert.equal(latest.details.successfulLotteries, 6);
+    assert.equal(latest.details.successfulLotteries, 9);
   },
 );

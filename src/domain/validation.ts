@@ -9,6 +9,9 @@ const FIXED_COUNTS: Record<LotteryId, readonly number[]> = {
   quina: [0],
   lotomania: [0],
   "dupla-sena": [0],
+  "mais-milionaria": [0],
+  timemania: [0],
+  "super-sete": [0],
 };
 
 const LUCKY_MONTHS = new Set([
@@ -35,16 +38,43 @@ export function assertValidContestNumbers(lottery: LotteryId, numbers: number[])
   if (numbers.some((number) => !Number.isInteger(number) || number < config.minNumber || number > config.maxNumber)) {
     throw new Error(`Invalid drawn number returned by Caixa for ${lottery}`);
   }
-  if (new Set(numbers).size !== numbers.length) {
+  if (lottery !== "super-sete" && new Set(numbers).size !== numbers.length) {
     throw new Error(`Duplicated drawn number returned by Caixa for ${lottery}`);
   }
 }
 
 export function assertValidGeneratedGame(game: GeneratedGame): void {
   const config = getLotteryConfig(game.lottery);
+  if (game.lottery === "super-sete") {
+    const totalMarks = game.columns?.reduce((sum, column) => sum + column.length, 0) ?? 0;
+    if (
+      !game.columns
+      || game.columns.length !== 7
+      || game.columns.some((column) =>
+        column.length < 1
+        || column.length > 3
+        || !hasUniqueIntegers(column)
+        || column.some((value) => value < 0 || value > 9)
+      )
+      || totalMarks < 7
+      || totalMarks > 21
+      || (totalMarks <= 14 && game.columns.some((column) => column.length > 2))
+      || (totalMarks >= 15 && game.columns.some((column) => column.length < 2))
+    ) {
+      throw new Error("Super Sete games require a valid 7-column composition with 7 to 21 marks");
+    }
+    if (game.numbers.length !== 0 || game.fixedNumbers.length !== 0 || game.variableNumbers.length !== 0) {
+      throw new Error("Super Sete columns must not be flattened into number selections");
+    }
+    return;
+  }
   const officialRule = getOfficialBetRule(game.lottery);
-  const minBetSize = officialRule?.minBetSize ?? config.defaultBetSize;
-  const maxBetSize = officialRule?.maxBetSize ?? config.defaultBetSize;
+  const minBetSize = game.lottery === "mais-milionaria"
+    ? 6
+    : officialRule?.minBetSize ?? config.defaultBetSize;
+  const maxBetSize = game.lottery === "mais-milionaria"
+    ? 12
+    : officialRule?.maxBetSize ?? config.defaultBetSize;
   if (game.numbers.length < minBetSize || game.numbers.length > maxBetSize) {
     throw new Error(
       `${game.lottery} games must contain between ${minBetSize} and ${maxBetSize} numbers`,
@@ -76,11 +106,39 @@ export function assertValidGeneratedGame(game: GeneratedGame): void {
     throw new Error(`${game.lottery} fixed count ${game.fixedNumbers.length} is not supported`);
   }
 
-  if (game.lottery === "dia-de-sorte") {
-    if (!game.luckyMonth || !LUCKY_MONTHS.has(game.luckyMonth)) {
+  if (game.lottery === "mais-milionaria") {
+    if (
+      game.secondary?.kind !== "clovers"
+      || game.secondary.values.length < 2
+      || game.secondary.values.length > 6
+      || !hasUniqueIntegers(game.secondary.values)
+      || game.secondary.values.some((value) => value < 1 || value > 6)
+    ) {
+      throw new Error("+Milionária games require 2 to 6 unique trevos between 1 and 6");
+    }
+  } else if (game.lottery === "timemania") {
+    if (
+      game.secondary?.kind !== "favorite-team"
+      || game.secondary.values.length !== 1
+      || !game.secondary.values[0]?.trim()
+    ) {
+      throw new Error("Timemania games require exactly one Time do Coração");
+    }
+  } else if (game.lottery === "dia-de-sorte") {
+    const month = game.secondary?.kind === "lucky-month"
+      ? game.secondary.values[0]
+      : game.luckyMonth;
+    if (!month || !LUCKY_MONTHS.has(month)) {
       throw new Error("Dia de Sorte games require a valid Mês da Sorte");
     }
-  } else if (game.luckyMonth !== undefined) {
+    if (game.secondary !== undefined && (game.secondary.kind !== "lucky-month" || game.secondary.values.length !== 1)) {
+      throw new Error("Dia de Sorte secondary selection must contain exactly one Mês da Sorte");
+    }
+  } else if (game.secondary !== undefined) {
+    throw new Error(`${game.lottery} games cannot contain secondary selections`);
+  }
+
+  if (game.lottery !== "dia-de-sorte" && game.luckyMonth !== undefined) {
     throw new Error(`${game.lottery} games cannot contain a Mês da Sorte`);
   }
 

@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 import type { GeneratedGame, LotteryId } from "../domain/types.js";
+import type { SecondarySelection } from "../domain/lotteryCatalog.js";
 import { assertValidGeneratedGame } from "../domain/validation.js";
 import type {
   GeneratedGameBatchRecord,
@@ -34,6 +35,8 @@ interface GameRow {
   variable_numbers: number[];
   mirror_numbers: number[] | null;
   lucky_month: string | null;
+  secondary_selection: SecondarySelection | null;
+  columns: number[][] | null;
   metadata: GeneratedGame["metadata"];
 }
 
@@ -60,6 +63,8 @@ function mapGame(lottery: LotteryId, row: GameRow): GeneratedGame {
     variableNumbers: row.variable_numbers.map(Number),
     ...(row.mirror_numbers ? { mirrorNumbers: row.mirror_numbers.map(Number) } : {}),
     ...(row.lucky_month ? { luckyMonth: row.lucky_month } : {}),
+    ...(row.secondary_selection ? { secondary: row.secondary_selection } : {}),
+    ...(row.columns ? { columns: row.columns.map((column) => column.map(Number)) } : {}),
     metadata: row.metadata,
   };
 }
@@ -90,8 +95,9 @@ async function insertGames(
     await client.query(
       `
         INSERT INTO generated_games (
-          batch_id, position, numbers, fixed_numbers, variable_numbers, mirror_numbers, lucky_month, metadata
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+          batch_id, position, numbers, fixed_numbers, variable_numbers, mirror_numbers,
+          lucky_month, secondary_selection, columns, metadata
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb)
       `,
       [
         batchId,
@@ -101,6 +107,8 @@ async function insertGames(
         game.variableNumbers,
         game.mirrorNumbers ?? null,
         game.luckyMonth ?? null,
+        game.secondary ? JSON.stringify(game.secondary) : null,
+        game.columns ? JSON.stringify(game.columns) : null,
         JSON.stringify(game.metadata),
       ],
     );
@@ -287,7 +295,7 @@ export class PostgresGameRepository {
       ),
       this.pool.query<GameRow>(
         `
-          SELECT batch_id, numbers, fixed_numbers, variable_numbers, mirror_numbers, lucky_month, metadata
+          SELECT batch_id, numbers, fixed_numbers, variable_numbers, mirror_numbers, lucky_month, secondary_selection, columns, metadata
           FROM generated_games
           WHERE batch_id = ANY($1::bigint[])
           ORDER BY batch_id, position

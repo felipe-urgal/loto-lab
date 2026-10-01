@@ -4,7 +4,10 @@ export type LotteryId =
   | "dia-de-sorte"
   | "quina"
   | "lotomania"
-  | "dupla-sena";
+  | "dupla-sena"
+  | "mais-milionaria"
+  | "timemania"
+  | "super-sete";
 export type NumberTier = "strong" | "balanced" | "cold";
 export type SelectionMode = "fix" | "exclude" | "auto";
 export type GenerationPurpose = "uniform" | "portfolio" | "experimental";
@@ -98,6 +101,11 @@ export type GeneratedGame = {
   variableNumbers: number[];
   mirrorNumbers?: number[];
   luckyMonth?: string;
+  secondary?:
+    | { kind: "lucky-month"; values: string[] }
+    | { kind: "clovers"; values: number[] }
+    | { kind: "favorite-team"; values: string[] };
+  columns?: number[][];
   metadata: {
     odd: number;
     even: number;
@@ -160,6 +168,9 @@ export type GenerationRequestPayload = {
   excludedNumbers: number[];
   constraints?: GenerationConstraints;
   seed?: string;
+  cloverCount?: number;
+  favoriteTeam?: string;
+  columnMarks?: number[];
 };
 
 export type GenerationPlanPayload = {
@@ -185,5 +196,8 @@ export type GeneratorState = {
   plan: GenerationPlan;
   preview: GenerationPreviewResponse | null;
   controller: AbortController;
+  cloverCount: number;
+  favoriteTeam: string;
+  columnMarks: number[];
   cleanup: (() => void) | null;
 };

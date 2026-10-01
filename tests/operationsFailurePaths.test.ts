@@ -70,6 +70,33 @@ function contest(lottery: LotteryId, number: number): Contest {
       numbers: Array.from({ length: 20 }, (_, index) => index),
     };
   }
+  if (lottery === "mais-milionaria") {
+    return {
+      lottery,
+      number,
+      date: `2026-08-${String(number).padStart(2, "0")}`,
+      numbers: [1, 2, 3, 4, 5, 6],
+      secondary: { kind: "clovers", values: [1, 2] },
+    };
+  }
+  if (lottery === "timemania") {
+    return {
+      lottery,
+      number,
+      date: `2026-08-${String(number).padStart(2, "0")}`,
+      numbers: [1, 2, 3, 4, 5, 6, 7],
+      secondary: { kind: "favorite-team", values: ["SANTOS /SP"] },
+    };
+  }
+  if (lottery === "super-sete") {
+    return {
+      lottery,
+      number,
+      date: `2026-08-${String(number).padStart(2, "0")}`,
+      numbers: [1, 2, 3, 4, 5, 6, 7],
+      columns: [1, 2, 3, 4, 5, 6, 7],
+    };
+  }
   return {
     lottery,
     number,
@@ -178,7 +205,7 @@ test(
       retryDelayMs: 0,
     });
     assert.equal(partial.status, "partial");
-    assert.equal(partial.details.successfulLotteries, 6);
+    assert.equal(partial.details.successfulLotteries, 9);
     assert.equal(partial.details.failedLotteries, 0);
     const partialMega = partial.details.lotteries.find((item) => item.lottery === "mega-sena");
     assert.equal(partialMega?.status, "partial");
@@ -205,7 +232,7 @@ test(
     });
     assert.equal(failed.status, "failed");
     assert.equal(failed.details.successfulLotteries, 0);
-    assert.equal(failed.details.failedLotteries, 6);
+    assert.equal(failed.details.failedLotteries, 9);
     assert.ok(failed.details.lotteries.every((item) => item.status === "failed"));
     assert.ok(failed.details.lotteries.every((item) => item.error?.startsWith("source unavailable for ")));
 
@@ -283,7 +310,7 @@ test(
     }
 
     assert.equal(notificationFailure.status, "partial");
-    assert.equal(notificationFailure.details.successfulLotteries, 6);
+    assert.equal(notificationFailure.details.successfulLotteries, 9);
     assert.equal(notificationFailure.details.failedLotteries, 0);
     assert.equal(notificationFailure.details.notificationRefresh, "failed");
     assert.match(notificationFailure.details.notificationError ?? "", /notifications blocked for test/);

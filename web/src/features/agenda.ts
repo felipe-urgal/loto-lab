@@ -51,6 +51,9 @@ const labels: Record<LotteryId, string> = {
   quina: "Quina",
   lotomania: "Lotomania",
   "dupla-sena": "Dupla Sena",
+  "mais-milionaria": "+Milionária",
+  timemania: "Timemania",
+  "super-sete": "Super Sete",
 };
 
 let filter: AgendaFilter = "all";

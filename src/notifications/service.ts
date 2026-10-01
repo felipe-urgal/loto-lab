@@ -21,6 +21,9 @@ const LABELS: Record<LotteryId, string> = {
   quina: "Quina",
   lotomania: "Lotomania",
   "dupla-sena": "Dupla Sena",
+  "mais-milionaria": "+Milionária",
+  timemania: "Timemania",
+  "super-sete": "Super Sete",
 };
 
 function money(value: number): string {

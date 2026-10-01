@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import type { Contest, ContestPrizeTier, LotteryId } from "../domain/types.js";
+import type { SecondarySelection } from "../domain/lotteryCatalog.js";
 import { hasCompletePrizeSchedule } from "../finance/prizes.js";
 
 interface ContestRow {
@@ -10,6 +11,8 @@ interface ContestRow {
   numbers: number[];
   second_draw_numbers: number[] | null;
   lucky_month: string | null;
+  secondary_selection: SecondarySelection | null;
+  columns: number[] | null;
   amount_collected: number | null;
   prize_tiers: ContestPrizeTier[];
 }
@@ -24,6 +27,8 @@ interface AnalysisContestRow {
 
 interface GenerationContestRow extends AnalysisContestRow {
   lucky_month: string | null;
+  secondary_selection: SecondarySelection | null;
+  columns: number[] | null;
 }
 
 interface ContestStatusRow {
@@ -49,6 +54,8 @@ function mapContest(row: ContestRow): Contest {
     numbers: row.numbers.map(Number),
     ...(row.second_draw_numbers ? { secondDrawNumbers: row.second_draw_numbers.map(Number) } : {}),
     ...(row.lucky_month ? { luckyMonth: row.lucky_month } : {}),
+    ...(row.secondary_selection ? { secondary: row.secondary_selection } : {}),
+    ...(row.columns ? { columns: row.columns.map(Number) } : {}),
     ...(prizeTiers.length > 0 ? { prizeTiers } : {}),
     ...(row.amount_collected !== null ? { amountCollected: Number(row.amount_collected) } : {}),
   };
@@ -68,6 +75,8 @@ function mapGenerationContest(row: GenerationContestRow): Contest {
   return {
     ...mapAnalysisContest(row),
     ...(row.lucky_month ? { luckyMonth: row.lucky_month } : {}),
+    ...(row.secondary_selection ? { secondary: row.secondary_selection } : {}),
+    ...(row.columns ? { columns: row.columns.map(Number) } : {}),
   };
 }
 
@@ -106,13 +115,16 @@ export class PostgresContestRepository {
         const result = await client.query<{ id: string }>(
           `
             INSERT INTO contests (
-              lottery, contest_number, draw_date, numbers, second_draw_numbers, lucky_month, amount_collected
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+              lottery, contest_number, draw_date, numbers, second_draw_numbers, lucky_month,
+              secondary_selection, columns, amount_collected
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)
             ON CONFLICT (lottery, contest_number) DO UPDATE SET
               draw_date = EXCLUDED.draw_date,
               numbers = EXCLUDED.numbers,
               second_draw_numbers = COALESCE(EXCLUDED.second_draw_numbers, contests.second_draw_numbers),
               lucky_month = COALESCE(EXCLUDED.lucky_month, contests.lucky_month),
+              secondary_selection = COALESCE(EXCLUDED.secondary_selection, contests.secondary_selection),
+              columns = COALESCE(EXCLUDED.columns, contests.columns),
               amount_collected = COALESCE(EXCLUDED.amount_collected, contests.amount_collected),
               updated_at = NOW()
             RETURNING id
@@ -124,6 +136,8 @@ export class PostgresContestRepository {
             contest.numbers,
             contest.secondDrawNumbers ?? null,
             contest.luckyMonth ?? null,
+            contest.secondary ? JSON.stringify(contest.secondary) : null,
+            contest.columns ?? null,
             contest.amountCollected ?? null,
           ],
         );
@@ -234,7 +248,9 @@ export class PostgresContestRepository {
           draw_date::text AS draw_date,
           numbers,
           second_draw_numbers,
-          lucky_month
+          lucky_month,
+          secondary_selection,
+          columns
         FROM contests
         WHERE lottery = $1
         ORDER BY contest_number ASC
@@ -379,6 +395,8 @@ export class PostgresContestRepository {
           c.numbers,
           c.second_draw_numbers,
           c.lucky_month,
+          c.secondary_selection,
+          c.columns,
           c.amount_collected::float8 AS amount_collected,
           COALESCE(
             jsonb_agg(

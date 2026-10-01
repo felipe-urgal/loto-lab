@@ -35,7 +35,9 @@ function numberPrizeExpected(target: Contest, hits: number): boolean {
   if (target.lottery === "dia-de-sorte") return hits >= 4;
   if (target.lottery === "quina") return hits >= 2;
   if (target.lottery === "lotomania") return hits === 0 || (hits >= 15 && hits <= 20);
-  return hits >= 3;
+  if (target.lottery === "dupla-sena") return hits >= 3;
+  if (target.lottery === "timemania" || target.lottery === "super-sete") return hits >= 3;
+  return false;
 }
 
 export function prizeTierForHits(
@@ -73,11 +75,19 @@ export function hasCompletePrizeSchedule(target: Contest): boolean {
       (hits) => tiers.some((tier) => numericHitsFromTier(tier) === hits),
     );
   }
-  return [1, 2].every((draw) =>
-    [3, 4, 5, 6].every((hits) =>
-      tiers.some((tier) => numericHitsFromTier(tier) === hits && (tier.draw ?? 1) === draw),
-    ),
-  );
+  if (target.lottery === "dupla-sena") {
+    return [1, 2].every((draw) =>
+      [3, 4, 5, 6].every((hits) =>
+        tiers.some((tier) => numericHitsFromTier(tier) === hits && (tier.draw ?? 1) === draw),
+      ),
+    );
+  }
+  if (target.lottery === "timemania" || target.lottery === "super-sete") {
+    return [3, 4, 5, 6, 7].every(
+      (hits) => tiers.some((tier) => numericHitsFromTier(tier) === hits),
+    );
+  }
+  return false;
 }
 
 export function resolvePrizeValue(
