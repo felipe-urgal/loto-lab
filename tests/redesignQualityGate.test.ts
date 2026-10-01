@@ -21,6 +21,8 @@ test("Redesign V2 quality gate remains wired to current product surfaces", async
   assert.match(redesignE2e, /e2eCriticalRoutes\.mjs/);
   assert.doesNotMatch(redesignE2e, /e2eMyGamesV2|e2eOperationalFlows/);
   assert.equal(pkg.scripts?.["test:e2e"], "npm run test:e2e:redesign");
+  assert.match(pkg.scripts?.["quality:static"] ?? "", /npm run quality:e2e-syntax/);
+  assert.match(pkg.scripts?.["quality:e2e-syntax"] ?? "", /node --check scripts\/e2eReadability\.mjs/);
 
   assert.match(e2e, /name: "desktop", width: 1440, height: 900/);
   assert.match(e2e, /name: "tablet", width: 820, height: 1180/);
