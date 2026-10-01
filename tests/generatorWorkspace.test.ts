@@ -62,7 +62,11 @@ test("generator workspace follows Redesign V2 while preserving audited generatio
   assert.match(generator, /postJson<GenerationSaveResponse>\("\/generation\/save"/);
   assert.match(generator, /includeSeed \? state\.preview\?\.generatorOptions\.seed/);
   assert.match(generator, /state\.preview = null/);
-  assert.match(generator, /state\.purpose === "experimental" \? \(tiers\.get\(value\) \|\| ""\) : ""/);
+  assert.match(generator, /const tier = tiers\.get\(value\) \|\| ""/);
+  assert.doesNotMatch(generator, /state\.purpose === "experimental" \? \(tiers\.get\(value\) \|\| ""\) : ""/);
+  assert.match(generator, /Forte histórica/);
+  assert.match(generator, /Intermediária histórica/);
+  assert.match(generator, /Fria histórica/);
   assert.match(generator, /Salvar grava exatamente os jogos exibidos abaixo/);
   assert.match(generator, /disponível no Painel/);
   assert.match(explainability, /Isto não é previsão/);
