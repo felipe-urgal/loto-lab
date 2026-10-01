@@ -199,6 +199,16 @@ function parseV2Selection(
   if (fixedNumbers.some((number) => excludedNumbers.includes(number))) {
     throw new ApiError(400, "INVALID_ARGUMENT", "A number cannot be fixed and excluded at the same time");
   }
+  if (
+    lottery === "super-sete"
+    && (fixedNumbers.length > 0 || excludedNumbers.length > 0 || body.constraints !== undefined)
+  ) {
+    throw new ApiError(
+      400,
+      "INVALID_ARGUMENT",
+      "Super Sete uses positional column marks and does not accept number selections or numeric constraints",
+    );
+  }
   const constraints = parseGenerationConstraints(body.constraints, lottery, betSize);
   return { fixedNumbers, excludedNumbers, ...(constraints ? { constraints } : {}) };
 }
