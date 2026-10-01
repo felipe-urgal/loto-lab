@@ -65,7 +65,7 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
     return response.text();
   };
 
-  const [app, shellBoundary, shell, refinementsBoundary, refinements, myGames, myGamesState, presentation, auditability, agenda, strategies, jobs, foundation] = await Promise.all([
+  const [app, shellBoundary, shell, refinementsBoundary, refinements, myGames, myGamesState, presentation, auditability, agenda, strategies, jobs, foundation, designSystem] = await Promise.all([
     fetchSource("app.js"),
     fetchSource("shell.js"),
     fetchSource("src/core/shell.js"),
@@ -79,6 +79,7 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
     fetchSource("src/features/strategies.js"),
     fetchSource("src/features/jobs.js"),
     fetchSource("ui-foundation.css"),
+    fetchSource("design-system.css"),
   ]);
 
   assert.match(app, /data-feature-owned="dashboard"/);
@@ -127,5 +128,6 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
   assert.match(jobs, /Promise\.all\(\[loadStrategies\(\), loadJobs\(\)\]\)/);
 
   assert.match(foundation, /\.nav-item \.nav-label/);
-  assert.match(foundation, /safe-area-inset-bottom/);
+  assert.doesNotMatch(foundation, /nav-more-menu/);
+  assert.match(designSystem, /safe-area-inset-bottom/);
 });
