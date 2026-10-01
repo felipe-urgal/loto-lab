@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import type { Pool } from "pg";
 import { createLotoLabServer } from "../src/api/server.js";
 
-test("agenda notification center is served by the web process", async (t) => {
+test("agenda legacy route redirects to the Panel while its internal module remains available", async (t) => {
   const pool = { query: async () => ({ rows: [] }) } as unknown as Pool;
   const server = createLotoLabServer({ pool });
   await new Promise<void>((resolve, reject) => {
@@ -17,36 +17,20 @@ test("agenda notification center is served by the web process", async (t) => {
   assert.ok(address && typeof address !== "string");
   const baseUrl = `http://127.0.0.1:${(address as AddressInfo).port}`;
 
-  const page = await fetch(`${baseUrl}/agenda`);
-  assert.equal(page.status, 200);
-  const html = await page.text();
-  assert.match(html, /Próximos concursos/);
-  assert.match(html, /Notificações/);
-  assert.match(html, /\/assets\/agenda\.js/);
-  assert.match(html, /\/assets\/agenda-workspace\.css/);
-  assert.doesNotMatch(html, /\/assets\/agenda\.css/);
+  const page = await fetch(`${baseUrl}/agenda`, { redirect: "manual" });
+  assert.equal(page.status, 308);
+  assert.equal(page.headers.get("location"), "/#dashboard");
 
-  const styles = await fetch(`${baseUrl}/assets/agenda-workspace.css`);
-  assert.equal(styles.status, 200);
-  const css = await styles.text();
-  assert.match(css, /\.main-nav a\.nav-item/);
-  assert.match(css, /text-decoration:\s*none\s*!important/);
-
-  const legacyStyles = await fetch(`${baseUrl}/assets/agenda.css`);
-  assert.equal(legacyStyles.status, 404);
-
-  const [boundaryResponse, typedResponse] = await Promise.all([
+  const [boundaryResponse, styles, typedResponse] = await Promise.all([
     fetch(`${baseUrl}/assets/agenda.js`),
+    fetch(`${baseUrl}/assets/agenda-workspace.css`),
     fetch(`${baseUrl}/assets/src/features/agenda.js`),
   ]);
-  assert.equal(boundaryResponse.status, 200);
+  assert.equal(boundaryResponse.status, 404);
+  assert.equal(styles.status, 404);
   assert.equal(typedResponse.status, 200);
 
-  const [boundarySource, typedSource] = await Promise.all([
-    boundaryResponse.text(),
-    typedResponse.text(),
-  ]);
-  assert.match(boundarySource, /\.\/src\/features\/agenda\.js/);
+  const typedSource = await typedResponse.text();
   assert.match(typedSource, /notifications\/read-all/);
   assert.match(typedSource, /data-read-notification/);
   assert.match(typedSource, /\.\.\/core\/api\.js/);
