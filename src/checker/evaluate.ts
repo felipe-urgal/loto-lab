@@ -93,10 +93,10 @@ export function evaluateGame(game: GeneratedGame, target: Contest): GameCheckRes
   const luckyMonthHit = game.lottery === "dia-de-sorte"
     ? canonical(game.luckyMonth) !== undefined && canonical(game.luckyMonth) === canonical(target.luckyMonth)
     : undefined;
-  const secondaryHits = game.lottery === "mais-milionaria"
-    && game.secondary?.kind === "clovers"
-    && target.secondary?.kind === "clovers"
-    ? game.secondary.values.filter((value) => target.secondary!.values.includes(value)).length
+  const gameClovers = game.secondary?.kind === "clovers" ? game.secondary.values : undefined;
+  const targetClovers = target.secondary?.kind === "clovers" ? target.secondary.values : undefined;
+  const secondaryHits = game.lottery === "mais-milionaria" && gameClovers && targetClovers
+    ? gameClovers.filter((value) => targetClovers.includes(value)).length
     : undefined;
   const secondaryHit = game.lottery === "timemania"
     && game.secondary?.kind === "favorite-team"
