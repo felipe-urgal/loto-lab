@@ -9,6 +9,9 @@ const lotteryIds: LotteryId[] = [
   "quina",
   "lotomania",
   "dupla-sena",
+  "mais-milionaria",
+  "timemania",
+  "super-sete",
 ];
 
 function parseLottery(value: string | undefined): LotteryId {
