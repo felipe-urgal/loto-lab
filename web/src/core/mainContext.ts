@@ -15,6 +15,9 @@ export const LOTTERY_IDS = [
   "quina",
   "lotomania",
   "dupla-sena",
+  "mais-milionaria",
+  "timemania",
+  "super-sete",
 ] as const;
 
 export type LotteryId = (typeof LOTTERY_IDS)[number];
