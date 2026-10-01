@@ -1,13 +1,19 @@
-export type LotteryId =
-  | "mega-sena"
-  | "lotofacil"
-  | "dia-de-sorte"
-  | "quina"
-  | "lotomania"
-  | "dupla-sena"
-  | "mais-milionaria"
-  | "timemania"
-  | "super-sete";
+import type { LotteryId } from "../../core/mainContext.js";
+
+export type { LotteryId };
+
+export type LotteryGenerationConfig = {
+  id: LotteryId;
+  name: string;
+  minNumber: number;
+  maxNumber: number;
+  drawSize: number;
+  defaultBetSize: number;
+  enabled: boolean;
+  capabilities?: {
+    simulation?: boolean;
+  };
+};
 export type NumberTier = "strong" | "balanced" | "cold";
 export type SelectionMode = "fix" | "exclude" | "auto";
 export type GenerationPurpose = "uniform" | "portfolio" | "experimental";
@@ -184,6 +190,7 @@ export type GenerationPlanPayload = {
 
 export type GeneratorState = {
   lottery: LotteryId;
+  lotteryConfig: LotteryGenerationConfig;
   gameCount: number;
   fixedCount: number;
   betSize: number;
