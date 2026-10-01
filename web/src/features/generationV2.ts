@@ -382,19 +382,19 @@ function workspaceMarkup(state: GeneratorState): string {
         </section>
 
         <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>2. Dezenas</strong><span>Escolha explicitamente a ação e clique nas dezenas. As cores históricas são apenas contexto visual nos modos Aleatório e Carteira.</span></div></div>
-          ${selectionModesMarkup(state)}
-          <div class="g2-number-legend">
+          <div class="g2-card-head"><div><strong>2. ${state.lottery === "super-sete" ? "Colunas" : "Dezenas"}</strong><span>${state.lottery === "super-sete" ? "A estrutura da aposta permanece por coluna; nenhuma marcação é convertida em dezena." : "Escolha explicitamente a ação e clique nas dezenas. As cores históricas são apenas contexto visual nos modos Aleatório e Carteira."}</span></div></div>
+          ${state.lottery === "super-sete" ? "" : selectionModesMarkup(state)}
+          ${state.lottery === "super-sete" ? "" : `<div class="g2-number-legend">
             <span><i class="g2-key"></i> Automática</span><span><i class="g2-key is-fixed"></i> Fixada</span><span><i class="g2-key is-excluded"></i> Excluída</span>
             <span><i class="g2-key is-strong"></i> Forte</span><span><i class="g2-key is-balanced"></i> Intermediária</span><span><i class="g2-key is-cold"></i> Fria</span>
-          </div>
+          </div>`}
           <div class="g2-number-grid" data-g2-number-grid>${numberGridMarkup(state)}</div>
           <div class="g2-selection-summary" data-g2-selection-summary></div>
         </section>
 
         <section class="panel g2-card">
-          <div class="g2-card-head"><div><strong>3. Filtros estruturais</strong><span>Desligados por padrão. As referências abaixo são condicionadas às dezenas manuais atuais.</span></div></div>
-          <div class="g2-filter-list" data-g2-filters>${filtersMarkup(state)}</div>
+          <div class="g2-card-head"><div><strong>3. Filtros estruturais</strong><span>${state.lottery === "super-sete" ? "Filtros de dezenas não se aplicam ao modelo posicional do Super Sete." : "Desligados por padrão. As referências abaixo são condicionadas às dezenas manuais atuais."}</span></div></div>
+          <div class="g2-filter-list" data-g2-filters>${state.lottery === "super-sete" ? '<p class="g2-disclaimer">A composição é controlada exclusivamente pelas marcações de cada coluna.</p>' : filtersMarkup(state)}</div>
           <div style="margin-top:14px">${methodologyMarkup(state)}</div>
         </section>
 
