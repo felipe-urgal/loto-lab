@@ -133,8 +133,19 @@ function sampleCandidate(
     ? sampleWithoutReplacement([1, 2, 3, 4, 5, 6], 2, random)
     : undefined;
   const favoriteTeam = options.lottery === "timemania"
-    ? options.referenceContest?.favoriteTeam ?? "Time do Coração"
+    && options.referenceContest?.secondary?.kind === "favorite-team"
+    ? options.referenceContest.secondary.values[0]
     : undefined;
+  if (options.lottery === "timemania" && !favoriteTeam) {
+    throw new Error("Timemania generation requires a reference contest with Time do Coração");
+  }
+  const secondary = options.lottery === "dia-de-sorte" && luckyMonth
+    ? { kind: "lucky-month" as const, values: [luckyMonth] }
+    : clovers
+      ? { kind: "clovers" as const, values: clovers }
+      : favoriteTeam
+        ? { kind: "favorite-team" as const, values: [favoriteTeam] }
+        : undefined;
   const mirrorNumbers = options.lottery === "lotomania"
     ? Array.from({ length: 100 }, (_, index) => index).filter((number) => !numbers.includes(number))
     : undefined;
@@ -145,8 +156,7 @@ function sampleCandidate(
     variableNumbers,
     ...(mirrorNumbers ? { mirrorNumbers } : {}),
     ...(luckyMonth ? { luckyMonth } : {}),
-    ...(clovers ? { clovers } : {}),
-    ...(favoriteTeam ? { favoriteTeam } : {}),
+    ...(secondary ? { secondary } : {}),
     metadata,
   };
 }
@@ -155,8 +165,7 @@ function candidateKey(game: GeneratedGame): string {
   return [
     game.numbers.join("-"),
     game.luckyMonth ?? "",
-    game.clovers?.join("-") ?? "",
-    game.favoriteTeam ?? "",
+    game.secondary ? JSON.stringify(game.secondary) : "",
     game.columns?.join("-") ?? "",
   ].join(":");
 }
