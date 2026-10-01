@@ -224,13 +224,13 @@ const checks = [
   { path: "/#dashboard", ready: "Boolean(document.querySelector('#content')) && !document.querySelector('.loading-state')" },
   { path: "/#analysis", ready: "Boolean(document.querySelector('.a2-shell'))" },
   { path: "/#generate", ready: "Boolean(document.querySelector('#content')) && !document.querySelector('.loading-state')" },
-  { path: "/#games", ready: "Boolean(document.querySelector('#content')) && !document.querySelector('.loading-state')" },
-  { path: "/#backtests", ready: "Boolean(document.querySelector('#content')) && !document.querySelector('.loading-state')" },
-  { path: "/jobs", ready: "Boolean(document.querySelector('#job-form'))" },
-  { path: "/strategies", ready: "Boolean(document.querySelector('#strategy-form'))" },
-  { path: "/ai", ready: "Boolean(document.querySelector('#ai-form'))" },
-  { path: "/lab", ready: "Boolean(document.querySelector('#lab-form'))" },
-  { path: "/agenda", ready: "Boolean(document.querySelector('#agenda-grid'))" },
+  { path: "/#games", ready: "location.hash === '#dashboard' && Boolean(document.querySelector('.dashboard-shell'))" },
+  { path: "/#backtests", ready: "location.hash === '#analysis' && Boolean(document.querySelector('.a2-shell'))" },
+  { path: "/jobs", ready: "location.pathname === '/' && location.hash === '#dashboard' && Boolean(document.querySelector('.dashboard-shell'))" },
+  { path: "/strategies", ready: "location.pathname === '/' && location.hash === '#analysis' && Boolean(document.querySelector('.a2-shell'))" },
+  { path: "/ai", ready: "location.pathname === '/' && location.hash === '#analysis' && Boolean(document.querySelector('.a2-shell'))" },
+  { path: "/lab", ready: "location.pathname === '/' && location.hash === '#analysis' && Boolean(document.querySelector('.a2-shell'))" },
+  { path: "/agenda", ready: "location.pathname === '/' && location.hash === '#dashboard' && Boolean(document.querySelector('.dashboard-shell'))" },
 ];
 
 const chrome = findChrome();
