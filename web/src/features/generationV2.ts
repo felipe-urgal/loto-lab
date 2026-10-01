@@ -1,4 +1,5 @@
 import { api } from "../core/api.js";
+import { isLotteryId } from "../core/mainContext.js";
 import {
   currentMainView,
   onMainViewChanged,
@@ -19,6 +20,7 @@ import type {
   GenerationRequestPayload,
   GenerationSaveResponse,
   GeneratorState,
+  LotteryGenerationConfig,
   LotteryId,
   NumberTier,
   SelectionMode,
@@ -28,42 +30,9 @@ const root = document.querySelector<HTMLElement>("#content");
 let lifecycleToken = 0;
 let cleanupCurrent: (() => void) | null = null;
 
-const LOTTERY_FALLBACK: Record<LotteryId, {
-  label: string;
-  min: number;
-  max: number;
-  drawSize: number;
-  defaultBetSize: number;
-  defaultGames: number;
-}> = {
-  "mega-sena": { label: "Mega-Sena", min: 1, max: 60, drawSize: 6, defaultBetSize: 6, defaultGames: 2 },
-  lotofacil: { label: "Lotofácil", min: 1, max: 25, drawSize: 15, defaultBetSize: 15, defaultGames: 4 },
-  "dia-de-sorte": { label: "Dia de Sorte", min: 1, max: 31, drawSize: 7, defaultBetSize: 7, defaultGames: 4 },
-  quina: { label: "Quina", min: 1, max: 80, drawSize: 5, defaultBetSize: 5, defaultGames: 4 },
-  lotomania: { label: "Lotomania", min: 0, max: 99, drawSize: 20, defaultBetSize: 50, defaultGames: 2 },
-  "dupla-sena": { label: "Dupla Sena", min: 1, max: 50, drawSize: 6, defaultBetSize: 6, defaultGames: 4 },
-  "mais-milionaria": { label: "+Milionária", min: 1, max: 50, drawSize: 6, defaultBetSize: 6, defaultGames: 4 },
-  timemania: { label: "Timemania", min: 1, max: 80, drawSize: 7, defaultBetSize: 10, defaultGames: 4 },
-  "super-sete": { label: "Super Sete", min: 0, max: 9, drawSize: 7, defaultBetSize: 7, defaultGames: 4 },
-};
+const DEFAULT_GAME_COUNT = 4;
 
 const NUMBER_TIERS: readonly NumberTier[] = ["strong", "balanced", "cold"];
-
-function isLotteryId(value: string | undefined): value is LotteryId {
-  return value === "mega-sena"
-    || value === "lotofacil"
-    || value === "dia-de-sorte"
-    || value === "quina"
-    || value === "lotomania"
-    || value === "dupla-sena"
-    || value === "mais-milionaria"
-    || value === "timemania"
-    || value === "super-sete";
-}
-
-function supportsExperimental(lottery: LotteryId): boolean {
-  return lottery === "mega-sena" || lottery === "lotofacil" || lottery === "dia-de-sorte";
-}
 
 function isSelectionMode(value: string | undefined): value is SelectionMode {
   return value === "fix" || value === "exclude" || value === "auto";
@@ -255,7 +224,7 @@ function numberGridMarkup(state: GeneratorState): string {
     return `<div class="g2-columns-note">Super Sete usa 7 colunas posicionais. Os dígitos são gerados e exibidos por coluna, sem serem tratados como dezenas.</div>`;
   }
   const tiers = tierByNumber(state.plan);
-  const minimum = LOTTERY_FALLBACK[state.lottery].min;
+  const minimum = state.lotteryConfig.minNumber;
   let html = "";
   for (let offset = 0; offset < state.plan.universeSize; offset += 1) {
     const value = minimum + offset;
@@ -318,7 +287,7 @@ function planMarkup(state: GeneratorState): string {
 
 function methodologyMarkup(state: GeneratorState): string {
   return `<div class="g2-methodology">
-    <strong>Metodologia · ${escapeHtml(LOTTERY_FALLBACK[state.lottery].label)}</strong>
+    <strong>Metodologia · ${escapeHtml(state.lotteryConfig.name)}</strong>
     <ul>${state.plan.methodology.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>
   </div>`;
 }
@@ -910,16 +879,30 @@ async function mount(detail: ViewRenderedDetail): Promise<void> {
   const lotteryValue = detail.lottery || document.querySelector<HTMLSelectElement>("#lottery-select")?.value || "mega-sena";
   if (!isLotteryId(lotteryValue)) return;
   const lottery = lotteryValue;
-  const fallback = LOTTERY_FALLBACK[lottery];
-  const legacyGameCount = Number(legacyForm?.querySelector<HTMLInputElement>("#game-count")?.value) || fallback.defaultGames;
+  const legacyGameCount = Number(legacyForm?.querySelector<HTMLInputElement>("#game-count")?.value) || DEFAULT_GAME_COUNT;
   const legacyTargetValue = Number(legacyForm?.querySelector<HTMLInputElement>("#target-contest")?.value);
   const legacyTarget = legacyTargetValue || undefined;
   const controller = new AbortController();
 
   try {
+    const catalog = await api<{ items?: LotteryGenerationConfig[] }>("/lotteries", {
+      signal: controller.signal,
+    });
+    const lotteryConfig = (catalog?.items || []).find((item) => item.id === lottery);
+    if (
+      !lotteryConfig
+      || !isLotteryId(lotteryConfig.id)
+      || lotteryConfig.enabled === false
+      || lotteryConfig.capabilities?.simulation === false
+      || !Number.isFinite(lotteryConfig.minNumber)
+      || !Number.isFinite(lotteryConfig.defaultBetSize)
+    ) {
+      throw new Error("A modalidade selecionada não possui configuração de geração disponível");
+    }
+
     const plan = await postJson<GenerationPlan>("/generation/plan", {
       lottery,
-      betSize: fallback.defaultBetSize,
+      betSize: lotteryConfig.defaultBetSize,
       ...(legacyTarget ? { targetContestNumber: legacyTarget } : {}),
       fixedNumbers: [],
       excludedNumbers: [],
@@ -930,6 +913,7 @@ async function mount(detail: ViewRenderedDetail): Promise<void> {
     const preferredSumMax = Math.round(plan.baseline.expectedSum + plan.baseline.sumStdDev);
     const state: GeneratorState = {
       lottery,
+      lotteryConfig,
       gameCount: legacyGameCount,
       fixedCount: plan.methodology.defaultFixedCount,
       betSize: plan.betSize,
