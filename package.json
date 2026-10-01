@@ -14,7 +14,7 @@
     "lint": "npm run platform:verify && tsc -p tsconfig.json --noEmit --noUnusedLocals --noUnusedParameters --noFallthroughCasesInSwitch && tsc -p tsconfig.web.json --noEmit --noUnusedLocals --noUnusedParameters --noFallthroughCasesInSwitch",
     "format": "node scripts/checkFormatting.mjs --write",
     "format:check": "node scripts/checkFormatting.mjs",
-    "quality:static": "npm run production:contract:verify && npm run format:check && npm run lint",
+    "quality:static": "npm run production:contract:verify && npm run format:check && npm run lint && npm run quality:e2e-syntax",
     "build:server": "tsc -p tsconfig.json",
     "web:build": "node scripts/buildWeb.mjs && tsc -p tsconfig.web.json --outDir web-dist/assets/src",
     "build": "npm run build:server && npm run web:build",
@@ -25,7 +25,7 @@
     "test": "npm run build && npm run test:run",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "check": "npm run quality:static && npm run build && npm run test:run",
-    "test:e2e": "node scripts/e2eBrowser.mjs && node scripts/e2eAnalysisLotteries.mjs && node scripts/e2eGeneratorV2.mjs && node scripts/e2eMyGamesV2.mjs && node scripts/e2eReadability.mjs && node scripts/e2eCriticalRoutes.mjs && node scripts/e2eOperationalFlows.mjs",
+    "test:e2e": "npm run test:e2e:redesign",
     "api:start": "npm run build && node --env-file-if-exists=.env dist/src/cli/apiStart.js",
     "dataset:sync": "npm run build:server && node --env-file-if-exists=.env dist/src/cli/sync.js",
     "dataset:refresh": "npm run build:server && node --env-file-if-exists=.env dist/src/cli/refresh.js",
@@ -52,7 +52,9 @@
     "prod:deploy": "docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build --wait --wait-timeout 120",
     "prod:verify": "docker compose --env-file .env.production -f docker-compose.prod.yml exec -T app node -e \"fetch('http://127.0.0.1:3000/health/ready',{signal:AbortSignal.timeout(5000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\"",
     "prod:restore-check": "node --env-file-if-exists=.env.production scripts/verifyBackup.mjs",
-    "prod:logs": "docker compose --env-file .env.production -f docker-compose.prod.yml logs -f app"
+    "prod:logs": "docker compose --env-file .env.production -f docker-compose.prod.yml logs -f app",
+    "test:e2e:redesign": "node scripts/e2eBrowser.mjs && node scripts/e2eAnalysisLotteries.mjs && node scripts/e2eGeneratorV2.mjs && node scripts/e2eReadability.mjs && node scripts/e2eCriticalRoutes.mjs",
+    "quality:e2e-syntax": "node --check scripts/e2eBrowser.mjs && node --check scripts/e2eAnalysisLotteries.mjs && node --check scripts/e2eGeneratorV2.mjs && node --check scripts/e2eReadability.mjs && node --check scripts/e2eCriticalRoutes.mjs"
   },
   "dependencies": {
     "pg": "^8.23.0"

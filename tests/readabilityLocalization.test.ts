@@ -46,8 +46,8 @@ test("canonical web source owns the 16px functional typography floor", async () 
   assert.match(uiFoundation, /\.topbar-copy h1 \{ font-size: 26px; \}/);
   assert.match(uiFoundation, /\.section-head h2 \{ font-size: 20px; \}/);
   assert.match(uiFoundation, /\.metric-value \{ font-size: 28px; \}/);
-  assert.match(uiFoundation, /\.button, \.link-button \{ min-height: 42px; padding-inline: 14px; \}/);
-  assert.match(uiFoundation, /\.button\.compact \{ min-height: 38px; \}/);
+  assert.match(uiFoundation, /\.button, \.link-button \{ min-height: var\(--control-min-size\); padding-inline: 14px; \}/);
+  assert.match(uiFoundation, /\.button\.compact \{ min-height: var\(--control-min-size\); \}/);
   assert.match(uiFoundation, /\.field input, \.field select \{ min-height: 46px; \}/);
   assert.match(uiFoundation, /\.ball \{ width: 38px; height: 38px; \}/);
   assert.match(uiFoundation, /\.list-row \{ min-height: 70px; \}/);

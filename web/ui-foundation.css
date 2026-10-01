@@ -80,8 +80,8 @@ td,
 
 .metric-value { font-size: 28px; }
 .metric-detail, .target-copy { line-height: 1.45; }
-.button, .link-button { min-height: 42px; padding-inline: 14px; }
-.button.compact { min-height: 38px; }
+.button, .link-button { min-height: var(--control-min-size); padding-inline: 14px; }
+.button.compact { min-height: var(--control-min-size); }
 .list-row { min-height: 70px; }
 .list-row-main p { line-height: 1.55; }
 .list-row-value small { line-height: 1.4; }
