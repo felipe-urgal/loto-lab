@@ -39,29 +39,20 @@ test("AI workspace and provider status are served without exposing credentials",
   const baseUrl = await listen(server);
   t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
 
-  const page = await fetch(`${baseUrl}/ai`);
-  assert.equal(page.status, 200);
-  const html = await page.text();
-  assert.match(html, /Algoritmo calcula\. IA interpreta\./);
-  assert.match(html, /\/assets\/ai\.js/);
-  assert.match(html, /\/assets\/ai-workspace\.css/);
-  assert.doesNotMatch(html, /\/assets\/ai\.css/);
+  const page = await fetch(`${baseUrl}/ai`, { redirect: "manual" });
+  assert.equal(page.status, 308);
+  assert.equal(page.headers.get("location"), "/#analysis");
 
-  const legacyStyle = await fetch(`${baseUrl}/assets/ai.css`);
-  assert.equal(legacyStyle.status, 404);
-
-  const [boundaryResponse, typedResponse] = await Promise.all([
+  const [boundaryResponse, workspaceStyle, typedResponse] = await Promise.all([
     fetch(`${baseUrl}/assets/ai.js`),
+    fetch(`${baseUrl}/assets/ai-workspace.css`),
     fetch(`${baseUrl}/assets/src/features/ai.js`),
   ]);
-  assert.equal(boundaryResponse.status, 200);
+  assert.equal(boundaryResponse.status, 404);
+  assert.equal(workspaceStyle.status, 404);
   assert.equal(typedResponse.status, 200);
 
-  const [boundarySource, typedSource] = await Promise.all([
-    boundaryResponse.text(),
-    typedResponse.text(),
-  ]);
-  assert.match(boundarySource, /\.\/src\/features\/ai\.js/);
+  const typedSource = await typedResponse.text();
   assert.match(typedSource, /\/ai\/insights/);
   assert.match(typedSource, /\.\.\/core\/api\.js/);
   assert.match(typedSource, /\.\.\/shared\/escaping\.js/);
