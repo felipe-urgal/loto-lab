@@ -69,8 +69,12 @@ export function assertValidGeneratedGame(game: GeneratedGame): void {
     return;
   }
   const officialRule = getOfficialBetRule(game.lottery);
-  const minBetSize = officialRule?.minBetSize ?? config.defaultBetSize;
-  const maxBetSize = officialRule?.maxBetSize ?? config.defaultBetSize;
+  const minBetSize = game.lottery === "mais-milionaria"
+    ? 6
+    : officialRule?.minBetSize ?? config.defaultBetSize;
+  const maxBetSize = game.lottery === "mais-milionaria"
+    ? 12
+    : officialRule?.maxBetSize ?? config.defaultBetSize;
   if (game.numbers.length < minBetSize || game.numbers.length > maxBetSize) {
     throw new Error(
       `${game.lottery} games must contain between ${minBetSize} and ${maxBetSize} numbers`,
