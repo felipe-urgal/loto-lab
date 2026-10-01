@@ -167,7 +167,7 @@ function gameFingerprint(games: GeneratedGame[]): string {
       [...game.numbers].sort((a, b) => a - b).join("-"),
       game.luckyMonth ?? "",
       game.secondary ? JSON.stringify(game.secondary) : "",
-      game.columns?.join("-") ?? "",
+      game.columns?.map((column) => column.join(".")).join("-") ?? "",
     ].join(":"))
     .sort((a, b) => a.localeCompare(b))
     .join("|");
