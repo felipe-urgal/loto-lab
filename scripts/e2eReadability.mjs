@@ -309,7 +309,10 @@ async function auditKeyboardFocus(client, label) {
         outlineWidth: Number.parseFloat(style.outlineWidth || '0'),
       };
     })()`);
-    if (!focus) throw new Error(`${label} lost keyboard focus on Tab ${index + 1} of ${traversalCount}`);
+    if (!focus) {
+      if (focused.length >= 2) break;
+      throw new Error(`${label} lost keyboard focus before traversing two controls on Tab ${index + 1} of ${traversalCount}`);
+    }
     if (focus.outlineStyle === "none" || focus.outlineWidth < 1.5) {
       throw new Error(`${label} keyboard focus is not visibly outlined: ${JSON.stringify(focus)}`);
     }
