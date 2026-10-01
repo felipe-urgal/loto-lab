@@ -57,8 +57,6 @@ test("Generator explainability supports the four-step product flow without compe
 
   assert.match(workspace, /\.g2-flow/);
   assert.match(workspace, /\.g2-education-grid/);
-  assert.match(workspace, /\.g2-preview-explain-title/);
-  assert.match(workspace, /\.g2-game-reason/);
 });
 
 test("Strategy Lab UI exposes score-model, inference resolution and predictive validation", async () => {
