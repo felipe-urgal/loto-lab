@@ -106,17 +106,17 @@ test("Generator 2.0 owns its conditioned reference copy in Portuguese", async ()
   assert.doesNotMatch(generator, /Os baselines abaixo são condicionados/);
 });
 
-test("canonical owners keep dashboard, analyses and historical-test copy in Portuguese", async () => {
+test("canonical owners keep Panel and Analyses copy in Portuguese while historical tests remain internal", async () => {
   const [app, backtests] = await Promise.all([
     source("web/app.js"),
     source("web/src/features/backtests.ts"),
   ]);
 
   assert.match(app, /dashboard: \["Painel"/);
-  assert.match(app, /backtests: \["Testes históricos"/);
+  assert.match(app, /analysis: \["Análises"/);
   assert.match(app, /Frequências, pontuação e classificação por horizonte/);
-  assert.match(app, /Resumo do último teste histórico salvo/);
-  assert.match(app, /Dezenas com maior pontuação/);
+  assert.doesNotMatch(app, /backtests: \["Testes históricos"/);
+  assert.doesNotMatch(app, /Resumo do último teste histórico salvo/);
   assert.match(backtests, /Executar teste histórico/);
   assert.match(backtests, /Teste histórico concluído/);
 
@@ -213,8 +213,10 @@ test("real-bet flow remains owned by typed My Games while dashboard summary belo
   assert.doesNotMatch(myGames, /refineDashboard/);
 
   assert.equal(dashboardBoundary, 'import "./src/features/dashboardScope.js";\n');
-  assert.match(dashboard, /function realStatusCard/);
-  assert.match(dashboard, /Apostas reais/);
-  assert.match(dashboard, /Resultado real/);
-  assert.match(dashboard, /knownNumber\(real\.netResult\)/);
+  assert.match(dashboard, /function savedGames/);
+  assert.match(dashboard, /function pendingSection/);
+  assert.match(dashboard, /data-dashboard-check-bet/);
+  assert.match(dashboard, /Jogos salvos/);
+  assert.match(dashboard, /Pendências/);
+  assert.doesNotMatch(dashboard, /function realStatusCard|Resultado real|ROI histórico/);
 });
