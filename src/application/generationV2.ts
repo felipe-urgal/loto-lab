@@ -2,6 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import type { Contest, GeneratedGame, LotteryId } from "../domain/types.js";
 import { quoteOfficialBet } from "../domain/betRules.js";
 import { getLotteryConfig } from "../lotteries/config.js";
+import {
+  quoteMaisMilionaria,
+  quoteSuperSete,
+  quoteTimemania,
+} from "../domain/structuredBetRules.js";
 import { generateDiaDeSorteGames, type DiaDeSorteFixedCount } from "../generator/diaDeSorte.js";
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { generateMegaSenaGames, type MegaSenaFixedCount } from "../generator/megaSena.js";
@@ -36,6 +41,9 @@ export interface GenerationV2Input {
   fixedNumbers?: number[];
   excludedNumbers?: number[];
   constraints?: GenerationConstraints;
+  cloverCount?: number;
+  favoriteTeam?: string;
+  columnMarks?: number[];
   persist?: boolean;
 }
 
@@ -147,6 +155,9 @@ export function generationConfigSignature(
     fixedNumbers: sortedNumbers(input.fixedNumbers),
     excludedNumbers: sortedNumbers(input.excludedNumbers),
     constraints: normalizedConstraints(input.constraints),
+    cloverCount: input.cloverCount ?? null,
+    favoriteTeam: input.favoriteTeam?.trim() ?? null,
+    columnMarks: input.columnMarks ?? null,
   }));
 }
 
@@ -309,7 +320,13 @@ export class GenerationV2UseCase {
     const purpose = input.purpose ?? "uniform";
     const config = getLotteryConfig(input.lottery);
     const effectiveBetSize = input.betSize ?? config.defaultBetSize;
-    const betQuote = quoteOfficialBet(input.lottery, effectiveBetSize, input.gameCount);
+    const betQuote = input.lottery === "mais-milionaria"
+      ? quoteMaisMilionaria(effectiveBetSize, input.cloverCount ?? 2, input.gameCount)
+      : input.lottery === "timemania"
+        ? quoteTimemania(input.gameCount)
+        : input.lottery === "super-sete"
+          ? quoteSuperSete(input.columnMarks ?? Array(7).fill(1), input.gameCount)
+          : quoteOfficialBet(input.lottery, effectiveBetSize, input.gameCount);
     if (!betQuote && effectiveBetSize !== config.defaultBetSize) {
       throw new GenerationV2Error(
         "INVALID_ARGUMENT",
@@ -351,6 +368,9 @@ export class GenerationV2UseCase {
       fixedNumbers: input.fixedNumbers ?? [],
       excludedNumbers: input.excludedNumbers ?? [],
       constraints: input.constraints,
+      cloverCount: input.cloverCount,
+      favoriteTeam: input.favoriteTeam,
+      columnMarks: input.columnMarks,
     }, targetContestNumber);
 
     if (persist) {
@@ -465,6 +485,9 @@ export class GenerationV2UseCase {
           fixedNumbers: input.fixedNumbers ?? [],
           excludedNumbers: input.excludedNumbers ?? [],
           ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
+          ...(input.cloverCount !== undefined ? { cloverCount: input.cloverCount } : {}),
+          ...(input.favoriteTeam !== undefined ? { favoriteTeam: input.favoriteTeam } : {}),
+          ...(input.columnMarks !== undefined ? { columnMarks: input.columnMarks } : {}),
           ...(referenceContestNumber !== null
             ? (() => {
                 const referenceContest = scoped.history.find(
@@ -548,6 +571,9 @@ export class GenerationV2UseCase {
       fixedNumbers: sortedNumbers(input.fixedNumbers),
       excludedNumbers: sortedNumbers(input.excludedNumbers),
       constraints: normalizedConstraints(input.constraints),
+      ...(input.cloverCount !== undefined ? { cloverCount: input.cloverCount } : {}),
+      ...(input.favoriteTeam !== undefined ? { favoriteTeam: input.favoriteTeam.trim() } : {}),
+      ...(input.columnMarks !== undefined ? { columnMarks: input.columnMarks } : {}),
       historySignature: currentHistorySignature,
       configSignature,
       gameFingerprint: fingerprint,
