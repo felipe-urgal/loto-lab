@@ -61,6 +61,12 @@ function parseV2BetSize(lottery: LotteryId, value: unknown): number {
     throw new ApiError(400, "INVALID_ARGUMENT", "betSize must be an integer");
   }
   if (!rule) {
+    if (lottery === "mais-milionaria") {
+      if (parsed < 6 || parsed > 12) {
+        throw new ApiError(400, "INVALID_ARGUMENT", "betSize must be between 6 and 12 for mais-milionaria");
+      }
+      return parsed;
+    }
     if (parsed !== config.defaultBetSize) {
       throw new ApiError(
         400,
@@ -151,6 +157,38 @@ function parseGenerationConstraints(
   };
 }
 
+function parseStructuredOptions(body: Record<string, unknown>, lottery: LotteryId) {
+  if (lottery === "mais-milionaria") {
+    const cloverCount = body.cloverCount === undefined ? 2 : Number(body.cloverCount);
+    if (!Number.isInteger(cloverCount) || cloverCount < 2 || cloverCount > 6) {
+      throw new ApiError(400, "INVALID_ARGUMENT", "cloverCount must be between 2 and 6");
+    }
+    return { cloverCount };
+  }
+  if (lottery === "timemania") {
+    const favoriteTeam = optionalString(body.favoriteTeam, "favoriteTeam", 120);
+    if (!favoriteTeam) throw new ApiError(400, "INVALID_ARGUMENT", "favoriteTeam is required for timemania");
+    return { favoriteTeam };
+  }
+  if (lottery === "super-sete") {
+    const value = body.columnMarks;
+    const columnMarks = value === undefined ? Array(7).fill(1) : value;
+    if (!Array.isArray(columnMarks) || columnMarks.length !== 7) {
+      throw new ApiError(400, "INVALID_ARGUMENT", "columnMarks must contain seven column counts");
+    }
+    const parsed = columnMarks.map(Number);
+    if (parsed.some((count) => !Number.isInteger(count) || count < 1 || count > 3)) {
+      throw new ApiError(400, "INVALID_ARGUMENT", "each Super Sete column must contain 1 to 3 marks");
+    }
+    const total = parsed.reduce((sum, count) => sum + count, 0);
+    if ((total <= 14 && parsed.some((count) => count > 2)) || (total >= 15 && parsed.some((count) => count < 2))) {
+      throw new ApiError(400, "INVALID_ARGUMENT", "invalid Super Sete column composition");
+    }
+    return { columnMarks: parsed };
+  }
+  return {};
+}
+
 function parseV2Selection(
   body: Record<string, unknown>,
   lottery: LotteryId,
@@ -237,6 +275,7 @@ export async function serveGenerationV2(
     const betSize = parseV2BetSize(lottery, body.betSize);
     const targetContestNumber = parseOptionalPositiveInt(body.targetContestNumber, "targetContestNumber");
     const purpose = parseGenerationPurpose(body.purpose);
+    const structuredOptions = parseStructuredOptions(body, lottery);
     const generationMode = parseGenerationMode(body.generationMode);
     const seed = optionalString(body.seed, "seed", 160);
     const selection = parseV2Selection(body, lottery, betSize);
@@ -259,6 +298,7 @@ export async function serveGenerationV2(
       generationMode,
       ...(seed !== undefined ? { seed } : {}),
       ...selection,
+      ...structuredOptions,
       persist,
     });
     sendJson(response, persist ? 201 : 200, result, corsOrigin);
