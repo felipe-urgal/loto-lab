@@ -55,7 +55,7 @@ export interface GeneratedGame {
   /** @deprecated Compatibility field; use secondary for new code. */
   luckyMonth?: string;
   secondary?: SecondarySelection;
-  columns?: number[];
+  columns?: number[][];
   metadata: {
     odd: number;
     even: number;
