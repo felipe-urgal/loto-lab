@@ -12,7 +12,7 @@ test("Redesign V2 design system is the shared source of truth across web surface
   const designSystem = await source("web/design-system.css");
 
   assert.match(designSystem, /--bg:\s*#08111d/);
-  assert.match(designSystem, /--accent:\s*#1689ff/);
+  assert.match(designSystem, /--accent:\s*#7c3aed/);
   assert.match(designSystem, /--success:\s*#24c77d/);
   assert.match(designSystem, /--sidebar-width:\s*220px/);
   assert.match(designSystem, /\.button\.primary\s*\{[^}]*background:\s*var\(--accent\)/s);
