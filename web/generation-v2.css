@@ -91,6 +91,12 @@
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+.g2-field input:focus-visible,
+.g2-field select:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 3px;
+}
+
 .g2-number-legend {
   display: flex;
   flex-wrap: wrap;
@@ -163,6 +169,7 @@
 
 .g2-filter-toggle {
   display: inline-flex;
+  min-height: var(--control-min-size);
   align-items: center;
   gap: 10px;
   color: var(--text);
