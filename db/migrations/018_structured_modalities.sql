@@ -171,7 +171,7 @@ BEGIN
     WHEN 'quina' THEN 15
     WHEN 'lotomania' THEN 50
     WHEN 'dupla-sena' THEN 15
-    WHEN 'mais-milionaria' THEN 6
+    WHEN 'mais-milionaria' THEN 12
     WHEN 'timemania' THEN 10
     WHEN 'super-sete' THEN 0
     ELSE NULL
