@@ -200,6 +200,69 @@ Toda superfície de rollout deve prever:
 
 A validação transversal e E2E pertence à #308, mas cada issue de rollout deve preservar estes guardrails.
 
+## Gate final de qualidade
+
+Issue: #308
+
+O Redesign V2 usa dois níveis complementares de validação:
+
+1. `npm run check` — contrato estático, build, tipagem e testes automatizados.
+2. `npm run test:e2e:redesign` — navegador real para as três superfícies canônicas.
+
+Suítes de telas absorvidas, como Meus Jogos, Laboratório, Execuções e IA, não fazem parte do gate visual canônico. Seus contratos internos continuam cobertos por testes unitários/integrados; os deep links são validados como redirecionamentos.
+
+### Matriz de viewports
+
+| Perfil | Viewport | Contrato |
+| --- | --- | --- |
+| Desktop | 1440 × 900 | sidebar persistente, conteúdo limitado e sem overflow estrutural |
+| Tablet | 820 × 1180 | navegação compacta, conteúdo refluído e todos os controles acessíveis |
+| Mobile | 390 × 844 | navegação inferior, uma coluna quando necessário, safe area e sem corte horizontal |
+
+Em cada viewport, Painel, Análises e Gerar jogos verificam automaticamente:
+
+- texto visível com pelo menos 16 px;
+- controles interativos com alvo mínimo de 44 × 44 px;
+- nome acessível em controles visíveis;
+- foco visível e progressão real por Tab;
+- disabled nativo quando `aria-disabled` for usado em controles nativos;
+- `prefers-reduced-motion: reduce`;
+- ausência de overflow horizontal do documento;
+- live regions para conteúdo, status de dados e toasts;
+- exceções de runtime e respostas HTTP 5xx;
+- CLS acumulado até 0,25 como guardrail inicial;
+- DOMContentLoaded até 5 s no ambiente E2E como guardrail de regressão grosseira.
+
+Os limites de performance são guardrails de regressão, não metas de produção ou Web Vitals publicados.
+
+### Cobertura por família
+
+O gate não força famílias sem superfície compatível a uma UI genérica. A cobertura automatizada usa a camada crítica disponível para cada família:
+
+| Família | Representante | Evidência automatizada |
+| --- | --- | --- |
+| `number-draw` | Mega-Sena | browser E2E de Painel/Análises/Gerador + geração/salvamento |
+| `number-draw-secondary` | +Milionária / Timemania | preview e persistência HTTP estruturada; UI respeita campos secundários |
+| `dual-number-draw` | Dupla Sena | normalização/persistência integrada + fallback estrutural em Análises |
+| `column-draw` | Super Sete | preview/persistência HTTP por colunas + fallback estrutural em Análises |
+| `sports-prediction` | Loteca | normalização CAIXA e avaliação de prognósticos |
+| `ticket-draw` | Federal | normalização CAIXA e conferência de bilhete/faixas |
+| `instant-product` | Instantânea | catálogo/capabilities e sincronização explicitamente não tratada como concurso numérico |
+
+Browser E2E é exigido onde existe superfície web integrada. Famílias sem fluxo web próprio permanecem protegidas pelo contrato de domínio e integração, evitando criar telas artificiais apenas para satisfazer o teste.
+
+### Estados e regressões
+
+Antes do merge de mudanças visuais, revisar os estados aplicáveis:
+
+- loading sem deslocamento estrutural excessivo;
+- vazio com explicação e próxima ação;
+- erro/indisponível com recuperação segura quando existir;
+- sucesso assíncrono anunciado sem depender apenas de cor;
+- capability ausente sem controle incompatível desabilitado ou tela vazia.
+
+Snapshots visuais não são obrigatórios no baseline atual. O gate prioriza invariantes de layout e interação de baixa manutenção; snapshots só devem ser adicionados quando capturarem uma regressão que esses invariantes não detectam.
+
 ## Limites das issues de rollout
 
 - **#298:** navegação de três itens, política de redirecionamento e novo Painel.
