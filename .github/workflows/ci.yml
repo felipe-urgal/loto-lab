@@ -94,6 +94,11 @@ jobs:
       - name: Build application
         run: npm run build
 
+      - name: Prepare deterministic E2E data
+        run: |
+          npm run db:migrate
+          npm run test:e2e:seed
+
       - name: Start E2E server
         shell: bash
         run: |
