@@ -139,6 +139,9 @@ function requestPayload(state: GeneratorState, includeSeed = false): GenerationR
     fixedNumbers: [...state.fixed].sort((a, b) => a - b),
     excludedNumbers: [...state.excluded].sort((a, b) => a - b),
     ...(constraints ? { constraints } : {}),
+    ...(state.lottery === "mais-milionaria" ? { cloverCount: state.cloverCount } : {}),
+    ...(state.lottery === "timemania" && state.favoriteTeam.trim() ? { favoriteTeam: state.favoriteTeam.trim() } : {}),
+    ...(state.lottery === "super-sete" ? { columnMarks: state.columnMarks } : {}),
     ...(typeof seed === "string" && seed ? { seed } : {}),
   };
 }
@@ -171,7 +174,14 @@ function fixedCountOptions(state: GeneratorState): string {
 
 function betSizeOptions(state: GeneratorState): string {
   const rule = state.plan.betRule;
-  if (!rule) return `<option value="${state.plan.betSize}" selected>${state.plan.betSize} dezenas</option>`;
+  if (!rule && state.lottery === "mais-milionaria") {
+    let html = "";
+    for (let value = 6; value <= 12; value += 1) {
+      html += `<option value="${value}" ${value === state.betSize ? "selected" : ""}>${value} números</option>`;
+    }
+    return html;
+  }
+  if (!rule) return `<option value="${state.plan.betSize}" selected>${state.lottery === "super-sete" ? "7 colunas" : `${state.plan.betSize} dezenas`}</option>`;
   let html = "";
   for (let value = rule.minBetSize; value <= rule.maxBetSize; value += 1) {
     const equivalent = rule.drawSize === value ? 1 : Math.round(
@@ -337,6 +347,19 @@ function selectionModesMarkup(state: GeneratorState): string {
   </div>`;
 }
 
+function structuredFieldsMarkup(state: GeneratorState): string {
+  if (state.lottery === "mais-milionaria") {
+    return `<div class="g2-field"><label for="g2-clover-count">Trevos por aposta</label><select id="g2-clover-count">${[2, 3, 4, 5, 6].map((value) => `<option value="${value}" ${value === state.cloverCount ? "selected" : ""}>${value} trevos</option>`).join("")}</select><small>Trevos permanecem separados dos números.</small></div>`;
+  }
+  if (state.lottery === "timemania") {
+    return `<div class="g2-field"><label for="g2-favorite-team">Time do Coração</label><input id="g2-favorite-team" type="text" maxlength="120" value="${escapeHtml(state.favoriteTeam)}" placeholder="Informe o time" /><small>Campo obrigatório e independente das 10 dezenas.</small></div>`;
+  }
+  if (state.lottery === "super-sete") {
+    return `<div class="g2-field" style="grid-column:1/-1"><label>Marcações por coluna</label><div class="g2-range">${state.columnMarks.map((count, index) => `<label>C${index + 1}<select data-g2-column-mark="${index}">${[1, 2, 3].map((value) => `<option value="${value}" ${value === count ? "selected" : ""}>${value}</option>`).join("")}</select></label>`).join("")}</div><small>7–14 marcações: 1–2 por coluna. 15–21: 2–3 por coluna.</small></div>`;
+  }
+  return "";
+}
+
 function workspaceMarkup(state: GeneratorState): string {
   return `<div class="g2-shell" data-g2-shell>
     <div class="g2-principle"><strong>Algoritmo calcula; você audita.</strong><span>Configure o lote, veja o universo matemático e o espaço realmente explorado, gere uma prévia congelada e só então salve.</span></div>
@@ -351,9 +374,10 @@ function workspaceMarkup(state: GeneratorState): string {
               <option value="experimental" ${state.purpose === "experimental" ? "selected" : ""} ${supportsExperimental(state.lottery) ? "" : "disabled"}>Experimental</option>
             </select><small>${escapeHtml(purposeCopy(state.purpose).description)}</small></div>
             <div class="g2-field"><label for="g2-game-count">Quantidade de jogos</label><input id="g2-game-count" type="number" min="1" max="10" value="${state.gameCount}" /></div>
-            <div class="g2-field"><label for="g2-bet-size">Dezenas por aposta</label><select id="g2-bet-size" ${state.purpose === "experimental" || !state.plan.betRule ? "disabled" : ""}>${betSizeOptions(state)}</select><small>${state.plan.betRule ? "Limites e preço vêm da regra oficial versionada." : "Cardinalidade fixa desta modalidade."}</small></div>
+            <div class="g2-field"><label for="g2-bet-size">${state.lottery === "mais-milionaria" ? "Números por aposta" : state.lottery === "super-sete" ? "Estrutura" : "Dezenas por aposta"}</label><select id="g2-bet-size" ${state.purpose === "experimental" || (!state.plan.betRule && state.lottery !== "mais-milionaria") ? "disabled" : ""}>${betSizeOptions(state)}</select><small>${state.plan.betRule || state.lottery === "mais-milionaria" ? "Limites e preço vêm da regra oficial versionada." : "Cardinalidade fixa desta modalidade."}</small></div>
             <div class="g2-field"><label for="g2-fixed-count">Núcleo compartilhado</label><select id="g2-fixed-count">${fixedCountOptions(state)}</select></div>
             <div class="g2-field"><label for="g2-target">Concurso alvo</label><input id="g2-target" type="number" min="1" value="${state.targetContestNumber ?? ""}" /></div>
+            ${structuredFieldsMarkup(state)}
           </div>
         </section>
 
@@ -443,7 +467,7 @@ function setError(message = ""): void {
 function gameMarkup(game: GeneratedGame, index: number): string {
   const fixed = new Set(game.fixedNumbers || []);
   const balls = game.columns
-    ? game.columns.map((value, column) => `<span class="ball" title="Coluna ${column + 1}">C${column + 1}:${value}</span>`).join("")
+    ? game.columns.map((values, column) => `<span class="ball" title="Coluna ${column + 1}">C${column + 1}:${values.join("·")}</span>`).join("")
     : (game.numbers || []).map((value) => `<span class="ball ${fixed.has(value) ? "is-fixed" : ""}">${numberLabel(value)}</span>`).join("");
   const repeated = game.metadata?.repeatedFromLastContest?.length ?? 0;
   const secondary = game.secondary?.kind === "clovers"
@@ -637,6 +661,24 @@ function bindWorkspace(state: GeneratorState): void {
     schedulePlan();
   });
 
+  root?.querySelector<HTMLSelectElement>("#g2-clover-count")?.addEventListener("change", (event) => {
+    const select = event.target;
+    if (!(select instanceof HTMLSelectElement)) return;
+    state.cloverCount = Number(select.value);
+    clearPreview(state);
+  });
+  root?.querySelector<HTMLInputElement>("#g2-favorite-team")?.addEventListener("input", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    state.favoriteTeam = input.value;
+    clearPreview(state);
+  });
+  root?.querySelectorAll<HTMLSelectElement>("[data-g2-column-mark]").forEach((select) => select.addEventListener("change", () => {
+    const index = Number(select.dataset.g2ColumnMark);
+    state.columnMarks[index] = Number(select.value);
+    clearPreview(state);
+  }));
+
   root?.querySelector<HTMLInputElement>("#g2-game-count")?.addEventListener("change", (event) => {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
@@ -784,6 +826,9 @@ async function mount(detail: ViewRenderedDetail): Promise<void> {
       },
       plan,
       preview: null,
+      cloverCount: 2,
+      favoriteTeam: "",
+      columnMarks: Array(7).fill(1),
       controller,
       cleanup: null,
     };
