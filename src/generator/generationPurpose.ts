@@ -58,6 +58,9 @@ function validateSelection(options: PurposeGenerationOptions): void {
   if (!Number.isInteger(betSize) || betSize < config.drawSize || betSize > universe.size) {
     throw new Error("betSize must fit between draw size and lottery universe");
   }
+  if (options.lottery === "mais-milionaria" && betSize > 12) {
+    throw new Error("+Milionaria betSize must be between 6 and 12");
+  }
   if (!Number.isInteger(options.fixedCount) || options.fixedCount < 0 || options.fixedCount > betSize) {
     throw new Error("fixedCount must fit inside the bet size");
   }
