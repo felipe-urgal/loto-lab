@@ -3,13 +3,15 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 
 test("Redesign V2 quality gate remains wired to current product surfaces", async () => {
-  const [packageSource, e2e, template, design, foundation, html] = await Promise.all([
+  const [packageSource, e2e, template, design, foundation, html, ci, loader] = await Promise.all([
     readFile("package.json", "utf8"),
     readFile("scripts/e2eReadability.mjs", "utf8"),
     readFile(".github/PULL_REQUEST_TEMPLATE.md", "utf8"),
     readFile("docs/design/REDESIGN_V2.md", "utf8"),
     readFile("web/ui-foundation.css", "utf8"),
     readFile("web/index.html", "utf8"),
+    readFile(".github/workflows/ci.yml", "utf8"),
+    readFile("web/src/core/featureLoader.ts", "utf8"),
   ]);
 
   const pkg = JSON.parse(packageSource) as { scripts?: Record<string, string> };
@@ -23,6 +25,16 @@ test("Redesign V2 quality gate remains wired to current product surfaces", async
   assert.equal(pkg.scripts?.["test:e2e"], "npm run test:e2e:redesign");
   assert.match(pkg.scripts?.["quality:static"] ?? "", /npm run quality:e2e-syntax/);
   assert.match(pkg.scripts?.["quality:e2e-syntax"] ?? "", /node --check scripts\/e2eReadability\.mjs/);
+
+  assert.match(ci, /e2e-redesign:/);
+  assert.match(ci, /name: Redesign V2 browser E2E/);
+  assert.match(ci, /run: npm run test:e2e:redesign/);
+  assert.match(ci, /API_PORT: 3099/);
+
+  assert.match(loader, /async function ensureViewFeatures\(\): Promise<boolean>/);
+  assert.match(loader, /if \(!await loadStyle\(name\)\) return false/);
+  assert.match(loader, /stylesReady\.some\(\(ready\) => !ready\)/);
+  assert.match(loader, /featuresReady === false/);
 
   assert.match(e2e, /name: "desktop", width: 1440, height: 900/);
   assert.match(e2e, /name: "tablet", width: 820, height: 1180/);
