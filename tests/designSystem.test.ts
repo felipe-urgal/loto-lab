@@ -8,11 +8,11 @@ async function source(path: string): Promise<string> {
 
 const pages = ["index.html", "agenda.html", "ai.html", "jobs.html", "lab.html", "strategies.html"];
 
-test("Prototype 1 design system is the shared source of truth across web surfaces", async () => {
+test("Redesign V2 design system is the shared source of truth across web surfaces", async () => {
   const designSystem = await source("web/design-system.css");
 
   assert.match(designSystem, /--bg:\s*#08111d/);
-  assert.match(designSystem, /--accent:\s*#1689ff/);
+  assert.match(designSystem, /--accent:\s*#7c3aed/);
   assert.match(designSystem, /--success:\s*#24c77d/);
   assert.match(designSystem, /--sidebar-width:\s*220px/);
   assert.match(designSystem, /\.button\.primary\s*\{[^}]*background:\s*var\(--accent\)/s);
@@ -20,12 +20,12 @@ test("Prototype 1 design system is the shared source of truth across web surface
 
   for (const page of pages) {
     const html = await source(`web/${page}`);
-    assert.match(html, /<meta name="theme-color" content="#08111d" \/>/, `${page} must own the Prototype 1 browser chrome color`);
+    assert.match(html, /<meta name="theme-color" content="#08111d" \/>/, `${page} must own the Redesign V2 browser chrome color`);
     assert.match(html, /\/assets\/design-system\.css/, `${page} must load the canonical design system`);
   }
 });
 
-test("built web surfaces ship the fingerprinted Prototype 1 design system", async () => {
+test("built web surfaces ship the fingerprinted Redesign V2 design system", async () => {
   for (const page of pages) {
     const html = await source(`web-dist/${page}`);
     assert.match(
