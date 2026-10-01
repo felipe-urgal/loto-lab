@@ -87,7 +87,10 @@ function normalizePrizeTiers(
 }
 
 export function normalizeCaixaContest(lottery: LotteryId, payload: CaixaContestResponse): Contest {
-  const numbers = payload.listaDezenas.map(Number).sort((a, b) => a - b);
+  const rawNumbers = payload.listaDezenas.map(Number);
+  const numbers = lottery === "super-sete"
+    ? rawNumbers
+    : [...rawNumbers].sort((a, b) => a - b);
   if (!Number.isInteger(payload.numero) || payload.numero < 1) throw new Error("Invalid contest number returned by Caixa");
   assertValidContestNumbers(lottery, numbers);
 
@@ -104,6 +107,13 @@ export function normalizeCaixaContest(lottery: LotteryId, payload: CaixaContestR
     }
   }
   if (lottery === "timemania" && !favoriteTeam) throw new Error("Timemania payload is missing Time do Coração");
+  const secondary = lottery === "dia-de-sorte" && luckyMonth
+    ? { kind: "lucky-month" as const, values: [luckyMonth] }
+    : lottery === "mais-milionaria" && clovers
+      ? { kind: "clovers" as const, values: clovers }
+      : lottery === "timemania" && favoriteTeam
+        ? { kind: "favorite-team" as const, values: [favoriteTeam] }
+        : undefined;
   const secondDrawNumbers = lottery === "dupla-sena"
     ? (payload.listaDezenasSegundoSorteio ?? []).map(Number).sort((a, b) => a - b)
     : undefined;
@@ -122,8 +132,7 @@ export function normalizeCaixaContest(lottery: LotteryId, payload: CaixaContestR
     numbers,
     ...(secondDrawNumbers ? { secondDrawNumbers } : {}),
     ...(luckyMonth ? { luckyMonth } : {}),
-    ...(clovers ? { clovers } : {}),
-    ...(favoriteTeam ? { favoriteTeam } : {}),
+    ...(secondary ? { secondary } : {}),
     ...(columns ? { columns } : {}),
     ...(prizeTiers ? { prizeTiers } : {}),
     ...(amountCollected !== undefined ? { amountCollected } : {}),
