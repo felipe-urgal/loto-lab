@@ -249,7 +249,7 @@ function isExpectedGeneratorFailure(error: unknown): boolean {
     "Unable to sample",
     "Unable to build a diversified portfolio",
     "Unable to select the requested portfolio size",
-    "Timemania generation requires a reference contest",
+    "Timemania generation requires an explicit Time do Coração",
   ].some((fragment) => error.message.includes(fragment));
 }
 
