@@ -13,6 +13,9 @@ const endpointByLottery: Record<LotteryId, string> = {
   quina: "quina",
   lotomania: "lotomania",
   "dupla-sena": "duplasena",
+  "mais-milionaria": "maismilionaria",
+  timemania: "timemania",
+  "super-sete": "supersete",
 };
 
 interface CaixaPrizeTierResponse {
@@ -27,6 +30,7 @@ interface CaixaContestResponse {
   dataApuracao: string;
   listaDezenas: string[];
   listaDezenasSegundoSorteio?: string[] | null;
+  trevosSorteados?: string[] | null;
   nomeTimeCoracaoMesSorte?: string | null;
   listaRateioPremio?: CaixaPrizeTierResponse[] | null;
   valorArrecadado?: number | null;
@@ -87,7 +91,19 @@ export function normalizeCaixaContest(lottery: LotteryId, payload: CaixaContestR
   if (!Number.isInteger(payload.numero) || payload.numero < 1) throw new Error("Invalid contest number returned by Caixa");
   assertValidContestNumbers(lottery, numbers);
 
-  const luckyMonth = lottery === "dia-de-sorte" ? sanitizeLuckyMonth(payload.nomeTimeCoracaoMesSorte) : undefined;
+  const secondaryText = sanitizeLuckyMonth(payload.nomeTimeCoracaoMesSorte);
+  const luckyMonth = lottery === "dia-de-sorte" ? secondaryText : undefined;
+  const favoriteTeam = lottery === "timemania" ? secondaryText : undefined;
+  const clovers = lottery === "mais-milionaria"
+    ? (payload.trevosSorteados ?? []).map(Number).sort((a, b) => a - b)
+    : undefined;
+  const columns = lottery === "super-sete" ? [...numbers] : undefined;
+  if (lottery === "mais-milionaria") {
+    if (clovers?.length !== 2 || new Set(clovers).size !== 2 || clovers.some((value) => !Number.isInteger(value) || value < 1 || value > 6)) {
+      throw new Error("Invalid trevos returned by Caixa for mais-milionaria");
+    }
+  }
+  if (lottery === "timemania" && !favoriteTeam) throw new Error("Timemania payload is missing Time do Coração");
   const secondDrawNumbers = lottery === "dupla-sena"
     ? (payload.listaDezenasSegundoSorteio ?? []).map(Number).sort((a, b) => a - b)
     : undefined;
@@ -106,6 +122,9 @@ export function normalizeCaixaContest(lottery: LotteryId, payload: CaixaContestR
     numbers,
     ...(secondDrawNumbers ? { secondDrawNumbers } : {}),
     ...(luckyMonth ? { luckyMonth } : {}),
+    ...(clovers ? { clovers } : {}),
+    ...(favoriteTeam ? { favoriteTeam } : {}),
+    ...(columns ? { columns } : {}),
     ...(prizeTiers ? { prizeTiers } : {}),
     ...(amountCollected !== undefined ? { amountCollected } : {}),
   };
