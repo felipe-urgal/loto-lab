@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import type { Pool } from "pg";
 import { createLotoLabServer } from "../src/api/server.js";
 
-test("UI refinement assets are lazy-loaded and typed Backtests bypasses legacy refinements", async (t) => {
+test("UI refinement assets are lazy-loaded only by canonical interactive views", async (t) => {
   const server = createLotoLabServer({ pool: {} as Pool });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -33,9 +33,9 @@ test("UI refinement assets are lazy-loaded and typed Backtests bypasses legacy r
   assert.match(loaderSource, /loadStyledModule\("refinements"\)/);
   assert.match(loaderSource, /await loadStyle\(name\)/);
   assert.match(loaderSource, /return loadModule\(name\)/);
-  assert.match(loaderSource, /if \(view === "backtests"\)/);
-  assert.match(loaderSource, /loadStyle\("backtests-workspace"\)/);
-  assert.match(loaderSource, /loadModule\("backtests"\)/);
+  assert.doesNotMatch(loaderSource, /if \(view === "backtests"\)/);
+  assert.doesNotMatch(loaderSource, /loadStyle\("backtests-workspace"\)/);
+  assert.doesNotMatch(loaderSource, /loadModule\("backtests"\)/);
   assert.doesNotMatch(loaderSource, /generation-diversity/);
 
   const app = await fetch(`${baseUrl}/assets/app.js`);
@@ -44,7 +44,9 @@ test("UI refinement assets are lazy-loaded and typed Backtests bypasses legacy r
   assert.match(appSource, /createMainRenderState/);
   assert.match(appSource, /state\.beginRender\(\)/);
   assert.match(appSource, /isCurrentRender/);
-  assert.match(appSource, /data-feature-owned="backtests"/);
+  assert.match(appSource, /data-feature-owned="dashboard"/);
+  assert.match(appSource, /data-feature-owned="analysis"/);
+  assert.doesNotMatch(appSource, /data-feature-owned="backtests"/);
   assert.doesNotMatch(appSource, /new AbortController\(\)/);
   assert.doesNotMatch(appSource, /async function renderBacktests/);
 
