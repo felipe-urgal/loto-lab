@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 
-test("my games workspace follows Prototype 1 with typed-only functional ownership", async () => {
+test("my games implementation remains internal while the Panel owns the user journey", async () => {
   const [loader, workspace, boundary, controller, presentation, comparison, formatting, betForm, auditability] = await Promise.all([
     readFile("web/src/core/featureLoader.ts", "utf8"),
     readFile("web/my-games-workspace.css", "utf8"),
@@ -16,18 +16,11 @@ test("my games workspace follows Prototype 1 with typed-only functional ownershi
   ]);
   const myGames = [controller, presentation, comparison, formatting, betForm, auditability].join("\n");
 
-  const baseStyle = loader.indexOf('loadStyle("my-games-v2")');
-  const moduleLoad = loader.indexOf('loadModule("my-games-v2")');
-  const workspaceLoad = loader.indexOf('loadStyle("my-games-workspace")');
-  const gamesBranch = loader.indexOf('if (view === "games")');
-  const refinementsLoad = loader.indexOf('loadStyledModule("refinements")');
-  assert.ok(baseStyle >= 0, "My Games 2.0 base style must remain available");
-  assert.ok(moduleLoad > baseStyle, "My Games functional module must follow its base style");
-  assert.ok(workspaceLoad > moduleLoad, "Prototype 1 must load after the functional owner");
-  assert.ok(gamesBranch >= 0 && refinementsLoad > gamesBranch, "My Games must return before generic legacy refinements load");
+  assert.doesNotMatch(loader, /loadStyle\("my-games-v2"\)/);
+  assert.doesNotMatch(loader, /loadModule\("my-games-v2"\)/);
+  assert.doesNotMatch(loader, /loadStyle\("my-games-workspace"\)/);
+  assert.doesNotMatch(loader, /if \(view === "games"\)/);
   assert.doesNotMatch(loader, /load(?:Module|Style)\("(?:real-bet-auditability|real-bets|my-games-management)"\)/);
-  assert.match(loader, /view === "games"[\s\S]*return loadMyGamesFeatures\(\)/);
-  assert.match(loader, /Não foi possível carregar Meus Jogos/);
 
   assert.match(workspace, /\.mg2-shell \{[\s\S]*max-width: 1440px/);
   assert.match(workspace, /\.mg2-filter\.is-active \{[\s\S]*background: var\(--accent-soft\)[\s\S]*color: var\(--accent-strong\)/);
