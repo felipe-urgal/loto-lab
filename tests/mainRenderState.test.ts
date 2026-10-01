@@ -38,7 +38,7 @@ test("view or lottery changes invalidate an in-flight render snapshot", () => {
   const state = createMainRenderState("#dashboard", "mega-sena");
   const render = state.beginRender();
 
-  state.view = "games";
+  state.view = "analysis";
   assert.equal(state.isCurrentRender(render), false);
 
   state.view = "dashboard";
