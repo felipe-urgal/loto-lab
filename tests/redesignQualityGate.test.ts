@@ -52,6 +52,8 @@ test("Redesign V2 quality gate remains wired to current product surfaces", async
   assert.match(e2e, /auditDocumentOverflow/);
   assert.match(e2e, /auditControls/);
   assert.match(e2e, /auditKeyboardFocus/);
+  assert.match(e2e, /focusableCount/);
+  assert.match(e2e, /Math\.min\(4, focusableCount\)/);
   assert.match(e2e, /auditReducedMotion/);
   assert.match(e2e, /auditLiveFeedback/);
   assert.match(e2e, /auditPerformance/);
