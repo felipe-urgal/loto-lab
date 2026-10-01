@@ -9,7 +9,6 @@ import type {
   AnalysisCycles,
   AnalysisNumberItem,
   AnalysisPayload,
-  AnalysisTab,
   AnalysisTier,
   AssociationItem,
   RankingMover,
@@ -21,30 +20,34 @@ import type {
 const root = document.querySelector<HTMLElement>("#content")!;
 const lotterySelect = document.querySelector<HTMLSelectElement>("#lottery-select");
 const viewSubtitle = document.querySelector<HTMLElement>("#view-subtitle");
-const ACTIVE_TAB_KEY = "loto-lab:analysis-v2-tab";
-const TABS: readonly AnalysisTab[] = ["ranking", "structure", "dynamics", "combinations", "validation"];
-const TAB_LABELS: Record<AnalysisTab, string> = {
-  ranking: "Classificação",
-  structure: "Estrutura",
-  dynamics: "Dinâmica",
-  combinations: "Combinações",
-  validation: "Validação",
-};
 const TIER_LABELS: Record<AnalysisTier, string> = {
   strong: "Fortes",
   balanced: "Intermediárias",
   cold: "Frias",
 };
 
+type AnalysisMapFilter = "all" | AnalysisTier;
+
+type LotteryCatalogItem = {
+  id?: string;
+  name?: string;
+  family?: string;
+  enabled?: boolean;
+  capabilities?: {
+    analysis?: boolean;
+  };
+};
+
+type LotteryCatalogPayload = {
+  items?: LotteryCatalogItem[];
+};
+
+const FLAT_NUMBER_FAMILIES = new Set(["number-draw", "number-draw-secondary"]);
+
 let renderToken = 0;
 let currentData: AnalysisPayload | null = null;
 let detailReturnFocus: HTMLElement | null = null;
-const savedTab = localStorage.getItem(ACTIVE_TAB_KEY);
-let activeTab: AnalysisTab = isAnalysisTab(savedTab) ? savedTab : "ranking";
-
-function isAnalysisTab(value: string | null | undefined): value is AnalysisTab {
-  return TABS.some((tab) => tab === value);
-}
+let activeMapFilter: AnalysisMapFilter = "all";
 
 function currentLottery(): string {
   return lotterySelect?.value || "mega-sena";
@@ -97,10 +100,22 @@ function metricCard(label: string, value: string | number, detail: string, tone 
   return `<article class="panel a2-metric"><span>${escapeHtml(label)}</span><strong class="${tone}">${value}</strong><small>${escapeHtml(detail || "")}</small></article>`;
 }
 
-function tabsMarkup(): string {
-  return `<div class="a2-tabs" role="tablist" aria-label="Modos de análise">${TABS.map((tab) => `
-    <button type="button" role="tab" id="a2-tab-${tab}" aria-controls="a2-view" tabindex="${activeTab === tab ? "0" : "-1"}" data-a2-tab="${tab}" class="${activeTab === tab ? "is-active" : ""}" aria-selected="${activeTab === tab}">${TAB_LABELS[tab]}</button>
+function mapFilterLabel(filter: AnalysisMapFilter): string {
+  return filter === "all" ? "Todas" : TIER_LABELS[filter];
+}
+
+function mapFilterMarkup(): string {
+  const filters: AnalysisMapFilter[] = ["all", "strong", "balanced", "cold"];
+  return `<div class="a2-map-filters" aria-label="Filtrar dezenas por grupo">${filters.map((filter) => `
+    <button type="button" data-a2-map-filter="${filter}" aria-pressed="${activeMapFilter === filter}" class="${activeMapFilter === filter ? "is-active" : ""}">${mapFilterLabel(filter)}</button>
   `).join("")}</div>`;
+}
+
+function detailsBlock(title: string, copy: string, body: string): string {
+  return `<details class="a2-technical-block">
+    <summary><span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(copy)}</small></span><b aria-hidden="true">+</b></summary>
+    <div class="a2-technical-body">${body}</div>
+  </details>`;
 }
 
 function qualityWarning(advanced: AnalysisPayload["advanced"]): string {
@@ -119,27 +134,76 @@ function qualityWarning(advanced: AnalysisPayload["advanced"]): string {
   return `<div class="a2-warning a2-quality-warning"><strong>Qualidade do histórico</strong><span>${escapeHtml(messages.join(" "))}</span></div>`;
 }
 
-function shellMarkup(data: AnalysisPayload): string {
+function secondaryFieldNotice(catalog: LotteryCatalogItem): string {
+  return catalog.family === "number-draw-secondary"
+    ? '<div class="a2-context-note">Este mapa analisa apenas o componente numérico. Campos secundários da modalidade são independentes e não entram nesta classificação.</div>'
+    : "";
+}
+
+function shellMarkup(data: AnalysisPayload, catalog: LotteryCatalogItem): string {
   const advanced = data.advanced;
   const latest = advanced.latestContest;
-  const tiers = advanced.ranking.tiers;
   return `<div class="a2-shell">
-    <div class="a2-summary grid cols-4">
-      ${metricCard("Concurso de referência", latest ? `#${latest.number}` : "—", latest ? formatDate(latest.date) : "Sem histórico")}
-      ${metricCard("Fortes", tiers.strong.length, "grupo superior da classificação", "positive")}
-      ${metricCard("Intermediárias", tiers.balanced.length, "faixa central", "warning")}
-      ${metricCard("Frias", tiers.cold.length, "grupo inferior da classificação")}
-    </div>
-    <div class="a2-principle"><strong>Observado × esperado</strong><span>${escapeHtml(advanced.model.disclaimer)}</span></div>
+    <header class="a2-analysis-head">
+      <div>
+        <span class="a2-eyebrow">Mapa das dezenas</span>
+        <h2>${escapeHtml(catalog.name || currentLottery())}</h2>
+        <p>Leitura descritiva do histórico. Clique em uma dezena para ver seus indicadores.</p>
+      </div>
+      <div class="a2-reference"><span>Concurso de referência</span><strong>${latest ? `#${latest.number}` : "—"}</strong><small>${latest ? formatDate(latest.date) : "Sem histórico"}</small></div>
+    </header>
+    <div class="a2-principle"><strong>Histórico, não previsão</strong><span>${escapeHtml(advanced.model.disclaimer)}</span></div>
+    ${secondaryFieldNotice(catalog)}
     ${qualityWarning(advanced)}
-    ${tabsMarkup()}
-    <section id="a2-view" role="tabpanel" aria-labelledby="a2-tab-${activeTab}"></section>
+    ${numberMapView(data)}
+    <section class="a2-technical-section" aria-labelledby="a2-technical-title">
+      <div class="section-head"><div><h2 id="a2-technical-title">Indicadores e metodologia</h2><p>Detalhes técnicos ficam recolhidos para não competir com o mapa principal.</p></div></div>
+      <div class="a2-technical-stack">
+        ${detailsBlock("Classificação completa", "Posição, movimento, tendência, robustez e atraso.", technicalRankingView(data))}
+        ${detailsBlock("Estrutura e distribuições", "Observado, histórico anterior e referências matemáticas.", structureView(data))}
+        ${detailsBlock("Dinâmica histórica", "Movimentos, ciclos, atrasos e mapa binário.", dynamicsView(data))}
+        ${detailsBlock("Associações", "Duplas, trincas e concursos parecidos; exploração sem previsão.", combinationsView(data))}
+        ${detailsBlock("Validação e metodologia", "Teste fora da amostra, sensibilidade e proteção anti-leakage.", validationView(data))}
+      </div>
+    </section>
     <dialog class="a2-detail" id="a2-detail" aria-label="Detalhe da dezena"></dialog>
   </div>`;
 }
 
-function ballList(numbers: number[], tier: AnalysisTier): string {
-  return numbers.map((value) => `<button class="a2-ball ${tierClass(tier)}" type="button" data-a2-number="${value}" aria-label="Abrir detalhe da dezena ${number(value)}">${number(value)}</button>`).join("");
+function numberMapView(data: AnalysisPayload): string {
+  const items = [...data.advanced.ranking.dynamics.items].sort((a, b) => a.number - b.number);
+  const ranked = [...items].sort((a, b) => a.rank - b.rank);
+  const options = ranked.map((item) => `<option value="${item.number}">${number(item.number)} · #${item.rank}</option>`).join("");
+  return `<section class="a2-map-section" aria-labelledby="a2-map-title">
+    <div class="a2-map-toolbar">
+      <div><h2 id="a2-map-title">Dezenas</h2><p>Grupos são relativos ao histórico analisado e não alteram a chance matemática do próximo sorteio.</p></div>
+      ${mapFilterMarkup()}
+    </div>
+    <div class="a2-map-legend" aria-label="Legenda dos grupos">
+      <span class="is-strong">Forte</span><span class="is-balanced">Intermediária</span><span class="is-cold">Fria</span>
+    </div>
+    <div class="a2-number-map" data-a2-number-map>
+      ${items.map((item) => `<button class="a2-map-number ${tierClass(item.tier)}" type="button" data-a2-number="${item.number}" data-a2-tier="${item.tier}" aria-label="Dezena ${number(item.number)}, ${TIER_LABELS[item.tier]}, posição ${item.rank}">
+        <strong>${number(item.number)}</strong><span>${TIER_LABELS[item.tier]}</span>
+      </button>`).join("")}
+    </div>
+    <article class="a2-compare-panel">
+      <div class="a2-panel-head"><div><strong>Comparar dezenas</strong><span>Compare indicadores sem sair do mapa.</span></div></div>
+      <div class="a2-compare-controls"><select data-a2-compare-a aria-label="Primeira dezena">${options}</select><select data-a2-compare-b aria-label="Segunda dezena">${options}</select><button class="button compact" type="button" data-a2-compare>Comparar</button></div>
+      <div data-a2-compare-result></div>
+    </article>
+  </section>`;
+}
+
+function technicalRankingView(data: AnalysisPayload): string {
+  const dynamics = [...data.advanced.ranking.dynamics.items].sort((a, b) => a.rank - b.rank);
+  return `<div class="a2-stack">
+    <section>
+      <div class="section-head"><div><h2>Classificação auditável</h2><p>Movimento usa o concurso exatamente 10 posições antes; referências ausentes não são aproximadas.</p></div></div>
+      <div class="panel table-wrap"><table class="a2-table"><thead><tr><th>#</th><th>Dezena</th><th>Grupo</th><th>Pontuação</th><th>Mov. 10</th><th>Tendência</th><th>Robustez</th><th>Atraso</th></tr></thead><tbody>${dynamics.map((item) => `
+        <tr data-a2-number="${item.number}" tabindex="0"><td><strong>${item.rank}</strong></td><td><strong>${number(item.number)}</strong></td><td><span class="a2-tier-chip ${tierClass(item.tier)}">${TIER_LABELS[item.tier]}</span></td><td>${decimal(item.score)}</td><td>${movementBadge(item.movements.ten)}</td><td>${trendCopy(item.trend)}</td><td>${percent(item.weightRobustness.tierStability)}</td><td>${delayCopy(item)}</td></tr>`).join("")}</tbody></table></div>
+    </section>
+  </div>`;
 }
 
 function movementBadge(value: number | null | undefined): string {
@@ -152,30 +216,6 @@ function delayCopy(item: AnalysisNumberItem): string {
   return item.delay.current === null
     ? "—"
     : `${item.delay.current} concurso(s)`;
-}
-
-function rankingView(data: AnalysisPayload): string {
-  const advanced = data.advanced;
-  const dynamics = [...advanced.ranking.dynamics.items].sort((a, b) => a.rank - b.rank);
-  const tierSections = (["strong", "balanced", "cold"] as const).map((tier) => `
-    <article class="panel a2-tier-panel">
-      <div class="a2-panel-head"><div><strong>${TIER_LABELS[tier]}</strong><span>${tier === "strong" ? "maior pontuação combinada" : tier === "balanced" ? "faixa central" : "menor pontuação combinada"}</span></div><small>${advanced.ranking.tiers[tier].length} dezenas</small></div>
-      <div class="a2-ball-cloud">${ballList(advanced.ranking.tiers[tier], tier)}</div>
-    </article>`).join("");
-
-  const options = dynamics.map((item) => `<option value="${item.number}">${number(item.number)} · #${item.rank}</option>`).join("");
-  return `<div class="a2-stack">
-    <section><div class="section-head"><div><h2>Classificação das dezenas</h2><p>Clique em uma dezena para abrir pontuação, frequência, atraso, tendência e robustez.</p></div></div><div class="a2-tier-list">${tierSections}</div></section>
-    <section class="panel a2-compare-panel">
-      <div class="a2-panel-head"><div><strong>Comparar dezenas</strong><span>Entenda por que duas dezenas ocupam posições diferentes.</span></div></div>
-      <div class="a2-compare-controls"><select data-a2-compare-a aria-label="Primeira dezena">${options}</select><select data-a2-compare-b aria-label="Segunda dezena">${options}</select><button class="button compact" type="button" data-a2-compare>Comparar</button></div>
-      <div data-a2-compare-result></div>
-    </section>
-    <section><div class="section-head"><div><h2>Classificação auditável</h2><p>Movimento usa o número real do concurso de referência; se a referência estiver ausente, a variação fica indisponível.</p></div></div>
-      <div class="panel table-wrap"><table class="a2-table"><thead><tr><th>#</th><th>Dezena</th><th>Grupo</th><th>Pontuação</th><th>Mov. 10</th><th>Tendência</th><th>Robustez</th><th>Atraso</th></tr></thead><tbody>${dynamics.map((item) => `
-        <tr data-a2-number="${item.number}" tabindex="0"><td><strong>${item.rank}</strong></td><td><strong>${number(item.number)}</strong></td><td><span class="a2-tier-chip ${tierClass(item.tier)}">${TIER_LABELS[item.tier]}</span></td><td>${decimal(item.score)}</td><td>${movementBadge(item.movements.ten)}</td><td>${trendCopy(item.trend)}</td><td>${percent(item.weightRobustness.tierStability)}</td><td>${delayCopy(item)}</td></tr>`).join("")}</tbody></table></div>
-    </section>
-  </div>`;
 }
 
 function theoreticalBars(metric?: StructureMetric | null): string {
@@ -328,19 +368,6 @@ function validationView(data: AnalysisPayload): string {
   </div>`;
 }
 
-function renderTab(): void {
-  if (!currentData || currentMainView() !== "analysis") return;
-  const target = root.querySelector<HTMLElement>("#a2-view");
-  if (!target) return;
-  target.setAttribute("aria-labelledby", `a2-tab-${activeTab}`);
-  if (activeTab === "ranking") target.innerHTML = rankingView(currentData);
-  else if (activeTab === "structure") target.innerHTML = structureView(currentData);
-  else if (activeTab === "dynamics") target.innerHTML = dynamicsView(currentData);
-  else if (activeTab === "combinations") target.innerHTML = combinationsView(currentData);
-  else target.innerHTML = validationView(currentData);
-  bindTabInteractions();
-}
-
 function numberDetailMarkup(item: AnalysisNumberItem): string {
   const contributions = Object.entries(item.contribution);
   const total = contributions.reduce((sum, [, value]) => sum + value, 0) || 1;
@@ -434,13 +461,33 @@ function chooseDistinctDefaults(firstSelector: string, secondSelector: string): 
   if (first.value === second.value) second.selectedIndex = 1;
 }
 
-function bindTabInteractions(): void {
+function applyMapFilter(filter: AnalysisMapFilter): void {
+  activeMapFilter = filter;
+  root.querySelectorAll<HTMLButtonElement>("[data-a2-map-filter]").forEach((button) => {
+    const selected = button.dataset.a2MapFilter === filter;
+    button.classList.toggle("is-active", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+  root.querySelectorAll<HTMLElement>(".a2-map-number").forEach((button) => {
+    button.hidden = filter !== "all" && button.dataset.a2Tier !== filter;
+  });
+}
+
+function bindAnalysisInteractions(): void {
   root.querySelectorAll<HTMLElement>("[data-a2-number]").forEach((node) => {
     node.addEventListener("click", () => openNumberDetail(node.dataset.a2Number, node));
     node.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         openNumberDetail(node.dataset.a2Number, node);
+      }
+    });
+  });
+  root.querySelectorAll<HTMLButtonElement>("[data-a2-map-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const filter = button.dataset.a2MapFilter;
+      if (filter === "all" || filter === "strong" || filter === "balanced" || filter === "cold") {
+        applyMapFilter(filter);
       }
     });
   });
@@ -457,36 +504,9 @@ function bindTabInteractions(): void {
   });
 }
 
-function activateTab(tab: string | undefined, focus = false): void {
-  if (!isAnalysisTab(tab)) return;
-  activeTab = tab;
-  localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
-  root.querySelectorAll<HTMLButtonElement>("[data-a2-tab]").forEach((item) => {
-    const selected = item.dataset.a2Tab === activeTab;
-    item.classList.toggle("is-active", selected);
-    item.setAttribute("aria-selected", String(selected));
-    item.setAttribute("tabindex", selected ? "0" : "-1");
-    if (selected && focus) item.focus();
-  });
-  closeNumberDetail({ restoreFocus: false });
-  renderTab();
-}
-
 function bindShellInteractions(): void {
-  const tabs = [...root.querySelectorAll<HTMLButtonElement>("[data-a2-tab]")];
-  tabs.forEach((button, index) => {
-    button.addEventListener("click", () => activateTab(button.dataset.a2Tab));
-    button.addEventListener("keydown", (event) => {
-      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-      event.preventDefault();
-      let nextIndex = index;
-      if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
-      if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
-      if (event.key === "Home") nextIndex = 0;
-      if (event.key === "End") nextIndex = tabs.length - 1;
-      activateTab(tabs[nextIndex]?.dataset.a2Tab, true);
-    });
-  });
+  bindAnalysisInteractions();
+  applyMapFilter(activeMapFilter);
 
   const detail = root.querySelector<HTMLDialogElement>("#a2-detail");
   detail?.addEventListener("close", () => cleanupDetailState());
@@ -494,7 +514,6 @@ function bindShellInteractions(): void {
     event.preventDefault();
     closeNumberDetail();
   });
-  // Keep programmatic Escape coverage deterministic in the CDP smoke suite.
   detail?.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       event.preventDefault();
@@ -511,12 +530,19 @@ function errorMessage(error: unknown): string {
 
 function showFallbackNotice(error: unknown): void {
   if (currentMainView() !== "analysis") return;
-  root.querySelector("[data-analysis-v2-fallback]")?.remove();
-  const notice = document.createElement("div");
-  notice.className = "a2-warning a2-fallback-notice";
-  notice.dataset.analysisV2Fallback = "";
-  notice.innerHTML = `<strong>Análises avançadas indisponíveis</strong><span>A visão básica foi preservada. ${escapeHtml(errorMessage(error))}</span>`;
-  root.prepend(notice);
+  root.innerHTML = `<div class="a2-shell"><div class="a2-warning a2-fallback-notice" data-analysis-v2-fallback><strong>Análises indisponíveis</strong><span>${escapeHtml(errorMessage(error))}</span></div></div>`;
+}
+
+function renderUnsupportedAnalysis(catalog: LotteryCatalogItem): void {
+  const familyCopy = catalog.family === "column-draw"
+    ? "Esta modalidade usa colunas independentes; tratá-la como um conjunto plano de dezenas produziria uma leitura incorreta."
+    : catalog.family === "dual-number-draw"
+      ? "Esta modalidade possui dois sorteios por concurso; o mapa único de dezenas não representa corretamente essa estrutura."
+      : "Esta modalidade não possui análise numérica compatível com esta superfície.";
+  currentData = null;
+  closeNumberDetail({ restoreFocus: false });
+  root.innerHTML = `<div class="a2-shell"><section class="a2-unavailable"><span class="a2-eyebrow">Análise por modalidade</span><h2>${escapeHtml(catalog.name || currentLottery())}</h2><p>${escapeHtml(familyCopy)}</p><strong>Nenhum indicador incompatível foi exibido.</strong></section></div>`;
+  if (viewSubtitle) viewSubtitle.textContent = "Indicadores aparecem somente quando a estrutura da modalidade é compatível.";
 }
 
 async function renderAnalysisV2(): Promise<void> {
@@ -524,15 +550,23 @@ async function renderAnalysisV2(): Promise<void> {
   const lottery = currentLottery();
   const token = ++renderToken;
   try {
+    const catalogPayload = await api<LotteryCatalogPayload>("/lotteries");
+    if (token !== renderToken || currentMainView() !== "analysis" || currentLottery() !== lottery) return;
+    const catalog = (catalogPayload?.items || []).find((item) => item.id === lottery);
+    if (!catalog || catalog.enabled === false || catalog.capabilities?.analysis === false || !FLAT_NUMBER_FAMILIES.has(catalog.family || "")) {
+      renderUnsupportedAnalysis(catalog || { id: lottery, name: lottery, family: "unsupported" });
+      return;
+    }
+
     const data = await api<AnalysisPayload>(`/analysis/${lottery}/advanced`);
     if (token !== renderToken || currentMainView() !== "analysis" || currentLottery() !== lottery) return;
     if (!data?.advanced) return;
     currentData = data;
-    if (viewSubtitle) viewSubtitle.textContent = "Classificação, estrutura, dinâmica, combinações e validação estatística.";
+    activeMapFilter = "all";
+    if (viewSubtitle) viewSubtitle.textContent = "Dezenas e indicadores históricos da modalidade selecionada.";
     closeNumberDetail({ restoreFocus: false });
-    root.innerHTML = shellMarkup(data);
+    root.innerHTML = shellMarkup(data, catalog);
     bindShellInteractions();
-    renderTab();
   } catch (error) {
     if (token !== renderToken || currentMainView() !== "analysis") return;
     showFallbackNotice(error);

@@ -196,23 +196,23 @@ try {
   ]);
 
   await navigate(client, "/#analysis");
-  await waitFor(client, "Boolean(document.querySelector('.a2-shell'))", "initial Analyses 2.0 shell");
-  await waitFor(client, "document.querySelector('[data-a2-tab]')?.textContent?.includes('Classificação')", "Portuguese analysis labels");
+  await waitFor(client, "Boolean(document.querySelector('.a2-shell'))", "initial Analyses single-map shell");
+  await waitFor(client, "Boolean(document.querySelector('[data-a2-number-map]'))", "number map");
 
   const readability = await evaluate(client, `({
     brand: document.querySelector('.brand-copy small')?.textContent?.trim(),
     navDashboard: [...document.querySelectorAll('[data-nav-key] .nav-label')].some((node) => node.textContent.trim() === 'Painel'),
-    tabFont: parseFloat(getComputedStyle(document.querySelector('[data-a2-tab]')).fontSize),
-    helperFont: parseFloat(getComputedStyle(document.querySelector('.a2-panel-head span')).fontSize),
+    numberFont: parseFloat(getComputedStyle(document.querySelector('.a2-map-number strong')).fontSize),
+    helperFont: parseFloat(getComputedStyle(document.querySelector('.a2-map-toolbar p')).fontSize),
     subtitleFont: parseFloat(getComputedStyle(document.querySelector('.topbar-copy p')).fontSize),
-    hasEnglishRanking: [...document.querySelectorAll('[data-a2-tab]')].some((node) => node.textContent.trim() === 'Ranking')
+    hasTabs: Boolean(document.querySelector('[data-a2-tab]'))
   })`);
-  assert(readability.brand === "Console de estratégias", `Brand subtitle was not translated: ${readability.brand}`);
+  assert(readability.brand === "Análise e jogos", `Brand subtitle mismatch: ${readability.brand}`);
   assert(readability.navDashboard, "Dashboard navigation label was not translated to Painel");
-  assert(!readability.hasEnglishRanking, "Analysis tab still exposes Ranking in English");
-  assert(readability.tabFont >= 13, `Analysis tab font is still too small: ${readability.tabFont}px`);
-  assert(readability.helperFont >= 12, `Analysis helper font is still too small: ${readability.helperFont}px`);
-  assert(readability.subtitleFont >= 13, `Topbar subtitle font is still too small: ${readability.subtitleFont}px`);
+  assert(!readability.hasTabs, "Analyses still exposes the old tab navigation");
+  assert(readability.numberFont >= 16, `Analysis number font is too small: ${readability.numberFont}px`);
+  assert(readability.helperFont >= 16, `Analysis helper font is too small: ${readability.helperFont}px`);
+  assert(readability.subtitleFont >= 16, `Topbar subtitle font is too small: ${readability.subtitleFont}px`);
 
   for (const lottery of lotteries) {
     await evaluate(client, `(() => {
@@ -225,72 +225,56 @@ try {
     await waitFor(
       client,
       `(() => {
-        const uniqueNumbers = new Set([...document.querySelectorAll('[data-a2-number]')].map((node) => node.dataset.a2Number));
+        const uniqueNumbers = new Set([...document.querySelectorAll('[data-a2-number-map] .a2-map-number')].map((node) => node.dataset.a2Number));
         return document.querySelector('#lottery-select')?.value === ${JSON.stringify(lottery.id)} && uniqueNumbers.size === ${lottery.numberCount};
       })()`,
       `${lottery.id} advanced ranking`,
     );
 
     const state = await evaluate(client, `(() => {
-      const uniqueNumbers = new Set([...document.querySelectorAll('[data-a2-number]')].map((node) => node.dataset.a2Number));
+      const uniqueNumbers = new Set([...document.querySelectorAll('[data-a2-number-map] .a2-map-number')].map((node) => node.dataset.a2Number));
       return {
         fallback: Boolean(document.querySelector('[data-analysis-v2-fallback]')),
-        principle: document.body.innerText.includes('Observado × esperado'),
+        principle: document.body.innerText.includes('Histórico, não previsão'),
         numberCount: uniqueNumbers.size,
-        tabs: document.querySelectorAll('[data-a2-tab]').length
+        technicalBlocks: document.querySelectorAll('.a2-technical-block').length
       };
     })()`);
     assert(!state.fallback, `${lottery.id} fell back instead of mounting advanced analyses`);
-    assert(state.principle, `${lottery.id} is missing the observed-vs-expected principle`);
-    assert(state.numberCount === lottery.numberCount, `${lottery.id} rendered ${state.numberCount} unique ranking numbers`);
-    assert(state.tabs === 5, `${lottery.id} did not render all five analysis modes`);
+    assert(state.principle, `${lottery.id} is missing the historical/non-predictive principle`);
+    assert(state.numberCount === lottery.numberCount, `${lottery.id} rendered ${state.numberCount} unique map numbers`);
+    assert(state.technicalBlocks === 5, `${lottery.id} did not preserve technical disclosure blocks`);
   }
 
-  const pageChecks = [
-    {
-      path: "/jobs",
-      ready: "Boolean(document.querySelector('#job-form'))",
-      required: ["Console de estratégias", "Janela histórica", "Bloco", "Teste histórico"],
-      forbidden: ["Strategy console", "Lookback", "Bucket"],
-    },
-    {
-      path: "/strategies",
-      ready: "Boolean(document.querySelector('#strategy-form'))",
-      required: ["Console de estratégias", "Identificador", "Janela histórica do Laboratório", "Bloco do Laboratório"],
-      forbidden: ["Strategy console", "Slug", "Lookback Lab", "Bucket Lab"],
-    },
-    {
-      path: "/ai",
-      ready: "Boolean(document.querySelector('#ai-form'))",
-      required: ["Console de estratégias", "teste histórico", "Registros anteriores"],
-      forbidden: ["Strategy console", "Snapshots anteriores"],
-    },
-    {
-      path: "/lab",
-      ready: "Boolean(document.querySelector('#lab-form'))",
-      required: ["Console de estratégias", "Classificação do período"],
-      forbidden: ["Strategy console", "Ranking do período"],
-    },
-    {
-      path: "/agenda",
-      ready: "Boolean(document.querySelector('#agenda-grid'))",
-      required: ["Console de estratégias"],
-      forbidden: ["Strategy console"],
-    },
-  ];
+  for (const lottery of ["dupla-sena", "super-sete"]) {
+    await evaluate(client, `(() => {
+      const select = document.querySelector('#lottery-select');
+      select.value = ${JSON.stringify(lottery)};
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    })()`);
+    await waitFor(client, "Boolean(document.querySelector('.a2-unavailable'))", `${lottery} structural fallback`);
+    assert(
+      await evaluate(client, "document.body.innerText.includes('Nenhum indicador incompatível foi exibido.')"),
+      `${lottery} did not explain the capability-aware fallback`,
+    );
+  }
 
-  for (const check of pageChecks) {
-    await navigate(client, check.path);
-    await waitFor(client, check.ready, `${check.path} shell`);
-    await waitFor(client, `(document.body.textContent || '').includes(${JSON.stringify(check.required[0])})`, `${check.path} localization`);
-    const bodyText = await evaluate(client, "document.body.textContent || ''");
-    for (const expected of check.required) assert(bodyText.includes(expected), `${check.path} is missing translated text: ${expected}`);
-    for (const forbidden of check.forbidden) assert(!bodyText.includes(forbidden), `${check.path} still exposes English text: ${forbidden}`);
+  const redirects = [
+    ["/lab", "#analysis"],
+    ["/strategies", "#analysis"],
+    ["/ai", "#analysis"],
+    ["/jobs", "#dashboard"],
+    ["/agenda", "#dashboard"],
+  ];
+  for (const [path, hash] of redirects) {
+    await navigate(client, path);
+    await waitFor(client, `location.pathname === '/' && location.hash === '${hash}'`, `${path} canonical redirect`);
   }
 
   assert(runtimeErrors.length === 0, `Browser runtime exceptions: ${runtimeErrors.join(" | ")}`);
   assert(serverErrors.length === 0, `Browser API/server failures: ${serverErrors.join(" | ")}`);
-  console.log("Analysis/UI E2E passed: three lotteries, readable typography and Portuguese UI");
+  console.log("Analysis/UI E2E passed: single map, capability-aware fallbacks, readable typography and canonical redirects");
 } finally {
   client?.close();
   await stopBrowser(browser);

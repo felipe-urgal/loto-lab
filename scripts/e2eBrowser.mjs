@@ -241,32 +241,32 @@ try {
   assert(home.text.includes("Painel"), "Main application rendered no meaningful navigation content");
 
   await navigate(client, "/#analysis");
-  await waitFor(client, "Boolean(document.querySelector('.a2-shell'))", "Analyses 2.0 shell");
-  const analysisTabs = await evaluate(client, `[...document.querySelectorAll('[data-a2-tab]')].map((node) => node.textContent.trim())`);
-  assert(analysisTabs.length === 5, "Analyses 2.0 did not render five modes");
+  await waitFor(client, "Boolean(document.querySelector('.a2-shell'))", "Analyses single-map shell");
+  await waitFor(client, "Boolean(document.querySelector('[data-a2-number-map] .a2-map-number'))", "number map");
+  const analysisSurface = await evaluate(client, `(() => ({
+    tabs: document.querySelectorAll('[data-a2-tab]').length,
+    mapNumbers: document.querySelectorAll('[data-a2-number-map] .a2-map-number').length,
+    filters: [...document.querySelectorAll('[data-a2-map-filter]')].map((node) => node.textContent.trim()),
+    technical: document.querySelectorAll('.a2-technical-block').length,
+    hasWarning: document.body.innerText.includes('Histórico, não previsão')
+  }))()`);
+  assert(analysisSurface.tabs === 0, `Analyses still exposes technical tabs: ${JSON.stringify(analysisSurface)}`);
+  assert(analysisSurface.mapNumbers > 0, "Analyses rendered no number map");
   assert(
-    ["Classificação", "Estrutura", "Dinâmica", "Combinações", "Validação"].every((label) => analysisTabs.includes(label)),
-    "Analyses 2.0 is missing one or more modes",
+    ["Todas", "Fortes", "Intermediárias", "Frias"].every((label) => analysisSurface.filters.includes(label)),
+    `Analyses filters are incomplete: ${JSON.stringify(analysisSurface)}`,
   );
-  assert(
-    await evaluate(client, "document.querySelector('.a2-tabs')?.getAttribute('role') === 'tablist'"),
-    "Analyses 2.0 tablist semantics are missing",
+  assert(analysisSurface.technical === 5, `Analyses technical disclosure is incomplete: ${JSON.stringify(analysisSurface)}`);
+  assert(analysisSurface.hasWarning, "Analyses is missing the historical/non-predictive principle");
+
+  await evaluate(client, "document.querySelector('[data-a2-map-filter=strong]').click(); true");
+  await waitFor(
+    client,
+    "[...document.querySelectorAll('.a2-map-number:not([hidden])')].every((node) => node.dataset.a2Tier === 'strong')",
+    "strong-number filter",
   );
-  assert(
-    await evaluate(client, "document.body.innerText.includes('Observado × esperado')"),
-    "Analyses 2.0 is missing the observed-vs-expected principle",
-  );
-  await evaluate(client, "document.querySelector('[data-a2-tab=structure]').click(); true");
-  await waitFor(client, "document.body.innerText.includes('Histórico esperado')", "transition-matched structure baseline");
-  await evaluate(client, "document.querySelector('[data-a2-tab=validation]').click(); true");
-  await waitFor(client, "document.body.innerText.includes('Teste fora da amostra')", "rolling validation analysis");
-  assert(
-    await evaluate(client, "document.body.innerText.includes('Sensibilidade dos pesos')"),
-    "Analyses 2.0 is missing weight-sensitivity validation",
-  );
-  await evaluate(client, "document.querySelector('[data-a2-tab=ranking]').click(); true");
-  await waitFor(client, "Boolean(document.querySelector('[data-a2-number]'))", "auditable ranking numbers");
-  await evaluate(client, "document.querySelector('[data-a2-number]').click(); true");
+  await evaluate(client, "document.querySelector('[data-a2-map-filter=all]').click(); true");
+  await evaluate(client, "document.querySelector('.a2-map-number').click(); true");
   await waitFor(client, "document.querySelector('#a2-detail')?.open === true", "number detail modal");
   assert(
     await evaluate(client, "document.querySelector('#a2-detail').innerText.includes('Decomposição da pontuação')"),
@@ -296,20 +296,22 @@ try {
   await navigate(client, "/#analysis");
   await waitFor(client, "Boolean(document.querySelector('.a2-shell'))", "mobile Analyses 2.0 shell");
   const mobileAnalysis = await evaluate(client, `(() => {
-    const tabs = document.querySelector('.a2-tabs');
-    const firstNumber = document.querySelector('[data-a2-number]');
+    const map = document.querySelector('[data-a2-number-map]');
+    const firstNumber = document.querySelector('.a2-map-number');
     return {
       width: document.documentElement.clientWidth,
       mobileBreakpoint: matchMedia('(max-width: 680px)').matches,
-      tabsVisible: Boolean(tabs && getComputedStyle(tabs).display !== 'none'),
-      firstNumberVisible: Boolean(firstNumber && firstNumber.getBoundingClientRect().width > 0)
+      mapVisible: Boolean(map && getComputedStyle(map).display !== 'none'),
+      firstNumberVisible: Boolean(firstNumber && firstNumber.getBoundingClientRect().width > 0),
+      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
     };
   })()`);
   assert(mobileAnalysis.mobileBreakpoint, `Analyses responsive breakpoint was not active: ${JSON.stringify(mobileAnalysis)}`);
   assert(mobileAnalysis.width <= 390, `Analyses responsive viewport is wider than expected: ${JSON.stringify(mobileAnalysis)}`);
-  assert(mobileAnalysis.tabsVisible, "Analyses tabs are not visible on mobile");
-  assert(mobileAnalysis.firstNumberVisible, "Analyses ranking numbers are not visible on mobile");
-  await evaluate(client, "document.querySelector('[data-a2-number]').click(); true");
+  assert(mobileAnalysis.mapVisible, "Analyses number map is not visible on mobile");
+  assert(mobileAnalysis.firstNumberVisible, "Analyses number map has no visible entries on mobile");
+  assert(!mobileAnalysis.overflow, `Analyses overflows the mobile viewport: ${JSON.stringify(mobileAnalysis)}`);
+  await evaluate(client, "document.querySelector('.a2-map-number').click(); true");
   await waitFor(client, "document.querySelector('#a2-detail')?.open === true", "mobile number detail modal");
   const mobileDrawer = await evaluate(client, `(() => {
     const detail = document.querySelector('#a2-detail');

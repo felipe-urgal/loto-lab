@@ -32,16 +32,13 @@ function mountJourneyActions(): void {
   const title = document.createElement("strong");
   title.textContent = "Próximos passos";
   const description = document.createElement("span");
-  description.textContent = "Experimente uma hipótese no Laboratório ou aplique uma configuração já compreendida no Gerador.";
+  description.textContent = "Quando terminar a leitura, use o Gerador para montar e revisar jogos sem transformar indicadores históricos em previsão.";
   copy.append(title, description);
   head.append(copy);
 
   const actions = document.createElement("div");
   actions.className = "a2-compare-controls";
-  actions.append(
-    actionLink("/lab", "Experimentar no Laboratório"),
-    actionLink("/#generate", "Gerar jogos"),
-  );
+  actions.append(actionLink("/#generate", "Gerar jogos"));
 
   navigation.append(head, actions);
   principle.insertAdjacentElement("afterend", navigation);
