@@ -347,13 +347,16 @@ export class GenerationV2UseCase {
         `Official bet cardinality is not available for ${input.lottery}`,
       );
     }
+    const coverageBetQuote = purpose === "coverage"
+      ? quoteOfficialBet(input.lottery, effectiveBetSize, 1)
+      : undefined;
     if (purpose === "coverage" && !["mega-sena", "lotofacil", "quina", "dupla-sena"].includes(input.lottery)) {
       throw new GenerationV2Error(
         "INVALID_ARGUMENT",
         `Coverage generation is not available for ${input.lottery}`,
       );
     }
-    if (purpose === "coverage" && !betQuote) {
+    if (purpose === "coverage" && !coverageBetQuote) {
       throw new GenerationV2Error("INVALID_ARGUMENT", "Coverage generation requires an official bet price");
     }
     if (purpose === "coverage") {
@@ -524,7 +527,7 @@ export class GenerationV2UseCase {
           ticketSize: effectiveBetSize,
           targetSize: input.coverageTargetSize ?? Math.max(1, config.drawSize - 1),
           maxTickets: input.gameCount,
-          pricePerTicketCents: betQuote?.pricePerBetCents ?? 0,
+          pricePerTicketCents: coverageBetQuote?.pricePerBetCents ?? 0,
           ...(input.coverageBudgetCents !== undefined ? { budgetCents: input.coverageBudgetCents } : {}),
           ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
           ...(referenceContestNumber !== null
