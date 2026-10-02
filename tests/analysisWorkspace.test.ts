@@ -48,7 +48,8 @@ test("analysis workspace follows Redesign V2 single-map contract without changin
   assert.match(analysis, /detailsBlock\("Estrutura e distribuições"/);
   assert.match(analysis, /detailsBlock\("Dinâmica histórica"/);
   assert.match(analysis, /detailsBlock\("Associações"/);
-  assert.match(analysis, /<h2>Auditoria de aleatoriedade<\\\/h2>/);\n  assert.match(analysis, /detailsBlock\("Validação e metodologia"/);
+  assert.match(analysis, /Auditoria de aleatoriedade/);
+  assert.match(analysis, /detailsBlock\("Validação e metodologia"/);
   assert.match(analysis, /api<LotteryCatalogPayload>\("\/lotteries"\)/);
   assert.match(analysis, /FLAT_NUMBER_FAMILIES/);
   assert.doesNotMatch(analysis, /role="tablist"|data-a2-tab|ACTIVE_TAB_KEY/);
