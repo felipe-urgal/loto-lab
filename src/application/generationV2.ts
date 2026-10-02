@@ -8,7 +8,7 @@ import {
   quoteTimemania,
 } from "../domain/structuredBetRules.js";
 import { generateDiaDeSorteGames, type DiaDeSorteFixedCount } from "../generator/diaDeSorte.js";
-import { generateCoveringDesign } from "../generator/coveringDesign.js";
+import { generateCoveringDesign, type CoveringDesignReport } from "../generator/coveringDesign.js";
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { generateMegaSenaGames, type MegaSenaFixedCount } from "../generator/megaSena.js";
 import {
@@ -515,6 +515,7 @@ export class GenerationV2UseCase {
       ? plan.referenceContestNumber ?? null
       : null;
     let games: GeneratedGame[];
+    let coverageReport: CoveringDesignReport | undefined;
     try {
       if (purpose === "coverage") {
         const result = generateCoveringDesign({
@@ -534,6 +535,7 @@ export class GenerationV2UseCase {
             : {}),
         });
         games = result.games;
+        coverageReport = result.report;
         if (games.length < 1) {
           throw new GenerationV2Error("ALGORITHM_SPACE_UNSATISFIED", "O orçamento ou os filtros não permitem selecionar nenhum jogo de cobertura.");
         }
@@ -611,24 +613,6 @@ export class GenerationV2UseCase {
       throw error;
     }
 
-    const coverageResult = purpose === "coverage"
-      ? generateCoveringDesign({
-          lottery: input.lottery,
-          poolNumbers: input.coveragePoolNumbers ?? [],
-          ticketSize: effectiveBetSize,
-          targetSize: input.coverageTargetSize ?? Math.max(1, config.drawSize - 1),
-          maxTickets: input.gameCount,
-          pricePerTicketCents: betQuote?.pricePerBetCents ?? 0,
-          ...(input.coverageBudgetCents !== undefined ? { budgetCents: input.coverageBudgetCents } : {}),
-          ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
-          ...(referenceContestNumber !== null
-            ? (() => {
-                const referenceContest = scoped.history.find((contest) => contest.number === referenceContestNumber);
-                return referenceContest ? { referenceContest } : {};
-              })()
-            : {}),
-        })
-      : undefined;
     const effectiveBetQuote = betQuote && purpose === "coverage"
       ? quoteOfficialBet(input.lottery, effectiveBetSize, games.length)
       : betQuote;
@@ -658,7 +642,7 @@ export class GenerationV2UseCase {
       ...(input.cloverCount !== undefined ? { cloverCount: input.cloverCount } : {}),
       ...(input.favoriteTeam !== undefined ? { favoriteTeam: input.favoriteTeam.trim() } : {}),
       ...(input.columnMarks !== undefined ? { columnMarks: input.columnMarks } : {}),
-      ...(coverageResult ? { coverage: coverageResult.report } : {}),
+      ...(coverageReport ? { coverage: coverageReport } : {}),
       ...(input.coveragePoolNumbers !== undefined ? { coveragePoolNumbers: sortedNumbers(input.coveragePoolNumbers) } : {}),
       ...(input.coverageTargetSize !== undefined ? { coverageTargetSize: input.coverageTargetSize } : {}),
       ...(input.coverageBudgetCents !== undefined ? { coverageBudgetCents: input.coverageBudgetCents } : {}),
