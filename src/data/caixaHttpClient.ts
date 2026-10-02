@@ -106,8 +106,10 @@ export class CaixaHttpClient {
   async getJson<T>(url: string, subject: string): Promise<T> {
     const startedAt = this.now();
     let lastError: CaixaRequestError | undefined;
+    let attemptsUsed = 0;
 
     for (let attempt = 1; attempt <= this.policy.maxAttempts; attempt += 1) {
+      attemptsUsed = attempt;
       const elapsed = this.now() - startedAt;
       const remainingMs = Math.max(0, this.policy.totalTimeoutMs - elapsed);
       if (remainingMs < 1) {
@@ -174,7 +176,7 @@ export class CaixaHttpClient {
     recordCaixaRequest(
       finalError instanceof CaixaTimeoutError ? "timeout" : "error",
       this.now() - startedAt,
-      this.policy.maxAttempts,
+      Math.max(1, attemptsUsed),
     );
     throw finalError;
   }
