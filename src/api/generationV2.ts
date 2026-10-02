@@ -282,7 +282,7 @@ export async function serveGenerationV2(
       max: purpose === "coverage" ? 100 : 10,
       defaultValue: defaultGameCount,
     });
-    const fixedCount = parseV2FixedCount(lottery, body.fixedCount);
+    const fixedCount = purpose === "coverage" ? 0 : parseV2FixedCount(lottery, body.fixedCount);
     const betSize = parseV2BetSize(lottery, body.betSize);
     const targetContestNumber = parseOptionalPositiveInt(body.targetContestNumber, "targetContestNumber");
     const structuredOptions = parseStructuredOptions(body, lottery);
