@@ -245,7 +245,7 @@ export function buildRandomnessIntegrityAudit(
     ?? `randomness-audit:${config.id}:${first?.number ?? 0}:${last?.number ?? 0}:${scoped.segment.length}:v1`;
   const eligible = scoped.segment.length >= RANDOMNESS_AUDIT_MIN_CONTESTS;
   const base = {
-    version: RANDOMNESS_AUDIT_VERSION,
+    version: RANDOMNESS_AUDIT_VERSION as typeof RANDOMNESS_AUDIT_VERSION,
     methodology: {
       baseline: "uniform-without-replacement" as const,
       correction: `bonferroni-${RANDOMNESS_AUDIT_GLOBAL_TESTS}-global-tests; bonferroni-${config.maxNumber - config.minNumber + 1}-per-number-tests`,
