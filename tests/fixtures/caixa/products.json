@@ -1,0 +1,50 @@
+{
+  "dupla-sena": {
+    "numero": 3014,
+    "dataApuracao": "28/09/2026",
+    "listaDezenas": ["11","20","24","25","33","49"],
+    "listaDezenasSegundoSorteio": ["24","26","31","35","39","43"]
+  },
+  "mais-milionaria": {
+    "numero": 393,
+    "dataApuracao": "27/09/2026",
+    "listaDezenas": ["02","15","17","26","29","32"],
+    "trevosSorteados": ["4","5"]
+  },
+  "timemania": {
+    "numero": 1,
+    "dataApuracao": "01/03/2008",
+    "listaDezenas": ["24","31","51","57","63","71","80"],
+    "nomeTimeCoracaoMesSorte": "PALMAS/TO"
+  },
+  "super-sete": {
+    "numero": 1,
+    "dataApuracao": "02/10/2020",
+    "listaDezenas": ["2","9","9","8","7","7","6"]
+  },
+  "loteca": {
+    "numero": 1272,
+    "dataApuracao": "28/09/2026",
+    "listaResultadoEquipeEsportiva": [
+      {"nuSequencial":1,"nomeEquipeUm":"Casa 1","nomeEquipeDois":"Fora 1","nuGolEquipeUm":2,"nuGolEquipeDois":0},
+      {"nuSequencial":2,"nomeEquipeUm":"Casa 2","nomeEquipeDois":"Fora 2","nuGolEquipeUm":1,"nuGolEquipeDois":1},
+      {"nuSequencial":3,"nomeEquipeUm":"Casa 3","nomeEquipeDois":"Fora 3","nuGolEquipeUm":0,"nuGolEquipeDois":2},
+      {"nuSequencial":4,"nomeEquipeUm":"Casa 4","nomeEquipeDois":"Fora 4","nuGolEquipeUm":2,"nuGolEquipeDois":0},
+      {"nuSequencial":5,"nomeEquipeUm":"Casa 5","nomeEquipeDois":"Fora 5","nuGolEquipeUm":1,"nuGolEquipeDois":1},
+      {"nuSequencial":6,"nomeEquipeUm":"Casa 6","nomeEquipeDois":"Fora 6","nuGolEquipeUm":0,"nuGolEquipeDois":2},
+      {"nuSequencial":7,"nomeEquipeUm":"Casa 7","nomeEquipeDois":"Fora 7","nuGolEquipeUm":2,"nuGolEquipeDois":0},
+      {"nuSequencial":8,"nomeEquipeUm":"Casa 8","nomeEquipeDois":"Fora 8","nuGolEquipeUm":1,"nuGolEquipeDois":1},
+      {"nuSequencial":9,"nomeEquipeUm":"Casa 9","nomeEquipeDois":"Fora 9","nuGolEquipeUm":0,"nuGolEquipeDois":2},
+      {"nuSequencial":10,"nomeEquipeUm":"Casa 10","nomeEquipeDois":"Fora 10","nuGolEquipeUm":2,"nuGolEquipeDois":0},
+      {"nuSequencial":11,"nomeEquipeUm":"Casa 11","nomeEquipeDois":"Fora 11","nuGolEquipeUm":1,"nuGolEquipeDois":1},
+      {"nuSequencial":12,"nomeEquipeUm":"Casa 12","nomeEquipeDois":"Fora 12","nuGolEquipeUm":0,"nuGolEquipeDois":2},
+      {"nuSequencial":13,"nomeEquipeUm":"Casa 13","nomeEquipeDois":"Fora 13","nuGolEquipeUm":2,"nuGolEquipeDois":0},
+      {"nuSequencial":14,"nomeEquipeUm":"Casa 14","nomeEquipeDois":"Fora 14","nuGolEquipeUm":1,"nuGolEquipeDois":1}
+    ]
+  },
+  "federal": {
+    "numero": 6104,
+    "dataApuracao": "27/09/2026",
+    "listaDezenas": ["059074","003557","020563","040449","007802"]
+  }
+}
