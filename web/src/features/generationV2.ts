@@ -42,6 +42,10 @@ function supportsExperimental(lottery: LotteryId): boolean {
   return lottery === "mega-sena" || lottery === "lotofacil" || lottery === "dia-de-sorte";
 }
 
+function supportsCoverage(lottery: LotteryId): boolean {
+  return lottery === "mega-sena" || lottery === "lotofacil" || lottery === "quina" || lottery === "dupla-sena";
+}
+
 function isSelectionMode(value: string | undefined): value is SelectionMode {
   return value === "fix" || value === "exclude" || value === "auto";
 }
@@ -120,6 +124,11 @@ function requestPayload(state: GeneratorState, includeSeed = false): GenerationR
     ...(state.lottery === "mais-milionaria" ? { cloverCount: state.cloverCount } : {}),
     ...(state.lottery === "timemania" && state.favoriteTeam.trim() ? { favoriteTeam: state.favoriteTeam.trim() } : {}),
     ...(state.lottery === "super-sete" ? { columnMarks: state.columnMarks } : {}),
+    ...(state.purpose === "coverage" ? {
+      coveragePoolNumbers: [...state.coveragePool].sort((a, b) => a - b),
+      coverageTargetSize: state.coverageTargetSize,
+      ...(state.coverageBudgetCents !== undefined ? { coverageBudgetCents: state.coverageBudgetCents } : {}),
+    } : {}),
     ...(typeof seed === "string" && seed ? { seed } : {}),
   };
 }
@@ -236,7 +245,9 @@ function numberGridMarkup(state: GeneratorState): string {
   let html = "";
   for (let offset = 0; offset < state.plan.universeSize; offset += 1) {
     const value = minimum + offset;
-    const selection = state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
+    const selection = state.purpose === "coverage"
+      ? state.coveragePool.has(value) ? "fixed" : "auto"
+      : state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
     const tier = tiers.get(value) || "";
     const selectionLabel = selection === "fixed" ? "fixada" : selection === "excluded" ? "excluída" : "automática";
     html += `<button type="button" class="g2-number ${tier ? `is-${tier}` : ""} ${selection !== "auto" ? `is-${selection}` : ""}" data-g2-number="${value}" data-selection="${selection}" aria-label="Dezena ${numberLabel(value)}: ${selectionLabel}">${numberLabel(value)}</button>`;
@@ -267,6 +278,13 @@ function purposeCopy(purpose: GenerationPurpose): { label: string; description: 
       label: "Carteira diversificada",
       description: "Amostra candidatos sem score histórico e prioriza menor sobreposição entre jogos.",
       disclaimer: "Diversificação amplia cobertura entre os jogos; não aumenta a chance individual de uma combinação.",
+    };
+  }
+  if (purpose === "coverage") {
+    return {
+      label: "Cobertura / Desdobramento",
+      description: "Seleciona jogos por Greedy Set Cover para cobrir o máximo de subconjuntos do pool escolhido.",
+      disclaimer: "Cobertura é uma propriedade combinatória. Garantia só existe quando a cobertura calculada chega a 100% e continua sendo condicional ao pool.",
     };
   }
   return {
@@ -359,7 +377,7 @@ function configurationSummaryMarkup(state: GeneratorState): string {
     <div><span>Finalidade</span><strong>${escapeHtml(purpose.label)}</strong></div>
     <div><span>Jogos</span><strong>${state.gameCount}</strong></div>
     <div><span>${state.lottery === "super-sete" ? "Estrutura" : "Aposta"}</span><strong>${state.lottery === "super-sete" ? "7 colunas" : `${state.betSize} dezenas`}</strong></div>
-    <div><span>Núcleo</span><strong>${state.fixedCount ? `${state.fixedCount} compartilhadas` : "Sem núcleo"}</strong></div>
+    <div><span>${state.purpose === "coverage" ? "Pool" : "Núcleo"}</span><strong>${state.purpose === "coverage" ? `${state.coveragePool.size} dezenas` : state.fixedCount ? `${state.fixedCount} compartilhadas` : "Sem núcleo"}</strong></div>
     <div><span>Concurso alvo</span><strong>${state.targetContestNumber ? `#${state.targetContestNumber}` : "Automático"}</strong></div>
     <div><span>Filtros</span><strong>${filters ? `${filters} ativo(s)` : "Nenhum"}</strong></div>
     ${extra ? `<div class="g2-summary-wide"><span>Modalidade</span><strong>${extra}</strong></div>` : ""}
@@ -410,10 +428,10 @@ function workspaceMarkup(state: GeneratorState): string {
     <div class="g2-workspace">
       <div class="g2-main">
         <section class="panel g2-card g2-build-card">
-          <div class="g2-card-head"><div><strong>${state.lottery === "super-sete" ? "Monte as colunas" : "Monte suas escolhas"}</strong><span>${state.lottery === "super-sete" ? "As marcações permanecem posicionais por coluna." : "Fixe, exclua ou deixe o motor escolher automaticamente."}</span></div></div>
-          ${state.lottery === "super-sete" ? "" : selectionModesMarkup(state)}
+          <div class="g2-card-head"><div><strong>${state.lottery === "super-sete" ? "Monte as colunas" : state.purpose === "coverage" ? "Monte o pool de cobertura" : "Monte suas escolhas"}</strong><span>${state.lottery === "super-sete" ? "As marcações permanecem posicionais por coluna." : state.purpose === "coverage" ? "Clique nas dezenas que devem formar o universo do desdobramento." : "Fixe, exclua ou deixe o motor escolher automaticamente."}</span></div></div>
+          ${state.lottery === "super-sete" || state.purpose === "coverage" ? "" : selectionModesMarkup(state)}
           ${state.lottery === "super-sete" ? "" : `<div class="g2-number-legend">
-            <span><i class="g2-key"></i> Automática</span><span><i class="g2-key is-fixed"></i> Fixada</span><span><i class="g2-key is-excluded"></i> Excluída</span>
+            <span><i class="g2-key"></i> ${state.purpose === "coverage" ? "Fora do pool" : "Automática"}</span><span><i class="g2-key is-fixed"></i> ${state.purpose === "coverage" ? "No pool" : "Fixada"}</span>${state.purpose === "coverage" ? "" : '<span><i class="g2-key is-excluded"></i> Excluída</span>'}
             ${hasHistoricalTiers ? '<span><i class="g2-key is-strong"></i> Forte histórica</span><span><i class="g2-key is-balanced"></i> Intermediária histórica</span><span><i class="g2-key is-cold"></i> Fria histórica</span>' : ""}
           </div>`}
           <div class="g2-number-grid" data-g2-number-grid>${numberGridMarkup(state)}</div>
@@ -450,12 +468,14 @@ function workspaceMarkup(state: GeneratorState): string {
             <div class="g2-field"><label for="g2-purpose">Finalidade</label><select id="g2-purpose">
               <option value="uniform" ${state.purpose === "uniform" ? "selected" : ""}>Aleatório auditável</option>
               <option value="portfolio" ${state.purpose === "portfolio" ? "selected" : ""}>Carteira diversificada</option>
+              <option value="coverage" ${state.purpose === "coverage" ? "selected" : ""} ${supportsCoverage(state.lottery) ? "" : "disabled"}>Cobertura / Desdobramento</option>
               <option value="experimental" ${state.purpose === "experimental" ? "selected" : ""} ${supportsExperimental(state.lottery) ? "" : "disabled"}>Experimental</option>
             </select><small>${escapeHtml(purposeCopy(state.purpose).description)}</small></div>
-            <div class="g2-field"><label for="g2-game-count">Quantidade de jogos</label><input id="g2-game-count" type="number" min="1" max="10" value="${state.gameCount}" /></div>
+            <div class="g2-field"><label for="g2-game-count">${state.purpose === "coverage" ? "Limite de jogos" : "Quantidade de jogos"}</label><input id="g2-game-count" type="number" min="1" max="${state.purpose === "coverage" ? 100 : 10}" value="${state.gameCount}" /></div>
             <div class="g2-field"><label for="g2-bet-size">${state.lottery === "mais-milionaria" ? "Números por aposta" : state.lottery === "super-sete" ? "Estrutura" : "Dezenas por aposta"}</label><select id="g2-bet-size" ${state.purpose === "experimental" || (!state.plan.betRule && state.lottery !== "mais-milionaria") ? "disabled" : ""}>${betSizeOptions(state)}</select></div>
-            <div class="g2-field"><label for="g2-fixed-count">Núcleo compartilhado</label><select id="g2-fixed-count">${fixedCountOptions(state)}</select></div>
+            <div class="g2-field"><label for="g2-fixed-count">Núcleo compartilhado</label><select id="g2-fixed-count" ${state.purpose === "coverage" ? "disabled" : ""}>${fixedCountOptions(state)}</select></div>
             <div class="g2-field"><label for="g2-target">Concurso alvo</label><input id="g2-target" type="number" min="1" value="${state.targetContestNumber ?? ""}" /></div>
+            ${state.purpose === "coverage" ? `<div class="g2-field"><label for="g2-coverage-target">Subconjunto alvo</label><input id="g2-coverage-target" type="number" min="1" max="${state.betSize}" value="${state.coverageTargetSize}" /><small>Cada subconjunto deste tamanho será contabilizado na cobertura.</small></div><div class="g2-field"><label for="g2-coverage-budget">Orçamento máximo</label><input id="g2-coverage-budget" type="number" min="0" step="0.01" value="${state.coverageBudgetCents === undefined ? "" : (state.coverageBudgetCents / 100).toFixed(2)}" placeholder="Opcional" /><small>Em reais. O motor para antes de ultrapassar o orçamento.</small></div>` : ""}
             ${structuredFieldsMarkup(state)}
           </div>
         </section>
@@ -479,6 +499,11 @@ function workspaceMarkup(state: GeneratorState): string {
 function selectionSummary(state: GeneratorState, message = ""): void {
   const target = root?.querySelector<HTMLElement>("[data-g2-selection-summary]");
   if (!target) return;
+  if (state.purpose === "coverage") {
+    const pool = [...state.coveragePool].sort((a, b) => a - b).map(numberLabel).join(", ") || "nenhuma";
+    target.innerHTML = `<span>Pool <strong>${escapeHtml(pool)}</strong></span><span>Alvo <strong>${state.coverageTargetSize} de ${state.betSize}</strong></span><span>Limite <strong>${state.gameCount} jogos</strong></span>${message ? `<span><strong>${escapeHtml(message)}</strong></span>` : ""}`;
+    return;
+  }
   const fixed = [...state.fixed].sort((a, b) => a - b).map(numberLabel).join(", ") || "nenhuma";
   const excluded = [...state.excluded].sort((a, b) => a - b).map(numberLabel).join(", ") || "nenhuma";
   const modeLabel = state.selectionMode === "fix" ? "Fixar" : state.selectionMode === "exclude" ? "Excluir" : "Automática";
@@ -497,17 +522,21 @@ function updateNumberButtons(state: GeneratorState): void {
   const tiers = tierByNumber(state.plan);
   root?.querySelectorAll<HTMLButtonElement>("[data-g2-number]").forEach((button) => {
     const value = Number(button.dataset.g2Number);
-    const selection = state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
+    const selection = state.purpose === "coverage"
+      ? state.coveragePool.has(value) ? "fixed" : "auto"
+      : state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
     const tier = tiers.get(value) || "";
     button.dataset.selection = selection;
     button.classList.toggle("is-fixed", selection === "fixed");
     button.classList.toggle("is-excluded", selection === "excluded");
     for (const name of NUMBER_TIERS) button.classList.toggle(`is-${name}`, tier === name);
-    const label = selection === "fixed" ? "fixada" : selection === "excluded" ? "excluída" : "automática";
+    const label = state.purpose === "coverage"
+      ? selection === "fixed" ? "no pool de cobertura" : "fora do pool de cobertura"
+      : selection === "fixed" ? "fixada" : selection === "excluded" ? "excluída" : "automática";
     button.setAttribute("aria-label", `Dezena ${numberLabel(value)}: ${label}`);
   });
   const select = root?.querySelector<HTMLSelectElement>("#g2-fixed-count");
-  if (select) [...select.options].forEach((option) => { option.disabled = Number(option.value) < state.fixed.size; });
+  if (select) [...select.options].forEach((option) => { option.disabled = state.purpose === "coverage" || Number(option.value) < state.fixed.size; });
 }
 
 function clearPreview(state: GeneratorState): void {
@@ -555,6 +584,16 @@ function renderPreview(state: GeneratorState): void {
   const audit = preview.audit;
   const seed = typeof preview.generatorOptions.seed === "string" ? preview.generatorOptions.seed : "—";
   const proof = preview.preview?.id || (typeof preview.generatorOptions.previewId === "string" ? preview.generatorOptions.previewId : "—");
+  const coverage = preview.generatorOptions.coverage && typeof preview.generatorOptions.coverage === "object"
+    ? preview.generatorOptions.coverage as {
+        targetSubsets?: number;
+        coveredSubsets?: number;
+        coverageRatio?: number;
+        isCompleteCoverage?: boolean;
+        selectedTickets?: number;
+        costCents?: number;
+      }
+    : undefined;
   const betQuote = preview.generatorOptions.betQuote && typeof preview.generatorOptions.betQuote === "object"
     ? preview.generatorOptions.betQuote as {
         betSize?: number;
@@ -575,6 +614,7 @@ function renderPreview(state: GeneratorState): void {
       <div><span>Finalidade</span><strong>${escapeHtml(purpose.label)}</strong></div>
       <div><span>Custo do lote</span><strong>${formatCurrencyCents(betQuote?.totalPriceCents)}</strong></div>
     </div>
+    ${coverage ? `<section class="panel g2-card g2-preview-rationale"><div class="g2-card-head"><div><strong>${coverage.isCompleteCoverage ? "Cobertura completa" : "Cobertura parcial"}</strong><span>${coverage.isCompleteCoverage ? "Garantia combinatória condicional ao pool e ao alvo configurados." : "Não há garantia: o limite/orçamento encerrou o processo antes de cobrir todo o alvo."}</span></div></div><div class="g2-rationale-grid"><div><strong>${formatPercent(coverage.coverageRatio)}</strong><span>Cobertura calculada</span></div><div><strong>${formatInteger(coverage.coveredSubsets)} / ${formatInteger(coverage.targetSubsets)}</strong><span>Subconjuntos cobertos</span></div></div></section>` : ""}
     <div class="g2-game-grid">${preview.games.map(gameMarkup).join("")}</div>
     <details class="g2-preview-audit">
       <summary>Ver auditoria da prévia</summary>
@@ -692,6 +732,7 @@ function renderDynamicPlan(state: GeneratorState): void {
   const algorithm = algorithmSpace(state);
   const previewButton = root?.querySelector<HTMLButtonElement>("[data-g2-preview]");
   const invalid = state.plan.space.eligibleCombinations < 1
+    || (state.purpose === "coverage" && state.coveragePool.size < state.betSize)
     || (state.purpose === "experimental" && algorithm.rawCombinationCapacity < 1)
     || state.plan.constraintIssues.length > 0
     || (state.lottery === "timemania" && !state.favoriteTeam.trim());
@@ -736,9 +777,18 @@ function bindWorkspace(state: GeneratorState): void {
     const select = event.target;
     if (!(select instanceof HTMLSelectElement)) return;
     const next = select.value;
-    if (next !== "uniform" && next !== "portfolio" && next !== "experimental") return;
+    if (next !== "uniform" && next !== "portfolio" && next !== "coverage" && next !== "experimental") return;
     state.purpose = next;
     if (next === "experimental") state.betSize = state.plan.drawSize;
+    if (next === "coverage") {
+      state.fixed.clear();
+      state.excluded.clear();
+      state.fixedCount = 0;
+      state.coverageTargetSize = Math.max(1, state.plan.drawSize - 1);
+      if (state.coveragePool.size < state.betSize) {
+        state.coveragePool = new Set(Array.from({ length: Math.min(state.plan.universeSize, state.betSize + 2) }, (_, index) => state.lotteryConfig.minNumber + index));
+      }
+    }
     clearPreview(state);
     root.innerHTML = workspaceMarkup(state);
     bindWorkspace(state);
@@ -773,7 +823,8 @@ function bindWorkspace(state: GeneratorState): void {
   root?.querySelector<HTMLInputElement>("#g2-game-count")?.addEventListener("change", (event) => {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
-    const value = Math.max(1, Math.min(10, Math.round(Number(input.value) || 1)));
+    const maximum = state.purpose === "coverage" ? 100 : 10;
+    const value = Math.max(1, Math.min(maximum, Math.round(Number(input.value) || 1)));
     state.gameCount = value;
     input.value = String(value);
     clearPreview(state);
@@ -820,6 +871,15 @@ function bindWorkspace(state: GeneratorState): void {
   root?.querySelectorAll<HTMLButtonElement>("[data-g2-number]").forEach((button) => button.addEventListener("click", () => {
     const value = Number(button.dataset.g2Number);
     let message = "";
+    if (state.purpose === "coverage") {
+      if (state.coveragePool.has(value)) state.coveragePool.delete(value);
+      else state.coveragePool.add(value);
+      updateNumberButtons(state);
+      selectionSummary(state);
+      clearPreview(state);
+      renderDynamicPlan(state);
+      return;
+    }
     if (state.selectionMode === "fix") {
       if (state.fixed.has(value)) {
         state.fixed.delete(value);
@@ -862,6 +922,24 @@ function bindWorkspace(state: GeneratorState): void {
     updateRange(state, key, edge, control.value);
     schedulePlan();
   }));
+
+  root?.querySelector<HTMLInputElement>("#g2-coverage-target")?.addEventListener("change", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    state.coverageTargetSize = Math.max(1, Math.min(state.betSize, Math.round(Number(input.value) || 1)));
+    input.value = String(state.coverageTargetSize);
+    clearPreview(state);
+    renderDynamicPlan(state);
+  });
+
+  root?.querySelector<HTMLInputElement>("#g2-coverage-budget")?.addEventListener("change", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    const raw = input.value.trim();
+    state.coverageBudgetCents = raw ? Math.max(0, Math.round(Number(raw.replace(",", ".")) * 100)) : undefined;
+    clearPreview(state);
+    renderDynamicPlan(state);
+  });
 
   root?.querySelector<HTMLButtonElement>("[data-g2-preview]")?.addEventListener("click", () => void generatePreview(state));
 
@@ -942,6 +1020,8 @@ async function mount(detail: ViewRenderedDetail): Promise<void> {
       cloverCount: 2,
       favoriteTeam: "",
       columnMarks: Array(7).fill(1),
+      coveragePool: new Set<number>(),
+      coverageTargetSize: Math.max(1, plan.drawSize - 1),
       controller,
       cleanup: null,
     };
