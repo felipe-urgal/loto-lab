@@ -72,7 +72,7 @@ export class ReconcileContestDataUseCase {
     const canonical = await this.contests.list({ lottery, order: "desc", limit });
     const checkedAt = this.now();
     const counts = emptyCounts();
-    const provider = "maickon/free-apiloterias";
+    const provider = this.secondary.provider;
 
     let latestSecondary: number;
     try {
