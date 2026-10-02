@@ -74,6 +74,7 @@ function normalize(
 }
 
 export class MaickonSecondaryContestSource implements SecondaryContestSource {
+  readonly provider = "maickon/free-apiloterias";
   constructor(
     private readonly fetchImpl: SecondaryFetchLike = fetch,
     private readonly timeoutMs = DEFAULT_TIMEOUT_MS,
