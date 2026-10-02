@@ -16,7 +16,7 @@ export type LotteryGenerationConfig = {
 };
 export type NumberTier = "strong" | "balanced" | "cold";
 export type SelectionMode = "fix" | "exclude" | "auto";
-export type GenerationPurpose = "uniform" | "portfolio" | "experimental";
+export type GenerationPurpose = "uniform" | "portfolio" | "coverage" | "experimental";
 export type GenerationFilterKey = "odd" | "repeated" | "sum";
 export type GenerationRangeEdge = "min" | "max";
 
@@ -177,6 +177,9 @@ export type GenerationRequestPayload = {
   cloverCount?: number;
   favoriteTeam?: string;
   columnMarks?: number[];
+  coveragePoolNumbers?: number[];
+  coverageTargetSize?: number;
+  coverageBudgetCents?: number;
 };
 
 export type GenerationPlanPayload = {
@@ -206,5 +209,8 @@ export type GeneratorState = {
   cloverCount: number;
   favoriteTeam: string;
   columnMarks: number[];
+  coveragePool: Set<number>;
+  coverageTargetSize: number;
+  coverageBudgetCents?: number;
   cleanup: (() => void) | null;
 };
