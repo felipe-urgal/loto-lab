@@ -289,6 +289,16 @@ export async function serveGenerationV2(
     const generationMode = parseGenerationMode(body.generationMode);
     const seed = optionalString(body.seed, "seed", 160);
     const selection = parseV2Selection(body, lottery, betSize);
+    if (
+      purpose === "coverage"
+      && (selection.fixedNumbers.length > 0 || selection.excludedNumbers.length > 0)
+    ) {
+      throw new ApiError(
+        400,
+        "INVALID_ARGUMENT",
+        "Coverage generation uses coveragePoolNumbers and does not accept fixedNumbers or excludedNumbers",
+      );
+    }
     const coveragePoolNumbers = purpose === "coverage"
       ? parseNumberArray(body.coveragePoolNumbers, "coveragePoolNumbers", lottery)
       : [];
