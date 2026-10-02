@@ -71,3 +71,47 @@ export type ComparisonResponse = {
   };
   items?: ComparisonItem[];
 };
+
+
+export type CoverageProbability = {
+  hits: number;
+  probability: number;
+};
+
+export type CoverageSimulation = {
+  method: "exact" | "monte-carlo";
+  seed: string;
+  evaluatedDraws: number;
+  expectedBestHits: number;
+  atLeast: CoverageProbability[];
+  quality: {
+    exact: boolean;
+    resolution: number;
+    maxMarginError95: number;
+    requestedMaxMarginError: number;
+    sufficient: boolean;
+  };
+  scope: {
+    synthetic: true;
+    historicalDataUsed: false;
+    primaryNumbersOnly: true;
+    note: string;
+  };
+};
+
+export type CoverageBenchmarkResponse = {
+  seed: string;
+  batch: {
+    id: number;
+    lottery: string;
+    gameCount: number;
+    generatorPurpose?: string;
+    coveringDesign: boolean;
+  };
+  target: CoverageSimulation;
+  randomBaseline: CoverageSimulation;
+  comparison: {
+    expectedBestHitsDelta: number;
+    atLeastDelta: CoverageProbability[];
+  };
+};
