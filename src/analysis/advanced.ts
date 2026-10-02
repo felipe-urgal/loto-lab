@@ -7,6 +7,7 @@ import { buildNumberAnalysis, DEFAULT_WEIGHTS } from "./scoring.js";
 import { round } from "./statistics.js";
 import { buildStructure, structureForContest } from "./structure.js";
 import { buildRollingValidation } from "./validation.js";
+import { buildRandomnessIntegrityAudit } from "./randomnessIntegrity.js";
 
 export { combination, exactBinomialTwoSidedP, hypergeometricDistribution } from "./statistics.js";
 export type { EvidenceLevel } from "./statistics.js";
@@ -102,5 +103,6 @@ export function buildAdvancedAnalysis(contests: Contest[], config: LotteryConfig
     combinations: buildAssociations(scoped, config),
     similarity: buildSimilarity(scoped, config),
     validation: buildRollingValidation(scoped, config),
+    randomnessAudit: buildRandomnessIntegrityAudit(scoped, config),
   };
 }
