@@ -23,6 +23,7 @@ function reader(items = canonical) {
 
 test("reconciliation classifies consistent, divergence and missing contests precisely", async () => {
   const source: SecondaryContestSource = {
+    provider: "test-secondary",
     supports: () => true,
     latestContestNumber: async () => 3046,
     fetchContest: async (_lottery, number) => {
@@ -57,6 +58,7 @@ test("reconciliation classifies consistent, divergence and missing contests prec
 
 test("reconciliation marks newer canonical contests as secondary stale", async () => {
   const source: SecondaryContestSource = {
+    provider: "test-secondary",
     supports: () => true,
     latestContestNumber: async () => 3044,
     fetchContest: async () => undefined,
@@ -72,6 +74,7 @@ test("reconciliation marks newer canonical contests as secondary stale", async (
 test("secondary outage is isolated and never mutates canonical data", async () => {
   let listCalls = 0;
   const source: SecondaryContestSource = {
+    provider: "test-secondary",
     supports: () => true,
     latestContestNumber: async () => {
       throw new SecondarySourceUnavailableError("offline");
@@ -97,6 +100,7 @@ test("secondary outage is isolated and never mutates canonical data", async () =
 
 test("reconciliation is bounded to at most 20 canonical contests", async () => {
   const source: SecondaryContestSource = {
+    provider: "test-secondary",
     supports: () => true,
     latestContestNumber: async () => 1,
     fetchContest: async () => undefined,
@@ -108,6 +112,7 @@ test("reconciliation is bounded to at most 20 canonical contests", async () => {
 test("unsupported lottery is rejected before any external call", async () => {
   let externalCalls = 0;
   const source: SecondaryContestSource = {
+    provider: "test-secondary",
     supports: () => false,
     latestContestNumber: async () => {
       externalCalls += 1;
