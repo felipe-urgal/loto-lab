@@ -10,6 +10,7 @@ import type { CompareGameBatchUseCase } from "../application/compareGameBatch.js
 import type { ContestCatalogUseCase } from "../application/contestCatalog.js";
 import type { GetDataStatusUseCase } from "../application/dataStatus.js";
 import type { ExecuteBacktestUseCase } from "../application/executeBacktest.js";
+import type { EvaluateGameBatchCoverageUseCase } from "../application/evaluateGameBatchCoverage.js";
 import type { GameBatchUseCase } from "../application/gameBatches.js";
 import type { GenerateGamesUseCase } from "../application/generateGames.js";
 import type { GenerationV2UseCase } from "../application/generationV2.js";
@@ -22,6 +23,7 @@ import { serveAnalysis } from "./analysis.js";
 import { serveContests } from "./contests.js";
 import { serveDataStatus } from "./dataStatus.js";
 import { serveGameBatchManagement } from "./gameBatchManagement.js";
+import { serveGameCoverage } from "./gameCoverage.js";
 import { serveGameBatches } from "./gameBatches.js";
 import { serveGameComparison } from "./gameComparison.js";
 import { serveGeneration } from "./generation.js";
@@ -49,6 +51,7 @@ export interface FeatureRouteDependencies {
   contestCatalog: ContestCatalogUseCase;
   dataStatus: GetDataStatusUseCase;
   executeBacktest: ExecuteBacktestUseCase;
+  evaluateGameBatchCoverage: EvaluateGameBatchCoverageUseCase;
   gameBatches: GameBatchUseCase;
   generateGames: GenerateGamesUseCase;
   generationV2: GenerationV2UseCase;
@@ -107,6 +110,8 @@ const featureRoutes: FeatureRouteHandler[] = [
       dependencies.gameBatches,
       dependencies.checkGameBatch,
     ),
+  (request, response, options, dependencies) =>
+    serveGameCoverage(request, response, options, dependencies.evaluateGameBatchCoverage),
   (request, response, options, dependencies) =>
     serveGameBatchManagement(request, response, options, dependencies.gameBatches),
   (request, response, options, dependencies) =>
