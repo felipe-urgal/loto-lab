@@ -257,6 +257,9 @@ function isExpectedGeneratorFailure(error: unknown): boolean {
     "Unable to build a diversified portfolio",
     "Unable to select the requested portfolio size",
     "Timemania generation requires an explicit Time do Coração",
+    "Coverage constraints leave no valid candidate tickets",
+    "Coverage candidate space exceeds safe limit",
+    "Coverage target space exceeds safe limit",
   ].some((fragment) => error.message.includes(fragment));
 }
 
@@ -317,8 +320,10 @@ export class GenerationV2UseCase {
 
   async execute(input: GenerationV2Input) {
     const purpose = input.purpose ?? "uniform";
-    validateFixedCount(input.lottery, input.fixedCount);
-    validateCoreSelection(input);
+    if (purpose !== "coverage") {
+      validateFixedCount(input.lottery, input.fixedCount);
+      validateCoreSelection(input);
+    }
     const maximumGameCount = purpose === "coverage" ? 100 : 10;
     if (!Number.isInteger(input.gameCount) || input.gameCount < 1 || input.gameCount > maximumGameCount) {
       throw new GenerationV2Error("INVALID_ARGUMENT", `gameCount must be an integer between 1 and ${maximumGameCount}`);
