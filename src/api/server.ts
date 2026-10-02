@@ -17,6 +17,7 @@ import { CompareGameBatchUseCase } from "../application/compareGameBatch.js";
 import { ContestCatalogUseCase } from "../application/contestCatalog.js";
 import { GetDataStatusUseCase } from "../application/dataStatus.js";
 import { ExecuteBacktestUseCase } from "../application/executeBacktest.js";
+import { EvaluateGameBatchCoverageUseCase } from "../application/evaluateGameBatchCoverage.js";
 import { GameBatchUseCase } from "../application/gameBatches.js";
 import { GenerateGamesUseCase } from "../application/generateGames.js";
 import { GenerationV2UseCase } from "../application/generationV2.js";
@@ -115,6 +116,7 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
     compareGameBatch: new CompareGameBatchUseCase(games, contests),
     contestCatalog: new ContestCatalogUseCase(contests),
     dataStatus: new GetDataStatusUseCase(contests),
+    evaluateGameBatchCoverage: new EvaluateGameBatchCoverageUseCase(games),
     executeBacktest: new ExecuteBacktestUseCase(
       expensiveAnalysisGate,
       (input, signal) => runBacktestInWorker(

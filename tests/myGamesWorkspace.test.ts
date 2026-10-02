@@ -3,18 +3,19 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 
 test("my games implementation remains internal while the Panel owns the user journey", async () => {
-  const [loader, workspace, boundary, controller, presentation, comparison, formatting, betForm, auditability] = await Promise.all([
+  const [loader, workspace, boundary, controller, presentation, comparison, coverage, formatting, betForm, auditability] = await Promise.all([
     readFile("web/src/core/featureLoader.ts", "utf8"),
     readFile("web/my-games-workspace.css", "utf8"),
     readFile("web/my-games-v2.js", "utf8"),
     readFile("web/src/features/myGames.ts", "utf8"),
     readFile("web/src/features/myGames/presentation.ts", "utf8"),
     readFile("web/src/features/myGames/comparison.ts", "utf8"),
+    readFile("web/src/features/myGames/coverage.ts", "utf8"),
     readFile("web/src/features/myGames/formatting.ts", "utf8"),
     readFile("web/src/features/myGames/betForm.ts", "utf8"),
     readFile("web/src/features/myGames/auditability.ts", "utf8"),
   ]);
-  const myGames = [controller, presentation, comparison, formatting, betForm, auditability].join("\n");
+  const myGames = [controller, presentation, comparison, coverage, formatting, betForm, auditability].join("\n");
 
   assert.doesNotMatch(loader, /loadStyle\("my-games-v2"\)/);
   assert.doesNotMatch(loader, /loadModule\("my-games-v2"\)/);

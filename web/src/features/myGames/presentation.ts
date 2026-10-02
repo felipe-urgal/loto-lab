@@ -123,10 +123,12 @@ function batchMarkup(batch: GameBatch, bet: RealBet | undefined, state: RenderSt
         ${batch.archivedAt
           ? `<button class="button" type="button" data-mg2-show="${batch.id}">Mostrar novamente</button>`
           : `${bet ? "" : `<button class="button primary" type="button" data-mg2-mark-bet="${batch.id}">Marcar como apostado</button>`}
+          <button class="button" type="button" data-mg2-coverage="${batch.id}">Simular cobertura</button>
           <button class="button" type="button" data-mg2-compare="${batch.id}">Comparar concursos</button>
           <button class="button ghost mg2-hide-action" type="button" data-mg2-hide="${batch.id}">Ocultar lote</button>`}
       </div>
       <div class="mg2-inline-host" data-mg2-inline="${batch.id}"></div>
+      <div class="mg2-comparison-host" data-mg2-coverage-host="${batch.id}"></div>
       <div class="mg2-comparison-host" data-mg2-comparison-host="${batch.id}"></div>
     </div>
   </article>`;
