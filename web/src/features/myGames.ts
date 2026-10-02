@@ -4,6 +4,7 @@ import { escapeHtml } from "../shared/escaping.js";
 import { toast } from "../shared/toast.js";
 import { renderBetForm } from "./myGames/betForm.js";
 import { loadComparison } from "./myGames/comparison.js";
+import { loadCoverage } from "./myGames/coverage.js";
 import { latestBetByBatch, renderMyGamesMarkup } from "./myGames/presentation.js";
 import { createMyGamesUiState } from "./myGames/state.js";
 import { errorMessage, requiredElement, requiredPayload } from "./myGames/support.js";
@@ -91,6 +92,19 @@ function bindScreen(data: GameBatchResponse, betData: RealBetResponse): void {
     const batch = batchById.get(batchId);
     const host = root.querySelector<HTMLElement>(`[data-mg2-inline="${batchId}"]`);
     if (batch && host) renderBetForm(host, batch, () => mount({ preserveExpanded: batch.id }));
+  }));
+
+  root.querySelectorAll<HTMLButtonElement>("[data-mg2-coverage]").forEach((button) => button.addEventListener("click", () => {
+    const batchId = Number(button.dataset.mg2Coverage);
+    const batch = batchById.get(batchId);
+    const host = root.querySelector<HTMLElement>(`[data-mg2-coverage-host="${batchId}"]`);
+    if (!batch || !host) return;
+    if (host.querySelector("[data-mg2-coverage]")) {
+      host.innerHTML = "";
+      button.textContent = "Simular cobertura";
+      return;
+    }
+    void loadCoverage(root, batch);
   }));
 
   root.querySelectorAll<HTMLButtonElement>("[data-mg2-compare]").forEach((button) => button.addEventListener("click", () => {
