@@ -275,20 +275,38 @@ export async function serveGenerationV2(
     if (!enforceRateLimit(request, response, generationLimiter, "generator-v2")) return true;
     const body = await readJsonBody(request);
     const lottery = parseLottery(body.lottery);
+    const purpose = parseGenerationPurpose(body.purpose);
     const defaultGameCount = lottery === "mega-sena" ? 2 : 4;
     const gameCount = parsePositiveInt(body.gameCount, "gameCount", {
       min: 1,
-      max: 10,
+      max: purpose === "coverage" ? 100 : 10,
       defaultValue: defaultGameCount,
     });
     const fixedCount = parseV2FixedCount(lottery, body.fixedCount);
     const betSize = parseV2BetSize(lottery, body.betSize);
     const targetContestNumber = parseOptionalPositiveInt(body.targetContestNumber, "targetContestNumber");
-    const purpose = parseGenerationPurpose(body.purpose);
     const structuredOptions = parseStructuredOptions(body, lottery);
     const generationMode = parseGenerationMode(body.generationMode);
     const seed = optionalString(body.seed, "seed", 160);
     const selection = parseV2Selection(body, lottery, betSize);
+    const coveragePoolNumbers = purpose === "coverage"
+      ? parseNumberArray(body.coveragePoolNumbers, "coveragePoolNumbers", lottery)
+      : [];
+    const coverageTargetSize = purpose === "coverage"
+      ? parsePositiveInt(body.coverageTargetSize, "coverageTargetSize", {
+          min: 1,
+          max: betSize,
+          defaultValue: Math.max(1, LOTTERY_CONFIGS[lottery].drawSize - 1),
+        })
+      : undefined;
+    let coverageBudgetCents: number | undefined;
+    if (purpose === "coverage" && body.coverageBudgetCents !== undefined && body.coverageBudgetCents !== null && body.coverageBudgetCents !== "") {
+      const parsedBudget = Number(body.coverageBudgetCents);
+      if (!Number.isInteger(parsedBudget) || parsedBudget < 0) {
+        throw new ApiError(400, "INVALID_ARGUMENT", "coverageBudgetCents must be a non-negative integer");
+      }
+      coverageBudgetCents = parsedBudget;
+    }
     const persist = pathname === "/api/v1/generation/save";
     if (persist && generationMode === "diversified" && !seed) {
       throw new ApiError(
@@ -309,6 +327,8 @@ export async function serveGenerationV2(
       ...(seed !== undefined ? { seed } : {}),
       ...selection,
       ...structuredOptions,
+      ...(purpose === "coverage" ? { coveragePoolNumbers, coverageTargetSize } : {}),
+      ...(coverageBudgetCents !== undefined ? { coverageBudgetCents } : {}),
       persist,
     });
     sendJson(response, persist ? 201 : 200, result, corsOrigin);
