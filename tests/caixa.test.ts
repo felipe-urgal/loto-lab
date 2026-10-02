@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CaixaContestSource, normalizeCaixaAgenda, normalizeCaixaContest } from "../src/data/caixa.js";
+import { CaixaInvalidResponseError } from "../src/data/caixaHttpClient.js";
 
 const megaPayload = {
   numero: 3046,
@@ -94,5 +95,17 @@ test("normalizeCaixaContest rejects invalid draw sizes", () => {
   assert.throws(
     () => normalizeCaixaContest("mega-sena", { ...megaPayload, listaDezenas: ["01", "02"] }),
     /Expected 6 numbers/,
+  );
+});
+
+
+test("CaixaContestSource exposes semantic payload failures as typed invalid-response errors", async () => {
+  const source = new CaixaContestSource(async () =>
+    new Response(JSON.stringify({ ...megaPayload, listaDezenas: ["01", "02"] }), { status: 200 }),
+  );
+
+  await assert.rejects(
+    () => source.fetchContest("mega-sena", 3046),
+    CaixaInvalidResponseError,
   );
 });

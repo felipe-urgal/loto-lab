@@ -2,16 +2,22 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   caixaMetricsSnapshot,
+  recordCaixaAttempt,
   recordCaixaRequest,
   resetCaixaMetricsForTests,
 } from "../src/observability/caixaMetrics.js";
 
 test("CAIXA metrics aggregate fixed-cardinality outcomes and bounded latency percentiles", () => {
   resetCaixaMetricsForTests();
-  recordCaixaRequest("success", 10);
-  recordCaixaRequest("success", 20);
-  recordCaixaRequest("error", 30);
-  recordCaixaRequest("timeout", 40);
+  recordCaixaAttempt("success");
+  recordCaixaRequest("success", 10, 1);
+  recordCaixaAttempt("http-error");
+  recordCaixaAttempt("success-after-retry");
+  recordCaixaRequest("success", 20, 2);
+  recordCaixaAttempt("network-error");
+  recordCaixaRequest("error", 30, 1);
+  recordCaixaAttempt("timeout");
+  recordCaixaRequest("timeout", 40, 1);
 
   assert.deepEqual(caixaMetricsSnapshot(), {
     scope: "process",
@@ -19,6 +25,18 @@ test("CAIXA metrics aggregate fixed-cardinality outcomes and bounded latency per
     successes: 2,
     errors: 1,
     timeouts: 1,
+    attempts: 5,
+    retries: 1,
+    recoveredAfterRetry: 1,
+    finalFailures: 2,
+    attemptOutcomes: {
+      success: 1,
+      "success-after-retry": 1,
+      "http-error": 1,
+      "network-error": 1,
+      timeout: 1,
+      "invalid-response": 0,
+    },
     errorRate: 0.25,
     timeoutRate: 0.25,
     latencyMs: {

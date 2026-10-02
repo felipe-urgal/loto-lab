@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import {
   CaixaProductSource,
   normalizeCaixaProductAgenda,
@@ -162,4 +163,32 @@ test("CaixaProductSource uses verified product endpoints", async () => {
   );
   assert.equal(result.contestNumber, 393);
   assert.equal(result.source.provider, "caixa");
+});
+
+
+test("versioned Caixa fixtures preserve normalization for critical product families", async () => {
+  const fixtures = JSON.parse(
+    await readFile("tests/fixtures/caixa/products.json", "utf8"),
+  ) as Record<string, CaixaProductResponse>;
+
+  assert.deepEqual(normalizeCaixaProductResult("dupla-sena", fixtures["dupla-sena"]!).result, {
+    family: "dual-number-draw",
+    draws: [[11, 20, 24, 25, 33, 49], [24, 26, 31, 35, 39, 43]],
+  });
+  assert.deepEqual(normalizeCaixaProductResult("mais-milionaria", fixtures["mais-milionaria"]!).result, {
+    family: "number-draw-secondary",
+    numbers: [2, 15, 17, 26, 29, 32],
+    secondary: { kind: "clovers", values: [4, 5] },
+  });
+  assert.deepEqual(normalizeCaixaProductResult("timemania", fixtures.timemania!).result, {
+    family: "number-draw-secondary",
+    numbers: [24, 31, 51, 57, 63, 71, 80],
+    secondary: { kind: "favorite-team", values: ["PALMAS/TO"] },
+  });
+  assert.deepEqual(normalizeCaixaProductResult("super-sete", fixtures["super-sete"]!).result, {
+    family: "column-draw",
+    columns: [2, 9, 9, 8, 7, 7, 6],
+  });
+  assert.equal(normalizeCaixaProductResult("loteca", fixtures.loteca!).result.family, "sports-prediction");
+  assert.equal(normalizeCaixaProductResult("federal", fixtures.federal!).result.family, "ticket-draw");
 });

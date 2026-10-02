@@ -1,6 +1,6 @@
 import type { Contest, ContestPrizeTier, LotteryId } from "../domain/types.js";
 import { assertValidContestNumbers } from "../domain/validation.js";
-import { recordCaixaRequest } from "../observability/caixaMetrics.js";
+import { CaixaHttpClient, CaixaInvalidResponseError, type FetchLike, type SleepLike } from "./caixaHttpClient.js";
 import type { ContestSource, LotteryAgendaSnapshot, LotteryAgendaSource } from "./source.js";
 
 const BASE_URL = "https://servicebus2.caixa.gov.br/portaldeloterias/api";
@@ -39,8 +39,6 @@ interface CaixaContestResponse {
   valorEstimadoProximoConcurso?: number | null;
   acumulado?: boolean | null;
 }
-
-export type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 function toIsoDate(value: string): string {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
@@ -159,16 +157,18 @@ export function normalizeCaixaAgenda(lottery: LotteryId, payload: CaixaContestRe
 }
 
 export class CaixaContestSource implements ContestSource, LotteryAgendaSource {
-  private readonly timeoutMs: number;
+  private readonly http: CaixaHttpClient;
 
   constructor(
-    private readonly fetchImpl: FetchLike = fetch,
+    fetchImpl: FetchLike = fetch,
     timeoutMs = DEFAULT_TIMEOUT_MS,
+    sleep?: SleepLike,
   ) {
-    if (!Number.isFinite(timeoutMs) || timeoutMs < 1000 || timeoutMs > 60_000) {
-      throw new Error("Caixa timeout must be between 1000 and 60000 ms");
-    }
-    this.timeoutMs = timeoutMs;
+    this.http = new CaixaHttpClient(
+      fetchImpl,
+      { totalTimeoutMs: timeoutMs },
+      sleep,
+    );
   }
 
   private async fetchPayload(lottery: LotteryId, contestNumber?: number): Promise<CaixaContestResponse> {
@@ -177,31 +177,25 @@ export class CaixaContestSource implements ContestSource, LotteryAgendaSource {
     }
     const endpoint = endpointByLottery[lottery];
     const url = `${BASE_URL}/${endpoint}${contestNumber ? `/${contestNumber}` : ""}`;
-    const startedAt = performance.now();
-
-    try {
-      const response = await this.fetchImpl(url, {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(this.timeoutMs),
-      });
-      if (!response.ok) throw new Error(`Caixa request failed (${response.status}) for ${lottery}`);
-      const payload = (await response.json()) as CaixaContestResponse;
-      recordCaixaRequest("success", performance.now() - startedAt);
-      return payload;
-    } catch (error) {
-      const timeout = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
-      recordCaixaRequest(timeout ? "timeout" : "error", performance.now() - startedAt);
-      if (timeout) throw new Error(`Caixa request timed out for ${lottery}`);
-      throw error;
-    }
+    return this.http.getJson<CaixaContestResponse>(url, lottery);
   }
 
   async fetchContest(lottery: LotteryId, contestNumber?: number): Promise<Contest> {
-    return normalizeCaixaContest(lottery, await this.fetchPayload(lottery, contestNumber));
+    const payload = await this.fetchPayload(lottery, contestNumber);
+    try {
+      return normalizeCaixaContest(lottery, payload);
+    } catch (error) {
+      throw new CaixaInvalidResponseError(`Invalid Caixa contest payload for ${lottery}`, { cause: error });
+    }
   }
 
   async fetchAgenda(lottery: LotteryId): Promise<LotteryAgendaSnapshot> {
-    return normalizeCaixaAgenda(lottery, await this.fetchPayload(lottery));
+    const payload = await this.fetchPayload(lottery);
+    try {
+      return normalizeCaixaAgenda(lottery, payload);
+    } catch (error) {
+      throw new CaixaInvalidResponseError(`Invalid Caixa agenda payload for ${lottery}`, { cause: error });
+    }
   }
 
   async fetchContestRange(lottery: LotteryId, startContest: number, endContest: number): Promise<Contest[]> {
