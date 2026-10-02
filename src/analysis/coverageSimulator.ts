@@ -11,6 +11,16 @@ export const DEFAULT_MAX_MARGIN_ERROR = 0.01;
 
 export type CoverageSimulationMethod = "exact" | "monte-carlo";
 
+export interface CoverageSpaceOptions {
+  universe: number[];
+  drawSize: number;
+  games: number[][];
+  seed?: string;
+  samples?: number;
+  exactDrawLimit?: number;
+  maxMarginError?: number;
+}
+
 export interface CoverageSimulationOptions {
   lottery: LotteryId;
   games: GeneratedGame[];
@@ -236,6 +246,90 @@ function resultFromCounts(
   };
 }
 
+function simulateSpaceCounts(options: CoverageSpaceOptions): {
+  method: CoverageSimulationMethod;
+  seed: string;
+  requestedMaxMarginError: number;
+  counts: number[];
+} {
+  const universe = [...options.universe].sort((a, b) => a - b);
+  if (universe.length !== new Set(universe).size || universe.some((value) => !Number.isInteger(value))) {
+    throw new Error("Coverage simulation universe must contain unique integers");
+  }
+  if (!Number.isInteger(options.drawSize) || options.drawSize < 1 || options.drawSize > universe.length) {
+    throw new Error("Coverage simulation drawSize must fit the universe");
+  }
+  const allowed = new Set(universe);
+  for (let index = 0; index < options.games.length; index += 1) {
+    const game = options.games[index]!;
+    if (game.length < options.drawSize || game.length > universe.length) {
+      throw new Error(`Coverage simulation game ${index + 1} has invalid bet size`);
+    }
+    if (game.length !== new Set(game).size || game.some((value) => !allowed.has(value))) {
+      throw new Error(`Coverage simulation game ${index + 1} is invalid for the simulation universe`);
+    }
+  }
+  const exactDrawLimit = Math.max(1, Math.min(
+    MAX_EXACT_DRAWS,
+    Math.round(options.exactDrawLimit ?? MAX_EXACT_DRAWS),
+  ));
+  const totalDraws = combinationCount(universe.length, options.drawSize);
+  const seed = options.seed ?? "loto-lab:coverage-simulator:v1";
+  const requestedMaxMarginError = options.maxMarginError ?? DEFAULT_MAX_MARGIN_ERROR;
+  if (!Number.isFinite(requestedMaxMarginError) || requestedMaxMarginError <= 0 || requestedMaxMarginError >= 1) {
+    throw new Error("Coverage simulation maxMarginError must be between 0 and 1");
+  }
+  if (totalDraws <= exactDrawLimit) {
+    const counts = Array(options.drawSize + 1).fill(0) as number[];
+    for (const draw of combinations(universe, options.drawSize)) {
+      counts[bestHits(options.games, draw)]! += 1;
+    }
+    return { method: "exact", seed, requestedMaxMarginError, counts };
+  }
+  const samples = Math.max(
+    MIN_MONTE_CARLO_SAMPLES,
+    Math.min(MAX_MONTE_CARLO_SAMPLES, Math.round(options.samples ?? DEFAULT_MONTE_CARLO_SAMPLES)),
+  );
+  const random = createSeededRandom(seed);
+  const counts = Array(options.drawSize + 1).fill(0) as number[];
+  for (let index = 0; index < samples; index += 1) {
+    const draw = sampleDraw(universe, options.drawSize, random);
+    counts[bestHits(options.games, draw)]! += 1;
+  }
+  return { method: "monte-carlo", seed, requestedMaxMarginError, counts };
+}
+
+export function simulateCoverageSpace(options: CoverageSpaceOptions) {
+  const simulation = simulateSpaceCounts(options);
+  const evaluatedDraws = simulation.counts.reduce((sum, value) => sum + value, 0);
+  const distribution = simulation.counts.map((count, hits) => ({
+    hits,
+    count,
+    probability: evaluatedDraws > 0 ? round(count / evaluatedDraws) : 0,
+  }));
+  const atLeast = simulation.counts.map((_, hits) => ({
+    hits,
+    probability: evaluatedDraws > 0
+      ? round(simulation.counts.slice(hits).reduce((sum, value) => sum + value, 0) / evaluatedDraws)
+      : 0,
+  }));
+  return {
+    method: simulation.method,
+    seed: simulation.seed,
+    evaluatedDraws,
+    distribution,
+    atLeast,
+    expectedBestHits: evaluatedDraws > 0
+      ? round(simulation.counts.reduce((sum, count, hits) => sum + hits * count, 0) / evaluatedDraws)
+      : 0,
+    quality: quality(
+      simulation.method === "exact",
+      evaluatedDraws,
+      simulation.requestedMaxMarginError,
+    ),
+  };
+}
+
 export function simulateCoverage(options: CoverageSimulationOptions): CoverageSimulationResult {
   const config = getLotteryConfig(options.lottery);
   const games = normalizeGames(options.lottery, options.games);
@@ -243,52 +337,24 @@ export function simulateCoverage(options: CoverageSimulationOptions): CoverageSi
     { length: config.maxNumber - config.minNumber + 1 },
     (_, index) => config.minNumber + index,
   );
-  const exactDrawLimit = Math.max(1, Math.min(
-    MAX_EXACT_DRAWS,
-    Math.round(options.exactDrawLimit ?? MAX_EXACT_DRAWS),
-  ));
-  const totalDraws = combinationCount(universe.length, config.drawSize);
-  const seed = options.seed ?? "loto-lab:coverage-simulator:v1";
-  const requestedMaxMarginError = options.maxMarginError ?? DEFAULT_MAX_MARGIN_ERROR;
-  if (!Number.isFinite(requestedMaxMarginError) || requestedMaxMarginError <= 0 || requestedMaxMarginError >= 1) {
-    throw new Error("Coverage simulation maxMarginError must be between 0 and 1");
-  }
-
-  if (totalDraws <= exactDrawLimit) {
-    const counts = Array(config.drawSize + 1).fill(0) as number[];
-    for (const draw of combinations(universe, config.drawSize)) {
-      counts[bestHits(games, draw)]! += 1;
-    }
-    return resultFromCounts({
-      lottery: options.lottery,
-      seed,
-      games,
-      method: "exact",
-      drawSize: config.drawSize,
-      universeSize: universe.length,
-      requestedMaxMarginError,
-    }, counts);
-  }
-
-  const samples = Math.max(
-    MIN_MONTE_CARLO_SAMPLES,
-    Math.min(MAX_MONTE_CARLO_SAMPLES, Math.round(options.samples ?? DEFAULT_MONTE_CARLO_SAMPLES)),
-  );
-  const random = createSeededRandom(seed);
-  const counts = Array(config.drawSize + 1).fill(0) as number[];
-  for (let index = 0; index < samples; index += 1) {
-    const draw = sampleDraw(universe, config.drawSize, random);
-    counts[bestHits(games, draw)]! += 1;
-  }
+  const simulation = simulateSpaceCounts({
+    universe,
+    drawSize: config.drawSize,
+    games,
+    ...(options.seed !== undefined ? { seed: options.seed } : {}),
+    ...(options.samples !== undefined ? { samples: options.samples } : {}),
+    ...(options.exactDrawLimit !== undefined ? { exactDrawLimit: options.exactDrawLimit } : {}),
+    ...(options.maxMarginError !== undefined ? { maxMarginError: options.maxMarginError } : {}),
+  });
   return resultFromCounts({
     lottery: options.lottery,
-    seed,
+    seed: simulation.seed,
     games,
-    method: "monte-carlo",
+    method: simulation.method,
     drawSize: config.drawSize,
     universeSize: universe.length,
-    requestedMaxMarginError,
-  }, counts);
+    requestedMaxMarginError: simulation.requestedMaxMarginError,
+  }, simulation.counts);
 }
 
 function randomBaselineGames(
