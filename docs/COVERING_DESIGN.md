@@ -57,7 +57,8 @@ A versão é persistida como `greedy-set-cover-v1`.
 Para impedir explosão combinatória, a versão inicial recusa configurações acima de:
 
 - 200.000 apostas candidatas;
-- 200.000 subconjuntos-alvo.
+- 200.000 subconjuntos-alvo;
+- 2.000.000 de incidências candidato × subconjunto.
 
 Esses limites são de segurança operacional, não limites matemáticos da modalidade.
 
