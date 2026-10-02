@@ -248,8 +248,10 @@ function numberGridMarkup(state: GeneratorState): string {
     const selection = state.purpose === "coverage"
       ? state.coveragePool.has(value) ? "fixed" : "auto"
       : state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
-    const tier = tiers.get(value) || "";
-    const selectionLabel = selection === "fixed" ? "fixada" : selection === "excluded" ? "excluída" : "automática";
+    const tier = state.purpose === "coverage" ? "" : tiers.get(value) || "";
+    const selectionLabel = state.purpose === "coverage"
+      ? selection === "fixed" ? "no pool de cobertura" : "fora do pool de cobertura"
+      : selection === "fixed" ? "fixada" : selection === "excluded" ? "excluída" : "automática";
     html += `<button type="button" class="g2-number ${tier ? `is-${tier}` : ""} ${selection !== "auto" ? `is-${selection}` : ""}" data-g2-number="${value}" data-selection="${selection}" aria-label="Dezena ${numberLabel(value)}: ${selectionLabel}">${numberLabel(value)}</button>`;
   }
   return html;
@@ -779,6 +781,9 @@ function bindWorkspace(state: GeneratorState): void {
     const next = select.value;
     if (next !== "uniform" && next !== "portfolio" && next !== "coverage" && next !== "experimental") return;
     state.purpose = next;
+    if (next !== "coverage" && !state.plan.methodology.fixedCountOptions.includes(state.fixedCount)) {
+      state.fixedCount = state.plan.methodology.defaultFixedCount;
+    }
     if (next === "experimental") state.betSize = state.plan.drawSize;
     if (next === "coverage") {
       state.fixed.clear();
@@ -798,6 +803,9 @@ function bindWorkspace(state: GeneratorState): void {
     const select = event.target;
     if (!(select instanceof HTMLSelectElement)) return;
     state.betSize = Number(select.value);
+    if (state.purpose === "coverage") {
+      state.coverageTargetSize = Math.min(state.coverageTargetSize, state.betSize);
+    }
     schedulePlan();
   });
 
