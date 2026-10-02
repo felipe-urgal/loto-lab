@@ -6,6 +6,7 @@ import { buildMetadata } from "./shared.js";
 export const COVERING_DESIGN_VERSION = "greedy-set-cover-v1";
 export const MAX_COVERAGE_CANDIDATES = 200_000;
 export const MAX_COVERAGE_TARGETS = 200_000;
+export const MAX_COVERAGE_INCIDENCES = 2_000_000;
 
 export interface CoveringDesignOptions {
   lottery: LotteryId;
@@ -96,11 +97,16 @@ function validateOptions(options: CoveringDesignOptions): number[] {
   }
   const candidateCount = combinationCount(pool.length, options.ticketSize);
   const targetCount = combinationCount(pool.length, options.targetSize);
+  const targetSubsetsPerCandidate = combinationCount(options.ticketSize, options.targetSize);
   if (candidateCount > MAX_COVERAGE_CANDIDATES) {
     throw new Error(`Coverage candidate space exceeds safe limit (${candidateCount} > ${MAX_COVERAGE_CANDIDATES})`);
   }
   if (targetCount > MAX_COVERAGE_TARGETS) {
     throw new Error(`Coverage target space exceeds safe limit (${targetCount} > ${MAX_COVERAGE_TARGETS})`);
+  }
+  const incidenceCount = candidateCount * targetSubsetsPerCandidate;
+  if (incidenceCount > MAX_COVERAGE_INCIDENCES) {
+    throw new Error(`Coverage incidence space exceeds safe limit (${incidenceCount} > ${MAX_COVERAGE_INCIDENCES})`);
   }
   return pool;
 }
