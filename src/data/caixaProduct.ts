@@ -4,7 +4,7 @@ import type {
   LotteryProductId,
   SecondarySelection,
 } from "../domain/lotteryCatalog.js";
-import { recordCaixaRequest } from "../observability/caixaMetrics.js";
+import { CaixaHttpClient, type FetchLike, type SleepLike } from "./caixaHttpClient.js";
 
 const BASE_URL = "https://servicebus2.caixa.gov.br/portaldeloterias/api";
 const DEFAULT_TIMEOUT_MS = 12_000;
@@ -79,8 +79,6 @@ export interface LotteryProductSource {
   fetchResult(product: LotteryProductId, contestNumber?: number): Promise<LotteryProductResult>;
   fetchAgenda(product: LotteryProductId): Promise<LotteryProductAgendaSnapshot>;
 }
-
-export type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 function toIsoDate(value: string): string {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
@@ -293,16 +291,18 @@ export function normalizeCaixaProductAgenda(
 }
 
 export class CaixaProductSource implements LotteryProductSource {
-  private readonly timeoutMs: number;
+  private readonly http: CaixaHttpClient;
 
   constructor(
-    private readonly fetchImpl: FetchLike = fetch,
+    fetchImpl: FetchLike = fetch,
     timeoutMs = DEFAULT_TIMEOUT_MS,
+    sleep?: SleepLike,
   ) {
-    if (!Number.isFinite(timeoutMs) || timeoutMs < 1000 || timeoutMs > 60_000) {
-      throw new Error("Caixa timeout must be between 1000 and 60000 ms");
-    }
-    this.timeoutMs = timeoutMs;
+    this.http = new CaixaHttpClient(
+      fetchImpl,
+      { totalTimeoutMs: timeoutMs },
+      sleep,
+    );
   }
 
   private async fetchPayload(
@@ -316,23 +316,7 @@ export class CaixaProductSource implements LotteryProductSource {
     }
 
     const url = `${BASE_URL}/${endpoint}${contestNumber ? `/${contestNumber}` : ""}`;
-    const startedAt = performance.now();
-    try {
-      const response = await this.fetchImpl(url, {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(this.timeoutMs),
-      });
-      if (!response.ok) throw new Error(`Caixa request failed (${response.status}) for ${product}`);
-      const payload = (await response.json()) as CaixaProductResponse;
-      recordCaixaRequest("success", performance.now() - startedAt);
-      return payload;
-    } catch (error) {
-      const timeout = error instanceof Error
-        && (error.name === "TimeoutError" || error.name === "AbortError");
-      recordCaixaRequest(timeout ? "timeout" : "error", performance.now() - startedAt);
-      if (timeout) throw new Error(`Caixa request timed out for ${product}`);
-      throw error;
-    }
+    return this.http.getJson<CaixaProductResponse>(url, product);
   }
 
   async fetchResult(product: LotteryProductId, contestNumber?: number): Promise<LotteryProductResult> {
