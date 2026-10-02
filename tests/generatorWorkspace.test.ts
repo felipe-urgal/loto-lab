@@ -62,8 +62,10 @@ test("generator workspace follows Redesign V2 while preserving audited generatio
   assert.match(generator, /postJson<GenerationSaveResponse>\("\/generation\/save"/);
   assert.match(generator, /includeSeed \? state\.preview\?\.generatorOptions\.seed/);
   assert.match(generator, /state\.preview = null/);
-  assert.match(generator, /const tier = tiers\.get\(value\) \|\| ""/);
+  assert.match(generator, /const tier = state\.purpose === "coverage" \? "" : tiers\.get\(value\) \|\| ""/);
   assert.doesNotMatch(generator, /state\.purpose === "experimental" \? \(tiers\.get\(value\) \|\| ""\) : ""/);
+  assert.match(generator, /Cobertura \/ Desdobramento/);
+  assert.match(generator, /coveragePoolNumbers/);
   assert.match(generator, /Forte histórica/);
   assert.match(generator, /Intermediária histórica/);
   assert.match(generator, /Fria histórica/);

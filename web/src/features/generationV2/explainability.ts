@@ -36,7 +36,9 @@ function installWhyPanel(shell: HTMLElement): void {
     ? "A estratégia experimental pode usar evidência histórica; versão e auditoria continuam registradas na prévia."
     : purpose === "portfolio"
       ? "A carteira parte de candidatos válidos e reduz sobreposição entre jogos sem usar score histórico."
-      : "A geração aleatória é uniforme dentro do espaço válido e reproduzível pela seed.";
+      : purpose === "coverage"
+        ? "O desdobramento usa Greedy Set Cover para cobrir subconjuntos do pool. Cobertura completa é uma garantia combinatória condicional, não previsão."
+        : "A geração aleatória é uniforme dentro do espaço válido e reproduzível pela seed.";
 
   const panel = document.createElement("details");
   panel.className = "g2-help";
@@ -138,7 +140,9 @@ function decoratePreview(shell: HTMLElement): void {
     ? "A seleção respeitou a estratégia experimental declarada e sua evidência versionada."
     : purpose === "portfolio"
       ? "A seleção priorizou diversidade entre jogos sem score histórico."
-      : "A seleção foi uniforme dentro do espaço válido, sem score histórico.";
+      : purpose === "coverage"
+        ? "A seleção priorizou ganho de cobertura dos subconjuntos ainda descobertos, com desempate determinístico."
+        : "A seleção foi uniforme dentro do espaço válido, sem score histórico.";
 
   const rationale = document.createElement("section");
   rationale.className = "panel g2-card g2-preview-rationale";

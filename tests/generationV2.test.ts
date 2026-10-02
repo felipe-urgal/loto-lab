@@ -231,3 +231,66 @@ test("Generator 2.0 keeps multiple bets out of legacy experimental strategy", as
     /Multiple-number bets are available only for uniform or portfolio generation/,
   );
 });
+
+
+test("Generator 2.0 integrates covering design with auditable report and exact save", async () => {
+  const useCase = fakeUseCase(() => megaHistory());
+  const input = {
+    lottery: "mega-sena" as const,
+    gameCount: 4,
+    fixedCount: 0,
+    purpose: "coverage" as const,
+    betSize: 6,
+    coveragePoolNumbers: [1, 2, 3, 4, 5, 6, 7, 8],
+    coverageTargetSize: 5,
+  };
+
+  const preview = await useCase.execute(input);
+  const coverage = preview.generatorOptions.coverage as {
+    targetSubsets: number;
+    coveredSubsets: number;
+    coverageRatio: number;
+    isCompleteCoverage: boolean;
+    selectedTickets: number;
+    costCents: number;
+  };
+
+  assert.equal(preview.generatorOptions.purpose, "coverage");
+  assert.equal(coverage.targetSubsets, 56);
+  assert.equal(coverage.selectedTickets, preview.games.length);
+  assert.equal(coverage.costCents, preview.games.length * 600);
+  assert.ok(coverage.coveredSubsets > 0);
+  assert.ok(coverage.coverageRatio > 0 && coverage.coverageRatio <= 1);
+
+  const seed = String(preview.generatorOptions.seed);
+  const saved = await useCase.execute({ ...input, seed, persist: true }) as {
+    games: GeneratedGame[];
+    alreadySaved: boolean;
+  };
+  assert.equal(saved.alreadySaved, false);
+  assert.equal(fingerprint(saved.games), fingerprint(preview.games));
+});
+
+test("coverage configuration is part of preview signature", async () => {
+  const useCase = fakeUseCase(() => megaHistory());
+  const base = {
+    lottery: "mega-sena" as const,
+    gameCount: 2,
+    fixedCount: 0,
+    purpose: "coverage" as const,
+    betSize: 6,
+    coveragePoolNumbers: [1, 2, 3, 4, 5, 6, 7],
+    coverageTargetSize: 5,
+  };
+  const preview = await useCase.execute(base);
+
+  await assert.rejects(
+    () => useCase.execute({
+      ...base,
+      coveragePoolNumbers: [1, 2, 3, 4, 5, 6, 8],
+      seed: String(preview.generatorOptions.seed),
+      persist: true,
+    }),
+    (error: unknown) => Boolean(error && typeof error === "object" && "code" in error && error.code === "PREVIEW_CONFIG_CHANGED"),
+  );
+});

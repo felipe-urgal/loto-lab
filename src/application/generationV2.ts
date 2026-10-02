@@ -8,6 +8,7 @@ import {
   quoteTimemania,
 } from "../domain/structuredBetRules.js";
 import { generateDiaDeSorteGames, type DiaDeSorteFixedCount } from "../generator/diaDeSorte.js";
+import { generateCoveringDesign, type CoveringDesignReport } from "../generator/coveringDesign.js";
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { generateMegaSenaGames, type MegaSenaFixedCount } from "../generator/megaSena.js";
 import {
@@ -44,6 +45,9 @@ export interface GenerationV2Input {
   cloverCount?: number;
   favoriteTeam?: string;
   columnMarks?: number[];
+  coveragePoolNumbers?: number[];
+  coverageTargetSize?: number;
+  coverageBudgetCents?: number;
   persist?: boolean;
 }
 
@@ -140,7 +144,7 @@ function normalizedConstraints(constraints: GenerationConstraints | undefined) {
 }
 
 export function generationConfigSignature(
-  input: Pick<GenerationV2Input, "lottery" | "gameCount" | "fixedCount" | "betSize" | "purpose" | "generationMode" | "fixedNumbers" | "excludedNumbers" | "constraints" | "cloverCount" | "favoriteTeam" | "columnMarks">,
+  input: Pick<GenerationV2Input, "lottery" | "gameCount" | "fixedCount" | "betSize" | "purpose" | "generationMode" | "fixedNumbers" | "excludedNumbers" | "constraints" | "cloverCount" | "favoriteTeam" | "columnMarks" | "coveragePoolNumbers" | "coverageTargetSize" | "coverageBudgetCents">,
   targetContestNumber?: number,
 ): string {
   return hashText(JSON.stringify({
@@ -158,6 +162,9 @@ export function generationConfigSignature(
     cloverCount: input.cloverCount ?? null,
     favoriteTeam: input.favoriteTeam?.trim() ?? null,
     columnMarks: input.columnMarks ?? null,
+    coveragePoolNumbers: sortedNumbers(input.coveragePoolNumbers),
+    coverageTargetSize: input.coverageTargetSize ?? null,
+    coverageBudgetCents: input.coverageBudgetCents ?? null,
   }));
 }
 
@@ -250,6 +257,10 @@ function isExpectedGeneratorFailure(error: unknown): boolean {
     "Unable to build a diversified portfolio",
     "Unable to select the requested portfolio size",
     "Timemania generation requires an explicit Time do Coração",
+    "Coverage constraints leave no valid candidate tickets",
+    "Coverage candidate space exceeds safe limit",
+    "Coverage target space exceeds safe limit",
+    "Coverage incidence space exceeds safe limit",
   ].some((fragment) => error.message.includes(fragment));
 }
 
@@ -309,15 +320,18 @@ export class GenerationV2UseCase {
   }
 
   async execute(input: GenerationV2Input) {
-    validateFixedCount(input.lottery, input.fixedCount);
-    validateCoreSelection(input);
-    if (!Number.isInteger(input.gameCount) || input.gameCount < 1 || input.gameCount > 10) {
-      throw new GenerationV2Error("INVALID_ARGUMENT", "gameCount must be an integer between 1 and 10");
+    const purpose = input.purpose ?? "uniform";
+    if (purpose !== "coverage") {
+      validateFixedCount(input.lottery, input.fixedCount);
+      validateCoreSelection(input);
+    }
+    const maximumGameCount = purpose === "coverage" ? 100 : 10;
+    if (!Number.isInteger(input.gameCount) || input.gameCount < 1 || input.gameCount > maximumGameCount) {
+      throw new GenerationV2Error("INVALID_ARGUMENT", `gameCount must be an integer between 1 and ${maximumGameCount}`);
     }
 
     const contests = await this.history.listGenerationHistory(input.lottery);
     const scoped = scopeGenerationHistory(contests, input.lottery, input.targetContestNumber);
-    const purpose = input.purpose ?? "uniform";
     const config = getLotteryConfig(input.lottery);
     const effectiveBetSize = input.betSize ?? config.defaultBetSize;
     const betQuote = input.lottery === "mais-milionaria"
@@ -332,6 +346,34 @@ export class GenerationV2UseCase {
         "INVALID_ARGUMENT",
         `Official bet cardinality is not available for ${input.lottery}`,
       );
+    }
+    const coverageBetQuote = purpose === "coverage"
+      ? quoteOfficialBet(input.lottery, effectiveBetSize, 1)
+      : undefined;
+    if (purpose === "coverage" && !["mega-sena", "lotofacil", "quina", "dupla-sena"].includes(input.lottery)) {
+      throw new GenerationV2Error(
+        "INVALID_ARGUMENT",
+        `Coverage generation is not available for ${input.lottery}`,
+      );
+    }
+    if (purpose === "coverage" && !coverageBetQuote) {
+      throw new GenerationV2Error("INVALID_ARGUMENT", "Coverage generation requires an official bet price");
+    }
+    if (purpose === "coverage") {
+      const pool = sortedNumbers(input.coveragePoolNumbers);
+      if (pool.length < effectiveBetSize) {
+        throw new GenerationV2Error("INVALID_ARGUMENT", "Coverage pool must contain at least the bet size");
+      }
+      if (new Set(pool).size !== pool.length) {
+        throw new GenerationV2Error("INVALID_ARGUMENT", "Coverage pool numbers must be unique");
+      }
+      const targetSize = input.coverageTargetSize ?? Math.max(1, config.drawSize - 1);
+      if (!Number.isInteger(targetSize) || targetSize < 1 || targetSize > effectiveBetSize) {
+        throw new GenerationV2Error("INVALID_ARGUMENT", "coverageTargetSize must fit between 1 and betSize");
+      }
+      if (input.coverageBudgetCents !== undefined && (!Number.isInteger(input.coverageBudgetCents) || input.coverageBudgetCents < 0)) {
+        throw new GenerationV2Error("INVALID_ARGUMENT", "coverageBudgetCents must be a non-negative integer");
+      }
     }
     if (purpose === "experimental" && effectiveBetSize !== config.defaultBetSize) {
       throw new GenerationV2Error(
@@ -371,6 +413,9 @@ export class GenerationV2UseCase {
       cloverCount: input.cloverCount,
       favoriteTeam: input.favoriteTeam,
       columnMarks: input.columnMarks,
+      coveragePoolNumbers: input.coveragePoolNumbers,
+      coverageTargetSize: input.coverageTargetSize,
+      coverageBudgetCents: input.coverageBudgetCents,
     }, targetContestNumber);
 
     if (persist) {
@@ -473,8 +518,31 @@ export class GenerationV2UseCase {
       ? plan.referenceContestNumber ?? null
       : null;
     let games: GeneratedGame[];
+    let coverageReport: CoveringDesignReport | undefined;
     try {
-      if (purpose === "uniform" || purpose === "portfolio") {
+      if (purpose === "coverage") {
+        const result = generateCoveringDesign({
+          lottery: input.lottery,
+          poolNumbers: input.coveragePoolNumbers ?? [],
+          ticketSize: effectiveBetSize,
+          targetSize: input.coverageTargetSize ?? Math.max(1, config.drawSize - 1),
+          maxTickets: input.gameCount,
+          pricePerTicketCents: coverageBetQuote?.pricePerBetCents ?? 0,
+          ...(input.coverageBudgetCents !== undefined ? { budgetCents: input.coverageBudgetCents } : {}),
+          ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
+          ...(referenceContestNumber !== null
+            ? (() => {
+                const referenceContest = scoped.history.find((contest) => contest.number === referenceContestNumber);
+                return referenceContest ? { referenceContest } : {};
+              })()
+            : {}),
+        });
+        games = result.games;
+        coverageReport = result.report;
+        if (games.length < 1) {
+          throw new GenerationV2Error("ALGORITHM_SPACE_UNSATISFIED", "O orçamento ou os filtros não permitem selecionar nenhum jogo de cobertura.");
+        }
+      } else if (purpose === "uniform" || purpose === "portfolio") {
         const generate = purpose === "uniform" ? generateUniformGames : generatePortfolioGames;
         games = generate({
           lottery: input.lottery,
@@ -548,6 +616,9 @@ export class GenerationV2UseCase {
       throw error;
     }
 
+    const effectiveBetQuote = betQuote && purpose === "coverage"
+      ? quoteOfficialBet(input.lottery, effectiveBetSize, games.length)
+      : betQuote;
     const fingerprint = gameFingerprint(games);
     const id = previewId(input.lottery, seed, currentHistorySignature, configSignature, fingerprint);
     const generatorOptions: Record<string, unknown> = {
@@ -555,7 +626,7 @@ export class GenerationV2UseCase {
       gameCount: input.gameCount,
       fixedCount: input.fixedCount,
       betSize: effectiveBetSize,
-      ...(betQuote ? { betQuote } : {}),
+      ...(effectiveBetQuote ? { betQuote: effectiveBetQuote } : {}),
       purpose,
       generationMode,
       ...(purpose === "experimental"
@@ -574,6 +645,10 @@ export class GenerationV2UseCase {
       ...(input.cloverCount !== undefined ? { cloverCount: input.cloverCount } : {}),
       ...(input.favoriteTeam !== undefined ? { favoriteTeam: input.favoriteTeam.trim() } : {}),
       ...(input.columnMarks !== undefined ? { columnMarks: input.columnMarks } : {}),
+      ...(coverageReport ? { coverage: coverageReport } : {}),
+      ...(input.coveragePoolNumbers !== undefined ? { coveragePoolNumbers: sortedNumbers(input.coveragePoolNumbers) } : {}),
+      ...(input.coverageTargetSize !== undefined ? { coverageTargetSize: input.coverageTargetSize } : {}),
+      ...(input.coverageBudgetCents !== undefined ? { coverageBudgetCents: input.coverageBudgetCents } : {}),
       historySignature: currentHistorySignature,
       configSignature,
       gameFingerprint: fingerprint,
