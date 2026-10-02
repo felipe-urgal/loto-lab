@@ -4,7 +4,7 @@ import type {
   LotteryProductId,
   SecondarySelection,
 } from "../domain/lotteryCatalog.js";
-import { CaixaHttpClient, type FetchLike, type SleepLike } from "./caixaHttpClient.js";
+import { CaixaHttpClient, CaixaInvalidResponseError, type FetchLike, type SleepLike } from "./caixaHttpClient.js";
 
 const BASE_URL = "https://servicebus2.caixa.gov.br/portaldeloterias/api";
 const DEFAULT_TIMEOUT_MS = 12_000;
@@ -320,10 +320,20 @@ export class CaixaProductSource implements LotteryProductSource {
   }
 
   async fetchResult(product: LotteryProductId, contestNumber?: number): Promise<LotteryProductResult> {
-    return normalizeCaixaProductResult(product, await this.fetchPayload(product, contestNumber));
+    const payload = await this.fetchPayload(product, contestNumber);
+    try {
+      return normalizeCaixaProductResult(product, payload);
+    } catch (error) {
+      throw new CaixaInvalidResponseError(`Invalid Caixa product payload for ${product}`, { cause: error });
+    }
   }
 
   async fetchAgenda(product: LotteryProductId): Promise<LotteryProductAgendaSnapshot> {
-    return normalizeCaixaProductAgenda(product, await this.fetchPayload(product));
+    const payload = await this.fetchPayload(product);
+    try {
+      return normalizeCaixaProductAgenda(product, payload);
+    } catch (error) {
+      throw new CaixaInvalidResponseError(`Invalid Caixa product agenda for ${product}`, { cause: error });
+    }
   }
 }
