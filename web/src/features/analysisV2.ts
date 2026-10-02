@@ -215,8 +215,7 @@ function shellMarkup(data: AnalysisPayload, catalog: LotteryCatalogItem): string
         ${detailsBlock("Estrutura e distribuições", "Observado, histórico anterior e referências matemáticas.", structureView(data))}
         ${detailsBlock("Dinâmica histórica", "Movimentos, ciclos, atrasos e mapa binário.", dynamicsView(data))}
         ${detailsBlock("Associações", "Duplas, trincas e concursos parecidos; exploração sem previsão.", combinationsView(data))}
-        ${detailsBlock("Auditoria de aleatoriedade", "Compatibilidade estatística, integridade temporal e baseline sintético; não é previsão.", randomnessAuditView(data))}
-        ${detailsBlock("Validação e metodologia", "Teste fora da amostra, sensibilidade e proteção anti-leakage.", validationView(data))}
+        ${detailsBlock("Validação e metodologia", "Teste fora da amostra, auditoria de aleatoriedade, sensibilidade e proteção anti-leakage.", validationView(data))}
       </div>
     </section>
     <dialog class="a2-detail" id="a2-detail" aria-label="Detalhe da dezena"></dialog>
@@ -417,6 +416,7 @@ function validationView(data: AnalysisPayload): string {
     <div class="a2-validation-principle"><strong>Teste fora da amostra</strong><span>${escapeHtml(validation.methodology.note)}</span></div>
     <section><div class="section-head"><div><h2>Fortes × intermediárias × frias</h2><p>A classificação de cada rodada é congelada antes de olhar o concurso seguinte. Selos de evidência exigem pelo menos ${validation.methodology.minimumEvidenceRounds ?? 30} alvos válidos.</p></div><label class="a2-window-control">Período<select data-a2-validation-window>${validation.periods.map((period) => `<option value="${period.window}" ${period.window === initial?.window ? "selected" : ""}>últimos ${period.window} · ${period.rounds} válidos</option>`).join("")}</select></label></div><div class="a2-validation-grid" data-a2-validation-cards>${validationCards(initial)}</div></section>
     <section><div class="section-head"><div><h2>Sensibilidade dos pesos</h2><p>Cada peso é perturbado em -10%, 0 e +10%, depois normalizado; são 243 cenários por dezena quando há histórico.</p></div></div><div class="panel table-wrap"><table class="a2-table"><thead><tr><th>Dezena</th><th>Posição</th><th>Grupo</th><th>Mesmo grupo</th><th>Forte nos cenários</th><th>Faixa de posição</th></tr></thead><tbody>${robustnessRows(data)}</tbody></table></div></section>
+    <section><div class="section-head"><div><h2>Auditoria de aleatoriedade</h2><p>Compatibilidade estatística e integridade temporal do histórico; não é previsão.</p></div></div>${randomnessAuditView(data)}</section>
     <section><article class="panel a2-method-card"><strong>Como ler esta aba</strong><p>Um grupo aparecer acima do esperado em uma janela não basta para concluir capacidade preditiva. O Loto Lab mostra o desvio, a incerteza e a correção estatística; resultados instáveis entre janelas devem ser tratados como observação, não como regra.</p><div><span>Aquecimento <b>${validation.methodology.warmupContests}</b></span><span>Evidência mín. <b>${validation.methodology.minimumEvidenceRounds ?? 30} alvos</b></span><span>Anti-leakage <b>${validation.methodology.leakageProtection ? "ativo" : "não"}</b></span><span>Trecho contínuo <b>${validation.sourceContests}</b></span><span>Correção <b>${validation.methodology.correction}</b></span></div></article></section>
   </div>`;
 }
