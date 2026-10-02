@@ -3,7 +3,7 @@ import { getLotteryConfig } from "../lotteries/config.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
 import { buildMetadata, createSeededRandom } from "./shared.js";
 
-export type GenerationPurpose = "uniform" | "portfolio" | "experimental";
+export type GenerationPurpose = "uniform" | "portfolio" | "coverage" | "experimental";
 
 const LUCKY_MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
