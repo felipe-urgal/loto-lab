@@ -527,7 +527,7 @@ function updateNumberButtons(state: GeneratorState): void {
     const selection = state.purpose === "coverage"
       ? state.coveragePool.has(value) ? "fixed" : "auto"
       : state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
-    const tier = tiers.get(value) || "";
+    const tier = state.purpose === "coverage" ? "" : tiers.get(value) || "";
     button.dataset.selection = selection;
     button.classList.toggle("is-fixed", selection === "fixed");
     button.classList.toggle("is-excluded", selection === "excluded");
