@@ -260,6 +260,7 @@ function isExpectedGeneratorFailure(error: unknown): boolean {
     "Coverage constraints leave no valid candidate tickets",
     "Coverage candidate space exceeds safe limit",
     "Coverage target space exceeds safe limit",
+    "Coverage incidence space exceeds safe limit",
   ].some((fragment) => error.message.includes(fragment));
 }
 
