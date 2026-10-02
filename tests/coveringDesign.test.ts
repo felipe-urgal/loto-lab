@@ -102,3 +102,18 @@ test("covering design rejects unsafe combinatorial spaces", () => {
     /safe limit/,
   );
 });
+
+
+test("covering design rejects excessive candidate-target incidence work", () => {
+  assert.throws(
+    () => generateCoveringDesign({
+      lottery: "mega-sena",
+      poolNumbers: Array.from({ length: 20 }, (_, index) => index + 1),
+      ticketSize: 10,
+      targetSize: 5,
+      maxTickets: 10,
+      pricePerTicketCents: 600,
+    }),
+    /incidence space exceeds safe limit/,
+  );
+});
