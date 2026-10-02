@@ -1,6 +1,6 @@
 import type { Contest, ContestPrizeTier, LotteryId } from "../domain/types.js";
 import { assertValidContestNumbers } from "../domain/validation.js";
-import { CaixaHttpClient, type FetchLike, type SleepLike } from "./caixaHttpClient.js";
+import { CaixaHttpClient, CaixaInvalidResponseError, type FetchLike, type SleepLike } from "./caixaHttpClient.js";
 import type { ContestSource, LotteryAgendaSnapshot, LotteryAgendaSource } from "./source.js";
 
 const BASE_URL = "https://servicebus2.caixa.gov.br/portaldeloterias/api";
@@ -181,11 +181,21 @@ export class CaixaContestSource implements ContestSource, LotteryAgendaSource {
   }
 
   async fetchContest(lottery: LotteryId, contestNumber?: number): Promise<Contest> {
-    return normalizeCaixaContest(lottery, await this.fetchPayload(lottery, contestNumber));
+    const payload = await this.fetchPayload(lottery, contestNumber);
+    try {
+      return normalizeCaixaContest(lottery, payload);
+    } catch (error) {
+      throw new CaixaInvalidResponseError(`Invalid Caixa contest payload for ${lottery}`, { cause: error });
+    }
   }
 
   async fetchAgenda(lottery: LotteryId): Promise<LotteryAgendaSnapshot> {
-    return normalizeCaixaAgenda(lottery, await this.fetchPayload(lottery));
+    const payload = await this.fetchPayload(lottery);
+    try {
+      return normalizeCaixaAgenda(lottery, payload);
+    } catch (error) {
+      throw new CaixaInvalidResponseError(`Invalid Caixa agenda payload for ${lottery}`, { cause: error });
+    }
   }
 
   async fetchContestRange(lottery: LotteryId, startContest: number, endContest: number): Promise<Contest[]> {
