@@ -9,6 +9,7 @@ import type { CheckGameBatchUseCase } from "../application/checkGameBatch.js";
 import type { CompareGameBatchUseCase } from "../application/compareGameBatch.js";
 import type { ContestCatalogUseCase } from "../application/contestCatalog.js";
 import type { GetDataStatusUseCase } from "../application/dataStatus.js";
+import type { ReconcileContestDataUseCase } from "../application/reconcileContestData.js";
 import type { ExecuteBacktestUseCase } from "../application/executeBacktest.js";
 import type { EvaluateGameBatchCoverageUseCase } from "../application/evaluateGameBatchCoverage.js";
 import type { GameBatchUseCase } from "../application/gameBatches.js";
@@ -22,6 +23,7 @@ import type { StrategyCatalogUseCase } from "../application/strategyCatalog.js";
 import { serveAnalysis } from "./analysis.js";
 import { serveContests } from "./contests.js";
 import { serveDataStatus } from "./dataStatus.js";
+import { serveDataReconciliation } from "./dataReconciliation.js";
 import { serveGameBatchManagement } from "./gameBatchManagement.js";
 import { serveGameCoverage } from "./gameCoverage.js";
 import { serveGameBatches } from "./gameBatches.js";
@@ -50,6 +52,7 @@ export interface FeatureRouteDependencies {
   compareGameBatch: CompareGameBatchUseCase;
   contestCatalog: ContestCatalogUseCase;
   dataStatus: GetDataStatusUseCase;
+  dataReconciliation: ReconcileContestDataUseCase;
   executeBacktest: ExecuteBacktestUseCase;
   evaluateGameBatchCoverage: EvaluateGameBatchCoverageUseCase;
   gameBatches: GameBatchUseCase;
@@ -82,6 +85,8 @@ const featureRoutes: FeatureRouteHandler[] = [
     serveContests(request, response, options, dependencies.contestCatalog),
   (request, response, options, dependencies) =>
     serveDataStatus(request, response, options, dependencies.dataStatus),
+  (request, response, options, dependencies) =>
+    serveDataReconciliation(request, response, options, dependencies.dataReconciliation),
   (request, response, options, dependencies) =>
     serveGeneration(request, response, options, dependencies.generateGames),
   (request, response, options, dependencies) =>

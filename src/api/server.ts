@@ -16,6 +16,7 @@ import { CheckGameBatchUseCase } from "../application/checkGameBatch.js";
 import { CompareGameBatchUseCase } from "../application/compareGameBatch.js";
 import { ContestCatalogUseCase } from "../application/contestCatalog.js";
 import { GetDataStatusUseCase } from "../application/dataStatus.js";
+import { ReconcileContestDataUseCase } from "../application/reconcileContestData.js";
 import { ExecuteBacktestUseCase } from "../application/executeBacktest.js";
 import { EvaluateGameBatchCoverageUseCase } from "../application/evaluateGameBatchCoverage.js";
 import { GameBatchUseCase } from "../application/gameBatches.js";
@@ -30,6 +31,8 @@ import { ResearchHypothesesUseCase } from "../application/researchHypotheses.js"
 import { RunStrategyLabUseCase } from "../application/runStrategyLab.js";
 import { StrategyCatalogUseCase } from "../application/strategyCatalog.js";
 import type { ContestSource } from "../data/source.js";
+import type { SecondaryContestSource } from "../data/secondarySource.js";
+import { MaickonSecondaryContestSource } from "../data/maickonSecondarySource.js";
 import { runGenerationPlanInWorker } from "../generator/planningWorkerClient.js";
 import { NotificationService } from "../notifications/service.js";
 import { caixaMetricsSnapshot } from "../observability/caixaMetrics.js";
@@ -72,6 +75,7 @@ export interface LotoLabServerOptions extends ApiServerOptions {
   aiProvider?: AiInterpretationProvider;
   operationSource?: ContestSource;
   staleAfterMinutes?: number;
+  secondaryContestSource?: SecondaryContestSource;
 }
 
 function isHealthPath(pathname: string): boolean {
@@ -116,6 +120,10 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
     compareGameBatch: new CompareGameBatchUseCase(games, contests),
     contestCatalog: new ContestCatalogUseCase(contests),
     dataStatus: new GetDataStatusUseCase(contests),
+    dataReconciliation: new ReconcileContestDataUseCase(
+      contests,
+      options.secondaryContestSource ?? new MaickonSecondaryContestSource(),
+    ),
     evaluateGameBatchCoverage: new EvaluateGameBatchCoverageUseCase(games),
     executeBacktest: new ExecuteBacktestUseCase(
       expensiveAnalysisGate,
