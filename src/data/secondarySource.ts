@@ -15,6 +15,7 @@ export interface SecondaryContestSnapshot {
 }
 
 export interface SecondaryContestSource {
+  readonly provider: string;
   supports(lottery: LotteryId): boolean;
   latestContestNumber(lottery: LotteryId): Promise<number>;
   fetchContest(lottery: LotteryId, contestNumber: number): Promise<SecondaryContestSnapshot | undefined>;
