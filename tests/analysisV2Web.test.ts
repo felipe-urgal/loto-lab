@@ -68,6 +68,9 @@ test("Analyses is lazy-loaded, typed and exposes one capability-aware number map
   assert.match(source, /detailsBlock\("Estrutura e distribuições"/);
   assert.match(source, /detailsBlock\("Dinâmica histórica"/);
   assert.match(source, /detailsBlock\("Associações"/);
+  assert.match(source, /Auditoria de aleatoriedade/);
+  assert.match(source, /randomnessAuditView/);
+  assert.match(source, /Compatível com o baseline testado/);
   assert.match(source, /detailsBlock\("Validação e metodologia"/);
   assert.match(source, /data-a2-pair-check/);
   assert.match(source, /data-a2-validation-window/);
@@ -95,6 +98,7 @@ test("Analyses is lazy-loaded, typed and exposes one capability-aware number map
 
   assert.match(advanced, /exactBinomialTwoSidedP/);
   assert.match(advanced, /validation: buildRollingValidation\(scoped, config\)/);
+  assert.match(advanced, /randomnessAudit: buildRandomnessIntegrityAudit\(scoped, config\)/);
   assert.match(validation, /bonferroni-\$\{VALIDATION_COMPARISONS\}-tests/);
   assert.match(validation, /leakageProtection: true/);
   assert.match(hardening, /historicalExpected/);

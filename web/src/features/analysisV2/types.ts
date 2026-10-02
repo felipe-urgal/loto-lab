@@ -207,6 +207,58 @@ export type AnalysisValidation = {
   sourceContests: number;
 };
 
+export type RandomnessAuditStatus = "compatible" | "investigate" | "insufficient-evidence";
+
+export type RandomnessAuditMetric = {
+  id: string;
+  label: string;
+  observed: number;
+  nullMedian: number;
+  nullP05: number;
+  nullP95: number;
+  pValue: number;
+  adjustedPValue: number;
+  status: RandomnessAuditStatus;
+  nullHypothesis: string;
+  limitation: string;
+};
+
+export type RandomnessNumberAudit = {
+  number: number;
+  observed: number;
+  expected: number;
+  pValue: number;
+  adjustedPValue: number;
+  status: RandomnessAuditStatus;
+};
+
+export type RandomnessIntegrityAudit = {
+  version: string;
+  available: boolean;
+  status: RandomnessAuditStatus;
+  methodology: {
+    baseline: string;
+    correction: string;
+    samples: number;
+    seed: string;
+    pValueResolution: number;
+    predictive: false;
+    note: string;
+  };
+  scope: {
+    sourceContests: number;
+    analyzedContests: number;
+    firstContest?: number;
+    lastContest?: number;
+    excludedBeforeSegment: number;
+    gapDetected: boolean;
+    regimeChangeDetected: boolean;
+    continuous: boolean;
+  };
+  metrics: RandomnessAuditMetric[];
+  perNumber: RandomnessNumberAudit[];
+};
+
 export type AdvancedAnalysis = {
   latestContest?: {
     number: number;
@@ -224,6 +276,7 @@ export type AdvancedAnalysis = {
     closest?: SimilarContest[];
   };
   validation: AnalysisValidation;
+  randomnessAudit: RandomnessIntegrityAudit;
 };
 
 export type AnalysisPayload = {
