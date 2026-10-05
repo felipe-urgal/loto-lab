@@ -58,7 +58,7 @@
     "quality:e2e-syntax": "node --check scripts/seedE2e.mjs && node --check scripts/e2eBrowser.mjs && node --check scripts/e2eAnalysisLotteries.mjs && node --check scripts/e2eGeneratorV2.mjs && node --check scripts/e2eReadability.mjs && node --check scripts/e2eCriticalRoutes.mjs"
   },
   "dependencies": {
-    "pg": "^8.23.0"
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.6",
