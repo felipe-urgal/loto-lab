@@ -1,4 +1,5 @@
 import test from "node:test";
+import type { Pool } from "pg";
 import assert from "node:assert/strict";
 import type { Contest, GeneratedGame } from "../src/domain/types.js";
 import { runMigrations } from "../src/db/migrations.js";
@@ -113,6 +114,68 @@ test(
         await assert.rejects(backtests.listRecent("lotofacil", invalidLimit), /limit/i);
         await assert.rejects(backtests.listRecentSummaries("lotofacil", invalidLimit), /limit/i);
       }
+      const bet = await realBets.create({
+        batchId: batch.id,
+        lottery: "lotofacil",
+        contestNumber: 3768,
+        actualCost: 3.5,
+        playedAt: new Date().toISOString(),
+        games: [{ batchPosition: 1, game }],
+      });
+      let updatedBetweenStatements = false;
+      // Commit a parent/children reconciliation after the reader's first SELECT.
+      const racingPool = new Proxy(pool, {
+        get(target, property, receiver) {
+          if (property !== "connect") return Reflect.get(target, property, receiver);
+          return async () => {
+            const reader = await target.connect();
+            return new Proxy(reader, {
+              get(client, key, clientReceiver) {
+                if (key !== "query") return Reflect.get(client, key, clientReceiver);
+                return async (...args: unknown[]) => {
+                  const result: unknown = await Reflect.apply(client.query, client, args);
+                  if (
+                    !updatedBetweenStatements &&
+                    typeof args[0] === "string" &&
+                    args[0].includes("FROM real_bets")
+                  ) {
+                    updatedBetweenStatements = true;
+                    const writer = await pool.connect();
+                    try {
+                      await writer.query("BEGIN");
+                      await writer.query(
+                        "UPDATE real_bet_games SET prize_value = 20 WHERE real_bet_id = $1",
+                        [bet.id],
+                      );
+                      await writer.query(
+                        "UPDATE real_bets SET status = 'checked', total_prize_value = 20, net_result = 16.5 WHERE id = $1",
+                        [bet.id],
+                      );
+                      await writer.query("COMMIT");
+                    } catch (error) {
+                      await writer.query("ROLLBACK");
+                      throw error;
+                    } finally {
+                      writer.release();
+                    }
+                  }
+                  return result;
+                };
+              },
+            });
+          };
+        },
+      }) as Pool;
+      const readDuringReconciliation = await new PostgresRealBetRepository(racingPool).findById(bet.id);
+      assert.equal(updatedBetweenStatements, true);
+      assert.equal(readDuringReconciliation?.status, "awaiting_result");
+      assert.equal(readDuringReconciliation?.totalPrizeValue, undefined);
+      assert.equal(readDuringReconciliation?.games[0]?.prizeValue, undefined);
+      const reconciled = await realBets.findById(bet.id);
+      assert.equal(reconciled?.status, "checked");
+      assert.equal(reconciled?.totalPrizeValue, 20);
+      assert.equal(reconciled?.games[0]?.prizeValue, 20);
+
       const run = await backtests.save({
         lottery: "lotofacil",
         strategyId: strategy.id,
