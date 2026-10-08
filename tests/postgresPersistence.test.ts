@@ -159,7 +159,7 @@ test(
             [bet.id],
           );
           await writer.query(
-            "UPDATE real_bets SET status = 'checked', total_prize_value = 20, net_result = 16.5 WHERE id = $1",
+            "UPDATE real_bets SET status = 'checked', checked_at = NOW(), total_prize_value = 20, net_result = 16.5 WHERE id = $1",
             [bet.id],
           );
           await writer.query("COMMIT");
