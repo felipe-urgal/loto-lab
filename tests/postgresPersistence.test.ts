@@ -5,6 +5,7 @@ import { runMigrations } from "../src/db/migrations.js";
 import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
 import { PostgresStrategyRepository } from "../src/persistence/strategyRepository.js";
 import { PostgresGameRepository } from "../src/persistence/gameRepository.js";
+import { PostgresRealBetRepository } from "../src/persistence/realBetRepository.js";
 import { PostgresBacktestRepository } from "../src/persistence/backtestRepository.js";
 import { createIsolatedPostgresDatabase } from "./helpers/postgres.js";
 
@@ -77,14 +78,41 @@ test(
       const batch = await games.saveBatch({
         lottery: "lotofacil",
         strategyId: strategy.id,
+        strategyVersionId: strategy.latestVersionId,
         targetContestNumber: 3768,
         generatorOptions: { gameCount: 1, fixedCount: 8 },
         games: [game],
       });
+      assert.equal(batch.strategyId, strategy.id);
+      assert.equal(batch.strategyVersionId, strategy.latestVersionId);
+      assert.equal((await games.findBatch(batch.id))?.strategyVersionId, strategy.latestVersionId);
+      assert.equal((await games.listRecent("lotofacil"))[0]?.strategyVersionId, strategy.latestVersionId);
+      const key = `persistence-version-${strategy.id}`;
+      const idempotentInput = {
+        lottery: "lotofacil" as const,
+        strategyId: strategy.id,
+        strategyVersionId: strategy.latestVersionId,
+        games: [game],
+      };
+      const initial = await games.saveBatchIdempotent(idempotentInput, key);
+      const repeated = await games.saveBatchIdempotent(idempotentInput, key);
+      assert.equal(initial.created, true);
+      assert.equal(repeated.created, false);
+      assert.equal(repeated.batch.id, initial.batch.id);
+      assert.equal(repeated.batch.strategyVersionId, strategy.latestVersionId);
+      assert.equal(repeated.batch.strategyId, strategy.id);
       assert.equal(batch.games.length, 1);
       assert.deepEqual(batch.games[0]?.fixedNumbers, game.fixedNumbers);
 
+      const realBets = new PostgresRealBetRepository(pool);
       const backtests = new PostgresBacktestRepository(pool);
+      for (const invalidLimit of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 999999]) {
+        await assert.rejects(games.listRecent("lotofacil", invalidLimit), /limit/i);
+        await assert.rejects(realBets.listRecent("lotofacil", invalidLimit), /limit/i);
+        await assert.rejects(realBets.listRealBets(1, invalidLimit), /limit/i);
+        await assert.rejects(backtests.listRecent("lotofacil", invalidLimit), /limit/i);
+        await assert.rejects(backtests.listRecentSummaries("lotofacil", invalidLimit), /limit/i);
+      }
       const run = await backtests.save({
         lottery: "lotofacil",
         strategyId: strategy.id,
