@@ -1,3 +1,4 @@
+import { assertRepositoryLimit } from "./repositoryLimit.js";
 import type { Pool } from "pg";
 import type { LotteryId } from "../domain/types.js";
 import type {
@@ -116,7 +117,10 @@ export class PostgresBacktestRepository {
   }
 
   async findById(id: number): Promise<BacktestRunRecord | undefined> {
-    const runResult = await this.pool.query<BacktestRunRow>(
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
+      const runResult = await client.query<BacktestRunRow>(
       `
         SELECT id, lottery, strategy_id, strategy_version_id, options, summary, created_at
         FROM backtest_runs
@@ -125,9 +129,12 @@ export class PostgresBacktestRepository {
       [id],
     );
     const run = runResult.rows[0];
-    if (!run) return undefined;
+    if (!run) {
+      await client.query("COMMIT");
+      return undefined;
+    }
 
-    const roundsResult = await this.pool.query<{ payload: BacktestRoundArtifact }>(
+    const roundsResult = await client.query<{ payload: BacktestRoundArtifact }>(
       `
         SELECT payload
         FROM backtest_rounds
@@ -137,6 +144,7 @@ export class PostgresBacktestRepository {
       [id],
     );
 
+    await client.query("COMMIT");
     return {
       id: Number(run.id),
       lottery: run.lottery,
@@ -147,9 +155,16 @@ export class PostgresBacktestRepository {
       rounds: roundsResult.rows.map((row) => row.payload),
       createdAt: run.created_at.toISOString(),
     };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async listRecent(lottery: LotteryId, limit = 20): Promise<BacktestRunRecord[]> {
+    assertRepositoryLimit(limit, 100);
     const result = await this.pool.query<{ id: string }>(
       `
         SELECT id
@@ -169,6 +184,7 @@ export class PostgresBacktestRepository {
     lottery: LotteryId,
     limit = 20,
   ): Promise<BacktestRunSummaryRecord[]> {
+    assertRepositoryLimit(limit, 500);
     const result = await this.pool.query<BacktestRunSummaryRow>(
       `
         SELECT
