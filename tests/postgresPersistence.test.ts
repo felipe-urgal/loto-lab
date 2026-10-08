@@ -12,6 +12,32 @@ import { createIsolatedPostgresDatabase } from "./helpers/postgres.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
+/** Commit a concurrent change precisely after the first read statement completes. */
+function poolWithInterleavedCommit(pool: Pool, needle: string, update: () => Promise<void>): Pool {
+  let invoked = false;
+  return new Proxy(pool, {
+    get(target, property, receiver) {
+      if (property !== "connect") return Reflect.get(target, property, receiver);
+      return async () => {
+        const reader = await target.connect();
+        return new Proxy(reader, {
+          get(client, key, clientReceiver) {
+            if (key !== "query") return Reflect.get(client, key, clientReceiver);
+            return async (...args: unknown[]) => {
+              const result: unknown = await Reflect.apply(client.query, client, args);
+              if (!invoked && typeof args[0] === "string" && args[0].includes(needle)) {
+                invoked = true;
+                await update();
+              }
+              return result;
+            };
+          },
+        });
+      };
+    },
+  }) as Pool;
+}
+
 test(
   "PostgreSQL persists contests, strategies, game batches and backtests",
   { skip: !databaseUrl },
@@ -123,49 +149,27 @@ test(
         games: [{ batchPosition: 1, game }],
       });
       let updatedBetweenStatements = false;
-      // Commit a parent/children reconciliation after the reader's first SELECT.
-      const racingPool = new Proxy(pool, {
-        get(target, property, receiver) {
-          if (property !== "connect") return Reflect.get(target, property, receiver);
-          return async () => {
-            const reader = await target.connect();
-            return new Proxy(reader, {
-              get(client, key, clientReceiver) {
-                if (key !== "query") return Reflect.get(client, key, clientReceiver);
-                return async (...args: unknown[]) => {
-                  const result: unknown = await Reflect.apply(client.query, client, args);
-                  if (
-                    !updatedBetweenStatements &&
-                    typeof args[0] === "string" &&
-                    args[0].includes("FROM real_bets")
-                  ) {
-                    updatedBetweenStatements = true;
-                    const writer = await pool.connect();
-                    try {
-                      await writer.query("BEGIN");
-                      await writer.query(
-                        "UPDATE real_bet_games SET prize_value = 20 WHERE real_bet_id = $1",
-                        [bet.id],
-                      );
-                      await writer.query(
-                        "UPDATE real_bets SET status = 'checked', total_prize_value = 20, net_result = 16.5 WHERE id = $1",
-                        [bet.id],
-                      );
-                      await writer.query("COMMIT");
-                    } catch (error) {
-                      await writer.query("ROLLBACK");
-                      throw error;
-                    } finally {
-                      writer.release();
-                    }
-                  }
-                  return result;
-                };
-              },
-            });
-          };
-        },
-      }) as Pool;
+      const racingPool = poolWithInterleavedCommit(pool, "FROM real_bets", async () => {
+        updatedBetweenStatements = true;
+        const writer = await pool.connect();
+        try {
+          await writer.query("BEGIN");
+          await writer.query(
+            "UPDATE real_bet_games SET prize_value = 20 WHERE real_bet_id = $1",
+            [bet.id],
+          );
+          await writer.query(
+            "UPDATE real_bets SET status = 'checked', total_prize_value = 20, net_result = 16.5 WHERE id = $1",
+            [bet.id],
+          );
+          await writer.query("COMMIT");
+        } catch (error) {
+          await writer.query("ROLLBACK");
+          throw error;
+        } finally {
+          writer.release();
+        }
+      });
       const readDuringReconciliation = await new PostgresRealBetRepository(racingPool).findById(bet.id);
       assert.equal(updatedBetweenStatements, true);
       assert.equal(readDuringReconciliation?.status, "awaiting_result");
@@ -197,6 +201,59 @@ test(
       assert.equal(run.rounds.length, 2);
       assert.equal(run.summary.roi, -0.3);
       assert.equal((await backtests.findById(run.id))?.rounds[0]?.contest, 3766);
+
+      // Updating the batch and a game between SELECTs must not yield a mixed snapshot.
+      const batchRacePool = poolWithInterleavedCommit(pool, "FROM generated_game_batches batch", async () => {
+        const writer = await pool.connect();
+        try {
+          await writer.query("BEGIN");
+          await writer.query("UPDATE generated_game_batches SET archived_at = NOW() WHERE id = $1", [batch.id]);
+          await writer.query(
+            "UPDATE generated_games SET metadata = jsonb_set(metadata, '{sum}', '999'::jsonb) WHERE batch_id = $1",
+            [batch.id],
+          );
+          await writer.query("COMMIT");
+        } catch (error) {
+          await writer.query("ROLLBACK");
+          throw error;
+        } finally {
+          writer.release();
+        }
+      });
+      const batchDuringChange = await new PostgresGameRepository(batchRacePool).findBatch(batch.id);
+      assert.equal(batchDuringChange?.archivedAt, undefined);
+      assert.equal(batchDuringChange?.games[0]?.metadata.sum, game.metadata.sum);
+      const changedBatch = await games.findBatch(batch.id);
+      assert.ok(changedBatch?.archivedAt);
+      assert.equal(changedBatch.games[0]?.metadata.sum, 999);
+
+      // The same guarantee applies to a mutable backtest parent and its rounds.
+      const backtestRacePool = poolWithInterleavedCommit(pool, "FROM backtest_runs", async () => {
+        const writer = await pool.connect();
+        try {
+          await writer.query("BEGIN");
+          await writer.query(
+            "UPDATE backtest_runs SET summary = jsonb_set(summary, '{testedContests}', '777'::jsonb) WHERE id = $1",
+            [run.id],
+          );
+          await writer.query(
+            "UPDATE backtest_rounds SET payload = jsonb_set(payload, '{bestHits}', '15'::jsonb) WHERE backtest_run_id = $1",
+            [run.id],
+          );
+          await writer.query("COMMIT");
+        } catch (error) {
+          await writer.query("ROLLBACK");
+          throw error;
+        } finally {
+          writer.release();
+        }
+      });
+      const backtestDuringChange = await new PostgresBacktestRepository(backtestRacePool).findById(run.id);
+      assert.equal(backtestDuringChange?.summary.testedContests, 100);
+      assert.equal(backtestDuringChange?.rounds[0]?.bestHits, 12);
+      const changedBacktest = await backtests.findById(run.id);
+      assert.equal(changedBacktest?.summary.testedContests, 777);
+      assert.equal(changedBacktest?.rounds[0]?.bestHits, 15);
     } finally {
       await database.close();
     }
