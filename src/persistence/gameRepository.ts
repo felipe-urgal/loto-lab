@@ -289,8 +289,7 @@ export class PostgresGameRepository {
     let gamesResult: { rows: GameRow[] };
     try {
       await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
-      [batchResult, gamesResult] = await Promise.all([
-      client.query<BatchRow>(
+      batchResult = await client.query<BatchRow>(
         `
           SELECT
             batch.*,
@@ -301,8 +300,8 @@ export class PostgresGameRepository {
           WHERE batch.id = ANY($1::bigint[])
         `,
         [uniqueIds],
-      ),
-      client.query<GameRow>(
+      );
+      gamesResult = await client.query<GameRow>(
         `
           SELECT batch_id, numbers, fixed_numbers, variable_numbers, mirror_numbers, lucky_month, secondary_selection, columns, metadata
           FROM generated_games
@@ -311,7 +310,6 @@ export class PostgresGameRepository {
         `,
         [uniqueIds],
       ),
-      ]);
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");
