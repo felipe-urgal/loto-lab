@@ -279,7 +279,7 @@ export async function runOperationalSync(
         notificationRefresh: "failed",
         notificationError: "Operational sync failed before notification refresh",
       };
-      await operations.finish(run.id, "failed", details).catch(() => undefined);
+      await operations.finish(run.id, details.successfulLotteries > 0 ? "partial" : "failed", details).catch(() => undefined);
       await new NotificationService(pool).refresh().catch((refreshError: unknown) => {
         logEvent("error", "notification_refresh_after_sync_failure_failed", {
           operationRunId: run?.id,
