@@ -239,7 +239,7 @@ export class PostgresRealBetRepository {
           ORDER BY real_bet_id, batch_position
         `,
         [uniqueIds],
-      ),
+      );
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");
