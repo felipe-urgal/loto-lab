@@ -8,6 +8,7 @@ import { PostgresAgendaRepository } from "../src/persistence/agendaRepository.js
 import { PostgresContestRepository } from "../src/persistence/contestRepository.js";
 import { PostgresNotificationRepository } from "../src/persistence/notificationRepository.js";
 import { PostgresOperationRepository } from "../src/persistence/operationRepository.js";
+import { formatOperationalSyncMessage } from "../src/operations/scheduler.js";
 import { runOperationalSync, type SyncAllDetails } from "../src/operations/sync.js";
 import { createIsolatedPostgresDatabase } from "./helpers/postgres.js";
 
@@ -107,7 +108,9 @@ function contest(lottery: LotteryId, number: number): Contest {
 }
 
 class FakeContestSource implements ContestSource {
+  readonly latestCalls = new Map<LotteryId, number>();
   async fetchContest(lottery: LotteryId, contestNumber?: number): Promise<Contest> {
+    if (contestNumber === undefined) this.latestCalls.set(lottery, (this.latestCalls.get(lottery) ?? 0) + 1);
     return contest(lottery, contestNumber ?? 2);
   }
 
@@ -140,7 +143,11 @@ test(
       await database.close();
     });
 
-    const result = await runOperationalSync(pool, { source: new FakeContestSource(), retries: 0, retryDelayMs: 0 });
+    const source = new FakeContestSource();
+    const result = await runOperationalSync(pool, { source, retries: 0, retryDelayMs: 0 });
+    assert.equal(source.latestCalls.size, 9);
+    assert.ok([...source.latestCalls.values()].every((calls) => calls === 1));
+    assert.match(formatOperationalSyncMessage(result), new RegExp(`${result.details.successfulLotteries}/${result.details.lotteries.length} lotteries`));
 
     assert.equal(result.status, "success");
     assert.equal(result.details.successfulLotteries, 9);
@@ -150,6 +157,7 @@ test(
     assert.ok(result.details.lotteries.every((item) => item.nextContest === 3));
     assert.ok(result.details.lotteries.every((item) => item.nextDrawDate === "2026-08-20"));
     assert.ok(result.details.lotteries.every((item) => item.totalStored === 2));
+    assert.ok(result.details.lotteries.every((item) => item.fetched === 2));
 
     const contests = new PostgresContestRepository(pool);
     for (const lottery of ["mega-sena", "lotofacil", "dia-de-sorte"] as const) {
