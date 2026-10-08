@@ -79,6 +79,7 @@ async function refreshRelevantFinancialContests(
   source: ContestSource,
   contests: PostgresContestRepository,
   lottery: LotteryId,
+  latestContest: Awaited<ReturnType<ContestSource["fetchContest"]>>,
 ): Promise<{ refreshed: number; failed: number; contestNumbers: number[] }> {
   const recent = await contests.list({ lottery, order: "desc", limit: FINANCIAL_REPAIR_WINDOW });
   if (recent.length === 0) return { refreshed: 0, failed: 0, contestNumbers: [] };
@@ -104,7 +105,9 @@ async function refreshRelevantFinancialContests(
   if (candidates.length === 0) return { refreshed: 0, failed: 0, contestNumbers: [] };
 
   const settled = await Promise.allSettled(
-    candidates.map((contest) => source.fetchContest(lottery, contest.number)),
+    candidates.map((contest) => contest.number === latestContest.number
+      ? Promise.resolve(latestContest)
+      : source.fetchContest(lottery, contest.number)),
   );
   const successful = settled
     .filter((result): result is PromiseFulfilledResult<Awaited<ReturnType<ContestSource["fetchContest"]>>> => result.status === "fulfilled")
@@ -151,6 +154,7 @@ export async function runOperationalSync(
   const source = options.source ?? new CaixaContestSource();
   let run: OperationRunRecord<Record<string, never>> | undefined;
   const startedAt = Date.now();
+  const lotteries: LotteryOperationResult[] = [];
 
   try {
     run = await operations.create("sync-all");
@@ -158,8 +162,6 @@ export async function runOperationalSync(
     const contests = new PostgresContestRepository(pool);
     const agenda = new PostgresAgendaRepository(pool);
     const realBets = new RealBetService(pool);
-    const lotteries: LotteryOperationResult[] = [];
-
     for (const lottery of LOTTERIES) {
       try {
         const bootstrap = await bootstrapLotteryHistory(source, contests, lottery, {
@@ -168,9 +170,7 @@ export async function runOperationalSync(
           retryDelayMs: options.retryDelayMs ?? 300,
         });
 
-        const latest = await source.fetchContest(lottery);
-        await contests.upsertMany([latest]);
-        const financialRepair = await refreshRelevantFinancialContests(pool, source, contests, lottery);
+        const financialRepair = await refreshRelevantFinancialContests(pool, source, contests, lottery, bootstrap.latestContest);
         const refreshedReconciliation = await realBets.reconcileContestNumbers(
           lottery,
           financialRepair.contestNumbers,
@@ -267,15 +267,19 @@ export async function runOperationalSync(
   } catch (error) {
     if (run) {
       const details: SyncAllDetails = {
-        lotteries: [],
-        successfulLotteries: 0,
-        failedLotteries: LOTTERIES.length,
-        reconciledRealBets: 0,
-        revisedRealBets: 0,
+        lotteries: [
+          ...lotteries,
+          ...LOTTERIES.filter((lottery) => !lotteries.some((item) => item.lottery === lottery))
+            .map((lottery) => ({ lottery, status: "failed" as const, error: "Operational sync interrupted before this lottery was completed" })),
+        ],
+        successfulLotteries: lotteries.filter((item) => item.status !== "failed").length,
+        failedLotteries: LOTTERIES.length - lotteries.filter((item) => item.status !== "failed").length,
+        reconciledRealBets: lotteries.reduce((sum, item) => sum + (item.reconciledRealBets ?? 0), 0),
+        revisedRealBets: lotteries.reduce((sum, item) => sum + (item.revisedRealBets ?? 0), 0),
         notificationRefresh: "failed",
         notificationError: "Operational sync failed before notification refresh",
       };
-      await operations.finish(run.id, "failed", details).catch(() => undefined);
+      await operations.finish(run.id, details.successfulLotteries > 0 ? "partial" : "failed", details).catch(() => undefined);
       await new NotificationService(pool).refresh().catch((refreshError: unknown) => {
         logEvent("error", "notification_refresh_after_sync_failure_failed", {
           operationRunId: run?.id,

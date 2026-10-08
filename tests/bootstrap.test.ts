@@ -72,9 +72,11 @@ test("historical bootstrap fills only gaps, retries transient failures and is re
   assert.equal(first.totalStored, 5);
   assert.equal(source.attempts.get(2), 1);
   assert.equal(source.attempts.get(4), 3);
-  assert.equal(source.attempts.get(5), 1);
-  assert.deepEqual(progress, [2, 3]);
+  assert.equal(source.attempts.get(5), undefined);
+  assert.deepEqual(first.latestContest, contest(5));
+  assert.deepEqual(progress, [3]);
 
+  store.values.set(5, { ...contest(5), date: "2025-12-31" });
   source.attempts.clear();
   const second = await bootstrapLotteryHistory(source, store, "mega-sena", {
     retryDelayMs: 0,
@@ -83,6 +85,7 @@ test("historical bootstrap fills only gaps, retries transient failures and is re
   assert.equal(second.missingBefore, 0);
   assert.equal(second.fetched, 0);
   assert.equal(second.totalStored, 5);
+  assert.equal(store.values.get(5)?.date, contest(5).date);
   assert.deepEqual([...source.attempts.keys()], []);
 });
 
