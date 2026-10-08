@@ -27,6 +27,7 @@ export interface BootstrapFailure {
 export interface BootstrapResult {
   lottery: LotteryId;
   latestOfficialContest: number;
+  latestContest: Contest;
   existingBefore: number;
   missingBefore: number;
   fetched: number;
@@ -111,11 +112,16 @@ export async function bootstrapLotteryHistory(
     if (!existingSet.has(contest)) missing.push(contest);
   }
 
-  let processed = 0;
-  let fetched = 0;
+  // The discovery payload is authoritative even when this contest already exists.
+  // Persist it once and reuse it rather than fetching the latest number again.
+  await store.upsertMany([latest]);
+  const missingLatest = !existingSet.has(latestOfficialContest);
+  const missingToFetch = missing.filter((number) => number !== latestOfficialContest);
+  let processed = missingLatest ? 1 : 0;
+  let fetched = missingLatest ? 1 : 0;
   const failures: BootstrapFailure[] = [];
 
-  for (const wave of chunks(missing, concurrency)) {
+  for (const wave of chunks(missingToFetch, concurrency)) {
     const settled = await Promise.allSettled(
       wave.map((contestNumber) =>
         withRetry(
@@ -160,6 +166,7 @@ export async function bootstrapLotteryHistory(
   return {
     lottery,
     latestOfficialContest,
+    latestContest: latest,
     existingBefore: existing.length,
     missingBefore: missing.length,
     fetched,
