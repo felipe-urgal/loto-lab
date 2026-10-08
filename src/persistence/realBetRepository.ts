@@ -215,8 +215,7 @@ export class PostgresRealBetRepository {
     let games: { rows: BetGameRow[] };
     try {
       await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
-      [bets, games] = await Promise.all([
-      client.query<BetRow>(
+      bets = await client.query<BetRow>(
         `
           SELECT
             id, batch_id, lottery, contest_number, status, research_hypothesis_id,
@@ -229,8 +228,8 @@ export class PostgresRealBetRepository {
           WHERE id = ANY($1::bigint[])
         `,
         [uniqueIds],
-      ),
-      client.query<BetGameRow>(
+      );
+      games = await client.query<BetGameRow>(
         `
           SELECT
             real_bet_id, batch_position, numbers, fixed_numbers, variable_numbers,
@@ -241,7 +240,6 @@ export class PostgresRealBetRepository {
         `,
         [uniqueIds],
       ),
-      ]);
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");
