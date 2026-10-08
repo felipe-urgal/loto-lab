@@ -309,7 +309,7 @@ export class PostgresGameRepository {
           ORDER BY batch_id, position
         `,
         [uniqueIds],
-      ),
+      );
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");
