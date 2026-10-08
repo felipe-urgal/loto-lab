@@ -20,6 +20,14 @@ function intervalMs(minutes: number): number {
   return Math.round(minutes * 60_000);
 }
 
+export function formatOperationalSyncMessage(result: {
+  id: number;
+  status: string;
+  details: { successfulLotteries: number; lotteries: unknown[]; reconciledRealBets: number };
+}): string {
+  return `Operational sync #${result.id}: ${result.status} (${result.details.successfulLotteries}/${result.details.lotteries.length} lotteries, ${result.details.reconciledRealBets} real bets reconciled)`;
+}
+
 export function startOperationsScheduler(
   pool: Pool,
   options: OperationsSchedulerOptions = {},
@@ -43,7 +51,7 @@ export function startOperationsScheduler(
       try {
         const result = await runOperationalSync(pool);
         options.onRun?.(
-          `Operational sync #${result.id}: ${result.status} (${result.details.successfulLotteries}/${result.details.lotteries.length} lotteries, ${result.details.reconciledRealBets} real bets reconciled)`,
+          formatOperationalSyncMessage(result),
         );
       } catch (error) {
         if (error instanceof OperationAlreadyRunningError) {
