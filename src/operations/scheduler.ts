@@ -43,7 +43,7 @@ export function startOperationsScheduler(
       try {
         const result = await runOperationalSync(pool);
         options.onRun?.(
-          `Operational sync #${result.id}: ${result.status} (${result.details.successfulLotteries}/3 lotteries, ${result.details.reconciledRealBets} real bets reconciled)`,
+          `Operational sync #${result.id}: ${result.status} (${result.details.successfulLotteries}/${result.details.lotteries.length} lotteries, ${result.details.reconciledRealBets} real bets reconciled)`,
         );
       } catch (error) {
         if (error instanceof OperationAlreadyRunningError) {
