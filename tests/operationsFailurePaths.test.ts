@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
+import type { Pool } from "pg";
 import { createLotoLabServer } from "../src/api/server.js";
 import type { ContestSource, LotteryAgendaSnapshot } from "../src/data/source.js";
 import type { Contest, LotteryId } from "../src/domain/types.js";
@@ -319,5 +320,38 @@ test(
     assert.equal(latest?.id, notificationFailure.id);
     assert.equal(latest?.status, "partial");
     assert.equal(latest?.details.notificationRefresh, "failed");
+
+    // A global failure after completed modalities must retain the collected evidence.
+    let finishAttempts = 0;
+    const interruptedPool = new Proxy(pool, {
+      get(target, property, receiver) {
+        if (property !== "query") return Reflect.get(target, property, receiver);
+        return async (...args: unknown[]) => {
+          if (
+            typeof args[0] === "string" &&
+            args[0].includes("UPDATE operation_runs") &&
+            finishAttempts++ === 0
+          ) {
+            throw new Error("synthetic global finalization failure");
+          }
+          return Reflect.apply(target.query, target, args);
+        };
+      },
+    }) as Pool;
+    await assert.rejects(
+      runOperationalSync(interruptedPool, {
+        source: new SuccessfulSource(),
+        retries: 0,
+        retryDelayMs: 0,
+      }),
+      /synthetic global finalization failure/,
+    );
+    const interrupted = await operations.latest<SyncAllDetails>("sync-all");
+    assert.equal(interrupted?.status, "partial");
+    assert.equal(interrupted.details.lotteries.length, 9);
+    assert.equal(interrupted.details.successfulLotteries, 9);
+    assert.equal(interrupted.details.failedLotteries, 0);
+    assert.ok(interrupted.details.lotteries.every((item) => item.status === "success"));
+    assert.equal(interrupted.details.notificationRefresh, "failed");
   },
 );
