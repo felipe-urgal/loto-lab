@@ -1,3 +1,4 @@
+import { assertRepositoryLimit } from "./repositoryLimit.js";
 import type { Pool } from "pg";
 import type { LotteryId } from "../domain/types.js";
 import type { GeneratedGame } from "../domain/types.js";
@@ -209,8 +210,12 @@ export class PostgresRealBetRepository {
   private async findMany(ids: number[]): Promise<RealBetRecord[]> {
     if (ids.length === 0) return [];
     const uniqueIds = [...new Set(ids)];
-    const [bets, games] = await Promise.all([
-      this.pool.query<BetRow>(
+    const client = await this.pool.connect();
+    let bets: { rows: BetRow[] };
+    let games: { rows: BetGameRow[] };
+    try {
+      await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
+      bets = await client.query<BetRow>(
         `
           SELECT
             id, batch_id, lottery, contest_number, status, research_hypothesis_id,
@@ -223,8 +228,8 @@ export class PostgresRealBetRepository {
           WHERE id = ANY($1::bigint[])
         `,
         [uniqueIds],
-      ),
-      this.pool.query<BetGameRow>(
+      );
+      games = await client.query<BetGameRow>(
         `
           SELECT
             real_bet_id, batch_position, numbers, fixed_numbers, variable_numbers,
@@ -234,8 +239,14 @@ export class PostgresRealBetRepository {
           ORDER BY real_bet_id, batch_position
         `,
         [uniqueIds],
-      ),
-    ]);
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
 
     const gamesByBet = new Map<number, BetGameRow[]>();
     for (const game of games.rows) {
@@ -285,6 +296,7 @@ export class PostgresRealBetRepository {
   }
 
   async listRecent(lottery: LotteryId, limit = 50): Promise<RealBetRecord[]> {
+    assertRepositoryLimit(limit, 500);
     const result = await this.pool.query<{ id: string }>(
       `
         SELECT id
@@ -299,6 +311,7 @@ export class PostgresRealBetRepository {
   }
 
   async listRealBets(researchHypothesisId: number, limit = 100): Promise<RealBetRecord[]> {
+    assertRepositoryLimit(limit, 500);
     const result = await this.pool.query<{ id: string }>(
       `
         SELECT id

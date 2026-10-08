@@ -1,3 +1,4 @@
+import { assertRepositoryLimit } from "./repositoryLimit.js";
 import type { Pool, PoolClient } from "pg";
 import type { GeneratedGame, LotteryId } from "../domain/types.js";
 import type { SecondarySelection } from "../domain/lotteryCatalog.js";
@@ -21,6 +22,7 @@ interface BatchRow {
   id: string;
   lottery: LotteryId;
   strategy_id: string | null;
+  strategy_version_id: string | null;
   target_contest_number: number | null;
   generator_options: Record<string, unknown>;
   created_at: Date;
@@ -138,13 +140,14 @@ export class PostgresGameRepository {
       const batch = await client.query<{ id: string }>(
         `
           INSERT INTO generated_game_batches (
-            lottery, strategy_id, target_contest_number, generator_options
-          ) VALUES ($1, $2, $3, $4::jsonb)
+            lottery, strategy_id, strategy_version_id, target_contest_number, generator_options
+          ) VALUES ($1, $2, $3, $4, $5::jsonb)
           RETURNING id
         `,
         [
           input.lottery,
           input.strategyId ?? null,
+          input.strategyVersionId ?? null,
           input.targetContestNumber ?? null,
           JSON.stringify(input.generatorOptions ?? {}),
         ],
@@ -179,14 +182,15 @@ export class PostgresGameRepository {
       const inserted = await client.query<{ id: string }>(
         `
           INSERT INTO generated_game_batches (
-            lottery, strategy_id, target_contest_number, generator_options, generation_key
-          ) VALUES ($1, $2, $3, $4::jsonb, $5)
+            lottery, strategy_id, strategy_version_id, target_contest_number, generator_options, generation_key
+          ) VALUES ($1, $2, $3, $4, $5::jsonb, $6)
           ON CONFLICT (generation_key) DO NOTHING
           RETURNING id
         `,
         [
           input.lottery,
           input.strategyId ?? null,
+          input.strategyVersionId ?? null,
           input.targetContestNumber ?? null,
           JSON.stringify(input.generatorOptions ?? {}),
           generationKey,
@@ -280,8 +284,12 @@ export class PostgresGameRepository {
   private async findBatches(ids: number[]): Promise<GeneratedGameBatchRecord[]> {
     if (ids.length === 0) return [];
     const uniqueIds = [...new Set(ids)];
-    const [batchResult, gamesResult] = await Promise.all([
-      this.pool.query<BatchRow>(
+    const client = await this.pool.connect();
+    let batchResult: { rows: BatchRow[] };
+    let gamesResult: { rows: GameRow[] };
+    try {
+      await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
+      batchResult = await client.query<BatchRow>(
         `
           SELECT
             batch.*,
@@ -292,8 +300,8 @@ export class PostgresGameRepository {
           WHERE batch.id = ANY($1::bigint[])
         `,
         [uniqueIds],
-      ),
-      this.pool.query<GameRow>(
+      );
+      gamesResult = await client.query<GameRow>(
         `
           SELECT batch_id, numbers, fixed_numbers, variable_numbers, mirror_numbers, lucky_month, secondary_selection, columns, metadata
           FROM generated_games
@@ -301,8 +309,14 @@ export class PostgresGameRepository {
           ORDER BY batch_id, position
         `,
         [uniqueIds],
-      ),
-    ]);
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
 
     const gamesByBatch = new Map<number, GameRow[]>();
     for (const row of gamesResult.rows) {
@@ -318,7 +332,8 @@ export class PostgresGameRepository {
       byId.set(id, {
         id,
         lottery: batch.lottery,
-        ...(batch.strategy_id ? { strategyId: Number(batch.strategy_id) } : {}),
+        ...(batch.strategy_id !== null ? { strategyId: Number(batch.strategy_id) } : {}),
+        ...(batch.strategy_version_id !== null ? { strategyVersionId: Number(batch.strategy_version_id) } : {}),
         ...(batch.target_contest_number !== null
           ? { targetContestNumber: batch.target_contest_number }
           : {}),
@@ -342,6 +357,7 @@ export class PostgresGameRepository {
     limit = 20,
     scope: GeneratedBatchScope = "active",
   ): Promise<GeneratedGameBatchRecord[]> {
+    assertRepositoryLimit(limit, 500);
     const lifecycleFilter = scope === "active"
       ? "AND archived_at IS NULL"
       : scope === "archived"
