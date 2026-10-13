@@ -1,5 +1,4 @@
-import { escapeHtml } from "../../shared/escaping.js";
-import type { GeneratedGame, GeneratorState, GenerationPlan, GenerationAlgorithmSpace, GenerationConstraints, GenerationFilterKey, GenerationRangeEdge, GenerationRequestPayload, GenerationPlanPayload, GenerationPurpose, LotteryId, NumberTier, SelectionMode } from "./types.js";
+import type { GeneratorState, GenerationPlan, GenerationAlgorithmSpace, GenerationConstraints, GenerationFilterKey, GenerationRangeEdge, GenerationRequestPayload, GenerationPlanPayload, GenerationPurpose, LotteryId, NumberTier, SelectionMode } from "./types.js";
 
 export const NUMBER_TIERS: readonly NumberTier[] = ["strong", "balanced", "cold"];
 
