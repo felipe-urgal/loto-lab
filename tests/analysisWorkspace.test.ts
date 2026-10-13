@@ -10,6 +10,7 @@ test("analysis workspace follows Redesign V2 single-map contract without changin
     readFile("web/src/features/analysisV2.ts", "utf8"),
   ]);
 
+  const analysisViews = analysis + "\n" + (await Promise.all(["shell", "map", "structure", "audit", "helpers"].map(name => readFile(`web/src/features/analysisV2/${name}.ts`, "utf8")))).join("\n");
   const baseStyle = loader.indexOf('loadStyle("analysis-v2")');
   const workspaceStyle = loader.indexOf('loadStyle("analysis-workspace")');
   const moduleLoad = loader.indexOf('loadModule("analysis-v2")');
@@ -23,8 +24,8 @@ test("analysis workspace follows Redesign V2 single-map contract without changin
     boundary,
     'import "./src/features/analysisV2.js";\nimport "./src/features/analysisV2/journey.js";\n',
   );
-  assert.match(analysis, /currentMainView/);
-  assert.match(analysis, /onMainViewChanged/);
+  assert.match(analysisViews, /currentMainView/);
+  assert.match(analysisViews, /onMainViewChanged/);
   assert.doesNotMatch(analysis, /runtime\.js/);
 
   assert.match(workspace, /\.a2-shell \{[\s\S]*max-width: var\(--content-max-width\)/);
@@ -40,19 +41,19 @@ test("analysis workspace follows Redesign V2 single-map contract without changin
   assert.match(workspace, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
 
-  assert.match(analysis, /Mapa das dezenas/);
-  assert.match(analysis, /data-a2-number-map/);
-  assert.match(analysis, /data-a2-map-filter/);
-  assert.match(analysis, /Comparar dezenas/);
-  assert.match(analysis, /Indicadores e metodologia/);
-  assert.match(analysis, /detailsBlock\("Estrutura e distribuições"/);
-  assert.match(analysis, /detailsBlock\("Dinâmica histórica"/);
-  assert.match(analysis, /detailsBlock\("Associações"/);
-  assert.match(analysis, /Auditoria de aleatoriedade/);
-  assert.match(analysis, /detailsBlock\("Validação e metodologia"/);
-  assert.match(analysis, /api<LotteryCatalogPayload>\("\/lotteries"\)/);
-  assert.match(analysis, /FLAT_NUMBER_FAMILIES/);
+  assert.match(analysisViews, /Mapa das dezenas/);
+  assert.match(analysisViews, /data-a2-number-map/);
+  assert.match(analysisViews, /data-a2-map-filter/);
+  assert.match(analysisViews, /Comparar dezenas/);
+  assert.match(analysisViews, /Indicadores e metodologia/);
+  assert.match(analysisViews, /detailsBlock\("Estrutura e distribuições"/);
+  assert.match(analysisViews, /detailsBlock\("Dinâmica histórica"/);
+  assert.match(analysisViews, /detailsBlock\("Associações"/);
+  assert.match(analysisViews, /Auditoria de aleatoriedade/);
+  assert.match(analysisViews, /detailsBlock\("Validação e metodologia"/);
+  assert.match(analysisViews, /api<LotteryCatalogPayload>\("\/lotteries"\)/);
+  assert.match(analysisViews, /FLAT_NUMBER_FAMILIES/);
   assert.doesNotMatch(analysis, /role="tablist"|data-a2-tab|ACTIVE_TAB_KEY/);
-  assert.match(analysis, /<dialog class="a2-detail"/);
-  assert.match(analysis, /Atraso e frequência são descrições históricas/);
+  assert.match(analysisViews, /<dialog class="a2-detail"/);
+  assert.match(analysisViews, /Atraso e frequência são descrições históricas/);
 });
