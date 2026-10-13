@@ -1,3 +1,4 @@
+import { BACKTEST_METHODOLOGY_VERSION, backtestHistorySignature, HISTORY_SIGNATURE_VERSION } from "../backtest/reproducibility.js";
 import type { Contest, LotteryId } from "../domain/types.js";
 import { backtestDiaDeSorte } from "../backtest/diaDeSorte.js";
 import { backtestLotofacil } from "../backtest/lotofacil.js";
@@ -79,7 +80,9 @@ export class RunBacktestUseCase {
         `Legacy backtest is not available for ${input.lottery}; use Generator V2 or modality-compatible analysis`,
       );
     }
-    const contests = await this.history.list({ lottery: input.lottery, order: "asc" });
+    const contests = (await this.history.list({ lottery: input.lottery, order: "asc" }))
+      .filter((contest) => contest.lottery === input.lottery)
+      .sort((a, b) => a.number - b.number);
     const eligibleRoundCount = contests
       .slice(input.warmupContests)
       .filter((contest) => input.startContest === undefined || contest.number >= input.startContest)
@@ -89,7 +92,18 @@ export class RunBacktestUseCase {
       throw new BacktestRoundLimitError(eligibleRoundCount);
     }
 
+    const fixedCount = input.lottery === "lotofacil" ? input.fixedCount ?? 8 : 3;
+    const analysisModel = "score-v2" as const;
+    const effectiveEndContest = input.endContest ?? contests.at(-1)?.number;
+    const effectiveStartContest = input.startContest ?? contests[input.warmupContests]?.number;
     const options: Record<string, unknown> = {
+      methodologyVersion: BACKTEST_METHODOLOGY_VERSION,
+      historySignatureVersion: HISTORY_SIGNATURE_VERSION,
+      historySignature: backtestHistorySignature(contests, input.lottery, effectiveEndContest),
+      fixedCount,
+      analysisModel,
+      ...(effectiveStartContest !== undefined ? { effectiveStartContest } : {}),
+      ...(effectiveEndContest !== undefined ? { effectiveEndContest } : {}),
       gameCount: input.gameCount,
       warmupContests: input.warmupContests,
       ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),
@@ -105,21 +119,24 @@ export class RunBacktestUseCase {
       result = backtestMegaSena(contests, {
         gameCount: input.gameCount,
         warmupContests: input.warmupContests,
+        fixedCount: 3,
+        analysisModel,
         ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),
         ...(input.endContest !== undefined ? { endContest: input.endContest } : {}),
       });
     } else if (input.lottery === "lotofacil") {
-      const fixedCount = input.fixedCount ?? 8;
-      options.fixedCount = fixedCount;
       result = backtestLotofacil(contests, {
         gameCount: input.gameCount,
-        fixedCount,
+        fixedCount: input.fixedCount ?? 8,
+        analysisModel,
         warmupContests: input.warmupContests,
         ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),
         ...(input.endContest !== undefined ? { endContest: input.endContest } : {}),
       });
     } else if (input.lottery === "dia-de-sorte") {
       result = backtestDiaDeSorte(contests, {
+        fixedCount: 3,
+        analysisModel,
         gameCount: input.gameCount,
         warmupContests: input.warmupContests,
         ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),

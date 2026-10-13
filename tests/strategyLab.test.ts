@@ -244,3 +244,21 @@ test("strategy lab external-rules family exposes the higher Monte Carlo resoluti
   assert.equal(result.benchmark.minimumRandomSamples, 179);
   assert.equal(result.benchmark.resolutionSufficient, false);
 });
+
+test("Strategy Lab exposes compact replayable random protocol and dataset fingerprint", () => {
+  const history = contestsFor("mega-sena", 18, 6, 60);
+  const opts = { lottery: "mega-sena" as const, gameCount: 1, warmupContests: 5, lookbackContests: 10, bucketSize: 5, randomSamples: 10 };
+  const result = compareStrategyLab(history, opts);
+  assert.equal(result.methodologyVersion, "strategy-lab-v2");
+  assert.match(result.historySignature, /^backtest-history-sha256-v1:[a-f0-9]{64}$/);
+  assert.equal(result.randomControlProtocol.seedPrefix, "loto-lab-random-distribution-v2");
+  assert.equal(result.randomControlProtocol.sampleIndexBase, 1);
+  const period = { lottery: opts.lottery, gameCount: opts.gameCount, warmupContests: opts.warmupContests, startContest: result.startContest, endContest: result.endContest };
+  const direct = sampleRandomControls(history, period, opts.randomSamples, result.randomControlProtocol.seedPrefix);
+  assert.equal(direct.length, result.benchmark.distribution.samples);
+  const rerun = compareStrategyLab([...history].reverse(), opts);
+  assert.deepEqual(rerun.benchmark.distribution, result.benchmark.distribution);
+  assert.equal(rerun.historySignature, result.historySignature);
+  const altered = history.map((contest, index) => index === 0 ? { ...contest, numbers: [2,3,4,5,6,7] } : contest);
+  assert.notEqual(compareStrategyLab(altered, opts).historySignature, result.historySignature);
+});

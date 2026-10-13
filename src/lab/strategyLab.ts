@@ -1,3 +1,4 @@
+import { STRATEGY_LAB_METHODOLOGY_VERSION, backtestHistorySignature } from "../backtest/reproducibility.js";
 import type { AnalysisModel, Contest, LotteryId } from "../domain/types.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { evaluateRankingQuality, type RankingQualityResult } from "../analysis/rankQuality.js";
@@ -20,6 +21,9 @@ import {
   backtestRandomControl,
   sampleRandomControls,
   type RandomControlSample,
+  RANDOM_DISTRIBUTION_SEED_PREFIX,
+  RANDOM_CONTROL_SEED_VERSION,
+  RANDOM_LEGACY_CONTROL_SEED,
 } from "./randomControl.js";
 import {
   buildStrategyLabVariant,
@@ -87,6 +91,16 @@ export interface StrategyLabRankingQuality {
 
 export interface StrategyLabResult {
   schemaVersion: 2;
+  methodologyVersion: string;
+  historySignature: string;
+  randomControlProtocol: {
+    version: string;
+    seedPrefix: string;
+    sampleIndexBase: 1;
+    seedTemplate: string;
+    legacyControlSeed: string;
+    perGameSeedTemplate: string;
+  };
   lottery: LotteryId;
   experiment: StrategyLabExperiment;
   startContest?: number;
@@ -423,6 +437,16 @@ export function compareStrategyLab(contests: Contest[], options: StrategyLabOpti
   const legacyDelta = strategyValue - legacyControlValue;
   return {
     schemaVersion: 2,
+    methodologyVersion: STRATEGY_LAB_METHODOLOGY_VERSION,
+    historySignature: backtestHistorySignature(contests, options.lottery, period.endContest),
+    randomControlProtocol: {
+      version: RANDOM_CONTROL_SEED_VERSION,
+      seedPrefix: RANDOM_DISTRIBUTION_SEED_PREFIX,
+      sampleIndexBase: 1,
+      seedTemplate: "${seedPrefix}:${index + 1}",
+      legacyControlSeed: RANDOM_LEGACY_CONTROL_SEED,
+      perGameSeedTemplate: "${seed}:${lottery}:${contestNumber}:${gameIndex}",
+    },
     lottery: options.lottery,
     experiment,
     ...period,

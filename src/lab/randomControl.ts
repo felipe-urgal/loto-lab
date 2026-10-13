@@ -5,6 +5,10 @@ import { summarizeBacktestRounds, type BacktestSummary } from "../backtest/share
 import { getLotteryConfig } from "../lotteries/config.js";
 import { buildMetadata, createSeededRandom } from "../generator/shared.js";
 
+export const RANDOM_DISTRIBUTION_SEED_PREFIX = "loto-lab-random-distribution-v2";
+export const RANDOM_CONTROL_SEED_VERSION = "random-control-v2-index-one-based";
+export const RANDOM_LEGACY_CONTROL_SEED = "loto-lab-random-control-v1";
+
 const LUCKY_MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
@@ -79,7 +83,7 @@ export function backtestRandomControl(
     .filter((contest) => contest.lottery === options.lottery)
     .sort((a, b) => a.number - b.number);
   const rounds: RandomControlRound[] = [];
-  const seed = options.seed ?? "loto-lab-random-control-v1";
+  const seed = options.seed ?? RANDOM_LEGACY_CONTROL_SEED;
   const targetIndexes = eligibleTargetIndexes(scoped, {
     warmupContests: options.warmupContests,
     ...(options.startContest !== undefined ? { startContest: options.startContest } : {}),
@@ -106,7 +110,7 @@ export function sampleRandomControls(
   contests: Contest[],
   options: Omit<RandomControlOptions, "seed">,
   samples = 100,
-  seedPrefix = "loto-lab-random-distribution-v2",
+  seedPrefix = RANDOM_DISTRIBUTION_SEED_PREFIX,
 ): RandomControlSample[] {
   if (!Number.isInteger(samples) || samples < 10 || samples > 500) {
     throw new Error("randomSamples must be an integer between 10 and 500");
