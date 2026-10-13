@@ -93,7 +93,7 @@ interface BetGameRow {
   fixed_numbers: number[];
   variable_numbers: number[];
   lucky_month: string | null;
-  metadata: GeneratedGame["metadata"];
+  metadata: GeneratedGame["metadata"] & { secondary?: GeneratedGame["secondary"]; columns?: GeneratedGame["columns"] };
   check_result: GameCheckResult | null;
   prize_value: number | null;
 }
@@ -110,6 +110,7 @@ interface FinancialRevisionRow {
 }
 
 function mapGame(lottery: LotteryId, row: BetGameRow): RealBetGameRecord {
+  const { secondary, columns, ...metadata } = row.metadata;
   return {
     batchPosition: row.batch_position,
     game: {
@@ -118,7 +119,9 @@ function mapGame(lottery: LotteryId, row: BetGameRow): RealBetGameRecord {
       fixedNumbers: row.fixed_numbers.map(Number),
       variableNumbers: row.variable_numbers.map(Number),
       ...(row.lucky_month ? { luckyMonth: row.lucky_month } : {}),
-      metadata: row.metadata,
+      metadata,
+      ...(secondary ? { secondary } : {}),
+      ...(columns ? { columns } : {}),
     },
     ...(row.check_result ? { checkResult: row.check_result } : {}),
     ...(row.prize_value !== null ? { prizeValue: Number(row.prize_value) } : {}),
@@ -189,7 +192,7 @@ export class PostgresRealBetRepository {
             game.fixedNumbers,
             game.variableNumbers,
             game.luckyMonth ?? null,
-            JSON.stringify(game.metadata),
+            JSON.stringify({ ...game.metadata, ...(game.secondary ? { secondary: game.secondary } : {}), ...(game.columns ? { columns: game.columns } : {}) }),
           ],
         );
       }

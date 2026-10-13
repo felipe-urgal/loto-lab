@@ -3,6 +3,7 @@ import type { Contest, ContestPrizeTier } from "../domain/types.js";
 export interface ResolvedPrize {
   numberPrizeValue?: number;
   luckyMonthPrizeValue?: number;
+  secondaryPrizeValue?: number;
   totalPrizeValue?: number;
 }
 
@@ -22,6 +23,31 @@ function numericHitsFromTier(tier: ContestPrizeTier): number | undefined {
 function isLuckyMonthTier(tier: ContestPrizeTier): boolean {
   const description = canonical(tier.description);
   return description.includes("mes da sorte") || description.includes("mes de sorte");
+}
+
+/** Only unambiguous official descriptions are mapped to their structured tier. */
+export function structuredTierIndex(description: string): number | undefined {
+  const d = canonical(description).replace(/\s+/g, " ");
+  const explicit = /^(?:faixa|premio|premiacao)\s*(?:n[º°.]?\s*)?(10|[1-9])(?:\s*[ªa])?$/.exec(d);
+  if (explicit) return Number(explicit[1]);
+  const match = /^(\d)\s*(?:acertos?|numeros?|dezenas?)\s*(?:\+|e)\s*(\d)\s*trevos?$/.exec(d);
+  if (!match) return undefined;
+  const hits = Number(match[1]), clovers = Number(match[2]);
+  if (hits === 6) return clovers === 2 ? 1 : clovers <= 1 ? 2 : undefined;
+  if (hits === 5) return clovers === 2 ? 3 : clovers <= 1 ? 4 : undefined;
+  if (hits === 4) return clovers === 2 ? 5 : clovers <= 1 ? 6 : undefined;
+  if (hits === 3) return clovers === 2 ? 7 : clovers === 1 ? 8 : undefined;
+  if (hits === 2) return clovers === 2 ? 9 : clovers === 1 ? 10 : undefined;
+  return undefined;
+}
+
+function structuredTier(target: Contest, index: number): ContestPrizeTier | undefined {
+  const matching = (target.prizeTiers ?? []).filter(t => structuredTierIndex(t.description) === index);
+  return matching.length === 1 ? matching[0] : undefined;
+}
+
+function teamTier(tier: ContestPrizeTier): boolean {
+  return /^(?:time do coracao|time de coracao)(?:\s*[-:]\s*.*)?$/.test(canonical(tier.description));
 }
 
 function validPrizeValue(tier?: ContestPrizeTier): number | undefined {
@@ -82,9 +108,11 @@ export function hasCompletePrizeSchedule(target: Contest): boolean {
       ),
     );
   }
-  if (target.lottery === "timemania" || target.lottery === "super-sete") {
+  if (target.lottery === "mais-milionaria") return Array.from({ length: 10 }, (_, i) => i + 1).every(i => validPrizeValue(structuredTier(target, i)) !== undefined);
+  if (target.lottery === "timemania") return [3, 4, 5, 6, 7].every(h => validPrizeValue(prizeTierForHits(target, h)) !== undefined) && tiers.filter(teamTier).length === 1 && validPrizeValue(tiers.find(teamTier)) !== undefined;
+  if (target.lottery === "super-sete") {
     return [3, 4, 5, 6, 7].every(
-      (hits) => tiers.some((tier) => numericHitsFromTier(tier) === hits),
+      (hits) => validPrizeValue(prizeTierForHits(target, hits)) !== undefined,
     );
   }
   return false;
@@ -95,10 +123,16 @@ export function resolvePrizeValue(
   hits: number,
   luckyMonthHit = false,
   draw: 1 | 2 = 1,
+  structured?: { cloverHits?: number; favoriteTeamHit?: boolean },
 ): ResolvedPrize {
-  const expectsNumberPrize = numberPrizeExpected(target, hits);
+  const index = target.lottery === "mais-milionaria" && structured?.cloverHits !== undefined ? (hits === 6 ? (structured.cloverHits === 2 ? 1 : 2) : hits === 5 ? (structured.cloverHits === 2 ? 3 : 4) : hits === 4 ? (structured.cloverHits === 2 ? 5 : 6) : hits === 3 ? (structured.cloverHits === 2 ? 7 : structured.cloverHits === 1 ? 8 : undefined) : hits === 2 ? (structured.cloverHits === 2 ? 9 : structured.cloverHits === 1 ? 10 : undefined) : undefined) : undefined;
+  const expectsNumberPrize = index !== undefined || numberPrizeExpected(target, hits);
+  const missingStructuredData = target.lottery === "mais-milionaria" && structured?.cloverHits === undefined && hits >= 2;
+  const secondaryExpected = target.lottery === "timemania" && structured?.favoriteTeamHit === true;
+  const secondaryTiers = target.prizeTiers?.filter(teamTier) ?? [];
+  const secondaryPrizeValue = secondaryExpected && secondaryTiers.length === 1 ? validPrizeValue(secondaryTiers[0]) : secondaryExpected ? undefined : 0;
   const numberPrizeValue = expectsNumberPrize
-    ? validPrizeValue(prizeTierForHits(target, hits, draw))
+    ? validPrizeValue(index !== undefined ? structuredTier(target, index) : prizeTierForHits(target, hits, draw))
     : 0;
   const numberPrizeKnown = !expectsNumberPrize || numberPrizeValue !== undefined;
 
@@ -108,13 +142,14 @@ export function resolvePrizeValue(
     : 0;
   const luckyMonthPrizeKnown = !expectsLuckyMonthPrize || luckyMonthPrizeValue !== undefined;
 
-  const totalPrizeValue = numberPrizeKnown && luckyMonthPrizeKnown
-    ? (numberPrizeValue ?? 0) + (luckyMonthPrizeValue ?? 0)
+  const totalPrizeValue = numberPrizeKnown && luckyMonthPrizeKnown && !missingStructuredData && secondaryPrizeValue !== undefined
+    ? (numberPrizeValue ?? 0) + (luckyMonthPrizeValue ?? 0) + secondaryPrizeValue
     : undefined;
 
   return {
     ...(numberPrizeValue !== undefined ? { numberPrizeValue } : {}),
     ...(target.lottery === "dia-de-sorte" && luckyMonthPrizeValue !== undefined ? { luckyMonthPrizeValue } : {}),
+    ...(secondaryExpected && secondaryPrizeValue !== undefined ? { secondaryPrizeValue } : {}),
     ...(totalPrizeValue !== undefined ? { totalPrizeValue } : {}),
   };
 }
