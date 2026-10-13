@@ -33,7 +33,8 @@ test("official bet rules match generator configs and executable validator bounds
       const numbers = Array.from({ length: size }, (_, i) => config.minNumber + i);
       const game = {
         lottery: rule.product as LotteryId, numbers,
-        fixedNumbers: [], variableNumbers: [...numbers],
+        fixedNumbers: rule.product === "lotofacil" ? numbers.slice(0, 8) : [],
+        variableNumbers: rule.product === "lotofacil" ? numbers.slice(8) : [...numbers],
         metadata: { odd: 0, even: 0, sum: 0, repeatedFromLastContest: [] },
       };
       assert.doesNotThrow(() => assertValidGeneratedGame(game), `${rule.product} size ${size}`);
