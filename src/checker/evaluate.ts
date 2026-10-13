@@ -17,6 +17,7 @@ export interface GameCheckResult {
   ticketCost?: number;
   numberPrizeValue?: number;
   luckyMonthPrizeValue?: number;
+  secondaryPrizeValue?: number;
   totalPrizeValue?: number;
   netResult?: number;
   secondDrawHits?: number;
@@ -84,7 +85,14 @@ export function evaluateGame(game: GeneratedGame, target: Contest): GameCheckRes
     const matchedColumns = gameColumns
       .map((values, index) => values.includes(targetColumns[index]!) ? index + 1 : undefined)
       .filter((value): value is number => value !== undefined);
+    const hits = matchedColumns.length;
+    const prize = resolvePrizeValue(target, hits);
+    const ticketCost = trySimpleBetPriceForContest(target) !== undefined
+      ? quoteOfficialBet(game.lottery, game.columns?.reduce((sum, col) => sum + col.length, 0) ?? 7)?.totalPriceCents / 100
+      : undefined;
     return {
+      ...prize,
+      ...(ticketCost !== undefined && Number.isFinite(ticketCost) ? { ticketCost, ...(prize.totalPrizeValue !== undefined ? { netResult: prize.totalPrizeValue - ticketCost } : {}) } : {}),
       lottery: game.lottery,
       contest: target.number,
       hits: matchedColumns.length,
@@ -132,7 +140,10 @@ export function evaluateGame(game: GeneratedGame, target: Contest): GameCheckRes
   const ticketCost = historicalSimplePrice !== undefined
     ? historicalSimplePrice * (currentQuote?.simpleEquivalentCount ?? 1)
     : undefined;
-  const prize = resolvePrizeValue(target, matchedNumbers.length, luckyMonthHit ?? false, 1);
+  const prize = resolvePrizeValue(target, matchedNumbers.length, luckyMonthHit ?? false, 1, {
+    ...(secondaryHits !== undefined ? { cloverHits: secondaryHits } : {}),
+    ...(secondaryHit !== undefined ? { favoriteTeamHit: secondaryHit } : {}),
+  });
   const secondDrawMatchedNumbers = target.secondDrawNumbers
     ? game.numbers.filter((number) => target.secondDrawNumbers!.includes(number))
     : undefined;
