@@ -88,7 +88,7 @@ export function evaluateGame(game: GeneratedGame, target: Contest): GameCheckRes
     const hits = matchedColumns.length;
     const prize = resolvePrizeValue(target, hits);
     const ticketCost = trySimpleBetPriceForContest(target) !== undefined
-      ? quoteOfficialBet(game.lottery, game.columns?.reduce((sum, col) => sum + col.length, 0) ?? 7)?.totalPriceCents / 100
+      ? (quoteOfficialBet(game.lottery, game.columns?.reduce((sum, col) => sum + col.length, 0) ?? 7)?.totalPriceCents ?? NaN) / 100
       : undefined;
     return {
       ...prize,
