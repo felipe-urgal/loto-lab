@@ -1,5 +1,5 @@
 import { escapeHtml } from "../../shared/escaping.js";
-import { number, formatDate, detailsBlock, qualityWarning, secondaryFieldNotice, type AnalysisMapFilter } from "./helpers.js";
+import { formatDate, detailsBlock, qualityWarning, secondaryFieldNotice, type AnalysisMapFilter } from "./helpers.js";
 import type { LotteryCatalogItem } from "./helpers.js";
 import { numberMapView, technicalRankingView } from "./map.js";
 import { structureView, dynamicsView, combinationsView } from "./structure.js";
