@@ -1,6 +1,6 @@
-import type { AnalysisCycles, AnalysisNumberItem, AnalysisPayload, AnalysisTier, AssociationItem, RankingMover, StructureMethodologyFilter, StructureMetric, ValidationPeriod } from "./types.js";
-import { escapeHtml } from "../../shared/escaping.js";
-import { number, decimal, percent, signed, formatDate, trendCopy, tierClass, metricCard, mapFilterLabel, TIER_LABELS, type AnalysisMapFilter } from "./helpers.js";
+import { number, decimal, percent, trendCopy, tierClass, metricCard, mapFilterLabel, movementBadge, delayCopy, TIER_LABELS, type AnalysisMapFilter } from "./helpers.js";
+import type { AnalysisNumberItem, AnalysisPayload } from "./types.js";
+
 export function mapFilterMarkup(activeMapFilter: AnalysisMapFilter): string {
   const filters: AnalysisMapFilter[] = ["all", "strong", "balanced", "cold"];
   return `<div class="a2-map-filters" aria-label="Filtrar dezenas por grupo">${filters.map((filter) => `
