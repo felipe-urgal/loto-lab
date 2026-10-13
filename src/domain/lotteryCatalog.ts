@@ -199,7 +199,7 @@ export const LOTTERY_CATALOG = {
     name: "Super Sete",
     family: "column-draw",
     enabled: true,
-    capabilities: capabilities({ columns: true, variableBetSize: false }),
+    capabilities: capabilities({ columns: true }),
     rules: { version: "2026-09", effectiveFrom: "2026-09-30" },
   },
   loteca: {
