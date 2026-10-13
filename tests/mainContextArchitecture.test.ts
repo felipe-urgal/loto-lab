@@ -29,7 +29,7 @@ test("main shell and lifecycle share one typed view/lottery contract", async () 
   assert.match(shellOwner, /requestedMainViewFromHash\(location\.hash\)/);
   assert.match(shellOwner, /mainViewFromHash\(location\.hash\)/);
   assert.match(shellOwner, /isMainView\(requested\)/);
-  assert.match(shellOwner, /isLotteryId\(storedLottery\)/);
+  assert.match(shellOwner, /isLotteryId\(saved\)/);
   assert.doesNotMatch(shell, /location\.hash\.replace/);
   assert.doesNotMatch(shell, /const mainViews = new Set/);
   assert.doesNotMatch(shell, /const lotteries = new Set/);
