@@ -27,10 +27,10 @@ function isLuckyMonthTier(tier: ContestPrizeTier): boolean {
 
 /** Only unambiguous official descriptions are mapped to their structured tier. */
 export function structuredTierIndex(description: string): number | undefined {
-  const d = canonical(description).replace(/\\s+/g, " ");
-  const explicit = /^(?:faixa|premio|premiacao)\\s*(?:n[º°.]?\\s*)?(10|[1-9])(?:\\s*[ªa])?$/.exec(d);
+  const d = canonical(description).replace(/\s+/g, " ");
+  const explicit = /^(?:faixa|premio|premiacao)\s*(?:n[º°.]?\s*)?(10|[1-9])(?:\s*[ªa])?$/.exec(d);
   if (explicit) return Number(explicit[1]);
-  const match = /^(\\d)\\s*(?:acertos?|numeros?|dezenas?)\\s*(?:\\+|e)\\s*(\\d)\\s*trevos?$/.exec(d);
+  const match = /^(\d)\s*(?:acertos?|numeros?|dezenas?)\s*(?:\+|e)\s*(\d)\s*trevos?$/.exec(d);
   if (!match) return undefined;
   const hits = Number(match[1]), clovers = Number(match[2]);
   if (hits === 6) return clovers === 2 ? 1 : clovers <= 1 ? 2 : undefined;
@@ -47,7 +47,7 @@ function structuredTier(target: Contest, index: number): ContestPrizeTier | unde
 }
 
 function teamTier(tier: ContestPrizeTier): boolean {
-  return /^(?:time do coracao|time de coracao)(?:\\s*[-:]\\s*.*)?$/.test(canonical(tier.description));
+  return /^(?:time do coracao|time de coracao)(?:\s*[-:]\s*.*)?$/.test(canonical(tier.description));
 }
 
 function validPrizeValue(tier?: ContestPrizeTier): number | undefined {
