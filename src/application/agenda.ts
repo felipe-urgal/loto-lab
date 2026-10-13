@@ -58,7 +58,12 @@ export class AgendaUseCase {
   ) {}
 
   async overview(unreadOnly: boolean) {
-    await this.refresher.refresh();
+    // Notification refresh is best-effort: persisted agenda must remain readable.
+    try {
+      await this.refresher.refresh();
+    } catch (error) {
+      console.error("Notification refresh failed; serving persisted agenda", error);
+    }
     const [agenda, notifications, unreadCount] = await Promise.all([
       this.agenda.list(),
       this.notifications.list({ limit: 100, unreadOnly }),
