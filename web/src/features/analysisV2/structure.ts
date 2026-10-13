@@ -1,6 +1,7 @@
-import type { AnalysisCycles, AnalysisNumberItem, AnalysisPayload, AnalysisTier, AssociationItem, RankingMover, StructureMethodologyFilter, StructureMetric, ValidationPeriod } from "./types.js";
 import { escapeHtml } from "../../shared/escaping.js";
-import { number, decimal, percent, signed, trendCopy, tierClass, metricCard, movementBadge, delayCopy, theoreticalBars, structureCard, filterValidationMarkup, moverList, heatmap, cycleMarkup, associationRow } from "./helpers.js";
+import { number, decimal, formatDate, structureCard, filterValidationMarkup, moverList, heatmap, cycleMarkup, associationRow } from "./helpers.js";
+import type { AnalysisPayload } from "./types.js";
+
 export function structureView(data: AnalysisPayload): string {
   const structure = data.advanced.structure;
   const metrics = structure.metrics;
