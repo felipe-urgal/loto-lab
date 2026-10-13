@@ -259,6 +259,6 @@ test("Strategy Lab exposes compact replayable random protocol and dataset finger
   const rerun = compareStrategyLab([...history].reverse(), opts);
   assert.deepEqual(rerun.benchmark.distribution, result.benchmark.distribution);
   assert.equal(rerun.historySignature, result.historySignature);
-  const altered = history.map((contest, index) => index === 0 ? { ...contest, numbers: [1,2,3,4,5,6] } : contest);
+  const altered = history.map((contest, index) => index === 0 ? { ...contest, numbers: [2,3,4,5,6,7] } : contest);
   assert.notEqual(compareStrategyLab(altered, opts).historySignature, result.historySignature);
 });
