@@ -44,7 +44,7 @@ test("Super Sete resolves payout after comparing ordered columns", () => {
   const result = evaluateGame(game, target);
   assert.equal(result.hits, 4);
   assert.equal(result.totalPrizeValue, 400);
-  assert.equal(evaluateGame(game, { ...target, prizeTiers: target.prizeTiers?.slice(1) }).totalPrizeValue, undefined);
-  assert.equal(hasCompletePrizeSchedule({ ...target, prizeTiers: target.prizeTiers?.slice(1) }), false);
+  assert.equal(evaluateGame(game, { ...target, prizeTiers: target.prizeTiers?.filter(t => t.description !== "4 acertos") }).totalPrizeValue, undefined);
+  assert.equal(hasCompletePrizeSchedule({ ...target, prizeTiers: target.prizeTiers?.filter(t => t.description !== "4 acertos") }), false);
   assert.equal(evaluateGame({ ...game, columns: [[0],[0],[0],[0],[0],[0],[0]] }, target).totalPrizeValue, 0);
 });
