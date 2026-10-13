@@ -231,3 +231,70 @@ test(
     }
   },
 );
+
+test(
+  "structured real bets reconcile unknown schedules and record exactly one official revision",
+  { skip: !process.env.DATABASE_URL, timeout: 30_000 },
+  async () => {
+    for (const lottery of ["mais-milionaria", "timemania", "super-sete"] as const) {
+      const database = await createIsolatedPostgresDatabase({ label: `financial-338-${lottery}` });
+      const { pool } = database;
+      const contests = new PostgresContestRepository(pool);
+      const batches = new PostgresGameRepository(pool);
+      const service = new RealBetService(pool);
+      const numbers = lottery === "mais-milionaria" ? [1,2,3,4,5,6] : [1,2,3,4,5,6,7];
+      const game: GeneratedGame = lottery === "super-sete"
+        ? { lottery, numbers: [], fixedNumbers: [], variableNumbers: [], columns: [[1],[2],[3],[4],[0],[0],[0]], metadata: { odd: 0, even: 0, sum: 0, repeatedFromLastContest: [] } }
+        : {
+            lottery,
+            numbers: lottery === "timemania" ? [1,2,3,11,12,13,14,15,16,17] : numbers,
+            fixedNumbers: [],
+            variableNumbers: lottery === "timemania" ? [1,2,3,11,12,13,14,15,16,17] : numbers,
+            secondary: lottery === "timemania"
+              ? { kind: "favorite-team", values: ["SANTOS"] }
+              : { kind: "clovers", values: [1,2] },
+            metadata: { odd: 0, even: 0, sum: 0, repeatedFromLastContest: [] },
+          };
+      const officialTiers = lottery === "mais-milionaria"
+        ? Array.from({ length: 10 }, (_, i) => ({ description: `Faixa ${i + 1}`, winners: 1, prizeValue: 100 + i }))
+        : [
+            ...[3,4,5,6,7].map(hits => ({ description: `${hits} acertos`, winners: 1, prizeValue: hits * 10 })),
+            ...(lottery === "timemania" ? [{ description: "Time do Coração", winners: 1, prizeValue: 15 }] : []),
+          ];
+      const target: Contest = {
+        lottery, number: TARGET, date: "2099-01-01", numbers,
+        ...(lottery === "super-sete" ? { columns: numbers } : {}),
+        ...(lottery === "timemania" ? { secondary: { kind: "favorite-team", values: ["SANTOS"] } as const } : {}),
+        ...(lottery === "mais-milionaria" ? { secondary: { kind: "clovers", values: [1,2] } as const } : {}),
+        prizeTiers: officialTiers,
+      };
+      try {
+        const batch = await batches.saveBatch({
+          lottery, targetContestNumber: TARGET, generatorOptions: { test: "financial-338" }, games: [game],
+        });
+        const bet = await service.create({ batchId: batch.id, actualCost: 6, playedAt: "2098-12-31T12:00:00Z" });
+        assert.deepEqual(bet.games[0]?.game.secondary, game.secondary);
+        assert.deepEqual(bet.games[0]?.game.columns, game.columns);
+
+        await contests.upsertMany([{ ...target, prizeTiers: [] }]);
+        assert.equal((await service.reconcile(bet.id))?.totalPrizeValue, undefined);
+
+        await contests.upsertMany([target]);
+        const first = await service.reconcile(bet.id);
+        const expected = lottery === "mais-milionaria" ? 100 : lottery === "timemania" ? 45 : 40;
+        assert.equal(first?.totalPrizeValue, expected);
+        assert.equal((await service.realBets.listFinancialRevisions(bet.id)).length, 0);
+
+        const correctedTiers = officialTiers.map(t => ({ ...t, prizeValue: t.prizeValue + 7 }));
+        await contests.upsertMany([{ ...target, prizeTiers: correctedTiers }]);
+        assert.equal((await service.reconcile(bet.id))?.totalPrizeValue, expected + (lottery === "timemania" ? 14 : 7));
+        await service.reconcile(bet.id);
+        const revisions = await service.realBets.listFinancialRevisions(bet.id);
+        assert.equal(revisions.length, 1);
+        assert.equal(revisions[0]?.previousTotalPrizeValue, expected);
+      } finally {
+        await database.close();
+      }
+    }
+  },
+);
