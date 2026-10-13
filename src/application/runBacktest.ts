@@ -117,7 +117,7 @@ export class RunBacktestUseCase {
       result = backtestMegaSena(contests, {
         gameCount: input.gameCount,
         warmupContests: input.warmupContests,
-        fixedCount,
+        fixedCount: 3,
         analysisModel,
         ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),
         ...(input.endContest !== undefined ? { endContest: input.endContest } : {}),
@@ -133,6 +133,8 @@ export class RunBacktestUseCase {
       });
     } else if (input.lottery === "dia-de-sorte") {
       result = backtestDiaDeSorte(contests, {
+        fixedCount: 3,
+        analysisModel,
         gameCount: input.gameCount,
         warmupContests: input.warmupContests,
         ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),
