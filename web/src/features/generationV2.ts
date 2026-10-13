@@ -3,7 +3,7 @@ import { isLotteryId } from "../core/mainContext.js";
 import { currentMainView, onMainViewChanged, onViewRendered, type ViewRenderedDetail } from "../core/viewLifecycle.js";
 import { escapeHtml } from "../shared/escaping.js";
 import { NUMBER_TIERS, isSelectionMode, isFilterKey, isRangeEdge, tierByNumber, requestPayload, planPayload, algorithmSpace, purposeCopy } from "./generationV2/state.js";
-import { formatInteger, formatDecimal, formatPercent, formatCurrencyCents, numberLabel, fixedCountOptions, planMarkup, baselineMarkup, configurationSummaryMarkup, workspaceMarkup, gameMarkup } from "./generationV2/view.js";
+import { formatInteger, formatDecimal, formatPercent, formatCurrencyCents, numberLabel, planMarkup, baselineMarkup, configurationSummaryMarkup, workspaceMarkup, gameMarkup } from "./generationV2/view.js";
 import type { GeneratorState, GenerationPlan, GenerationFilterKey, GenerationRangeEdge, GenerationPlanPayload, LotteryId, GenerationPreviewResponse, GenerationSaveResponse, LotteryGenerationConfig } from "./generationV2/types.js";
 
 const root = document.querySelector<HTMLElement>("#content");
