@@ -130,3 +130,25 @@ test("agenda read-all returns the persisted update count with zero unread", asyn
 
   assert.deepEqual(await useCase.markAllRead(), { updated: 8, unreadCount: 0 });
 });
+
+test("agenda overview serves persisted data when notification refresh fails", async () => {
+  const useCase = new AgendaUseCase(
+    { list: async () => [agendaItem] },
+    {
+      list: async () => [notification],
+      unreadCount: async () => 1,
+      markRead: async () => undefined,
+      markAllRead: async () => 0,
+    },
+    { refresh: async () => { throw new Error("refresh unavailable"); } },
+  );
+  const previous = console.error;
+  console.error = () => undefined;
+  try {
+    assert.deepEqual(await useCase.overview(false), {
+      agenda: [agendaItem], notifications: [notification], unreadCount: 1,
+    });
+  } finally {
+    console.error = previous;
+  }
+});
