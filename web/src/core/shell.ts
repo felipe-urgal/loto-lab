@@ -1,4 +1,4 @@
-import { readLotteryPreference, writeLotteryPreference } from "./lotteryPreference.js";
+import { readLotteryPreference } from "./lotteryPreference.js";
 import {
   isMainView,
   mainViewFromHash,
@@ -34,7 +34,7 @@ const LEGACY_PATH_REDIRECTS: Readonly<Record<string, MainView>> = {
 
 const nav = document.querySelector<HTMLElement>("[data-shell-nav]");
 const isMainApp = location.pathname === "/" || location.pathname === "/index.html";
-const storedLottery = readLotteryPreference();
+readLotteryPreference();
 
 function redirectLegacyPath(): boolean {
   if (isMainApp) return false;
