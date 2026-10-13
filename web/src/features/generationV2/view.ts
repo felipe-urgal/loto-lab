@@ -1,6 +1,6 @@
 import { escapeHtml } from "../../shared/escaping.js";
-import type { GeneratedGame, GeneratorState, GenerationPlan, GenerationAlgorithmSpace, GenerationConstraints, GenerationFilterKey, GenerationRangeEdge, GenerationRequestPayload, GenerationPlanPayload, GenerationPurpose, LotteryId, NumberTier, SelectionMode } from "./types.js";
-import { NUMBER_TIERS, tierByNumber, algorithmSpace, purposeCopy, activeFilterCount } from "./state.js";
+import { NUMBER_TIERS, supportsExperimental, supportsCoverage, tierByNumber, algorithmSpace, purposeCopy, activeFilterCount } from "./state.js";
+import type { GeneratedGame, GeneratorState, GenerationFilterKey, SelectionMode } from "./types.js";
 
 export function formatInteger(value: unknown): string {
   return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(Number(value) || 0);
