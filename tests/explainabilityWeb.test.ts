@@ -15,6 +15,7 @@ test("Generator explainability supports the four-step product flow without compe
   const workspace = await source("web/generation-workspace.css");
   const loader = await source("web/feature-loader.js");
 
+  const generationOwners = generator + "\n" + await source("web/src/features/generationV2/state.ts") + "\n" + await source("web/src/features/generationV2/view.ts");
   assert.doesNotMatch(loader, /loadModule\("generation-explainability"\)/);
   assert.doesNotMatch(loader, /loadModule\("generation-readiness"\)/);
   assert.doesNotMatch(loader, /generation-diversity/);
@@ -43,12 +44,12 @@ test("Generator explainability supports the four-step product flow without compe
   assert.doesNotMatch(enhancements, /location\.hash/);
   assert.doesNotMatch(enhancements, /addEventListener\("hashchange"/);
 
-  assert.match(generator, /data-g2-flow-step="configure"/);
-  assert.match(generator, /data-g2-flow-step="preview"/);
-  assert.match(generator, /data-g2-flow-step="review"/);
-  assert.match(generator, /data-g2-flow-step="save"/);
-  assert.match(generator, /generationMode: "diversified"/);
-  assert.match(generator, /generatorOptions\.seed/);
+  assert.match(generationOwners, /data-g2-flow-step="configure"/);
+  assert.match(generationOwners, /data-g2-flow-step="preview"/);
+  assert.match(generationOwners, /data-g2-flow-step="review"/);
+  assert.match(generationOwners, /data-g2-flow-step="save"/);
+  assert.match(generationOwners, /generationMode: "diversified"/);
+  assert.match(generationOwners, /generatorOptions\.seed/);
 
   await assert.rejects(source("web/generation-diversity.js"), /ENOENT/);
   await assert.rejects(source("web/generation-explainability.js"), /ENOENT/);
