@@ -74,6 +74,9 @@ export class PostgresAgendaRepository {
         WHEN 'quina' THEN 4
         WHEN 'lotomania' THEN 5
         WHEN 'dupla-sena' THEN 6
+        WHEN 'mais-milionaria' THEN 7
+        WHEN 'timemania' THEN 8
+        WHEN 'super-sete' THEN 9
         ELSE 99
       END
     `);
