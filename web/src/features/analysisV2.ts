@@ -1,25 +1,10 @@
-import { type AnalysisMapFilter, TIER_LABELS, number, decimal, percent, signed, tierClass, metricCard } from "./analysisV2/helpers.js";
-import { numberMapView, numberDetailMarkup, mapFilterMarkup } from "./analysisV2/map.js";
+import { number, decimal, percent, evidenceCopy, validationCards, TIER_LABELS, type AnalysisMapFilter } from "./analysisV2/helpers.js";
+import { numberDetailMarkup } from "./analysisV2/map.js";
 import { shellMarkup } from "./analysisV2/shell.js";
-import { validationCards } from "./analysisV2/helpers.js";
 import { api } from "../core/api.js";
-import {
-  currentMainView,
-  onMainViewChanged,
-  onViewRendered,
-} from "../core/viewLifecycle.js";
+import { currentMainView, onMainViewChanged, onViewRendered } from "../core/viewLifecycle.js";
 import { escapeHtml } from "../shared/escaping.js";
-import type {
-  AnalysisCycles,
-  AnalysisNumberItem,
-  AnalysisPayload,
-  AnalysisTier,
-  AssociationItem,
-  RankingMover,
-  StructureMethodologyFilter,
-  StructureMetric,
-  ValidationPeriod,
-} from "./analysisV2/types.js";
+import type { AnalysisPayload } from "./analysisV2/types.js";
 
 const root = document.querySelector<HTMLElement>("#content")!;
 const lotterySelect = document.querySelector<HTMLSelectElement>("#lottery-select");
