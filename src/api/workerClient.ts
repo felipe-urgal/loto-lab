@@ -1,3 +1,4 @@
+import { assertLegacyBacktestLottery } from "../application/legacyBacktestLottery.js";
 import { Worker } from "node:worker_threads";
 import type { Contest, LotteryId } from "../domain/types.js";
 import {
@@ -179,6 +180,7 @@ export async function runBacktestInWorker(
   input: StrategyBacktestRequest,
   options: RunBacktestWorkerOptions = {},
 ): Promise<RunBacktestResponse> {
+  assertLegacyBacktestLottery(input.lottery);
   const contests = await services.contests.list({ lottery: input.lottery, order: "asc" });
   const roundCount = eligibleRoundCount(contests, input);
   if ((options.enforceHttpRoundLimit ?? true) && roundCount > MAX_BACKTEST_ROUNDS) {
