@@ -1,3 +1,4 @@
+import { assertLegacyBacktestLottery } from "./legacyBacktestLottery.js";
 import type { RunBacktestRequest, RunBacktestResponse } from "./runBacktest.js";
 
 export interface BacktestExecutionGate {
@@ -25,6 +26,7 @@ export class ExecuteBacktestUseCase {
   ) {}
 
   async execute(input: RunBacktestRequest, signal?: AbortSignal): Promise<RunBacktestResponse> {
+    assertLegacyBacktestLottery(input.lottery);
     const release = this.gate.acquire();
     if (!release) throw new BacktestExecutionBusyError();
 

@@ -1,3 +1,4 @@
+import { UnsupportedBacktestLotteryError, assertLegacyBacktestLottery } from "../application/legacyBacktestLottery.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { BacktestCatalogUseCase } from "../application/backtestCatalog.js";
 import {
@@ -59,9 +60,10 @@ export async function serveBacktests(
     }
 
     if (method === "POST" && listMatch?.[1] === "run") {
-      if (!enforceRateLimit(request, response, backtestLimiter, "backtest")) return true;
       const body = await readJsonBody(request);
       const lottery = parseLottery(body.lottery);
+      assertLegacyBacktestLottery(lottery);
+      if (!enforceRateLimit(request, response, backtestLimiter, "backtest")) return true;
       const defaultGameCount = lottery === "mega-sena" ? 2 : 4;
       const gameCount = parsePositiveInt(body.gameCount, "gameCount", {
         min: 1,
@@ -129,6 +131,10 @@ export async function serveBacktests(
   } catch (error) {
     if (error instanceof ApiError) {
       sendJson(response, error.statusCode, { error: { code: error.code, message: error.message } }, corsOrigin);
+      return true;
+    }
+    if (error instanceof UnsupportedBacktestLotteryError) {
+      sendJson(response, 422, { error: { code: error.code, message: error.message } }, corsOrigin);
       return true;
     }
     if (error instanceof BacktestExecutionBusyError) {

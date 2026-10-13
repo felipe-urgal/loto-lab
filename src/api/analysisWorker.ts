@@ -1,3 +1,4 @@
+import { assertLegacyBacktestLottery, assertNeverBacktestLottery } from "../application/legacyBacktestLottery.js";
 import { parentPort, workerData } from "node:worker_threads";
 import type { Contest, LotteryId } from "../domain/types.js";
 import { buildAdvancedAnalysis } from "../analysis/advanced.js";
@@ -46,6 +47,7 @@ function compactBacktestRound(round: BacktestRoundArtifact): BacktestRoundArtifa
 }
 
 function computeBacktest(contests: Contest[], input: RunBacktestRequest) {
+  assertLegacyBacktestLottery(input.lottery);
   const options: Record<string, unknown> = {
     gameCount: input.gameCount,
     warmupContests: input.warmupContests,
@@ -71,13 +73,15 @@ function computeBacktest(contests: Contest[], input: RunBacktestRequest) {
       ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),
       ...(input.endContest !== undefined ? { endContest: input.endContest } : {}),
     });
-  } else {
+  } else if (input.lottery === "dia-de-sorte") {
     result = backtestDiaDeSorte(contests, {
       gameCount: input.gameCount,
       warmupContests: input.warmupContests,
       ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),
       ...(input.endContest !== undefined ? { endContest: input.endContest } : {}),
     });
+  } else {
+    assertNeverBacktestLottery(input.lottery);
   }
 
   return {

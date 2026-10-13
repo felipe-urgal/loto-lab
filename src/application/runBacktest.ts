@@ -1,3 +1,4 @@
+import { assertLegacyBacktestLottery } from "./legacyBacktestLottery.js";
 import { BACKTEST_METHODOLOGY_VERSION, backtestHistorySignature, HISTORY_SIGNATURE_VERSION } from "../backtest/reproducibility.js";
 import type { Contest, LotteryId } from "../domain/types.js";
 import { backtestDiaDeSorte } from "../backtest/diaDeSorte.js";
@@ -71,15 +72,7 @@ export class RunBacktestUseCase {
   ) {}
 
   async execute(input: RunBacktestRequest): Promise<RunBacktestResponse> {
-    if (
-      input.lottery !== "mega-sena"
-      && input.lottery !== "lotofacil"
-      && input.lottery !== "dia-de-sorte"
-    ) {
-      throw new Error(
-        `Legacy backtest is not available for ${input.lottery}; use Generator V2 or modality-compatible analysis`,
-      );
-    }
+    assertLegacyBacktestLottery(input.lottery);
     const contests = (await this.history.list({ lottery: input.lottery, order: "asc" }))
       .filter((contest) => contest.lottery === input.lottery)
       .sort((a, b) => a.number - b.number);
