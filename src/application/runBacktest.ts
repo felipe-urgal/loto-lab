@@ -125,7 +125,7 @@ export class RunBacktestUseCase {
     } else if (input.lottery === "lotofacil") {
       result = backtestLotofacil(contests, {
         gameCount: input.gameCount,
-        fixedCount,
+        fixedCount: input.fixedCount ?? 8,
         analysisModel,
         warmupContests: input.warmupContests,
         ...(input.startContest !== undefined ? { startContest: input.startContest } : {}),
