@@ -1,19 +1,12 @@
 import type { Pool } from "pg";
 import type { LotteryId } from "../domain/types.js";
+import { LOTTERY_CONFIGS } from "../lotteries/config.js";
 import { PostgresAgendaRepository } from "../persistence/agendaRepository.js";
-import { PostgresContestRepository } from "../persistence/contestRepository.js";
 import { PostgresNotificationRepository } from "../persistence/notificationRepository.js";
 import { PostgresOperationRepository, type OperationRunRecord } from "../persistence/operationRepository.js";
 import { PostgresRealBetRepository } from "../persistence/realBetRepository.js";
 
-const LOTTERIES: LotteryId[] = [
-  "mega-sena",
-  "lotofacil",
-  "dia-de-sorte",
-  "quina",
-  "lotomania",
-  "dupla-sena",
-];
+const LOTTERIES = Object.keys(LOTTERY_CONFIGS) as LotteryId[];
 const LABELS: Record<LotteryId, string> = {
   "mega-sena": "Mega-Sena",
   lotofacil: "Lotofácil",
@@ -45,15 +38,15 @@ export interface NotificationRefreshResult {
 type CurrentOperation = Pick<OperationRunRecord<Record<string, unknown>>, "id" | "status">;
 
 export class NotificationService {
+  private readonly pool: Pool;
   private readonly agenda: PostgresAgendaRepository;
-  private readonly contests: PostgresContestRepository;
   private readonly notifications: PostgresNotificationRepository;
   private readonly operations: PostgresOperationRepository;
   private readonly realBets: PostgresRealBetRepository;
 
   constructor(pool: Pool) {
+    this.pool = pool;
     this.agenda = new PostgresAgendaRepository(pool);
-    this.contests = new PostgresContestRepository(pool);
     this.notifications = new PostgresNotificationRepository(pool);
     this.operations = new PostgresOperationRepository(pool);
     this.realBets = new PostgresRealBetRepository(pool);
@@ -88,35 +81,56 @@ export class NotificationService {
       agendaCount += 1;
     }
 
-    for (const lottery of LOTTERIES) {
-      const bets = await this.realBets.listRecent(lottery, 100);
+    const betsByLottery = await Promise.all(LOTTERIES.map(async lottery => ({
+      lottery,
+      bets: await this.realBets.listRecent(lottery, 100),
+    })));
+    const pending = betsByLottery.flatMap(({ lottery, bets }) =>
+      bets.filter(bet => bet.status !== "checked").map(bet => ({ lottery, contestNumber: bet.contestNumber })),
+    );
+    const available = new Set<string>();
+    if (pending.length > 0) {
+      const results = await this.pool.query<{ lottery: LotteryId; contest_number: number }>(
+        `SELECT c.lottery, c.contest_number
+         FROM contests c
+         JOIN unnest($1::text[], $2::integer[]) AS requested(lottery, contest_number)
+           ON c.lottery = requested.lottery AND c.contest_number = requested.contest_number`,
+        [pending.map(item => item.lottery), pending.map(item => item.contestNumber)],
+      );
+      for (const row of results.rows) available.add(`${row.lottery}:${row.contest_number}`);
+    }
+
+    for (const { lottery, bets } of betsByLottery) {
       for (const bet of bets) {
         if (bet.status === "checked") {
-          const won = (bet.totalPrizeValue ?? 0) > 0;
+          const unknown = bet.totalPrizeValue === undefined;
+          const won = !unknown && bet.totalPrizeValue! > 0;
           await this.notifications.upsert({
             eventKey: `bet:${bet.id}`,
             type: won ? "bet-prize" : "bet-checked",
             lottery,
-            severity: won ? "success" : "info",
+            severity: won ? "success" : unknown ? "warning" : "info",
             title: won ? `Aposta #${bet.id} premiada` : `Aposta #${bet.id} conferida`,
-            body: won
-              ? `Concurso #${bet.contestNumber}: prêmio total ${money(bet.totalPrizeValue!)}.`
-              : `Concurso #${bet.contestNumber}: conferência concluída sem prêmio registrado.`,
-            actionHref: `/#games`,
-            metadata: { betId: bet.id, contestNumber: bet.contestNumber, totalPrizeValue: bet.totalPrizeValue },
+            body: unknown
+              ? `Concurso #${bet.contestNumber}: conferência concluída; premiação ainda não disponível.`
+              : won
+                ? `Concurso #${bet.contestNumber}: prêmio total ${money(bet.totalPrizeValue!)}.`
+                : `Concurso #${bet.contestNumber}: conferência concluída sem prêmio registrado.`,
+            actionHref: "/#games",
+            metadata: { betId: bet.id, contestNumber: bet.contestNumber, totalPrizeValue: bet.totalPrizeValue ?? null },
           });
         } else {
-          const result = await this.contests.findByNumber(lottery, bet.contestNumber);
+          const hasResult = available.has(`${lottery}:${bet.contestNumber}`);
           await this.notifications.upsert({
             eventKey: `bet:${bet.id}`,
-            type: result ? "result-available" : "bet-awaiting",
+            type: hasResult ? "result-available" : "bet-awaiting",
             lottery,
-            severity: result ? "warning" : "info",
-            title: result ? `Resultado disponível · aposta #${bet.id}` : `Aposta #${bet.id} aguardando sorteio`,
-            body: result
+            severity: hasResult ? "warning" : "info",
+            title: hasResult ? `Resultado disponível · aposta #${bet.id}` : `Aposta #${bet.id} aguardando sorteio`,
+            body: hasResult
               ? `O concurso #${bet.contestNumber} já está na base e a aposta aguarda reconciliação.`
               : `Aposta registrada para o concurso #${bet.contestNumber}.`,
-            actionHref: `/#games`,
+            actionHref: "/#games",
             metadata: { betId: bet.id, contestNumber: bet.contestNumber },
           });
         }
