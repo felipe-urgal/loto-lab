@@ -77,3 +77,24 @@ test("ExecuteBacktestUseCase releases the expensive-work gate when execution fai
   await assert.rejects(() => useCase.execute(input), /worker failed/);
   assert.equal(releases, 1);
 });
+
+test("all six unsupported lotteries fail before the work gate or executor", async () => {
+  const unsupported = ["quina", "lotomania", "dupla-sena", "mais-milionaria", "timemania", "super-sete"] as const;
+  for (const lottery of unsupported) {
+    let acquisitions = 0;
+    let executions = 0;
+    const useCase = new ExecuteBacktestUseCase(
+      gate(() => { acquisitions += 1; return () => undefined; }),
+      async () => { executions += 1; return {} as RunBacktestResponse; },
+    );
+    await assert.rejects(
+      () => useCase.execute({ ...input, lottery, persist: true }),
+      (error: unknown) => {
+        assert.equal((error as { code?: string }).code, "UNSUPPORTED_BACKTEST_LOTTERY");
+        return true;
+      },
+    );
+    assert.equal(acquisitions, 0, lottery);
+    assert.equal(executions, 0, lottery);
+  }
+});
