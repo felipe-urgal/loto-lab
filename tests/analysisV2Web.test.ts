@@ -41,15 +41,16 @@ test("Analyses is lazy-loaded, typed and exposes one capability-aware number map
     readFile("src/api/analysisWorker.ts", "utf8"),
   ]);
 
+  const viewSource = source + "\n" + (await Promise.all(["shell", "map", "structure", "audit", "helpers"].map(name => readFile(`web/src/features/analysisV2/${name}.ts`, "utf8")))).join("\n");
   assert.equal(
     boundary,
     'import "./src/features/analysisV2.js";\nimport "./src/features/analysisV2/journey.js";\n',
   );
-  assert.match(source, /from "\.\.\/core\/api\.js"/);
-  assert.match(source, /from "\.\.\/core\/viewLifecycle\.js"/);
-  assert.match(source, /from "\.\.\/shared\/escaping\.js"/);
+  assert.match(viewSource, /from "\.\.\/core\/api\.js"/);
+  assert.match(viewSource, /from "\.\.\/core\/viewLifecycle\.js"/);
+  assert.match(viewSource, /from "\.\.\/shared\/escaping\.js"/);
   assert.doesNotMatch(source, /runtime\.js/);
-  assert.match(source, /api<AnalysisPayload>/);
+  assert.match(viewSource, /api<AnalysisPayload>/);
   assert.match(types, /export type AnalysisPayload/);
   assert.match(types, /export type AnalysisNumberItem/);
 
@@ -58,36 +59,36 @@ test("Analyses is lazy-loaded, typed and exposes one capability-aware number map
   assert.match(loader, /loadStyle\("analysis-workspace"\)/);
   assert.doesNotMatch(loader, /loadStyle\("analysis-v2-hardening"\)/);
   assert.match(loader, /loadModule\("analysis-v2"\)/);
-  assert.match(source, /Mapa das dezenas/);
-  assert.match(source, /Histórico, não previsão/);
-  assert.match(source, /data-a2-number-map/);
-  assert.match(source, /data-a2-map-filter/);
-  assert.match(source, /Comparar dezenas/);
-  assert.match(source, /Indicadores e metodologia/);
-  assert.match(source, /detailsBlock\("Classificação completa"/);
-  assert.match(source, /detailsBlock\("Estrutura e distribuições"/);
-  assert.match(source, /detailsBlock\("Dinâmica histórica"/);
-  assert.match(source, /detailsBlock\("Associações"/);
-  assert.match(source, /Auditoria de aleatoriedade/);
-  assert.match(source, /randomnessAuditView/);
-  assert.match(source, /Compatível com o baseline testado/);
-  assert.match(source, /detailsBlock\("Validação e metodologia"/);
-  assert.match(source, /data-a2-pair-check/);
-  assert.match(source, /data-a2-validation-window/);
-  assert.match(source, /Atraso e frequência são descrições históricas/);
-  assert.match(source, /api<LotteryCatalogPayload>\("\/lotteries"\)/);
-  assert.match(source, /FLAT_NUMBER_FAMILIES/);
-  assert.match(source, /column-draw/);
-  assert.match(source, /dual-number-draw/);
+  assert.match(viewSource, /Mapa das dezenas/);
+  assert.match(viewSource, /Histórico, não previsão/);
+  assert.match(viewSource, /data-a2-number-map/);
+  assert.match(viewSource, /data-a2-map-filter/);
+  assert.match(viewSource, /Comparar dezenas/);
+  assert.match(viewSource, /Indicadores e metodologia/);
+  assert.match(viewSource, /detailsBlock\("Classificação completa"/);
+  assert.match(viewSource, /detailsBlock\("Estrutura e distribuições"/);
+  assert.match(viewSource, /detailsBlock\("Dinâmica histórica"/);
+  assert.match(viewSource, /detailsBlock\("Associações"/);
+  assert.match(viewSource, /Auditoria de aleatoriedade/);
+  assert.match(viewSource, /randomnessAuditView/);
+  assert.match(viewSource, /Compatível com o baseline testado/);
+  assert.match(viewSource, /detailsBlock\("Validação e metodologia"/);
+  assert.match(viewSource, /data-a2-pair-check/);
+  assert.match(viewSource, /data-a2-validation-window/);
+  assert.match(viewSource, /Atraso e frequência são descrições históricas/);
+  assert.match(viewSource, /api<LotteryCatalogPayload>\("\/lotteries"\)/);
+  assert.match(viewSource, /FLAT_NUMBER_FAMILIES/);
+  assert.match(viewSource, /column-draw/);
+  assert.match(viewSource, /dual-number-draw/);
   assert.doesNotMatch(source, /role="tablist"|data-a2-tab|ACTIVE_TAB_KEY/);
-  assert.match(source, /<dialog class="a2-detail"/);
-  assert.match(source, /showModal\(\)/);
-  assert.match(source, /\.close\(\)/);
-  assert.match(source, /Escape/);
-  assert.match(source, /Qualidade do histórico/);
-  assert.match(source, /historicalExpected/);
-  assert.match(source, /amostra insuficiente para classificar evidência/);
-  assert.match(source, /\/analysis\/\$\{lottery\}\/advanced/);
+  assert.match(viewSource, /<dialog class="a2-detail"/);
+  assert.match(viewSource, /showModal\(\)/);
+  assert.match(viewSource, /\.close\(\)/);
+  assert.match(viewSource, /Escape/);
+  assert.match(viewSource, /Qualidade do histórico/);
+  assert.match(viewSource, /historicalExpected/);
+  assert.match(viewSource, /amostra insuficiente para classificar evidência/);
+  assert.match(viewSource, /\/analysis\/\$\{lottery\}\/advanced/);
   assert.doesNotMatch(source, /const cache = new Map\(\)/);
   assert.doesNotMatch(source, /lotterySelect\?\.addEventListener\("change"/);
   assert.match(css, /\.a2-detail-open/);
