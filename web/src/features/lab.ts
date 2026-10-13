@@ -1,3 +1,4 @@
+import { readLotteryPreference, writeLotteryPreference } from "../core/lotteryPreference.js";
 import { ApiError, api } from "../core/api.js";
 import { isLotteryId } from "../core/mainContext.js";
 import type { LotteryId } from "../core/mainContext.js";
@@ -336,7 +337,7 @@ function updateLotteryCopy(resetGames = false): void {
   }
 
   if (resetGames) gamesInput.value = String(config.defaultGames);
-  localStorage.setItem("loto-lab:lottery", lottery);
+  writeLotteryPreference(lottery);
   currentResult = undefined;
   resultsRoot.hidden = true;
   message.hidden = false;
@@ -755,7 +756,7 @@ form.addEventListener("submit", (event) => {
 });
 metricSelect.addEventListener("change", renderChart);
 
-const savedLottery = localStorage.getItem("loto-lab:lottery");
+const savedLottery = readLotteryPreference();
 if (isLotteryId(savedLottery)) lotterySelect.value = savedLottery;
 gamesInput.value = String(lotteries[selectedLottery()].defaultGames);
 updateLotteryCopy(false);

@@ -1,5 +1,5 @@
+import { readLotteryPreference } from "./lotteryPreference.js";
 import {
-  isLotteryId,
   isMainView,
   mainViewFromHash,
   requestedMainViewFromHash,
@@ -34,8 +34,7 @@ const LEGACY_PATH_REDIRECTS: Readonly<Record<string, MainView>> = {
 
 const nav = document.querySelector<HTMLElement>("[data-shell-nav]");
 const isMainApp = location.pathname === "/" || location.pathname === "/index.html";
-const storedLottery = localStorage.getItem("loto-lab:lottery");
-if (storedLottery && !isLotteryId(storedLottery)) localStorage.removeItem("loto-lab:lottery");
+readLotteryPreference();
 
 function redirectLegacyPath(): boolean {
   if (isMainApp) return false;

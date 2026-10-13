@@ -12,6 +12,7 @@ test("main shell and lifecycle share one typed view/lottery contract", async () 
     source("web/src/core/shell.ts"),
     source("web/src/core/viewLifecycle.ts"),
   ]);
+  const shellOwner = shell + "\n" + await readFile("web/src/core/lotteryPreference.ts", "utf8");
 
   assert.match(context, /MAIN_VIEWS/);
   assert.match(context, /LOTTERY_IDS/);
@@ -23,12 +24,12 @@ test("main shell and lifecycle share one typed view/lottery contract", async () 
   assert.match(context, /backtests: "analysis"/);
   assert.match(context, /LEGACY_MAIN_VIEW_REDIRECTS\[requested\] \?\? "dashboard"/);
 
-  assert.match(shell, /from "\.\/mainContext\.js"/);
-  assert.match(shell, /view: MainView/);
-  assert.match(shell, /requestedMainViewFromHash\(location\.hash\)/);
-  assert.match(shell, /mainViewFromHash\(location\.hash\)/);
-  assert.match(shell, /isMainView\(requested\)/);
-  assert.match(shell, /isLotteryId\(storedLottery\)/);
+  assert.match(shellOwner, /from "\.\/mainContext\.js"/);
+  assert.match(shellOwner, /view: MainView/);
+  assert.match(shellOwner, /requestedMainViewFromHash\(location\.hash\)/);
+  assert.match(shellOwner, /mainViewFromHash\(location\.hash\)/);
+  assert.match(shellOwner, /isMainView\(requested\)/);
+  assert.match(shellOwner, /isLotteryId\(saved\)/);
   assert.doesNotMatch(shell, /location\.hash\.replace/);
   assert.doesNotMatch(shell, /const mainViews = new Set/);
   assert.doesNotMatch(shell, /const lotteries = new Set/);

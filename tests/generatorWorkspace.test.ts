@@ -13,6 +13,7 @@ test("generator workspace follows Redesign V2 while preserving audited generatio
     readFile("web/src/features/generationV2/enhancements.ts", "utf8"),
   ]);
 
+  const generationOwners = generator + "\n" + (await Promise.all(["state", "view"].map(name => readFile(`web/src/features/generationV2/${name}.ts`, "utf8")))).join("\n");
   const generatorLayer = loader.indexOf('loadStyledModule("generation-v2")');
   const workspaceLayer = loader.indexOf('loadStyle("generation-workspace")');
   assert.ok(generatorLayer >= 0, "Generator 2.0 must remain the functional owner");
@@ -44,33 +45,33 @@ test("generator workspace follows Redesign V2 while preserving audited generatio
     boundary,
     'import "./src/features/generationV2.js";\nimport "./src/features/generationV2/enhancements.js";\n',
   );
-  assert.match(generator, /from "\.\.\/core\/api\.js"/);
-  assert.match(generator, /from "\.\.\/core\/mainContext\.js"/);
-  assert.match(generator, /from "\.\.\/core\/viewLifecycle\.js"/);
-  assert.match(generator, /from "\.\.\/shared\/escaping\.js"/);
+  assert.match(generationOwners, /from "\.\.\/core\/api\.js"/);
+  assert.match(generationOwners, /from "\.\.\/core\/mainContext\.js"/);
+  assert.match(generationOwners, /from "\.\.\/core\/viewLifecycle\.js"/);
+  assert.match(generationOwners, /from "\.\.\/shared\/escaping\.js"/);
   assert.doesNotMatch(generator, /fetch\(/);
   assert.doesNotMatch(generator, /location\.hash = "games"/);
   assert.match(types, /from "\.\.\/\.\.\/core\/mainContext\.js"/);
   assert.match(types, /export type LotteryGenerationConfig/);
   assert.match(types, /export type GenerationPlan/);
   assert.match(types, /export type GeneratorState/);
-  assert.match(generator, /api<\{ items\?: LotteryGenerationConfig\[\] \}>\("\/lotteries"/);
-  assert.match(generator, /betSize: lotteryConfig\.defaultBetSize/);
+  assert.match(generationOwners, /api<\{ items\?: LotteryGenerationConfig\[\] \}>\("\/lotteries"/);
+  assert.match(generationOwners, /betSize: lotteryConfig\.defaultBetSize/);
   assert.doesNotMatch(generator, /LOTTERY_FALLBACK/);
-  assert.match(generator, /postJson<GenerationPlan>\("\/generation\/plan"/);
-  assert.match(generator, /postJson<GenerationPreviewResponse>\("\/generation\/preview"/);
-  assert.match(generator, /postJson<GenerationSaveResponse>\("\/generation\/save"/);
-  assert.match(generator, /includeSeed \? state\.preview\?\.generatorOptions\.seed/);
-  assert.match(generator, /state\.preview = null/);
-  assert.match(generator, /const tier = state\.purpose === "coverage" \? "" : tiers\.get\(value\) \|\| ""/);
+  assert.match(generationOwners, /postJson<GenerationPlan>\("\/generation\/plan"/);
+  assert.match(generationOwners, /postJson<GenerationPreviewResponse>\("\/generation\/preview"/);
+  assert.match(generationOwners, /postJson<GenerationSaveResponse>\("\/generation\/save"/);
+  assert.match(generationOwners, /includeSeed \? state\.preview\?\.generatorOptions\.seed/);
+  assert.match(generationOwners, /state\.preview = null/);
+  assert.match(generationOwners, /const tier = state\.purpose === "coverage" \? "" : tiers\.get\(value\) \|\| ""/);
   assert.doesNotMatch(generator, /state\.purpose === "experimental" \? \(tiers\.get\(value\) \|\| ""\) : ""/);
-  assert.match(generator, /Cobertura \/ Desdobramento/);
-  assert.match(generator, /coveragePoolNumbers/);
-  assert.match(generator, /Forte histórica/);
-  assert.match(generator, /Intermediária histórica/);
-  assert.match(generator, /Fria histórica/);
-  assert.match(generator, /Salvar grava exatamente os jogos exibidos abaixo/);
-  assert.match(generator, /disponível no Painel/);
+  assert.match(generationOwners, /Cobertura \/ Desdobramento/);
+  assert.match(generationOwners, /coveragePoolNumbers/);
+  assert.match(generationOwners, /Forte histórica/);
+  assert.match(generationOwners, /Intermediária histórica/);
+  assert.match(generationOwners, /Fria histórica/);
+  assert.match(generationOwners, /Salvar grava exatamente os jogos exibidos abaixo/);
+  assert.match(generationOwners, /disponível no Painel/);
   assert.match(explainability, /Isto não é previsão/);
   assert.match(explainability, /four-step product journey/);
   assert.match(enhancements, /onViewRendered/);

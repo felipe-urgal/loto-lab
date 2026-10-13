@@ -82,14 +82,16 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
     fetchSource("design-system.css"),
   ]);
 
+  const preference = await fetchSource("src/core/lotteryPreference.js");
+  const shellOwner = shell + "\n" + preference;
   assert.match(app, /data-feature-owned="dashboard"/);
   assert.doesNotMatch(app, /setView\("games"\)/);
   assert.doesNotMatch(app, /render\.view === "backtests"/);
 
   assert.match(shellBoundary, /\.\/src\/core\/shell\.js/);
-  assert.match(shell, /normalizeMainHash/);
-  assert.match(shell, /localStorage\.removeItem\("loto-lab:lottery"\)/);
-  assert.match(shell, /LEGACY_PATH_REDIRECTS/);
+  assert.match(shellOwner, /normalizeMainHash/);
+  assert.match(shellOwner, /localStorage\.removeItem\(LOTTERY_PREFERENCE_KEY\)/);
+  assert.match(shellOwner, /LEGACY_PATH_REDIRECTS/);
   assert.doesNotMatch(shell, /nav-more|Mais opções/);
 
   assert.match(refinementsBoundary, /src\/features\/refinements\.js/);
