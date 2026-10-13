@@ -80,7 +80,9 @@ export class RunBacktestUseCase {
         `Legacy backtest is not available for ${input.lottery}; use Generator V2 or modality-compatible analysis`,
       );
     }
-    const contests = await this.history.list({ lottery: input.lottery, order: "asc" });
+    const contests = (await this.history.list({ lottery: input.lottery, order: "asc" }))
+      .filter((contest) => contest.lottery === input.lottery)
+      .sort((a, b) => a.number - b.number);
     const eligibleRoundCount = contests
       .slice(input.warmupContests)
       .filter((contest) => input.startContest === undefined || contest.number >= input.startContest)
