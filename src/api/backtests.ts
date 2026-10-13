@@ -60,10 +60,10 @@ export async function serveBacktests(
     }
 
     if (method === "POST" && listMatch?.[1] === "run") {
-      if (!enforceRateLimit(request, response, backtestLimiter, "backtest")) return true;
       const body = await readJsonBody(request);
       const lottery = parseLottery(body.lottery);
       assertLegacyBacktestLottery(lottery);
+      if (!enforceRateLimit(request, response, backtestLimiter, "backtest")) return true;
       const defaultGameCount = lottery === "mega-sena" ? 2 : 4;
       const gameCount = parsePositiveInt(body.gameCount, "gameCount", {
         min: 1,
