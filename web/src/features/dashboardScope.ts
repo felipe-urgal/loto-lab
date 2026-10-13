@@ -1,3 +1,4 @@
+import { readLotteryPreference, writeLotteryPreference } from "../core/lotteryPreference.js";
 import { api } from "../core/api.js";
 import { currentMainView, onMainViewChanged, onViewRendered } from "../core/viewLifecycle.js";
 import { escapeHtml } from "../shared/escaping.js";
@@ -17,7 +18,6 @@ import {
   type RealBetsPayload,
 } from "./dashboardScope/types.js";
 
-const LOTTERY_KEY = "loto-lab:lottery";
 const root = document.querySelector<HTMLElement>("#content");
 const select = document.querySelector<HTMLSelectElement>("#lottery-select");
 const title = document.querySelector<HTMLElement>("#view-title");
@@ -35,7 +35,7 @@ function validLottery(value: unknown): value is LotteryId {
 }
 
 function savedLottery(): LotteryId {
-  const value = localStorage.getItem(LOTTERY_KEY);
+  const value = readLotteryPreference();
   return validLottery(value) ? value : "mega-sena";
 }
 
@@ -323,7 +323,7 @@ async function applyDashboard(): Promise<void> {
   loadController = controller;
   const token = ++applyToken;
   const lottery = validLottery(select.value) ? select.value : savedLottery();
-  localStorage.setItem(LOTTERY_KEY, lottery);
+  writeLotteryPreference(lottery);
   setHeader(lottery);
 
   try {
@@ -380,7 +380,7 @@ async function syncDashboardData(): Promise<void> {
 
 select?.addEventListener("change", () => {
   if (currentMainView() !== "dashboard" || !validLottery(select.value)) return;
-  localStorage.setItem(LOTTERY_KEY, select.value);
+  writeLotteryPreference(select.value as LotteryId);
   scheduleApply();
 });
 
@@ -418,7 +418,7 @@ root?.addEventListener("click", (event) => {
   const view = button.dataset.dashboardOpen;
   if (!validLottery(lottery) || (view !== "analysis" && view !== "generate")) return;
 
-  localStorage.setItem(LOTTERY_KEY, lottery);
+  writeLotteryPreference(lottery);
   select.value = lottery;
   window.location.hash = view;
 });
