@@ -14,24 +14,25 @@ test("web shell exposes only the three approved destinations and redirects legac
     source("web/index.html"),
   ]);
 
+  const shellOwner = shell + "\n" + await source("web/src/core/lotteryPreference.ts");
   assert.equal(boundary.trim(), 'import "./src/core/shell.js";');
   assert.doesNotMatch(boundary, /data-shell-nav|localStorage|LEGACY_PATH_REDIRECTS/);
 
-  assert.match(shell, /interface NavigationItem/);
-  assert.match(shell, /data-shell-nav/);
-  assert.match(shell, /loto-lab:lottery/);
-  assert.match(shell, /label: "Painel"/);
-  assert.match(shell, /label: "Análises"/);
-  assert.match(shell, /label: "Gerar jogos"/);
+  assert.match(shellOwner, /interface NavigationItem/);
+  assert.match(shellOwner, /data-shell-nav/);
+  assert.match(shellOwner, /loto-lab:lottery/);
+  assert.match(shellOwner, /label: "Painel"/);
+  assert.match(shellOwner, /label: "Análises"/);
+  assert.match(shellOwner, /label: "Gerar jogos"/);
   assert.doesNotMatch(shell, /label: "Meus jogos"|label: "Testes históricos"|label: "Laboratório"|label: "Execuções"|label: "Agenda"|label: "IA"/);
   assert.doesNotMatch(shell, /nav-more|Mais opções/);
-  assert.match(shell, /"\/agenda": "dashboard"/);
-  assert.match(shell, /"\/jobs": "dashboard"/);
-  assert.match(shell, /"\/lab": "analysis"/);
-  assert.match(shell, /"\/strategies": "analysis"/);
-  assert.match(shell, /"\/ai": "analysis"/);
-  assert.match(shell, /location\.replace/);
-  assert.match(shell, /hashchange/);
+  assert.match(shellOwner, /"\/agenda": "dashboard"/);
+  assert.match(shellOwner, /"\/jobs": "dashboard"/);
+  assert.match(shellOwner, /"\/lab": "analysis"/);
+  assert.match(shellOwner, /"\/strategies": "analysis"/);
+  assert.match(shellOwner, /"\/ai": "analysis"/);
+  assert.match(shellOwner, /location\.replace/);
+  assert.match(shellOwner, /hashchange/);
 
   assert.match(html, /src="\/assets\/shell\.js"/);
   assert.match(html, /value="mais-milionaria"/);
