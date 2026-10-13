@@ -1,6 +1,7 @@
-import type { AnalysisCycles, AnalysisNumberItem, AnalysisPayload, AnalysisTier, AssociationItem, RankingMover, StructureMethodologyFilter, StructureMetric, ValidationPeriod } from "./types.js";
 import { escapeHtml } from "../../shared/escaping.js";
-import { number, decimal, percent, signed, evidenceCopy, qualityWarning, validationCards, robustnessRows } from "./helpers.js";
+import { number, decimal, validationCards, robustnessRows } from "./helpers.js";
+import type { AnalysisPayload } from "./types.js";
+
 export function randomnessAuditView(data: AnalysisPayload): string {
   const audit = data.advanced.randomnessAudit;
   const scope = audit.scope;
