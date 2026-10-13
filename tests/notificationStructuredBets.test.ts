@@ -67,7 +67,7 @@ test("nine-lottery notifications preserve unknown payout, reopen official payout
     for (const id of ids) {
       const row = (await notifications.list()).find(item => item.eventKey === `bet:${id}`);
       assert.equal(row?.type, "bet-awaiting");
-      await pool.query("UPDATE real_bets SET status = 'checked', total_prize_value = NULL WHERE id = $1", [id]);
+      await pool.query("UPDATE real_bets SET status = 'checked', checked_at = NOW(), total_prize_value = NULL WHERE id = $1", [id]);
     }
     await new NotificationService(pool).refresh();
     for (const id of ids) {
