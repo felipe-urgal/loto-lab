@@ -1,10 +1,11 @@
-import type { AnalysisCycles, AnalysisNumberItem, AnalysisPayload, AnalysisTier, AssociationItem, RankingMover, StructureMethodologyFilter, StructureMetric, ValidationPeriod } from "./types.js";
 import { escapeHtml } from "../../shared/escaping.js";
-type LotteryCatalogItem = { id?: string; name?: string; family?: string; enabled?: boolean; capabilities?: { analysis?: boolean } };
-import { formatDate, detailsBlock, qualityWarning, secondaryFieldNotice, TIER_LABELS, type AnalysisMapFilter } from "./helpers.js";
+import { number, formatDate, detailsBlock, qualityWarning, secondaryFieldNotice, type AnalysisMapFilter } from "./helpers.js";
+import type { LotteryCatalogItem } from "./helpers.js";
 import { numberMapView, technicalRankingView } from "./map.js";
 import { structureView, dynamicsView, combinationsView } from "./structure.js";
 import { validationView } from "./audit.js";
+import type { AnalysisPayload } from "./types.js";
+
 export function shellMarkup(data: AnalysisPayload, catalog: LotteryCatalogItem, lottery: string, activeMapFilter: AnalysisMapFilter): string {
   const advanced = data.advanced;
   const latest = advanced.latestContest;
