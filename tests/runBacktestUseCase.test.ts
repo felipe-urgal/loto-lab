@@ -91,12 +91,16 @@ test("RunBacktestUseCase executes a scoped Mega-Sena backtest without persistenc
   assert.equal(result.id, undefined);
   assert.equal(result.roundCount, 3);
   assert.equal(result.summary.testedContests, 3);
-  assert.deepEqual(result.options, {
-    gameCount: 2,
-    warmupContests: 20,
-    startContest: 2620,
-    endContest: 2622,
-  });
+  assert.equal(result.options.gameCount, 2);
+  assert.equal(result.options.warmupContests, 20);
+  assert.equal(result.options.startContest, 2620);
+  assert.equal(result.options.endContest, 2622);
+  assert.equal(result.options.effectiveStartContest, 2620);
+  assert.equal(result.options.effectiveEndContest, 2622);
+  assert.equal(result.options.methodologyVersion, "legacy-backtest-v1");
+  assert.equal(result.options.fixedCount, 3);
+  assert.equal(result.options.analysisModel, "score-v2");
+  assert.match(String(result.options.historySignature), /^backtest-history-sha256-v1:[a-f0-9]{64}$/);
 });
 
 test("RunBacktestUseCase persists compact Lotofácil artifacts and the default fixed count", async () => {
@@ -138,5 +142,22 @@ test("RunBacktestUseCase keeps Dia de Sorte on its dedicated engine", async () =
 
   assert.equal(result.roundCount, 2);
   assert.equal(result.summary.testedContests, 2);
-  assert.equal("fixedCount" in result.options, false);
+  assert.equal(result.options.fixedCount, 3);
+  assert.equal(result.options.analysisModel, "score-v2");
+});
+
+test("persisted backtest artifact replays exactly and history correction changes fingerprint", async () => {
+  const history = makeHistory("mega-sena", 25);
+  const saved: SaveApplicationBacktestInput[] = [];
+  const options = { lottery: "mega-sena" as const, gameCount: 1, warmupContests: 20, persist: true };
+  const first = await new RunBacktestUseCase(historyReader(history), store(saved)).execute(options);
+  const second = await new RunBacktestUseCase(historyReader([...history].reverse()), store()).execute({ ...options, persist: false });
+  assert.deepEqual(first.summary, second.summary);
+  assert.equal(first.options.historySignature, second.options.historySignature);
+  assert.deepEqual(saved[0]?.options, first.options);
+  const changed = history.map((contest, index) => index === 0
+    ? { ...contest, numbers: [1,2,3,4,5,6] }
+    : contest);
+  const corrected = await new RunBacktestUseCase(historyReader(changed), store()).execute({ ...options, persist: false });
+  assert.notEqual(corrected.options.historySignature, first.options.historySignature);
 });
