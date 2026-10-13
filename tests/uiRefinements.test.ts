@@ -91,8 +91,11 @@ test("UI refinement assets are lazy-loaded only by canonical interactive views",
   const generator = await fetch(`${baseUrl}/assets/src/features/generationV2.js`);
   assert.equal(generator.status, 200);
   const generatorSource = await generator.text();
-  assert.match(generatorSource, /generationMode: "diversified"/);
-  assert.match(generatorSource, /generatorOptions\.seed/);
+  const generationStateResponse = await fetch(`${baseUrl}/assets/src/features/generationV2/state.js`);
+  assert.equal(generationStateResponse.status, 200);
+  const generationOwners = generatorSource + "\n" + await generationStateResponse.text();
+  assert.match(generationOwners, /generationMode: "diversified"/);
+  assert.match(generationOwners, /generatorOptions\.seed/);
 
   const labPage = await fetch(`${baseUrl}/lab`, { redirect: "manual" });
   assert.equal(labPage.status, 308);
