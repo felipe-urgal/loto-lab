@@ -46,6 +46,12 @@ export class BetSizeOutOfRangeError extends Error {
   }
 }
 
+export function assertValidGameCount(gameCount: number): void {
+  if (!Number.isInteger(gameCount) || gameCount < 1) {
+    throw new Error("gameCount must be a positive integer");
+  }
+}
+
 export function combinationCount(n: number, k: number): number {
   if (!Number.isInteger(n) || !Number.isInteger(k) || n < 0 || k < 0 || k > n) return 0;
   const size = Math.min(k, n - k);
@@ -189,9 +195,7 @@ export function quoteOfficialBet(
       rule.maxBetSize,
     );
   }
-  if (!Number.isInteger(gameCount) || gameCount < 1) {
-    throw new Error("gameCount must be a positive integer");
-  }
+  assertValidGameCount(gameCount);
 
   const simpleEquivalentCountValue = simpleEquivalentCount(betSize, rule.drawSize);
   const topPrizeOneIn = rule.topPrizeOneInByBetSize[betSize];

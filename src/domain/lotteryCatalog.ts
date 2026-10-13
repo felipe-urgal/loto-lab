@@ -31,6 +31,7 @@ export interface LotteryCapabilities {
   simulation: boolean;
   analysis: boolean;
   checking: boolean;
+  /** True only if the currently executable validator accepts multiple numeric bet sizes. */
   variableBetSize: boolean;
   secondaryFields: boolean;
   columns: boolean;
@@ -150,7 +151,7 @@ export const LOTTERY_CATALOG = {
     name: "Dia de Sorte",
     family: "number-draw-secondary",
     enabled: true,
-    capabilities: capabilities({ secondaryFields: true }),
+    capabilities: capabilities({ secondaryFields: true, variableBetSize: false }),
     rules: { version: "2026-09", effectiveFrom: "2026-09-30" },
   },
   quina: {
@@ -166,7 +167,7 @@ export const LOTTERY_CATALOG = {
     name: "Lotomania",
     family: "number-draw",
     enabled: true,
-    capabilities: capabilities(),
+    capabilities: capabilities({ variableBetSize: false }),
     rules: { version: "2026-09", effectiveFrom: "2026-09-30" },
   },
   "dupla-sena": {
@@ -190,7 +191,7 @@ export const LOTTERY_CATALOG = {
     name: "Timemania",
     family: "number-draw-secondary",
     enabled: true,
-    capabilities: capabilities({ secondaryFields: true }),
+    capabilities: capabilities({ secondaryFields: true, variableBetSize: false }),
     rules: { version: "2026-09", effectiveFrom: "2026-09-30" },
   },
   "super-sete": {

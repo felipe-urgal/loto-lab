@@ -1,3 +1,5 @@
+import { assertValidGameCount, combinationCount } from "./betRules.js";
+
 export interface StructuredBetQuote {
   betSize: number;
   simpleEquivalentCount: number;
@@ -8,20 +10,12 @@ export interface StructuredBetQuote {
   };
 }
 
-function combinationCount(n: number, k: number): number {
-  if (!Number.isInteger(n) || !Number.isInteger(k) || k < 0 || n < k) return 0;
-  let value = 1;
-  for (let i = 1; i <= Math.min(k, n - k); i += 1) {
-    value = (value * (n - i + 1)) / i;
-  }
-  return Math.round(value);
-}
-
 export function quoteMaisMilionaria(
   numberCount: number,
   cloverCount: number,
   gameCount = 1,
 ): StructuredBetQuote {
+  assertValidGameCount(gameCount);
   if (!Number.isInteger(numberCount) || numberCount < 6 || numberCount > 12) {
     throw new Error("+Milionaria number count must be between 6 and 12");
   }
@@ -41,6 +35,7 @@ export function quoteMaisMilionaria(
 }
 
 export function quoteTimemania(gameCount = 1): StructuredBetQuote {
+  assertValidGameCount(gameCount);
   return {
     betSize: 10,
     simpleEquivalentCount: 1,
@@ -74,6 +69,7 @@ export function quoteSuperSete(
   columnMarks: number[],
   gameCount = 1,
 ): StructuredBetQuote {
+  assertValidGameCount(gameCount);
   const totalMarks = validateSuperSeteColumnMarks(columnMarks);
   const simpleEquivalentCount = columnMarks.reduce((value, count) => value * count, 1);
   return {
