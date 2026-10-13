@@ -90,12 +90,13 @@ test("canonical web source owns the 16px functional typography floor", async () 
 
 test("Analyses 2.0 owns its Portuguese product vocabulary in source", async () => {
   const analysis = await source("web/src/features/analysisV2.ts");
+  const analysisOwners = analysis + "\n" + (await Promise.all(["shell","map","structure","audit","helpers"].map(n => source(`web/src/features/analysisV2/${n}.ts`)))).join("\n");
 
-  assert.match(analysis, /Mapa das dezenas/);
-  assert.match(analysis, /Decomposição da pontuação/);
-  assert.match(analysis, /Classificação por escore-z; valor-p exato/);
-  assert.match(analysis, /Histórico, não previsão/);
-  assert.match(analysis, /Indicadores e metodologia/);
+  assert.match(analysisOwners, /Mapa das dezenas/);
+  assert.match(analysisOwners, /Decomposição da pontuação/);
+  assert.match(analysisOwners, /Classificação por escore-z; valor-p exato/);
+  assert.match(analysisOwners, /Histórico, não previsão/);
+  assert.match(analysisOwners, /Indicadores e metodologia/);
   assert.doesNotMatch(analysis, /role="tablist"|data-a2-tab/);
   assert.doesNotMatch(analysis, />Ranking auditável</);
   assert.doesNotMatch(analysis, />Score</);
@@ -104,9 +105,10 @@ test("Analyses 2.0 owns its Portuguese product vocabulary in source", async () =
 
 test("Generator 2.0 owns its conditioned reference copy in Portuguese", async () => {
   const generator = await source("web/src/features/generationV2.ts");
+  const generationOwners = generator + "\n" + (await Promise.all(["state","view"].map(n => source(`web/src/features/generationV2/${n}.ts`)))).join("\n");
 
-  assert.match(generator, />Referência condicionada</);
-  assert.match(generator, /Referências após fixadas\/excluídas/);
+  assert.match(generationOwners, />Referência condicionada</);
+  assert.match(generationOwners, /Referências após fixadas\/excluídas/);
   assert.doesNotMatch(generator, />Baseline condicionado</);
   assert.doesNotMatch(generator, /Os baselines abaixo são condicionados/);
 });
