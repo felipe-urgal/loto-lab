@@ -1,6 +1,5 @@
 import { escapeHtml } from "../../shared/escaping.js";
 import type { AnalysisCycles, AnalysisNumberItem, AnalysisPayload, AnalysisTier, AssociationItem, RankingMover, StructureMethodologyFilter, StructureMetric, ValidationPeriod } from "./types.js";
-import type { AnalysisCycles, AnalysisNumberItem, AnalysisPayload, AnalysisTier, AssociationItem, RankingMover, StructureMethodologyFilter, StructureMetric, ValidationPeriod } from "./types.js";
 
 export type LotteryCatalogItem = { id?: string; name?: string; family?: string; enabled?: boolean; capabilities?: { analysis?: boolean } };
 const TIER_LABELS: Record<AnalysisTier,string> = { strong: "Fortes", balanced: "Intermediárias", cold: "Frias" };
