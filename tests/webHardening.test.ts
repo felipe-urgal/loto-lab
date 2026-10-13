@@ -90,7 +90,7 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
 
   assert.match(shellBoundary, /\.\/src\/core\/shell\.js/);
   assert.match(shellOwner, /normalizeMainHash/);
-  assert.match(shellOwner, /localStorage\.removeItem\("loto-lab:lottery"\)/);
+  assert.match(shellOwner, /localStorage\.removeItem\(LOTTERY_PREFERENCE_KEY\)/);
   assert.match(shellOwner, /LEGACY_PATH_REDIRECTS/);
   assert.doesNotMatch(shell, /nav-more|Mais opções/);
 
