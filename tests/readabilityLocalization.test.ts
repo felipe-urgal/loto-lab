@@ -113,15 +113,15 @@ test("Generator 2.0 owns its conditioned reference copy in Portuguese", async ()
   assert.doesNotMatch(generator, /Os baselines abaixo são condicionados/);
 });
 
-test("canonical owners keep Panel and Analyses copy in Portuguese while historical tests remain internal", async () => {
+test("single generator owns Portuguese product copy while historical tests remain internal", async () => {
   const [app, backtests] = await Promise.all([
-    source("web/app.js"),
+    source("web/index.html"),
     source("web/src/features/backtests.ts"),
   ]);
 
-  assert.match(app, /dashboard: \["Painel"/);
-  assert.match(app, /analysis: \["Análises"/);
-  assert.match(app, /Frequências, pontuação e classificação por horizonte/);
+  assert.match(app, /Bora criar/);
+  assert.match(app, /Últimos 3 concursos/);
+  assert.match(app, /Sincronizar resultados/);
   assert.doesNotMatch(app, /backtests: \["Testes históricos"/);
   assert.doesNotMatch(app, /Resumo do último teste histórico salvo/);
   assert.match(backtests, /Executar teste histórico/);

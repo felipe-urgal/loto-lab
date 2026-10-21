@@ -194,6 +194,7 @@ export type GenerationPlanPayload = {
 export type GeneratorState = {
   lottery: LotteryId;
   lotteryConfig: LotteryGenerationConfig;
+  lotteryCatalog: LotteryGenerationConfig[];
   gameCount: number;
   fixedCount: number;
   betSize: number;
@@ -213,4 +214,8 @@ export type GeneratorState = {
   coverageTargetSize: number;
   coverageBudgetCents?: number;
   cleanup: (() => void) | null;
+  revision?: number;
+  generating?: boolean;
+  planSequence?: number;
+  planPending?: boolean;
 };

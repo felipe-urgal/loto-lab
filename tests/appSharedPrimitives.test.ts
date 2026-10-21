@@ -10,14 +10,7 @@ async function appSource(): Promise<string> {
 test("main app stays a thin shell while canonical features own data access", async () => {
   const app = await appSource();
 
-  assert.match(app, /from "\.\/src\/core\/mainContext\.js"/);
-  assert.match(app, /import \{ createMainRenderState \} from "\.\/src\/core\/mainRenderState\.js"/);
-  assert.match(app, /import \{ escapeHtml \} from "\.\/src\/shared\/escaping\.js"/);
-  assert.match(app, /data-feature-owned="dashboard"/);
-  assert.match(app, /data-feature-owned="analysis"/);
-  assert.match(app, /data-feature-owned="generate"/);
-  assert.match(app, /state\.beginRender\(\)/);
-  assert.match(app, /state\.finishRender\(render\)/);
+  assert.equal(app.trim(), 'import "./src/features/generatorPage.js";');
 
   assert.doesNotMatch(app, /import \{ api \}/);
   assert.doesNotMatch(app, /import \{ toast \}/);

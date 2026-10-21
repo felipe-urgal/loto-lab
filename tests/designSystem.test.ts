@@ -2,38 +2,40 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-async function source(path: string): Promise<string> {
-  return readFile(path, "utf8");
-}
+const source = (path: string) => readFile(path, "utf8");
 
-const pages = ["index.html", "agenda.html", "ai.html", "jobs.html", "lab.html", "strategies.html"];
+test("Playground owns its light palette, local fonts and motion preferences", async () => {
+  const css = await source("web/generator.css");
+  const html = await source("web/index.html");
+  assert.match(html, /theme-color" content="#faf9f3"/);
+  assert.match(html, /assets\/generator\.css/);
+  assert.doesNotMatch(html, /assets\/(?:design-system|styles|ui-foundation)\.css/);
+  assert.match(css, /#faf9f3/);
+  assert.match(css, /#4d41f8/);
+  assert.match(css, /bricolage-grotesque\.woff2/);
+  assert.match(css, /dm-sans\.woff2/);
+  assert.match(css, /prefers-reduced-motion: reduce/);
+  assert.match(css, /:focus-visible/);
+});
 
-test("Redesign V2 design system is the shared source of truth across web surfaces", async () => {
-  const designSystem = await source("web/design-system.css");
-
-  assert.match(designSystem, /--bg:\s*#08111d/);
-  assert.match(designSystem, /--accent:\s*#7c3aed/);
-  assert.match(designSystem, /--success:\s*#24c77d/);
-  assert.match(designSystem, /--sidebar-width:\s*220px/);
-  assert.match(designSystem, /\.button\.primary\s*\{[^}]*background:\s*var\(--accent\)/s);
-  assert.match(designSystem, /\.status-row\.is-ok \.status-dot\s*\{[^}]*background:\s*var\(--success\)/s);
-
-  for (const page of pages) {
-    const html = await source(`web/${page}`);
-    assert.match(html, /<meta name="theme-color" content="#08111d" \/>/, `${page} must own the Redesign V2 browser chrome color`);
-    assert.match(html, /\/assets\/design-system\.css/, `${page} must load the canonical design system`);
+test("production ships fingerprinted Playground assets and a single destination", async () => {
+  const html = await source("web-dist/index.html");
+  assert.match(html, /assets\/generator\.css\?v=[a-f0-9]{12}/);
+  assert.match(html, /images\/generator-orbit\.webp\?v=[a-f0-9]{12}/);
+  assert.match(html, /fonts\/dm-sans\.woff2\?v=[a-f0-9]{12}/);
+  for (const page of ["agenda", "ai", "jobs", "lab", "strategies"]) {
+    await assert.rejects(source(`web-dist/${page}.html`), /ENOENT/);
   }
 });
 
-test("canonical production page ships the fingerprinted Redesign V2 design system", async () => {
+test("nested frontend imports carry the same build version as the entry point", async () => {
   const html = await source("web-dist/index.html");
-  assert.match(
-    html,
-    /\/assets\/design-system\.css\?v=[a-f0-9]{12}/,
-    "index.html must ship the fingerprinted design system",
-  );
-
-  for (const page of pages.filter((item) => item !== "index.html")) {
-    await assert.rejects(source(`web-dist/${page}`), /ENOENT/, `${page} must not ship as a legacy destination`);
+  const version = html.match(/data-build="([a-f0-9]{12})"/)?.[1];
+  assert.ok(version);
+  for (const name of ["app.js", "src/features/generatorPage.js", "src/features/generationV2.js"]) {
+    const module = await source(`web-dist/assets/${name}`);
+    const imports = [...module.matchAll(/(?:from|import)\s*["'](\.[^"']+)["']/g)].map(match => match[1]!);
+    assert.ok(imports.length > 0);
+    assert.ok(imports.every(path => path.endsWith(`?v=${version}`)), `${name}: nested imports must be fresh after an update`);
   }
 });

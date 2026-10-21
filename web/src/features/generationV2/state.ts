@@ -51,7 +51,7 @@ export function requestPayload(state: GeneratorState, includeSeed = false): Gene
   return {
     lottery: state.lottery,
     gameCount: state.gameCount,
-    fixedCount: state.fixedCount,
+    fixedCount: state.purpose === "uniform" || state.purpose === "portfolio" ? state.fixed.size : state.fixedCount,
     betSize: state.betSize,
     targetContestNumber: state.targetContestNumber,
     purpose: state.purpose,

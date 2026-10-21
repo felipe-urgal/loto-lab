@@ -62,7 +62,7 @@ test("web build skips TypeScript sources and emits browser JavaScript through ts
   };
   assert.equal(
     packageJson.scripts?.["web:build"],
-    "node scripts/buildWeb.mjs && tsc -p tsconfig.web.json --outDir web-dist/assets/src",
+    "node scripts/buildWeb.mjs && tsc -p tsconfig.web.json --outDir web-dist/assets/src && node scripts/fingerprintWebImports.mjs",
   );
   assert.match(packageJson.scripts?.typecheck || "", /tsconfig\.web\.json --noEmit/);
 });

@@ -41,7 +41,7 @@ test("AI workspace and provider status are served without exposing credentials",
 
   const page = await fetch(`${baseUrl}/ai`, { redirect: "manual" });
   assert.equal(page.status, 308);
-  assert.equal(page.headers.get("location"), "/#analysis");
+  assert.equal(page.headers.get("location"), "/#generate");
 
   const [boundaryResponse, workspaceStyle, typedResponse] = await Promise.all([
     fetch(`${baseUrl}/assets/ai.js`),

@@ -7,16 +7,17 @@ async function source(path: string): Promise<string> {
   return readFile(resolve(process.cwd(), path), "utf8");
 }
 
-test("operational HTTP metrics stay behind application authentication", async () => {
+test("HTTP observability and same-origin mutation checks remain in the public generator", async () => {
   const server = await source("src/api/server.ts");
   const handlerStart = server.indexOf("return createServer(async");
   const handler = server.slice(handlerStart);
-  const authCheck = handler.indexOf("requireAppAuthentication");
+  const originCheck = handler.indexOf("requireSameOriginMutation");
   const metricsEndpoint = handler.indexOf('url.pathname === "/api/v1/ops/metrics"');
 
   assert.ok(handlerStart >= 0);
-  assert.ok(authCheck >= 0);
-  assert.ok(metricsEndpoint > authCheck);
+  assert.ok(originCheck >= 0);
+  assert.ok(metricsEndpoint > originCheck);
+  assert.doesNotMatch(handler, /requireAppAuthentication/);
   assert.match(handler, /classifyHttpRoute\(metricsUrl\.pathname\)/);
   assert.match(handler, /response\.once\("finish"/);
   assert.match(handler, /recordHttpRequest\(routeFamily, response\.statusCode/);

@@ -33,7 +33,10 @@ const GENERATION_V2_PATHS = new Set([
   "/api/v1/generation/save",
 ]);
 
-function parseV2FixedCount(lottery: LotteryId, value: unknown): number {
+function parseV2FixedCount(lottery: LotteryId, value: unknown, purpose: string, betSize: number): number {
+  if (purpose === "uniform" || purpose === "portfolio") {
+    return parsePositiveInt(value, "fixedCount", { min: 0, max: betSize, defaultValue: 0 });
+  }
   const allowed = lottery === "lotofacil"
     ? [8, 9, 10]
     : lottery === "mega-sena" || lottery === "dia-de-sorte"
@@ -282,8 +285,8 @@ export async function serveGenerationV2(
       max: purpose === "coverage" ? 100 : 10,
       defaultValue: defaultGameCount,
     });
-    const fixedCount = purpose === "coverage" ? 0 : parseV2FixedCount(lottery, body.fixedCount);
     const betSize = parseV2BetSize(lottery, body.betSize);
+    const fixedCount = purpose === "coverage" ? 0 : parseV2FixedCount(lottery, body.fixedCount, purpose, betSize);
     const targetContestNumber = parseOptionalPositiveInt(body.targetContestNumber, "targetContestNumber");
     const structuredOptions = parseStructuredOptions(body, lottery);
     const generationMode = parseGenerationMode(body.generationMode);

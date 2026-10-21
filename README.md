@@ -6,11 +6,13 @@ Motor auditável para análise, geração, conferência e experimentação com m
 
 ## Produto
 
-A navegação principal possui três destinos:
+Página única, sem login, focada em gerar combinações:
 
-1. **Painel** — resultados recentes, jogos salvos, conferência, pendências e estado dos dados.
-2. **Análises** — dezenas e indicadores descritivos compatíveis com a família da modalidade.
-3. **Gerar jogos** — configurar → gerar prévia → revisar → salvar.
+1. Escolher modalidade, modo, quantidade e dezenas por jogo.
+2. Opcionalmente fixar/excluir dezenas e ajustar filtros.
+3. Gerar e copiar os jogos diretamente, sem salvamento ou estimativa de custo.
+
+Os três concursos mais recentes da modalidade ficam na mesma página, com atualização pelo botão **Sincronizar resultados**. As engines e APIs internas de análise, conferência e experimentação permanecem disponíveis ao projeto, fora da interface principal.
 
 O catálogo de domínio cobre Mega-Sena, Lotofácil, Dia de Sorte, Quina, Lotomania, Dupla Sena, +Milionária, Timemania, Super Sete, Loteca, Loteria Federal, Instantânea e Lotogol. Lotogol permanece conhecido porém desabilitado até existir fonte operacional confirmada; cada superfície respeita as capabilities da modalidade em vez de forçar uma experiência numérica genérica.
 
@@ -34,7 +36,7 @@ Gate de navegador para mudanças de UI/fluxos:
 
     npm run test:e2e:redesign
 
-O CI executa os dois níveis: qualidade/build/testes e o E2E canônico do Redesign V2.
+O CI executa os dois níveis: qualidade/build/testes e o E2E canônico do gerador.
 
 ## Princípios
 
@@ -49,7 +51,7 @@ O CI executa os dois níveis: qualidade/build/testes e o E2E canônico do Redesi
 ## Documentação
 
 - [Desenvolvimento](docs/DEVELOPMENT.md)
-- [Redesign V2](docs/design/REDESIGN_V2.md)
+- [Design do gerador](docs/design/REDESIGN_V2.md)
 - [Template de tarefa](docs/TASK_TEMPLATE.md)
 - [Guia de code review](docs/CODE_REVIEW.md)
 

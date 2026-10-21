@@ -1,81 +1,24 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { gamesToText } from "../web/src/features/generationV2/view.js";
+import { recentContestsMarkup } from "../web/src/features/generatorPresentation.js";
+import type { GeneratedGame } from "../web/src/features/generationV2/types.js";
 
-test("generator workspace follows Redesign V2 while preserving audited generation", async () => {
-  const [loader, workspace, boundary, generator, types, explainability, enhancements] = await Promise.all([
-    readFile("web/src/core/featureLoader.ts", "utf8"),
-    readFile("web/generation-workspace.css", "utf8"),
-    readFile("web/generation-v2.js", "utf8"),
-    readFile("web/src/features/generationV2.ts", "utf8"),
-    readFile("web/src/features/generationV2/types.ts", "utf8"),
-    readFile("web/src/features/generationV2/explainability.ts", "utf8"),
-    readFile("web/src/features/generationV2/enhancements.ts", "utf8"),
-  ]);
+const game: GeneratedGame = { lottery: "mega-sena", numbers: [7, 12, 18, 29, 42, 56], fixedNumbers: [7, 18], variableNumbers: [12, 29, 42, 56], metadata: { odd: 2, even: 4, sum: 164, repeatedFromLastContest: [] } };
 
-  const generationOwners = generator + "\n" + (await Promise.all(["state", "view"].map(name => readFile(`web/src/features/generationV2/${name}.ts`, "utf8")))).join("\n");
-  const generatorLayer = loader.indexOf('loadStyledModule("generation-v2")');
-  const workspaceLayer = loader.indexOf('loadStyle("generation-workspace")');
-  assert.ok(generatorLayer >= 0, "Generator 2.0 must remain the functional owner");
-  assert.ok(workspaceLayer > generatorLayer, "Redesign V2 must remain the final generator style layer");
-  assert.doesNotMatch(loader, /loadModule\("generation-explainability"\)/);
-  assert.doesNotMatch(loader, /loadModule\("generation-readiness"\)/);
-  assert.doesNotMatch(loader, /loadStyledModule\("generation-explainability"\)/);
-  assert.doesNotMatch(loader, /loadStyle\("generation-explainability"\)/);
-  assert.doesNotMatch(loader, /generation-diversity/);
-  await assert.rejects(readFile("web/generation-explainability.js", "utf8"), /ENOENT/);
-  await assert.rejects(readFile("web/generation-readiness.js", "utf8"), /ENOENT/);
-  await assert.rejects(readFile("web/generation-explainability.css", "utf8"), /ENOENT/);
-  await assert.rejects(readFile("web/generation-diversity.js", "utf8"), /ENOENT/);
-  await assert.rejects(readFile("web/generation-diversity.css", "utf8"), /ENOENT/);
+test("copy output contains the exact generated numbers and secondary fields", () => {
+  assert.equal(gamesToText([game]), "Jogo 01: 07 12 18 29 42 56");
+  assert.equal(gamesToText([{ ...game, lottery: "dia-de-sorte", secondary: { kind: "lucky-month", values: ["Janeiro"] } }]), "Jogo 01: 07 12 18 29 42 56 | Janeiro");
+  assert.equal(gamesToText([{ ...game, lottery: "super-sete", numbers: [], columns: [[0], [1, 3], [2], [3], [4], [5], [6]] }]), "Jogo 01: C1: 0 | C2: 1, 3 | C3: 2 | C4: 3 | C5: 4 | C6: 5 | C7: 6");
+});
 
-  assert.match(workspace, /\.g2-shell \{[\s\S]*max-width: var\(--content-max-width\)/);
-  assert.match(workspace, /\.g2-flow \{[\s\S]*repeat\(4, minmax\(0, 1fr\)\)/);
-  assert.match(workspace, /\.g2-number\.is-fixed \{[\s\S]*background: var\(--accent\)[\s\S]*color: #ffffff/);
-  assert.match(workspace, /\.g2-methodology \{[\s\S]*border-color: var\(--border\)/);
-  assert.match(workspace, /\.g2-saved \{[\s\S]*color: var\(--success-strong\)/);
-  assert.match(workspace, /\.g2-game-month \{[\s\S]*color: var\(--accent-strong\)/);
-  assert.match(workspace, /\.g2-review-summary \{[\s\S]*repeat\(4, minmax\(0, 1fr\)\)/);
-  assert.match(workspace, /\.g2-rationale-grid \{[\s\S]*repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(workspace, /@media \(max-width: 760px\)[\s\S]*\.g2-flow/);
-  assert.match(workspace, /@media \(prefers-reduced-motion: reduce\)/);
-  assert.doesNotMatch(workspace, /font-size:\s*(?:[0-9]|1[0-5])px/);
-
-  assert.equal(
-    boundary,
-    'import "./src/features/generationV2.js";\nimport "./src/features/generationV2/enhancements.js";\n',
-  );
-  assert.match(generationOwners, /from "\.\.\/core\/api\.js"/);
-  assert.match(generationOwners, /from "\.\.\/core\/mainContext\.js"/);
-  assert.match(generationOwners, /from "\.\.\/core\/viewLifecycle\.js"/);
-  assert.match(generationOwners, /from "\.\.\/shared\/escaping\.js"/);
-  assert.doesNotMatch(generator, /fetch\(/);
-  assert.doesNotMatch(generator, /location\.hash = "games"/);
-  assert.match(types, /from "\.\.\/\.\.\/core\/mainContext\.js"/);
-  assert.match(types, /export type LotteryGenerationConfig/);
-  assert.match(types, /export type GenerationPlan/);
-  assert.match(types, /export type GeneratorState/);
-  assert.match(generationOwners, /api<\{ items\?: LotteryGenerationConfig\[\] \}>\("\/lotteries"/);
-  assert.match(generationOwners, /betSize: lotteryConfig\.defaultBetSize/);
-  assert.doesNotMatch(generator, /LOTTERY_FALLBACK/);
-  assert.match(generationOwners, /postJson<GenerationPlan>\("\/generation\/plan"/);
-  assert.match(generationOwners, /postJson<GenerationPreviewResponse>\("\/generation\/preview"/);
-  assert.match(generationOwners, /postJson<GenerationSaveResponse>\("\/generation\/save"/);
-  assert.match(generationOwners, /includeSeed \? state\.preview\?\.generatorOptions\.seed/);
-  assert.match(generationOwners, /state\.preview = null/);
-  assert.match(generationOwners, /const tier = state\.purpose === "coverage" \? "" : tiers\.get\(value\) \|\| ""/);
-  assert.doesNotMatch(generator, /state\.purpose === "experimental" \? \(tiers\.get\(value\) \|\| ""\) : ""/);
-  assert.match(generationOwners, /Cobertura \/ Desdobramento/);
-  assert.match(generationOwners, /coveragePoolNumbers/);
-  assert.match(generationOwners, /Forte histórica/);
-  assert.match(generationOwners, /Intermediária histórica/);
-  assert.match(generationOwners, /Fria histórica/);
-  assert.match(generationOwners, /Salvar grava exatamente os jogos exibidos abaixo/);
-  assert.match(generationOwners, /disponível no Painel/);
-  assert.match(explainability, /Isto não é previsão/);
-  assert.match(explainability, /four-step product journey/);
-  assert.match(enhancements, /onViewRendered/);
-  assert.match(enhancements, /onMainViewChanged/);
-  assert.doesNotMatch(enhancements, /location\.hash/);
-  assert.doesNotMatch(enhancements, /addEventListener\("hashchange"/);
+test("recent results show at most three contests and preserve zero and two draws", () => {
+  const items = [4, 3, 2, 1].map(number => ({ number, date: "2026-10-20", numbers: [0, 7] }));
+  const html = recentContestsMarkup(items);
+  assert.equal((html.match(/class="recent-row"/g) || []).length, 3);
+  assert.match(html, />00<\/span>/);
+  assert.doesNotMatch(html, /Concurso #1</);
+  assert.match(recentContestsMarkup([{ ...items[0]!, secondDrawNumbers: [1, 2] }]), /2º sorteio/);
+  assert.match(recentContestsMarkup([{ ...items[0]!, secondary: { kind: "favorite-team", values: ["<script>"] } }]), /&lt;script&gt;/);
+  assert.match(recentContestsMarkup([]), /Ainda não há resultados/);
 });

@@ -32,13 +32,8 @@ function expectIncludes(html, values, route) {
   }
 }
 
-const cases = [
-  ["/lab", ["Análises", "a2-shell"]],
-  ["/strategies", ["Análises", "a2-shell"]],
-  ["/ai", ["Análises", "a2-shell"]],
-  ["/jobs", ["Painel", "dashboard-shell", "Seus jogos"]],
-  ["/agenda", ["Painel", "dashboard-shell", "Resultados recentes"]],
-];
+const cases = ["/lab", "/strategies", "/ai", "/jobs", "/agenda"]
+  .map(route => [route, ["Bora criar", "g2-shell", "Últimos 3 concursos"]]);
 
 for (const [route, markers] of cases) {
   const html = dumpDom(route);
