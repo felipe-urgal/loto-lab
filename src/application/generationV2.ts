@@ -190,7 +190,13 @@ function previewId(
   return hashText(`generator-v2|${lottery}|${seed}|${historySignature}|${configSignature}|${fingerprint}`);
 }
 
-function validateFixedCount(lottery: LotteryId, fixedCount: number): void {
+function validateFixedCount(lottery: LotteryId, fixedCount: number, purpose: string, betSize: number): void {
+  if (purpose === "uniform" || purpose === "portfolio") {
+    if (!Number.isInteger(fixedCount) || fixedCount < 0 || fixedCount > betSize) {
+      throw new GenerationV2Error("INVALID_ARGUMENT", `fixedCount must be an integer between 0 and ${betSize}`);
+    }
+    return;
+  }
   const allowed = lottery === "lotofacil"
     ? [8, 9, 10]
     : lottery === "mega-sena" || lottery === "dia-de-sorte"
@@ -322,7 +328,7 @@ export class GenerationV2UseCase {
   async execute(input: GenerationV2Input) {
     const purpose = input.purpose ?? "uniform";
     if (purpose !== "coverage") {
-      validateFixedCount(input.lottery, input.fixedCount);
+      validateFixedCount(input.lottery, input.fixedCount, purpose, input.betSize ?? getLotteryConfig(input.lottery).defaultBetSize);
       validateCoreSelection(input);
     }
     const maximumGameCount = purpose === "coverage" ? 100 : 10;

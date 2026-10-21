@@ -41,13 +41,9 @@ test("generator typed enhancements are loaded with Generator 2.0 and expose the 
   const generatorSource = await generator.text();
   const [viewSource, stateSource] = await Promise.all(["view", "state"].map(async name => (await fetch(`${baseUrl}/assets/src/features/generationV2/${name}.js`)).text()));
   const generationOwners = generatorSource + "\n" + viewSource + "\n" + stateSource;
-  assert.match(generationOwners, /data-g2-flow-step="configure"/);
-  assert.match(generationOwners, /data-g2-flow-step="preview"/);
-  assert.match(generationOwners, /data-g2-flow-step="review"/);
-  assert.match(generationOwners, /data-g2-flow-step="save"/);
+  assert.doesNotMatch(generationOwners, /data-g2-save|data-g2-flow-step/);
+  assert.match(generationOwners, /data-g2-copy/);
   assert.match(generationOwners, /state\.preview = null/);
-  assert.match(generationOwners, /Salvar grava exatamente os jogos exibidos abaixo/);
-  assert.match(generationOwners, /Lote #\$\{response\.batchId\} salvo e disponível no Painel/);
   assert.match(generationOwners, /const catalog = await api\("\/lotteries"/);
   assert.match(generationOwners, /betSize: lotteryConfig\.defaultBetSize/);
   assert.match(generationOwners, /const minimum = state\.lotteryConfig\.minNumber/);

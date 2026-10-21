@@ -144,13 +144,13 @@ test(
   },
 );
 
-test("public exposure guard requires auth and HTTPS outside loopback", () => {
+test("public generator requires HTTPS outside loopback without requiring an account", () => {
   assert.doesNotThrow(() => validatePublicExposure({ API_HOST: "127.0.0.1" }));
 
-  assert.throws(
-    () => validatePublicExposure({ API_HOST: "0.0.0.0" }),
-    /requires APP_AUTH_USER and APP_AUTH_PASSWORD/i,
-  );
+  assert.doesNotThrow(() => validatePublicExposure({
+    API_HOST: "0.0.0.0",
+    PUBLIC_ORIGIN: "https://example.test",
+  }));
 
   assert.throws(
     () => validatePublicExposure({

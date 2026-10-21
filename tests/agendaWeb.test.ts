@@ -19,7 +19,7 @@ test("agenda legacy route redirects to the Panel while its internal module remai
 
   const page = await fetch(`${baseUrl}/agenda`, { redirect: "manual" });
   assert.equal(page.status, 308);
-  assert.equal(page.headers.get("location"), "/#dashboard");
+  assert.equal(page.headers.get("location"), "/#generate");
 
   const [boundaryResponse, styles, typedResponse] = await Promise.all([
     fetch(`${baseUrl}/assets/agenda.js`),

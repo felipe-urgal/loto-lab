@@ -62,7 +62,6 @@ import { PostgresStrategyRepository } from "../persistence/strategyRepository.js
 import { RealBetService } from "../realBets/service.js";
 import { serveFeatureRoutes } from "./routes.js";
 import { serveWebAsset } from "./web.js";
-import { loadAppAuthConfig, requireAppAuthentication } from "./auth.js";
 import {
   requireSameOriginMutation,
   resolveMutationExpectedOrigin,
@@ -168,7 +167,6 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
       runStrategyLabInWorker,
     ),
   };
-  const auth = loadAppAuthConfig();
   const corsOrigin = options.corsOrigin ?? process.env.API_CORS_ORIGIN ?? "http://localhost:5173";
   const configuredOrigin = options.corsOrigin
     ?? process.env.API_CORS_ORIGIN
@@ -188,9 +186,6 @@ export function createLotoLabServer(options: LotoLabServerOptions): Server {
       const method = request.method ?? "GET";
       const url = metricsUrl;
 
-      if (!isHealthPath(url.pathname) && !requireAppAuthentication(request, response, auth)) {
-        return;
-      }
       const expectedOrigin = resolveMutationExpectedOrigin(request, configuredOrigin);
       if (!isHealthPath(url.pathname) && !requireSameOriginMutation(request, response, expectedOrigin)) {
         logEvent("warn", "cross_origin_mutation_blocked", {

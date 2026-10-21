@@ -2,25 +2,21 @@ import { api } from "../core/api.js";
 import { isLotteryId } from "../core/mainContext.js";
 import { currentMainView, onMainViewChanged, onViewRendered, type ViewRenderedDetail } from "../core/viewLifecycle.js";
 import { escapeHtml } from "../shared/escaping.js";
-import { NUMBER_TIERS, isSelectionMode, isFilterKey, isRangeEdge, tierByNumber, requestPayload, planPayload, algorithmSpace, purposeCopy } from "./generationV2/state.js";
-import { formatInteger, formatDecimal, formatPercent, formatCurrencyCents, numberLabel, planMarkup, baselineMarkup, configurationSummaryMarkup, workspaceMarkup, gameMarkup } from "./generationV2/view.js";
-import type { GeneratorState, GenerationPlan, GenerationFilterKey, GenerationRangeEdge, GenerationPlanPayload, LotteryId, GenerationPreviewResponse, GenerationSaveResponse, LotteryGenerationConfig } from "./generationV2/types.js";
+import { isSelectionMode, isFilterKey, isRangeEdge, requestPayload, planPayload, algorithmSpace, purposeCopy } from "./generationV2/state.js";
+import { formatDecimal, numberLabel, planMarkup, baselineMarkup, configurationSummaryMarkup, workspaceMarkup, selectionBrief, gameMarkup, emptyGamesMarkup, gamesToText, icon } from "./generationV2/view.js";
+import type { GeneratorState, GenerationPlan, GenerationFilterKey, GenerationRangeEdge, GenerationPlanPayload, LotteryId, GenerationPreviewResponse, LotteryGenerationConfig } from "./generationV2/types.js";
 
 const root = document.querySelector<HTMLElement>("#content");
 let lifecycleToken = 0;
 let cleanupCurrent: (() => void) | null = null;
+let refreshOnSync: (() => void) | null = null;
+window.addEventListener("loto-lab:data-synced", () => refreshOnSync?.());
 
 const DEFAULT_GAME_COUNT = 4;
 const DEFAULT_GAME_COUNTS: Partial<Record<LotteryId, number>> = {
   "mega-sena": 2,
   lotomania: 2,
 };
-
-
-
-
-
-
 
 async function postJson<T>(path: string, body: unknown, signal: AbortSignal): Promise<T> {
   const payload = await api<T>(path, {
@@ -32,51 +28,11 @@ async function postJson<T>(path: string, body: unknown, signal: AbortSignal): Pr
   return payload;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-type GenerationFlowStage = "configure" | "preview" | "review" | "save" | "saved";
+type GenerationFlowStage = "configure" | "preview" | "review";
 
 function updateFlowState(stage: GenerationFlowStage): void {
   const shell = root?.querySelector<HTMLElement>("[data-g2-shell]");
-  if (!shell) return;
-  shell.dataset.g2Stage = stage;
-  const order: Array<Exclude<GenerationFlowStage, "saved">> = ["configure", "preview", "review", "save"];
-  const effective = stage === "saved" ? "save" : stage;
-  const activeIndex = order.indexOf(effective);
-  shell.querySelectorAll<HTMLElement>("[data-g2-flow-step]").forEach((step) => {
-    const key = step.dataset.g2FlowStep as Exclude<GenerationFlowStage, "saved"> | undefined;
-    const index = key ? order.indexOf(key) : -1;
-    const complete = stage === "saved" || (index >= 0 && index < activeIndex);
-    const active = stage !== "saved" && index === activeIndex;
-    step.classList.toggle("is-complete", complete);
-    step.classList.toggle("is-active", active);
-    if (active) step.setAttribute("aria-current", "step");
-    else step.removeAttribute("aria-current");
-  });
+  if (shell) shell.dataset.g2Stage = stage;
 }
 
 function renderConfigurationSummary(state: GeneratorState): void {
@@ -86,6 +42,8 @@ function renderConfigurationSummary(state: GeneratorState): void {
 
 
 function selectionSummary(state: GeneratorState, message = ""): void {
+  const brief = root?.querySelector<HTMLElement>("[data-g2-selection-brief]");
+  if (brief) brief.textContent = selectionBrief(state);
   const target = root?.querySelector<HTMLElement>("[data-g2-selection-summary]");
   if (!target) return;
   if (state.purpose === "coverage") {
@@ -108,17 +66,14 @@ function updateModeButtons(state: GeneratorState): void {
 }
 
 function updateNumberButtons(state: GeneratorState): void {
-  const tiers = tierByNumber(state.plan);
   root?.querySelectorAll<HTMLButtonElement>("[data-g2-number]").forEach((button) => {
     const value = Number(button.dataset.g2Number);
     const selection = state.purpose === "coverage"
       ? state.coveragePool.has(value) ? "fixed" : "auto"
       : state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
-    const tier = state.purpose === "coverage" ? "" : tiers.get(value) || "";
     button.dataset.selection = selection;
     button.classList.toggle("is-fixed", selection === "fixed");
     button.classList.toggle("is-excluded", selection === "excluded");
-    for (const name of NUMBER_TIERS) button.classList.toggle(`is-${name}`, tier === name);
     const label = state.purpose === "coverage"
       ? selection === "fixed" ? "no pool de cobertura" : "fora do pool de cobertura"
       : selection === "fixed" ? "fixada" : selection === "excluded" ? "excluída" : "automática";
@@ -130,8 +85,10 @@ function updateNumberButtons(state: GeneratorState): void {
 
 function clearPreview(state: GeneratorState): void {
   state.preview = null;
+  state.revision = (state.revision ?? 0) + 1;
   const target = root?.querySelector<HTMLElement>("[data-g2-result]");
-  if (target) target.innerHTML = "";
+  if (target) target.innerHTML = emptyGamesMarkup();
+  root?.querySelector("[data-g2-generated-audit]")?.replaceChildren();
   updateFlowState("configure");
   renderConfigurationSummary(state);
 }
@@ -144,116 +101,82 @@ function setError(message = ""): void {
 }
 
 
+async function copyGames(state: GeneratorState, button: HTMLButtonElement): Promise<void> {
+  if (!state.preview) return;
+  const text = gamesToText(state.preview.games);
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const previous = document.activeElement;
+      const input = document.createElement("textarea");
+      input.value = text;
+      input.className = "clipboard-fallback";
+      input.setAttribute("aria-label", "Jogos para copiar");
+      document.body.append(input);
+      try {
+        input.select();
+        if (!document.execCommand("copy")) throw new Error("Selecione as dezenas para copiar manualmente.");
+      } finally {
+        input.remove();
+        if (previous instanceof HTMLElement) previous.focus();
+      }
+    }
+    button.innerHTML = `${icon("check")}Jogos copiados!`;
+    button.setAttribute("aria-label", "Jogos copiados para a área de transferência");
+  } catch {
+    setError("Não foi possível copiar automaticamente. Selecione as dezenas e copie manualmente.");
+  }
+}
+
 function renderPreview(state: GeneratorState): void {
   const target = root?.querySelector<HTMLElement>("[data-g2-result]");
   if (!target || !state.preview) return;
   const preview = state.preview;
   const audit = preview.audit;
   const seed = typeof preview.generatorOptions.seed === "string" ? preview.generatorOptions.seed : "—";
-  const proof = preview.preview?.id || (typeof preview.generatorOptions.previewId === "string" ? preview.generatorOptions.previewId : "—");
-  const coverage = preview.generatorOptions.coverage && typeof preview.generatorOptions.coverage === "object"
-    ? preview.generatorOptions.coverage as {
-        targetSubsets?: number;
-        coveredSubsets?: number;
-        coverageRatio?: number;
-        isCompleteCoverage?: boolean;
-        selectedTickets?: number;
-        costCents?: number;
-      }
-    : undefined;
-  const betQuote = preview.generatorOptions.betQuote && typeof preview.generatorOptions.betQuote === "object"
-    ? preview.generatorOptions.betQuote as {
-        betSize?: number;
-        simpleEquivalentCount?: number;
-        totalPriceCents?: number;
-        topPrizeOneIn?: number;
-        rule?: { effectiveFrom?: string; sourceUrl?: string };
-      }
-    : undefined;
-  const purpose = purposeCopy(state.purpose);
-  const cardinality = state.lottery === "super-sete" ? "7 colunas" : `${betQuote?.betSize ?? audit.plan.betSize} dezenas`;
-
   target.innerHTML = `<div class="g2-preview">
-    <div class="g2-preview-head"><div><span class="g2-preview-kicker">Prévia gerada</span><h2>Revise antes de salvar</h2><p>Este lote ainda não foi persistido. Salvar grava exatamente os jogos exibidos abaixo.</p></div></div>
-    <div class="g2-review-summary">
-      <div><span>Jogos</span><strong>${preview.games.length}</strong></div>
-      <div><span>Configuração</span><strong>${cardinality}</strong></div>
-      <div><span>Finalidade</span><strong>${escapeHtml(purpose.label)}</strong></div>
-      <div><span>Custo do lote</span><strong>${formatCurrencyCents(betQuote?.totalPriceCents)}</strong></div>
-    </div>
-    ${coverage ? `<section class="panel g2-card g2-preview-rationale"><div class="g2-card-head"><div><strong>${coverage.isCompleteCoverage ? "Cobertura completa" : "Cobertura parcial"}</strong><span>${coverage.isCompleteCoverage ? "Garantia combinatória condicional ao pool e ao alvo configurados." : "Não há garantia: o limite/orçamento encerrou o processo antes de cobrir todo o alvo."}</span></div></div><div class="g2-rationale-grid"><div><strong>${formatPercent(coverage.coverageRatio)}</strong><span>Cobertura calculada</span></div><div><strong>${formatInteger(coverage.coveredSubsets)} / ${formatInteger(coverage.targetSubsets)}</strong><span>Subconjuntos cobertos</span></div></div></section>` : ""}
+    <div class="section-heading"><h2><img class="coral-spark" src="/assets/images/coral-spark.webp" width="36" height="40" alt="" />Seus jogos</h2><span class="generated-count">${preview.games.length} ${preview.games.length === 1 ? "combinação gerada" : "combinações geradas"}</span><button class="button copy-button" type="button" data-g2-copy>${icon("copy")}Copiar jogos</button></div>
     <div class="g2-game-grid">${preview.games.map(gameMarkup).join("")}</div>
-    <details class="g2-preview-audit">
-      <summary>Ver auditoria da prévia</summary>
-      <div class="g2-preview-audit-body">
-        <div class="g2-audit-grid">
-          <div class="g2-audit"><span>Núcleo compartilhado</span><strong>${audit.sharedCore.map(numberLabel).join(" · ") || "Sem núcleo"}</strong><small>${audit.sharedCore.length} dezenas em todos os jogos</small></div>
-          <div class="g2-audit"><span>Cobertura do lote</span><strong>${audit.uniqueNumbers.length} dezenas</strong><small>${audit.uniqueVariableNumbers.length} variáveis distintas</small></div>
-          <div class="g2-audit"><span>Sobreposição média</span><strong>${formatDecimal(audit.averagePairwiseOverlap)}</strong><small>mín. ${formatDecimal(audit.minimumPairwiseOverlap)} · máx. ${formatDecimal(audit.maximumPairwiseOverlap)}</small></div>
-          <div class="g2-audit"><span>Elegíveis matematicamente</span><strong>${formatInteger(audit.plan.space.eligibleCombinations)}</strong><small>${formatPercent(audit.plan.space.overallCoverage)} do universo</small></div>
-          <div class="g2-audit"><span>Cardinalidade</span><strong>${cardinality}</strong><small>${betQuote ? `${formatInteger(betQuote.simpleEquivalentCount)} equivalentes simples` : "Preço oficial desconhecido"}</small></div>
-          <div class="g2-audit"><span>Probabilidade oficial</span><strong>${betQuote?.topPrizeOneIn ? `1 em ${formatInteger(betQuote.topPrizeOneIn)}` : "—"}</strong><small>por aposta, quando disponível</small></div>
-        </div>
-        <div class="g2-seed"><strong>Seed</strong><code>${escapeHtml(seed)}</code></div>
-        <div class="g2-seed"><strong>Preview ID</strong><code>${escapeHtml(proof)}</code></div>
-      </div>
-    </details>
-    <div class="g2-result-actions">
-      <button class="button" type="button" data-g2-another>Gerar outra prévia</button>
-      <button class="button primary" type="button" data-g2-save>Salvar jogos</button>
-      <button class="button" type="button" data-g2-open-dashboard hidden>Ver no Painel</button>
-      <span class="g2-saved" data-g2-saved hidden></span>
-    </div>
-  </div>`;
 
+  </div>`;
+  const auditTarget = root?.querySelector<HTMLElement>("[data-g2-generated-audit]");
+  if (auditTarget) auditTarget.innerHTML = `<details class="g2-preview-audit"><summary>Como estes jogos foram gerados</summary><div class="g2-preview-audit-body"><p>${escapeHtml(purposeCopy(state.purpose).description)}</p><div class="g2-audit-grid"><div><span>Dezenas distintas</span><strong>${audit.uniqueNumbers.length}</strong></div><div><span>Sobreposição média</span><strong>${formatDecimal(audit.averagePairwiseOverlap)}</strong></div></div><p>Referência da geração: ${audit.plan.referenceContestNumber ? `histórico até o concurso #${audit.plan.referenceContestNumber}` : "sem concurso anterior disponível"}.</p><p>Identificador para reprodução: <code>${escapeHtml(seed)}</code></p></div></details>`;
   updateFlowState("review");
-  target.querySelector<HTMLButtonElement>("[data-g2-another]")?.addEventListener("click", () => void generatePreview(state));
-  target.querySelector<HTMLButtonElement>("[data-g2-save]")?.addEventListener("click", () => void savePreview(state));
-  target.querySelector<HTMLButtonElement>("[data-g2-open-dashboard]")?.addEventListener("click", () => {
-    window.location.hash = "dashboard";
-  });
+  const button = target.querySelector<HTMLButtonElement>("[data-g2-copy]");
+  button?.addEventListener("click", () => void copyGames(state, button));
 }
 
 async function generatePreview(state: GeneratorState): Promise<void> {
+  if (state.generating || state.planPending) return;
   const button = root?.querySelector<HTMLButtonElement>("[data-g2-preview]");
-  const another = root?.querySelector<HTMLButtonElement>("[data-g2-another]");
+  const label = button?.querySelector("span");
   if (button) button.disabled = true;
-  if (another) another.disabled = true;
+  if (label) label.textContent = "Criando combinações…";
   setError("");
   updateFlowState("preview");
+  state.generating = true;
+  const revision = state.revision ?? 0;
+  const result = root?.querySelector<HTMLElement>("[data-g2-result]");
+  result?.setAttribute("aria-busy", "true");
   try {
-    state.preview = await postJson<GenerationPreviewResponse>("/generation/preview", requestPayload(state), state.controller.signal);
+    const response = await postJson<GenerationPreviewResponse>("/generation/preview", requestPayload(state), state.controller.signal);
+    if (state.controller.signal.aborted || revision !== (state.revision ?? 0)) return;
+    state.preview = response;
     renderPreview(state);
-    root?.querySelector<HTMLElement>("[data-g2-result]")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch (error) {
-    updateFlowState("configure");
-    setError(error instanceof Error ? error.message : "Falha ao gerar a prévia");
-  } finally {
-    if (button?.isConnected) button.disabled = false;
-    if (another?.isConnected) another.disabled = false;
-  }
-}
-
-async function savePreview(state: GeneratorState): Promise<void> {
-  if (typeof state.preview?.generatorOptions.seed !== "string" || !state.preview.generatorOptions.seed) return;
-  const button = root?.querySelector<HTMLButtonElement>("[data-g2-save]");
-  const saved = root?.querySelector<HTMLElement>("[data-g2-saved]");
-  if (button) button.disabled = true;
-  updateFlowState("save");
-  try {
-    const response = await postJson<GenerationSaveResponse>("/generation/save", requestPayload(state, true), state.controller.signal);
-    if (saved) {
-      saved.hidden = false;
-      saved.textContent = response.alreadySaved ? `Lote #${response.batchId} já estava salvo e está disponível no Painel.` : `Lote #${response.batchId} salvo e disponível no Painel.`;
+    const output = root?.querySelector<HTMLElement>("[data-g2-result]");
+    if (output && output.getBoundingClientRect().top > window.innerHeight - 100) {
+      output.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
     }
-    const dashboardButton = root?.querySelector<HTMLButtonElement>("[data-g2-open-dashboard]");
-    if (dashboardButton) dashboardButton.hidden = false;
-    if (button) button.textContent = "Jogos salvos";
-    updateFlowState("saved");
   } catch (error) {
-    updateFlowState("review");
-    setError(error instanceof Error ? error.message : "Falha ao salvar o lote");
-    if (button) button.disabled = false;
+    if (state.controller.signal.aborted || revision !== (state.revision ?? 0)) return;
+    updateFlowState("configure");
+    setError(error instanceof Error ? error.message : "Não foi possível gerar os jogos. Tente novamente.");
+  } finally {
+    state.generating = false;
+    result?.setAttribute("aria-busy", "false");
+    if (label?.isConnected) label.textContent = "Gerar jogos";
+    if (!state.controller.signal.aborted) renderDynamicPlan(state);
   }
 }
 
@@ -298,7 +221,8 @@ function renderDynamicPlan(state: GeneratorState): void {
   }
   const algorithm = algorithmSpace(state);
   const previewButton = root?.querySelector<HTMLButtonElement>("[data-g2-preview]");
-  const invalid = state.plan.space.eligibleCombinations < 1
+  const invalid = Boolean(state.generating || state.planPending)
+    || state.plan.space.eligibleCombinations < 1
     || (state.purpose === "coverage" && state.coveragePool.size < state.betSize)
     || (state.purpose === "experimental" && algorithm.rawCombinationCapacity < 1)
     || state.plan.constraintIssues.length > 0
@@ -311,14 +235,14 @@ function bindWorkspace(state: GeneratorState): void {
   updateModeButtons(state);
   renderDynamicPlan(state);
   let planTimer: ReturnType<typeof setTimeout> | undefined;
-  let planSequence = 0;
 
   async function refreshPlan(): Promise<void> {
-    const sequence = ++planSequence;
+    const sequence = state.planSequence = (state.planSequence ?? 0) + 1;
     try {
       const plan = await postJson<GenerationPlan>("/generation/plan", planPayload(state), state.controller.signal);
-      if (sequence !== planSequence || state.controller.signal.aborted) return;
+      if (sequence !== state.planSequence || state.controller.signal.aborted) return;
       state.plan = plan;
+      state.planPending = false;
       if (!plan.dataQuality.previousContestAvailable && state.filters.repeated.enabled) {
         state.filters.repeated.enabled = false;
         const toggle = root?.querySelector<HTMLInputElement>('[data-g2-filter-toggle="repeated"]');
@@ -329,13 +253,18 @@ function bindWorkspace(state: GeneratorState): void {
       const issue = plan.constraintIssues[0];
       setError(issue || (plan.space.eligibleCombinations < 1 ? "Nenhuma combinação atende à configuração atual." : ""));
     } catch (error) {
-      if (state.controller.signal.aborted) return;
+      if (state.controller.signal.aborted || sequence !== state.planSequence) return;
+      state.planPending = false;
       setError(error instanceof Error ? error.message : "Não foi possível recalcular o espaço combinatório");
+      renderDynamicPlan(state);
     }
   }
 
   function schedulePlan(): void {
+    state.planSequence = (state.planSequence ?? 0) + 1;
     clearPreview(state);
+    state.planPending = true;
+    renderDynamicPlan(state);
     if (planTimer !== undefined) clearTimeout(planTimer);
     planTimer = setTimeout(() => void refreshPlan(), 220);
   }
@@ -346,7 +275,8 @@ function bindWorkspace(state: GeneratorState): void {
     const next = select.value;
     if (next !== "uniform" && next !== "portfolio" && next !== "coverage" && next !== "experimental") return;
     state.purpose = next;
-    if (next !== "coverage" && !state.plan.methodology.fixedCountOptions.includes(state.fixedCount)) {
+    if (next === "uniform" || next === "portfolio") state.fixedCount = state.fixed.size;
+    if (next === "experimental" && !state.plan.methodology.fixedCountOptions.includes(state.fixedCount)) {
       state.fixedCount = state.plan.methodology.defaultFixedCount;
     }
     if (next === "experimental") state.betSize = state.plan.drawSize;
@@ -359,9 +289,12 @@ function bindWorkspace(state: GeneratorState): void {
         state.coveragePool = new Set(Array.from({ length: Math.min(state.plan.universeSize, state.betSize + 2) }, (_, index) => state.lotteryConfig.minNumber + index));
       }
     }
+    if (planTimer !== undefined) clearTimeout(planTimer);
     clearPreview(state);
+    state.planPending = true;
     root.innerHTML = workspaceMarkup(state);
     bindWorkspace(state);
+    void refreshPlan();
     updateFlowState("configure");
   });
   root?.querySelector<HTMLSelectElement>("#g2-bet-size")?.addEventListener("change", (event) => {
@@ -456,10 +389,8 @@ function bindWorkspace(state: GeneratorState): void {
     if (state.selectionMode === "fix") {
       if (state.fixed.has(value)) {
         state.fixed.delete(value);
-      } else if (state.fixedCount === 0) {
-        message = "Selecione um núcleo compartilhado maior que zero para fixar dezenas.";
-      } else if (state.fixed.size >= state.fixedCount) {
-        message = `O núcleo já tem ${state.fixedCount} dezenas fixadas manualmente.`;
+      } else if (state.fixed.size >= (state.purpose === "experimental" ? state.fixedCount : state.betSize)) {
+        message = `Você pode fixar até ${state.purpose === "experimental" ? state.fixedCount : state.betSize} dezenas neste modo.`;
       } else {
         state.excluded.delete(value);
         state.fixed.add(value);
@@ -472,6 +403,7 @@ function bindWorkspace(state: GeneratorState): void {
       state.fixed.delete(value);
       state.excluded.delete(value);
     }
+    if (state.purpose === "uniform" || state.purpose === "portfolio") state.fixedCount = state.fixed.size;
     updateNumberButtons(state);
     selectionSummary(state, message);
     if (!message) schedulePlan();
@@ -505,16 +437,21 @@ function bindWorkspace(state: GeneratorState): void {
     renderDynamicPlan(state);
   });
 
-  root?.querySelector<HTMLInputElement>("#g2-coverage-budget")?.addEventListener("change", (event) => {
-    const input = event.target;
-    if (!(input instanceof HTMLInputElement)) return;
-    const raw = input.value.trim();
-    state.coverageBudgetCents = raw ? Math.max(0, Math.round(Number(raw.replace(",", ".")) * 100)) : undefined;
-    clearPreview(state);
-    renderDynamicPlan(state);
-  });
+  root?.querySelectorAll<HTMLButtonElement>("[data-g2-step]").forEach(button => button.addEventListener("click", () => {
+    const input = root?.querySelector<HTMLInputElement>("#g2-game-count");
+    if (!input) return;
+    input.value = String(state.gameCount + Number(button.dataset.g2Step));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }));
 
   root?.querySelector<HTMLButtonElement>("[data-g2-preview]")?.addEventListener("click", () => void generatePreview(state));
+
+  refreshOnSync = () => {
+    if (planTimer !== undefined) clearTimeout(planTimer);
+    state.planPending = true;
+    renderDynamicPlan(state);
+    void refreshPlan();
+  };
 
   state.cleanup = () => {
     if (planTimer !== undefined) clearTimeout(planTimer);
@@ -526,6 +463,7 @@ function cleanupGeneration(): void {
   lifecycleToken += 1;
   cleanupCurrent?.();
   cleanupCurrent = null;
+  refreshOnSync = null;
 }
 
 async function mount(detail: ViewRenderedDetail): Promise<void> {
@@ -533,38 +471,28 @@ async function mount(detail: ViewRenderedDetail): Promise<void> {
   cleanupCurrent?.();
   cleanupCurrent = null;
   if (!root || currentMainView() !== "generate") return;
-  const legacyForm = root.querySelector<HTMLFormElement>("#generate-form");
-
-  const lotteryValue = detail.lottery || document.querySelector<HTMLSelectElement>("#lottery-select")?.value || "mega-sena";
+  const lotteryValue = detail.lottery || "mega-sena";
   if (!isLotteryId(lotteryValue)) return;
-  const lottery = lotteryValue;
-  const legacyGameCount = Number(legacyForm?.querySelector<HTMLInputElement>("#game-count")?.value)
-    || DEFAULT_GAME_COUNTS[lottery]
-    || DEFAULT_GAME_COUNT;
-  const legacyTargetValue = Number(legacyForm?.querySelector<HTMLInputElement>("#target-contest")?.value);
-  const legacyTarget = legacyTargetValue || undefined;
   const controller = new AbortController();
+  cleanupCurrent = () => controller.abort();
+  refreshOnSync = null;
 
   try {
     const catalog = await api<{ items?: LotteryGenerationConfig[] }>("/lotteries", {
       signal: controller.signal,
     });
-    const lotteryConfig = (catalog?.items || []).find((item) => item.id === lottery);
-    if (
-      !lotteryConfig
-      || !isLotteryId(lotteryConfig.id)
-      || lotteryConfig.enabled === false
-      || lotteryConfig.capabilities?.simulation === false
-      || !Number.isFinite(lotteryConfig.minNumber)
-      || !Number.isFinite(lotteryConfig.defaultBetSize)
-    ) {
-      throw new Error("A modalidade selecionada não possui configuração de geração disponível");
-    }
+    const available = (catalog?.items || []).filter(item => isLotteryId(item.id)
+      && item.enabled !== false && item.capabilities?.simulation !== false
+      && Number.isFinite(item.minNumber) && Number.isFinite(item.defaultBetSize));
+    const lotteryConfig = available.find(item => item.id === lotteryValue)
+      || available.find(item => item.id === "mega-sena") || available[0];
+    if (!lotteryConfig) throw new Error("Nenhuma modalidade está disponível para geração agora.");
+    const lottery = lotteryConfig.id;
+    const gameCount = DEFAULT_GAME_COUNTS[lottery] || DEFAULT_GAME_COUNT;
 
     const plan = await postJson<GenerationPlan>("/generation/plan", {
       lottery,
       betSize: lotteryConfig.defaultBetSize,
-      ...(legacyTarget ? { targetContestNumber: legacyTarget } : {}),
       fixedNumbers: [],
       excludedNumbers: [],
     } satisfies GenerationPlanPayload, controller.signal);
@@ -575,10 +503,11 @@ async function mount(detail: ViewRenderedDetail): Promise<void> {
     const state: GeneratorState = {
       lottery,
       lotteryConfig,
-      gameCount: legacyGameCount,
-      fixedCount: plan.methodology.defaultFixedCount,
+      lotteryCatalog: catalog?.items || [],
+      gameCount,
+      fixedCount: 0,
       betSize: plan.betSize,
-      targetContestNumber: plan.targetContestNumber,
+      targetContestNumber: undefined,
       fixed: new Set<number>(),
       excluded: new Set<number>(),
       selectionMode: "fix",
@@ -600,11 +529,15 @@ async function mount(detail: ViewRenderedDetail): Promise<void> {
     };
 
     root.innerHTML = workspaceMarkup(state);
+    root.setAttribute("aria-busy", "false");
     bindWorkspace(state);
+    window.dispatchEvent(new CustomEvent("loto-lab:generator-ready", { detail: { lottery, name: lotteryConfig.name } }));
     cleanupCurrent = () => state.cleanup?.();
   } catch (error) {
     controller.abort();
-    console.warn("Generator 2.0 unavailable; keeping basic generator", error);
+    if (token !== lifecycleToken) return;
+    root.setAttribute("aria-busy", "false");
+    root.innerHTML = `<div class="error-state" role="alert"><h2>Vamos tentar de novo?</h2><p>${escapeHtml(error instanceof Error ? error.message : "Não foi possível preparar o gerador.")}</p><button class="button" type="button" data-g2-retry>Tentar novamente</button></div>`;
   }
 }
 

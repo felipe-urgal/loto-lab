@@ -8,7 +8,7 @@ function basic(username: string, password: string): string {
   return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
 }
 
-test("production auth protects application routes while health remains public", async (t) => {
+test("generator is available anonymously even when legacy auth variables are present", async (t) => {
   const previousUser = process.env.APP_AUTH_USER;
   const previousPassword = process.env.APP_AUTH_PASSWORD;
   process.env.APP_AUTH_USER = "review-user";
@@ -37,13 +37,13 @@ test("production auth protects application routes while health remains public", 
   assert.equal(health.status, 200);
 
   const anonymous = await fetch(`${baseUrl}/`);
-  assert.equal(anonymous.status, 401);
-  assert.match(anonymous.headers.get("www-authenticate") ?? "", /Basic realm="Loto Lab"/);
+  assert.equal(anonymous.status, 200);
+  assert.equal(anonymous.headers.get("www-authenticate"), null);
 
   const invalid = await fetch(`${baseUrl}/`, {
     headers: { Authorization: basic("review-user", "wrong-password") },
   });
-  assert.equal(invalid.status, 401);
+  assert.equal(invalid.status, 200);
 
   const authenticated = await fetch(`${baseUrl}/`, {
     headers: { Authorization: basic("review-user", "a-very-long-review-password") },

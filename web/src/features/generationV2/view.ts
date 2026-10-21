@@ -1,5 +1,5 @@
 import { escapeHtml } from "../../shared/escaping.js";
-import { NUMBER_TIERS, supportsExperimental, supportsCoverage, tierByNumber, algorithmSpace, purposeCopy, activeFilterCount } from "./state.js";
+import { supportsExperimental, supportsCoverage, algorithmSpace, purposeCopy, activeFilterCount } from "./state.js";
 import type { GeneratedGame, GeneratorState, GenerationFilterKey, SelectionMode } from "./types.js";
 
 export function formatInteger(value: unknown): string {
@@ -58,11 +58,7 @@ export function betSizeOptions(state: GeneratorState): string {
   if (!rule) return `<option value="${state.plan.betSize}" selected>${state.lottery === "super-sete" ? "7 colunas" : `${state.plan.betSize} dezenas`}</option>`;
   let html = "";
   for (let value = rule.minBetSize; value <= rule.maxBetSize; value += 1) {
-    const equivalent = rule.drawSize === value ? 1 : Math.round(
-      Array.from({ length: rule.drawSize }, (_, index) => (value - index) / (rule.drawSize - index))
-        .reduce((total, factor) => total * factor, 1),
-    );
-    html += `<option value="${value}" ${value === state.betSize ? "selected" : ""}>${value} dezenas · ${formatInteger(equivalent)} apostas simples</option>`;
+    html += `<option value="${value}" ${value === state.betSize ? "selected" : ""}>${value}</option>`;
   }
   return html;
 }
@@ -131,7 +127,6 @@ export function numberGridMarkup(state: GeneratorState): string {
   if (state.lottery === "super-sete") {
     return `<div class="g2-columns-note">Super Sete usa 7 colunas posicionais. Os dígitos são gerados e exibidos por coluna, sem serem tratados como dezenas.</div>`;
   }
-  const tiers = tierByNumber(state.plan);
   const minimum = state.lotteryConfig.minNumber;
   let html = "";
   for (let offset = 0; offset < state.plan.universeSize; offset += 1) {
@@ -139,11 +134,10 @@ export function numberGridMarkup(state: GeneratorState): string {
     const selection = state.purpose === "coverage"
       ? state.coveragePool.has(value) ? "fixed" : "auto"
       : state.fixed.has(value) ? "fixed" : state.excluded.has(value) ? "excluded" : "auto";
-    const tier = state.purpose === "coverage" ? "" : tiers.get(value) || "";
     const selectionLabel = state.purpose === "coverage"
       ? selection === "fixed" ? "no pool de cobertura" : "fora do pool de cobertura"
       : selection === "fixed" ? "fixada" : selection === "excluded" ? "excluída" : "automática";
-    html += `<button type="button" class="g2-number ${tier ? `is-${tier}` : ""} ${selection !== "auto" ? `is-${selection}` : ""}" data-g2-number="${value}" data-selection="${selection}" aria-label="Dezena ${numberLabel(value)}: ${selectionLabel}">${numberLabel(value)}</button>`;
+    html += `<button type="button" class="g2-number ${selection !== "auto" ? `is-${selection}` : ""}" data-g2-number="${value}" data-selection="${selection}" aria-label="Dezena ${numberLabel(value)}: ${selectionLabel}">${numberLabel(value)}</button>`;
   }
   return html;
 }
@@ -160,7 +154,7 @@ export function planMarkup(state: GeneratorState): string {
       <div class="g2-plan-stat"><span>Universo matemático</span><strong>${formatInteger(plan.lotteryBaseline.totalCombinations)}</strong><small>todas as combinações simples</small></div>
       <div class="g2-plan-stat"><span>Após seleção manual</span><strong>${formatInteger(plan.space.afterManualSelection)}</strong><small>fixadas/excluídas, antes dos filtros</small></div>
       <div class="g2-plan-stat"><span>Elegíveis matematicamente</span><strong>${formatInteger(plan.space.eligibleCombinations)}</strong><small>atendem aos filtros estruturais</small></div>
-      <div class="g2-plan-stat"><span>Pool explorado pelo motor</span><strong>${formatInteger(algorithm.rawCombinationCapacity)}</strong><small>${algorithm.candidatePoolSize} dezenas no pool · shortlist até ${algorithm.shortlistLimit}</small></div>
+      ${state.purpose === "experimental" ? `<div class="g2-plan-stat"><span>Pool explorado pelo motor</span><strong>${formatInteger(algorithm.rawCombinationCapacity)}</strong><small>${algorithm.candidatePoolSize} dezenas no pool · shortlist até ${algorithm.shortlistLimit}</small></div>` : `<div class="g2-plan-stat"><span>Modo de geração</span><strong>${escapeHtml(purpose.label)}</strong><small>${escapeHtml(purpose.description)}</small></div>`}
     </div>
     <div class="g2-space-bar" aria-hidden="true"><span style="width:${Math.max(.2, coverage * 100)}%"></span></div>
     ${issue ? `<p class="g2-error">${escapeHtml(issue)}</p>` : ""}
@@ -239,118 +233,84 @@ export function configurationSummaryMarkup(state: GeneratorState): string {
     <div><span>Concurso alvo</span><strong>${state.targetContestNumber ? `#${state.targetContestNumber}` : "Automático"}</strong></div>
     <div><span>Filtros</span><strong>${filters ? `${filters} ativo(s)` : "Nenhum"}</strong></div>
     ${extra ? `<div class="g2-summary-wide"><span>Modalidade</span><strong>${extra}</strong></div>` : ""}
-    <div class="g2-summary-wide"><span>Custo</span><strong>Confirmado na prévia</strong></div>
   </div>`;
 }
 
 
-export function flowMarkup(): string {
-  return `<ol class="g2-flow" aria-label="Etapas para gerar jogos">
-    <li data-g2-flow-step="configure"><span>1</span><strong>Configurar</strong></li>
-    <li data-g2-flow-step="preview"><span>2</span><strong>Gerar prévia</strong></li>
-    <li data-g2-flow-step="review"><span>3</span><strong>Revisar</strong></li>
-    <li data-g2-flow-step="save"><span>4</span><strong>Salvar</strong></li>
-  </ol>`;
+export function icon(name: string): string {
+  return `<img class="icon" src="/assets/icons/${name}.svg" alt="" width="22" height="22" />`;
 }
 
+export function emptyGamesMarkup(): string {
+  return `<div class="section-heading"><h2><img class="coral-spark" src="/assets/images/coral-spark.webp" width="36" height="40" alt="" />Seus jogos</h2></div><div class="games-empty"><strong>Um clique, novas possibilidades.</strong><p>Escolha a modalidade e toque em Gerar jogos para começar.</p></div>`;
+}
+
+export function selectionBrief(state: GeneratorState): string {
+  if (state.purpose === "coverage") return `${state.coveragePool.size} dezenas no pool`;
+  const describe = (values: Set<number>, singular: string, plural: string): string => {
+    if (!values.size) return "";
+    const label = values.size <= 3 ? [...values].sort((a, b) => a - b).map(numberLabel).join(" e ") : String(values.size);
+    return `${label} ${values.size === 1 ? singular : plural}`;
+  };
+  return [describe(state.fixed, "fixada", "fixadas"), describe(state.excluded, "excluída", "excluídas")].filter(Boolean).join(" · ") || "Personalização opcional";
+}
 
 export function workspaceMarkup(state: GeneratorState): string {
-  const hasHistoricalTiers = NUMBER_TIERS.some((tier) => (state.plan.numberTiers[tier] || []).length > 0);
+  const catalog = state.lotteryCatalog || [state.lotteryConfig];
+  const selection = selectionBrief(state);
   return `<div class="g2-shell" data-g2-shell data-g2-stage="configure">
-    <div class="g2-principle"><strong>Gerar jogos</strong><span>Configure a aposta, gere uma prévia, revise os jogos e salve somente o que você aprovou.</span></div>
-    ${flowMarkup()}
-    <div class="g2-workspace">
-      <div class="g2-main">
-        <section class="panel g2-card g2-build-card">
-          <div class="g2-card-head"><div><strong>${state.lottery === "super-sete" ? "Monte as colunas" : state.purpose === "coverage" ? "Monte o pool de cobertura" : "Monte suas escolhas"}</strong><span>${state.lottery === "super-sete" ? "As marcações permanecem posicionais por coluna." : state.purpose === "coverage" ? "Clique nas dezenas que devem formar o universo do desdobramento." : "Fixe, exclua ou deixe o motor escolher automaticamente."}</span></div></div>
+    <section class="g2-controls" aria-label="Configuração dos jogos">
+      <div class="g2-field modality-field"><label for="lottery-select">Modalidade</label><select id="lottery-select">${catalog.filter(item => item.enabled !== false && item.capabilities?.simulation !== false).map(item => `<option value="${escapeHtml(item.id)}" ${item.id === state.lottery ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}</select></div>
+      <div class="g2-field"><label for="g2-purpose">Modo de geração</label><select id="g2-purpose"><option value="uniform" ${state.purpose === "uniform" ? "selected" : ""}>Aleatório</option><option value="portfolio" ${state.purpose === "portfolio" ? "selected" : ""}>Diversificado</option>${supportsCoverage(state.lottery) ? `<option value="coverage" ${state.purpose === "coverage" ? "selected" : ""}>Desdobramento</option>` : ""}${supportsExperimental(state.lottery) ? `<option value="experimental" ${state.purpose === "experimental" ? "selected" : ""}>Experimental</option>` : ""}</select></div>
+      <div class="g2-field quantity-field"><label for="g2-game-count">Jogos</label><div class="stepper"><button type="button" data-g2-step="-1" aria-label="Diminuir quantidade de jogos">${icon("minus")}</button><input id="g2-game-count" type="number" min="1" max="${state.purpose === "coverage" ? 100 : 10}" value="${state.gameCount}" /><button type="button" data-g2-step="1" aria-label="Aumentar quantidade de jogos">${icon("plus")}</button></div></div>
+      <div class="g2-field size-field"><label for="g2-bet-size">${state.lottery === "super-sete" ? "Estrutura" : "Dezenas por jogo"}</label><select id="g2-bet-size" ${state.purpose === "experimental" || (!state.plan.betRule && state.lottery !== "mais-milionaria") ? "disabled" : ""}>${betSizeOptions(state)}</select></div>
+      <button class="button primary generate-button" type="button" data-g2-preview>${icon("star-four")}<span>Gerar jogos</span>${icon("arrow-right")}</button>
+    </section>
+    ${structuredFieldsMarkup(state) ? `<div class="structured-fields">${structuredFieldsMarkup(state)}</div>` : ""}
+    <div class="g2-error" data-g2-error role="alert" hidden></div>
+    <details class="g2-customize" data-g2-customize ${state.purpose === "coverage" ? "open" : ""}>
+      <summary>${icon("sliders-horizontal")}<strong>Personalizar dezenas e filtros</strong>${icon("caret-down")}<span data-g2-selection-brief>${selection}</span></summary>
+      <div class="customize-body">
+        <section class="number-workspace"><div class="g2-card-head"><strong>${state.purpose === "coverage" ? "Monte seu pool de cobertura" : state.lottery === "super-sete" ? "Suas colunas" : "Do seu jeito"}</strong><p>${state.purpose === "coverage" ? "Selecione as dezenas que podem compor o desdobramento." : "Fixe as dezenas que entram nos jogos, exclua outras ou deixe a escolha automática."}</p></div>
           ${state.lottery === "super-sete" || state.purpose === "coverage" ? "" : selectionModesMarkup(state)}
-          ${state.lottery === "super-sete" ? "" : `<div class="g2-number-legend">
-            <span><i class="g2-key"></i> ${state.purpose === "coverage" ? "Fora do pool" : "Automática"}</span><span><i class="g2-key is-fixed"></i> ${state.purpose === "coverage" ? "No pool" : "Fixada"}</span>${state.purpose === "coverage" ? "" : '<span><i class="g2-key is-excluded"></i> Excluída</span>'}
-            ${hasHistoricalTiers ? '<span><i class="g2-key is-strong"></i> Forte histórica</span><span><i class="g2-key is-balanced"></i> Intermediária histórica</span><span><i class="g2-key is-cold"></i> Fria histórica</span>' : ""}
-          </div>`}
           <div class="g2-number-grid" data-g2-number-grid>${numberGridMarkup(state)}</div>
-          <div class="g2-selection-summary" data-g2-selection-summary></div>
+          <div class="g2-selection-summary" data-g2-selection-summary aria-live="polite"></div>
         </section>
-
-        <details class="g2-advanced" data-g2-advanced>
-          <summary><span>Filtros e auditoria</span><small>Opcional · fechado por padrão</small></summary>
-          <div class="g2-advanced-body">
-            <section>
-              <div class="g2-card-head"><div><strong>Filtros estruturais</strong><span>${state.lottery === "super-sete" ? "Filtros de dezenas não se aplicam a esta modalidade." : "Desligados por padrão. Use somente quando quiser restringir a composição."}</span></div></div>
-              <div class="g2-filter-list" data-g2-filters>${state.lottery === "super-sete" ? '<p class="g2-disclaimer">A composição é controlada pelas marcações de cada coluna.</p>' : filtersMarkup(state)}</div>
-            </section>
-            <details class="g2-subdetails">
-              <summary>Metodologia</summary>
-              <div class="g2-subdetails-body">${methodologyMarkup(state)}</div>
-            </details>
-            <details class="g2-subdetails">
-              <summary>Espaço combinatório e referências</summary>
-              <div class="g2-technical-grid">
-                <section class="g2-technical-panel" data-g2-plan>${planMarkup(state)}</section>
-                <section class="g2-technical-panel" data-g2-baseline>${baselineMarkup(state)}</section>
-              </div>
-            </details>
-            <div data-g2-explainability-slot></div>
-          </div>
-        </details>
+        <section class="preferences-workspace"><h3>Mais possibilidades</h3>
+          ${state.purpose === "experimental" ? `<div class="g2-field"><label for="g2-fixed-count">Dezenas compartilhadas entre jogos</label><select id="g2-fixed-count">${fixedCountOptions(state)}</select></div>` : ""}
+          <div class="g2-field"><label for="g2-target">Concurso de referência</label><input id="g2-target" type="number" min="1" value="${state.targetContestNumber ?? ""}" placeholder="Próximo concurso" /></div>
+          ${state.purpose === "coverage" ? `<div class="g2-field"><label for="g2-coverage-target">Tamanho dos subconjuntos</label><input id="g2-coverage-target" type="number" min="1" max="${state.betSize}" value="${state.coverageTargetSize}" /></div>` : ""}
+          ${state.lottery === "super-sete" ? "" : `<details class="g2-subdetails"><summary>Filtros de composição</summary><div class="g2-filter-list">${filtersMarkup(state)}</div></details>`}
+          <details class="g2-subdetails"><summary>Metodologia e referências</summary><div class="g2-technical-grid">${methodologyMarkup(state)}<section data-g2-plan>${planMarkup(state)}</section><section data-g2-baseline>${baselineMarkup(state)}</section></div></details>
+          <div data-g2-generated-audit></div>
+        </section>
       </div>
-
-      <aside class="g2-side">
-        <section class="panel g2-card g2-config-card">
-          <div class="g2-card-head"><div><strong>Configuração</strong><span>Somente o necessário para gerar a prévia.</span></div></div>
-          <div class="g2-form-grid">
-            <div class="g2-field"><label for="g2-purpose">Finalidade</label><select id="g2-purpose">
-              <option value="uniform" ${state.purpose === "uniform" ? "selected" : ""}>Aleatório auditável</option>
-              <option value="portfolio" ${state.purpose === "portfolio" ? "selected" : ""}>Carteira diversificada</option>
-              <option value="coverage" ${state.purpose === "coverage" ? "selected" : ""} ${supportsCoverage(state.lottery) ? "" : "disabled"}>Cobertura / Desdobramento</option>
-              <option value="experimental" ${state.purpose === "experimental" ? "selected" : ""} ${supportsExperimental(state.lottery) ? "" : "disabled"}>Experimental</option>
-            </select><small>${escapeHtml(purposeCopy(state.purpose).description)}</small></div>
-            <div class="g2-field"><label for="g2-game-count">${state.purpose === "coverage" ? "Limite de jogos" : "Quantidade de jogos"}</label><input id="g2-game-count" type="number" min="1" max="${state.purpose === "coverage" ? 100 : 10}" value="${state.gameCount}" /></div>
-            <div class="g2-field"><label for="g2-bet-size">${state.lottery === "mais-milionaria" ? "Números por aposta" : state.lottery === "super-sete" ? "Estrutura" : "Dezenas por aposta"}</label><select id="g2-bet-size" ${state.purpose === "experimental" || (!state.plan.betRule && state.lottery !== "mais-milionaria") ? "disabled" : ""}>${betSizeOptions(state)}</select></div>
-            <div class="g2-field"><label for="g2-fixed-count">Núcleo compartilhado</label><select id="g2-fixed-count" ${state.purpose === "coverage" ? "disabled" : ""}>${fixedCountOptions(state)}</select></div>
-            <div class="g2-field"><label for="g2-target">Concurso alvo</label><input id="g2-target" type="number" min="1" value="${state.targetContestNumber ?? ""}" /></div>
-            ${state.purpose === "coverage" ? `<div class="g2-field"><label for="g2-coverage-target">Subconjunto alvo</label><input id="g2-coverage-target" type="number" min="1" max="${state.betSize}" value="${state.coverageTargetSize}" /><small>Cada subconjunto deste tamanho será contabilizado na cobertura.</small></div><div class="g2-field"><label for="g2-coverage-budget">Orçamento máximo</label><input id="g2-coverage-budget" type="number" min="0" step="0.01" value="${state.coverageBudgetCents === undefined ? "" : (state.coverageBudgetCents / 100).toFixed(2)}" placeholder="Opcional" /><small>Em reais. O motor para antes de ultrapassar o orçamento.</small></div>` : ""}
-            ${structuredFieldsMarkup(state)}
-          </div>
-        </section>
-
-        <section class="panel g2-card g2-summary-card">
-          <div class="g2-card-head"><div><strong>Resumo</strong><span>Revise a configuração antes de gerar.</span></div></div>
-          <div data-g2-config-summary>${configurationSummaryMarkup(state)}</div>
-        </section>
-
-        <section class="panel g2-card g2-action-card">
-          <p>A prévia não salva nada. Você verá os jogos e o custo antes de confirmar.</p>
-          <button class="button primary" type="button" data-g2-preview>Gerar prévia</button>
-          <div class="g2-error" data-g2-error hidden></div>
-        </section>
-      </aside>
-    </div>
-    <section class="g2-result" data-g2-result></section>
+    </details>
+    <section class="g2-result" data-g2-result aria-live="polite">${emptyGamesMarkup()}</section>
   </div>`;
 }
 
+export function gamesToText(games: GeneratedGame[]): string {
+  return games.map((game, index) => {
+    const numbers = game.columns
+      ? game.columns.map((values, column) => `C${column + 1}: ${values.join(", ")}`).join(" | ")
+      : (game.numbers || []).map(numberLabel).join(" ");
+    const secondary = game.secondary?.values.join(", ") || game.luckyMonth || "";
+    return `Jogo ${String(index + 1).padStart(2, "0")}: ${numbers}${secondary ? ` | ${secondary}` : ""}`;
+  }).join("\n");
+}
 
 export function gameMarkup(game: GeneratedGame, index: number): string {
   const fixed = new Set(game.fixedNumbers || []);
   const balls = game.columns
-    ? game.columns.map((values, column) => `<span class="ball" title="Coluna ${column + 1}">C${column + 1}:${values.join("·")}</span>`).join("")
-    : (game.numbers || []).map((value) => `<span class="ball ${fixed.has(value) ? "is-fixed" : ""}">${numberLabel(value)}</span>`).join("");
-  const repeated = game.metadata?.repeatedFromLastContest?.length ?? 0;
+    ? game.columns.map((values, column) => `<span class="ball column-ball" aria-label="Coluna ${column + 1}: ${values.join(", ")}">C${column + 1}:${values.join("·")}</span>`).join("")
+    : (game.numbers || []).map(value => `<span class="ball ${fixed.has(value) ? "is-fixed" : ""}" ${fixed.has(value) ? 'aria-label="Dezena fixada '+numberLabel(value)+'"' : ""}>${numberLabel(value)}${fixed.has(value) ? icon("push-pin") : ""}</span>`).join("");
   const secondary = game.secondary?.kind === "clovers"
     ? `Trevos · ${game.secondary.values.join(" · ")}`
     : game.secondary?.kind === "favorite-team"
       ? `Time do Coração · ${escapeHtml(game.secondary.values[0] ?? "")}`
       : game.secondary?.kind === "lucky-month"
         ? `Mês da Sorte · ${escapeHtml(game.secondary.values[0] ?? "")}`
-        : game.luckyMonth
-          ? `Mês da Sorte · ${escapeHtml(game.luckyMonth)}`
-          : "";
-  return `<article class="panel g2-game">
-    <div class="g2-game-head"><strong>Jogo ${index + 1}</strong><span>${game.fixedNumbers?.length ?? 0} núcleo · ${game.variableNumbers?.length ?? 0} variáveis</span></div>
-    <div class="draw-numbers">${balls}</div>
-    <div class="g2-game-meta"><span>Pares <strong>${game.metadata?.even ?? "—"}</strong></span><span>Ímpares <strong>${game.metadata?.odd ?? "—"}</strong></span><span>Soma <strong>${game.metadata?.sum ?? "—"}</strong></span><span>Repetidas <strong>${repeated}</strong></span></div>
-    ${secondary ? `<div class="g2-game-month">${secondary}</div>` : ""}
-  </article>`;
+        : game.luckyMonth ? `Mês da Sorte · ${escapeHtml(game.luckyMonth)}` : "";
+  return `<article class="g2-game"><h3>Jogo ${String(index + 1).padStart(2, "0")}</h3><div class="draw-numbers">${balls}</div>${secondary ? `<p class="g2-game-month">${secondary}</p>` : ""}</article>`;
 }
-

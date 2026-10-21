@@ -294,3 +294,10 @@ test("coverage configuration is part of preview signature", async () => {
     (error: unknown) => Boolean(error && typeof error === "object" && "code" in error && error.code === "PREVIEW_CONFIG_CHANGED"),
   );
 });
+
+test("direct uniform generation accepts the exact manual fixed count without an automatic core", async () => {
+  const useCase = fakeUseCase(() => megaHistory());
+  const result = await useCase.execute({ lottery: "mega-sena", purpose: "uniform", gameCount: 2, fixedCount: 1, fixedNumbers: [7], seed: "direct-manual-core" });
+  assert.ok(result.games.every(game => game.numbers.includes(7)));
+  assert.ok(result.games.every(game => game.fixedNumbers.length === 1 && game.fixedNumbers[0] === 7));
+});

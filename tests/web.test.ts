@@ -35,10 +35,10 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.equal(page.headers.get("cache-control"), "no-cache");
   const html = await page.text();
   assert.match(html, /Loto Lab/);
-  assert.match(html, /data-shell-nav/);
-  assert.match(html, /\/assets\/shell\.js/);
-  assert.match(html, /\/assets\/feature-loader\.js/);
-  assert.match(html, /\/assets\/ui-foundation\.css/);
+  assert.match(html, /id="content"/);
+  assert.match(html, /\/assets\/app\.js/);
+  assert.match(html, /\/assets\/generator\.css/);
+  assert.match(html, /\/assets\/fonts\/dm-sans\.woff2/);
   assert.doesNotMatch(html, /<script[^>]+data-status\.js/);
   assert.doesNotMatch(html, /<script[^>]+real-bets\.js/);
   const buildVersion = html.match(/\bdata-build="([a-f0-9]{12})"/)?.[1];
@@ -46,14 +46,14 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
 
   const indexPage = await fetch(`${baseUrl}/index.html`);
   assert.equal(indexPage.status, 200);
-  assert.match(await indexPage.text(), /data-shell-nav/);
+  assert.match(await indexPage.text(), /id="content"/);
 
   for (const [route, target] of [
-    ["/agenda", "/#dashboard"],
-    ["/jobs", "/#dashboard"],
-    ["/lab", "/#analysis"],
-    ["/strategies", "/#analysis"],
-    ["/ai", "/#analysis"],
+    ["/agenda", "/#generate"],
+    ["/jobs", "/#generate"],
+    ["/lab", "/#generate"],
+    ["/strategies", "/#generate"],
+    ["/ai", "/#generate"],
   ] as const) {
     const redirect = await fetch(`${baseUrl}${route}`, { redirect: "manual" });
     assert.equal(redirect.status, 308, route);
@@ -61,7 +61,7 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
 
     const followed = await fetch(`${baseUrl}${route}`);
     assert.equal(followed.status, 200, route);
-    assert.match(await followed.text(), /data-shell-nav/);
+    assert.match(await followed.text(), /id="content"/);
   }
 
   const shellBoundary = await fetch(`${baseUrl}/assets/shell.js`);
@@ -103,10 +103,7 @@ test("web shell, lazy feature assets and cache policy are served by the Loto Lab
   assert.match(javascript.headers.get("content-type") ?? "", /^text\/javascript/);
   assert.match(javascript.headers.get("cache-control") ?? "", /immutable/);
   const source = await javascript.text();
-  assert.match(source, /\.\/src\/core\/mainContext\.js/);
-  assert.match(source, /data-feature-owned="dashboard"/);
-  assert.match(source, /data-feature-owned="analysis"/);
-  assert.match(source, /data-feature-owned="generate"/);
+  assert.match(source, /src\/features\/generatorPage\.js/);
   assert.doesNotMatch(source, /games\/generate|generation\/preview|generation\/save/);
   assert.doesNotMatch(source, /setView\("games"\)|render\.view === "backtests"/);
 

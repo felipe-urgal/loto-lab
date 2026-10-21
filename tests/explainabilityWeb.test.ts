@@ -7,7 +7,7 @@ async function source(path: string): Promise<string> {
   return readFile(resolve(process.cwd(), path), "utf8");
 }
 
-test("Generator explainability supports the four-step product flow without competing navigation", async () => {
+test("generator keeps audit details available without a save journey", async () => {
   const explainability = await source("web/src/features/generationV2/explainability.ts");
   const enhancements = await source("web/src/features/generationV2/enhancements.ts");
   const boundary = await source("web/generation-v2.js");
@@ -44,10 +44,10 @@ test("Generator explainability supports the four-step product flow without compe
   assert.doesNotMatch(enhancements, /location\.hash/);
   assert.doesNotMatch(enhancements, /addEventListener\("hashchange"/);
 
-  assert.match(generationOwners, /data-g2-flow-step="configure"/);
-  assert.match(generationOwners, /data-g2-flow-step="preview"/);
-  assert.match(generationOwners, /data-g2-flow-step="review"/);
-  assert.match(generationOwners, /data-g2-flow-step="save"/);
+  assert.doesNotMatch(generationOwners, /data-g2-flow-step|data-g2-save/);
+  assert.match(generationOwners, /Como estes jogos foram gerados/);
+  assert.match(generationOwners, /Identificador para reprodução/);
+  assert.match(generationOwners, /data-g2-copy/);
   assert.match(generationOwners, /generationMode: "diversified"/);
   assert.match(generationOwners, /generatorOptions\.seed/);
 

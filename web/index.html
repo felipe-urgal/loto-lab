@@ -3,43 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#08111d" />
-    <meta name="description" content="Loto Lab — análise, geração e testes históricos estruturados de loterias." />
-    <title>Loto Lab</title>
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/assets/styles.css" />
-    <link rel="stylesheet" href="/assets/ui-foundation.css" />
-    <link rel="stylesheet" href="/assets/design-system.css" />
+    <meta name="theme-color" content="#faf9f3" />
+    <meta name="description" content="Crie combinações de loterias, personalize suas dezenas e acompanhe os últimos concursos no Loto Lab." />
+    <title>Loto Lab — Bora criar combinações?</title>
+    <link rel="icon" href="/assets/images/brand-mark.webp" type="image/webp" />
+    <link rel="preload" href="/assets/fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/assets/fonts/dm-sans.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/assets/generator.css" />
   </head>
-  <body data-active-nav="app">
-    <div class="app-shell">
-      <aside class="sidebar" aria-label="Navegação principal">
-        <a class="brand" href="#dashboard" aria-label="Loto Lab - Painel">
-          <span class="brand-mark" aria-hidden="true">L</span>
-          <span class="brand-copy"><strong>Loto Lab</strong><small>Análise e jogos</small></span>
-        </a>
-        <nav class="main-nav" data-shell-nav aria-label="Seções do Loto Lab"></nav>
-        <div class="sidebar-footer">
-          <div class="status-row" id="api-status" aria-live="polite"><span class="status-dot"></span><span>Verificando API</span></div>
-          <p>Algoritmo calcula.<br />IA interpreta.</p>
-        </div>
-      </aside>
-
-      <main class="main-area">
-        <header class="topbar">
-          <div class="topbar-copy"><h1 id="view-title">Painel</h1><p id="view-subtitle">Visão geral dos concursos, jogos e desempenho.</p></div>
-          <div class="topbar-actions">
-            <label class="select-control" for="lottery-select"><span>Loteria</span><select id="lottery-select"><option value="mega-sena">Mega-Sena</option><option value="lotofacil">Lotofácil</option><option value="dia-de-sorte">Dia de Sorte</option><option value="quina">Quina</option><option value="lotomania">Lotomania</option><option value="dupla-sena">Dupla Sena</option><option value="mais-milionaria">+Milionária</option><option value="timemania">Timemania</option><option value="super-sete">Super Sete</option></select></label>
-            <button class="icon-button" id="refresh-view" type="button" aria-label="Atualizar tela" title="Atualizar"><span data-icon="refresh"></span></button>
-          </div>
-        </header>
-        <section class="data-status-bar" id="data-status-bar" aria-live="polite"></section>
-        <section class="content" id="content" aria-live="polite"><div class="loading-state"><span class="spinner"></span><span>Carregando Loto Lab...</span></div></section>
-      </main>
-    </div>
-    <div class="toast-root" id="toast-root" aria-live="assertive"></div>
-    <script type="module" src="/assets/shell.js"></script>
+  <body>
+    <a class="skip-link" href="#content">Ir para o gerador</a>
+    <main class="playground">
+      <header class="page-header">
+        <a class="wordmark" href="#generate" aria-label="Loto Lab — gerador"><img src="/assets/images/brand-mark.webp" alt="" width="42" height="42" /><span>Loto Lab</span></a>
+        <div class="sync-actions"><button class="button sync-button" id="sync-results" type="button"><img class="sync-icon" src="/assets/icons/arrows-clockwise.svg" alt="" width="22" height="22" /><span>Sincronizar resultados</span></button><span id="sync-status" class="sync-status" role="status"></span></div>
+      </header>
+      <section class="hero" aria-labelledby="page-title">
+        <div class="hero-copy"><h1 id="page-title">Bora criar<br /><span>combinações?</span></h1><p>Configure os parâmetros, gere seus jogos e copie as combinações.</p></div>
+        <img class="hero-art" src="/assets/images/generator-orbit.webp" alt="" width="1000" height="667" fetchpriority="high" />
+      </section>
+      <section id="content" tabindex="-1" class="generator-content" aria-label="Gerador de jogos" aria-busy="true"><div class="loading-state" role="status">Preparando seu espaço de combinações…</div></section>
+      <section class="recent-section" aria-labelledby="recent-title">
+        <div class="section-heading"><h2 id="recent-title"><img src="/assets/icons/chart-bar.svg" alt="" width="26" height="26" />Últimos 3 concursos</h2><span class="recent-modality" id="recent-modality"></span></div>
+        <div id="recent-results" aria-live="polite" aria-busy="true"><p class="loading-state">Buscando os resultados…</p></div>
+      </section>
+      <footer class="page-footer"><span>Feito para explorar combinações.</span><p>Resultados anteriores são referências históricas. Não preveem os próximos sorteios.</p></footer>
+    </main>
+    <div id="toast-root" class="toast-root" role="status" aria-live="polite"></div>
     <script type="module" src="/assets/app.js"></script>
-    <script type="module" src="/assets/feature-loader.js"></script>
   </body>
 </html>

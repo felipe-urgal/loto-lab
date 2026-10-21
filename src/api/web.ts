@@ -9,11 +9,11 @@ const HTML_ROUTES = new Map([
 ]);
 
 const LEGACY_REDIRECTS = new Map([
-  ["/agenda", "/#dashboard"],
-  ["/jobs", "/#dashboard"],
-  ["/lab", "/#analysis"],
-  ["/strategies", "/#analysis"],
-  ["/ai", "/#analysis"],
+  ["/agenda", "/#generate"],
+  ["/jobs", "/#generate"],
+  ["/lab", "/#generate"],
+  ["/strategies", "/#generate"],
+  ["/ai", "/#generate"],
 ]);
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -22,6 +22,9 @@ const CONTENT_TYPES: Record<string, string> = {
   ".js": "text/javascript; charset=utf-8",
   ".svg": "image/svg+xml; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".webp": "image/webp",
+  ".png": "image/png",
+  ".woff2": "font/woff2",
 };
 
 const buildVersions = new Map<string, string>();

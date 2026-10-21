@@ -14,7 +14,7 @@
 - [ ] Erros/regressões relevantes verificados
 - [ ] Anti-leakage/reprodutibilidade revisados quando aplicável
 
-Para mudanças em UI/fluxos do Redesign V2:
+Para mudanças em UI/fluxos do gerador:
 
 - [ ] `npm run test:e2e:redesign`
 - [ ] Desktop 1440×900, tablet 820×1180 e mobile 390×844 sem overflow estrutural

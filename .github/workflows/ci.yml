@@ -54,7 +54,7 @@ jobs:
 
 
   e2e-redesign:
-    name: Redesign V2 browser E2E
+    name: Generator browser E2E
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -113,7 +113,7 @@ jobs:
           cat /tmp/loto-lab-e2e.log
           exit 1
 
-      - name: Run Redesign V2 browser gate
+      - name: Run generator browser gate
         run: npm run test:e2e:redesign
 
       - name: Show E2E server log on failure

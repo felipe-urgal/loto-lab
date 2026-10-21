@@ -84,7 +84,7 @@ test("frontend hardening guards stale state, async races and duplicate refinemen
 
   const preference = await fetchSource("src/core/lotteryPreference.js");
   const shellOwner = shell + "\n" + preference;
-  assert.match(app, /data-feature-owned="dashboard"/);
+  assert.match(app, /src\/features\/generatorPage\.js/);
   assert.doesNotMatch(app, /setView\("games"\)/);
   assert.doesNotMatch(app, /render\.view === "backtests"/);
 

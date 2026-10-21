@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import type { Pool } from "pg";
 import { createLotoLabServer } from "../src/api/server.js";
 
-test("UI refinement assets are lazy-loaded only by canonical interactive views", async (t) => {
+test("single generator entry keeps legacy feature assets out of the active page", async (t) => {
   const server = createLotoLabServer({ pool: {} as Pool });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -21,7 +21,8 @@ test("UI refinement assets are lazy-loaded only by canonical interactive views",
   const html = await page.text();
   assert.doesNotMatch(html, /<link[^>]+refinements\.css/);
   assert.doesNotMatch(html, /<script[^>]+refinements\.js/);
-  assert.match(html, /feature-loader\.js/);
+  assert.doesNotMatch(html, /feature-loader\.js/);
+  assert.match(html, /generator\.css/);
 
   const loaderBoundary = await fetch(`${baseUrl}/assets/feature-loader.js`);
   assert.equal(loaderBoundary.status, 200);
@@ -41,11 +42,7 @@ test("UI refinement assets are lazy-loaded only by canonical interactive views",
   const app = await fetch(`${baseUrl}/assets/app.js`);
   assert.equal(app.status, 200);
   const appSource = await app.text();
-  assert.match(appSource, /createMainRenderState/);
-  assert.match(appSource, /state\.beginRender\(\)/);
-  assert.match(appSource, /isCurrentRender/);
-  assert.match(appSource, /data-feature-owned="dashboard"/);
-  assert.match(appSource, /data-feature-owned="analysis"/);
+  assert.match(appSource, /src\/features\/generatorPage\.js/);
   assert.doesNotMatch(appSource, /data-feature-owned="backtests"/);
   assert.doesNotMatch(appSource, /new AbortController\(\)/);
   assert.doesNotMatch(appSource, /async function renderBacktests/);
@@ -99,7 +96,7 @@ test("UI refinement assets are lazy-loaded only by canonical interactive views",
 
   const labPage = await fetch(`${baseUrl}/lab`, { redirect: "manual" });
   assert.equal(labPage.status, 308);
-  assert.equal(labPage.headers.get("location"), "/#analysis");
+  assert.equal(labPage.headers.get("location"), "/#generate");
 
   const labRefinementsBoundary = await fetch(`${baseUrl}/assets/lab-refinements.js`);
   assert.equal(labRefinementsBoundary.status, 404);
