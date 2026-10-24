@@ -302,7 +302,7 @@ test("direct uniform generation accepts the exact manual fixed count without an 
   assert.ok(result.games.every(game => game.fixedNumbers.length === 1 && game.fixedNumbers[0] === 7));
 });
 
-test("Generator 2.0 payout purpose records an auditable report, saves exactly and stays Mega-Sena only", async () => {
+test("Generator 2.0 payout purpose records an auditable report, saves exactly and rejects unsupported lotteries", async () => {
   const useCase = fakeUseCase(() => megaHistory());
   const input = {
     lottery: "mega-sena" as const,
@@ -325,6 +325,25 @@ test("Generator 2.0 payout purpose records an auditable report, saves exactly an
   const saved = await useCase.execute({ ...input, persist: true });
   assert.equal(fingerprint(saved.games), fingerprint(preview.games));
 
-  await assert.rejects(() => useCase.execute({ ...input, lottery: "lotofacil" }), /Payout generation is not available/);
+  await assert.rejects(() => useCase.execute({ ...input, lottery: "quina" }), /Payout generation is not available/);
   await assert.rejects(() => useCase.execute({ ...input, betSize: 7 }), /Multiple-number bets/);
+});
+
+test("Generator 2.0 payout purpose also serves Lotofácil with its own auditable report", async () => {
+  const useCase = fakeUseCase(() => megaHistory());
+  const preview = await useCase.execute({
+    lottery: "lotofacil",
+    gameCount: 3,
+    fixedCount: 0,
+    purpose: "payout",
+    seed: "payout-lotofacil",
+  });
+  const payout = preview.generatorOptions.payout as { strategy: string; evIndex: number[] };
+  assert.equal(payout.strategy, "lotofacil-payout-v1");
+  assert.equal(payout.evIndex.length, 3);
+  assert.ok(preview.games.every((game) => game.lottery === "lotofacil" && game.numbers.length === 15));
+  await assert.rejects(
+    () => useCase.execute({ lottery: "quina", gameCount: 1, fixedCount: 0, purpose: "payout", seed: "x" }),
+    /Payout generation is not available/,
+  );
 });

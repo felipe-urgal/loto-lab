@@ -8,7 +8,7 @@ export function supportsExperimental(lottery: LotteryId): boolean {
 
 
 export function supportsPayout(lottery: LotteryId): boolean {
-  return lottery === "mega-sena";
+  return lottery === "mega-sena" || lottery === "lotofacil";
 }
 
 
@@ -119,8 +119,8 @@ export function purposeCopy(purpose: GenerationPurpose): { label: string; descri
   if (purpose === "payout") {
     return {
       label: "Prêmio máximo (anti-rateio)",
-      description: "Prefere combinações com dezenas menos apostadas pelo público e limita a sobreposição entre os jogos.",
-      disclaimer: "Não aumenta a chance de acertar: todo jogo tem a mesma probabilidade. Se houver ganhadores, tende a reduzir o rateio do prêmio com outros apostadores.",
+      description: "Maximiza o retorno esperado estimado: prefere dezenas menos apostadas pelo público (menor rateio) e, na Lotofácil, um pequeno viés histórico de frequência.",
+      disclaimer: "Na Mega-Sena não muda a chance de acertar; na Lotofácil o ganho de probabilidade é pequeno e estimado. É uma estimativa de valor esperado, não garantia de prêmio.",
     };
   }
   if (purpose === "coverage") {
