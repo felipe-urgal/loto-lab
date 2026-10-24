@@ -25,11 +25,11 @@ export function parseGenerationMode(value: unknown): GenerationMode {
 
 export function parseGenerationPurpose(value: unknown): GenerationPurpose {
   if (value === undefined || value === null || value === "") return "uniform";
-  if (value !== "uniform" && value !== "portfolio" && value !== "coverage" && value !== "experimental") {
+  if (value !== "uniform" && value !== "portfolio" && value !== "coverage" && value !== "experimental" && value !== "payout") {
     throw new ApiError(
       400,
       "INVALID_ARGUMENT",
-      "purpose must be uniform, portfolio, coverage or experimental",
+      "purpose must be uniform, portfolio, coverage, experimental or payout",
     );
   }
   return value;

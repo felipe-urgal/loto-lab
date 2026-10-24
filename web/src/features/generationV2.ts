@@ -273,13 +273,13 @@ function bindWorkspace(state: GeneratorState): void {
     const select = event.target;
     if (!(select instanceof HTMLSelectElement)) return;
     const next = select.value;
-    if (next !== "uniform" && next !== "portfolio" && next !== "coverage" && next !== "experimental") return;
+    if (next !== "uniform" && next !== "portfolio" && next !== "coverage" && next !== "experimental" && next !== "payout") return;
     state.purpose = next;
-    if (next === "uniform" || next === "portfolio") state.fixedCount = state.fixed.size;
+    if (next === "uniform" || next === "portfolio" || next === "payout") state.fixedCount = state.fixed.size;
     if (next === "experimental" && !state.plan.methodology.fixedCountOptions.includes(state.fixedCount)) {
       state.fixedCount = state.plan.methodology.defaultFixedCount;
     }
-    if (next === "experimental") state.betSize = state.plan.drawSize;
+    if (next === "experimental" || next === "payout") state.betSize = state.plan.drawSize;
     if (next === "coverage") {
       state.fixed.clear();
       state.excluded.clear();
@@ -403,7 +403,7 @@ function bindWorkspace(state: GeneratorState): void {
       state.fixed.delete(value);
       state.excluded.delete(value);
     }
-    if (state.purpose === "uniform" || state.purpose === "portfolio") state.fixedCount = state.fixed.size;
+    if (state.purpose === "uniform" || state.purpose === "portfolio" || state.purpose === "payout") state.fixedCount = state.fixed.size;
     updateNumberButtons(state);
     selectionSummary(state, message);
     if (!message) schedulePlan();
