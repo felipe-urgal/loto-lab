@@ -325,7 +325,7 @@ test("Generator 2.0 payout purpose records an auditable report, saves exactly an
   const saved = await useCase.execute({ ...input, persist: true });
   assert.equal(fingerprint(saved.games), fingerprint(preview.games));
 
-  await assert.rejects(() => useCase.execute({ ...input, lottery: "quina" }), /Payout generation is not available/);
+  await assert.rejects(() => useCase.execute({ ...input, lottery: "lotomania" }), /Payout generation is not available/);
   await assert.rejects(() => useCase.execute({ ...input, betSize: 7 }), /Multiple-number bets/);
 });
 
@@ -343,7 +343,22 @@ test("Generator 2.0 payout purpose also serves Lotofácil with its own auditable
   assert.equal(payout.evIndex.length, 3);
   assert.ok(preview.games.every((game) => game.lottery === "lotofacil" && game.numbers.length === 15));
   await assert.rejects(
-    () => useCase.execute({ lottery: "quina", gameCount: 1, fixedCount: 0, purpose: "payout", seed: "x" }),
+    () => useCase.execute({ lottery: "lotomania", gameCount: 1, fixedCount: 0, purpose: "payout", seed: "x" }),
     /Payout generation is not available/,
   );
+});
+
+test("Generator 2.0 payout purpose also serves Quina", async () => {
+  const useCase = fakeUseCase(() => megaHistory());
+  const preview = await useCase.execute({
+    lottery: "quina",
+    gameCount: 3,
+    fixedCount: 0,
+    purpose: "payout",
+    seed: "payout-quina",
+  });
+  const payout = preview.generatorOptions.payout as { strategy: string; evIndex: number[] };
+  assert.equal(payout.strategy, "quina-payout-v1");
+  assert.equal(payout.evIndex.length, 3);
+  assert.ok(preview.games.every((game) => game.lottery === "quina" && game.numbers.length === 5));
 });
