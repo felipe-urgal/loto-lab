@@ -8,7 +8,7 @@ export function supportsExperimental(lottery: LotteryId): boolean {
 
 
 export function supportsPayout(lottery: LotteryId): boolean {
-  return lottery === "mega-sena" || lottery === "lotofacil" || lottery === "quina" || lottery === "dia-de-sorte" || lottery === "dupla-sena" || lottery === "mais-milionaria";
+  return lottery === "mega-sena" || lottery === "lotofacil" || lottery === "quina" || lottery === "dia-de-sorte" || lottery === "dupla-sena" || lottery === "mais-milionaria" || lottery === "timemania";
 }
 
 

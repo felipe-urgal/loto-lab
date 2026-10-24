@@ -19,6 +19,7 @@ Cada modalidade tem modelo versionado em `src/generator/<modalidade>Model.ts`, g
 | Dia de Sorte | `dia-de-sorte-ev-v1` | `DIA_DE_SORTE_PAYOUT.md` | ≈ +11% |
 | Dupla Sena | `dupla-sena-ev-v1` | `DUPLA_SENA_PAYOUT.md` | ≈ +17% a +27% |
 | +Milionária | `mais-milionaria-ev-v1` | `MAIS_MILIONARIA_PAYOUT.md` | ≈ +12% a +16% |
+| Timemania | `timemania-ev-v1` | `TIMEMANIA_PAYOUT.md` | ≈ +12% a +15% |
 
 O retorno total de qualquer loteria continua muito abaixo de 100% da arrecadação: não é estratégia de lucro.
 

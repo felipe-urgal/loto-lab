@@ -17,6 +17,7 @@ import { generateLotofacilPayoutGames } from "../generator/lotofacilPayout.js";
 import { generateMaisMilionariaPayoutGames } from "../generator/maisMilionariaPayout.js";
 import { generateMegaSenaPayoutGames } from "../generator/megaSenaPayout.js";
 import { generateQuinaPayoutGames } from "../generator/quinaPayout.js";
+import { generateTimemaniaPayoutGames } from "../generator/timemaniaPayout.js";
 import {
   generatePortfolioGames,
   generateUniformGames,
@@ -36,7 +37,10 @@ import {
 } from "./generateGames.js";
 import type { ApplicationGameBatch, SaveApplicationGameBatchInput } from "./gameBatch.js";
 
-type PayoutGeneratorOptions = Parameters<typeof generateMegaSenaPayoutGames>[0] & { cloverCount?: number };
+type PayoutGeneratorOptions = Parameters<typeof generateMegaSenaPayoutGames>[0] & {
+  cloverCount?: number;
+  favoriteTeam?: string;
+};
 
 const PAYOUT_GENERATORS: Partial<
   Record<LotteryId, (options: PayoutGeneratorOptions) => { games: GeneratedGame[]; report: object }>
@@ -47,6 +51,7 @@ const PAYOUT_GENERATORS: Partial<
   "dia-de-sorte": generateDiaDeSortePayoutGames,
   "dupla-sena": generateDuplaSenaPayoutGames,
   "mais-milionaria": generateMaisMilionariaPayoutGames,
+  timemania: generateTimemaniaPayoutGames,
 };
 
 export interface GenerationV2Input {
@@ -569,6 +574,7 @@ export class GenerationV2UseCase {
           fixedNumbers: input.fixedNumbers ?? [],
           excludedNumbers: input.excludedNumbers ?? [],
           ...(input.cloverCount !== undefined ? { cloverCount: input.cloverCount } : {}),
+          ...(input.favoriteTeam !== undefined ? { favoriteTeam: input.favoriteTeam } : {}),
           ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
           ...(referenceContestNumber !== null
             ? (() => {
