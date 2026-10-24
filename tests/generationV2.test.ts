@@ -362,3 +362,18 @@ test("Generator 2.0 payout purpose also serves Quina", async () => {
   assert.equal(payout.evIndex.length, 3);
   assert.ok(preview.games.every((game) => game.lottery === "quina" && game.numbers.length === 5));
 });
+
+test("Generator 2.0 payout purpose also serves Dia de Sorte with lucky months", async () => {
+  const useCase = fakeUseCase(() => megaHistory());
+  const preview = await useCase.execute({
+    lottery: "dia-de-sorte",
+    gameCount: 3,
+    fixedCount: 0,
+    purpose: "payout",
+    seed: "payout-dia",
+  });
+  const payout = preview.generatorOptions.payout as { strategy: string; evIndex: number[] };
+  assert.equal(payout.strategy, "dia-de-sorte-payout-v1");
+  assert.equal(payout.evIndex.length, 3);
+  assert.ok(preview.games.every((game) => game.numbers.length === 7 && game.luckyMonth));
+});

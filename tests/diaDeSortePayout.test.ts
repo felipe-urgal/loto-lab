@@ -1,0 +1,70 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { generateDiaDeSortePayoutGames } from "../src/generator/diaDeSortePayout.js";
+import {
+  DIA_DE_SORTE_MODEL,
+  diaDeSorteShareIndex,
+  evaluateDiaDeSorteTicket,
+} from "../src/generator/diaDeSorteModel.js";
+import { createSeededRandom } from "../src/generator/shared.js";
+
+function uniformTicket(random: () => number): number[] {
+  const drawn = new Set<number>();
+  while (drawn.size < 7) drawn.add(1 + Math.floor(random() * 31));
+  return [...drawn].sort((a, b) => a - b);
+}
+
+test("model covers the 31 numbers and is centered", () => {
+  assert.equal(DIA_DE_SORTE_MODEL.popularity.length, 31);
+  const mean = [...DIA_DE_SORTE_MODEL.popularity].reduce((sum: number, value: number) => sum + value, 0) / 31;
+  assert.ok(Math.abs(mean) < 0.005);
+});
+
+test("share index and evIndex are normalised to 1 for uniform tickets", () => {
+  const random = createSeededRandom("dia-normalisation");
+  let ev = 0;
+  let share = 0;
+  const draws = 40_000;
+  for (let index = 0; index < draws; index += 1) {
+    const ticket = uniformTicket(random);
+    ev += evaluateDiaDeSorteTicket(ticket).evIndex;
+    share += diaDeSorteShareIndex(ticket, 6);
+  }
+  assert.ok(Math.abs(ev / draws - 1) < 0.01, `ev ${ev / draws}`);
+  assert.ok(Math.abs(share / draws - 1) < 0.02, `share ${share / draws}`);
+});
+
+test("payout games are replayable, carry a lucky month and beat the baseline", () => {
+  const options = { gameCount: 6, fixedCount: 0, seed: "dia-payout" };
+  const first = generateDiaDeSortePayoutGames(options);
+  assert.deepEqual(first.games, generateDiaDeSortePayoutGames(options).games);
+  assert.equal(new Set(first.games.map((game) => game.numbers.join("-"))).size, 6);
+  assert.ok(first.games.every((game) => game.numbers.length === 7 && new Set(game.numbers).size === 7));
+  assert.ok(first.games.every((game) => game.luckyMonth && game.secondary?.kind === "lucky-month"));
+  assert.equal(new Set(first.games.map((game) => game.luckyMonth)).size, 6);
+  assert.ok(first.report.averageEvIndex > 1.05, `average ev ${first.report.averageEvIndex}`);
+  assert.ok(first.report.jackpotShareIndex.every((value) => value < 0.8));
+});
+
+test("payout respects fixed, excluded and structural constraints", () => {
+  const { games } = generateDiaDeSortePayoutGames({
+    gameCount: 3,
+    fixedCount: 2,
+    seed: "dia-constraints",
+    fixedNumbers: [15],
+    excludedNumbers: [1, 21],
+    constraints: { odd: { min: 3, max: 4 } },
+  });
+  for (const game of games) {
+    assert.ok(game.numbers.includes(15));
+    assert.ok(!game.numbers.includes(1) && !game.numbers.includes(21));
+    assert.ok(game.metadata.odd >= 3 && game.metadata.odd <= 4);
+    assert.equal(game.fixedNumbers.length, 2);
+  }
+});
+
+test("payout rejects invalid selections", () => {
+  assert.throws(() => generateDiaDeSortePayoutGames({ gameCount: 1, fixedCount: 1, seed: "x", fixedNumbers: [5], excludedNumbers: [5] }));
+  assert.throws(() => generateDiaDeSortePayoutGames({ gameCount: 1, fixedCount: 0, seed: "x", fixedNumbers: [5] }));
+  assert.throws(() => generateDiaDeSortePayoutGames({ gameCount: 0, fixedCount: 0, seed: "x" }));
+});
