@@ -392,3 +392,19 @@ test("Generator 2.0 payout purpose also serves Dupla Sena", async () => {
   assert.equal(payout.evIndex.length, 3);
   assert.ok(preview.games.every((game) => game.lottery === "dupla-sena" && game.numbers.length === 6));
 });
+
+test("Generator 2.0 payout purpose also serves +Milionária with clovers", async () => {
+  const useCase = fakeUseCase(() => megaHistory());
+  const preview = await useCase.execute({
+    lottery: "mais-milionaria",
+    gameCount: 3,
+    fixedCount: 0,
+    cloverCount: 3,
+    purpose: "payout",
+    seed: "payout-mm",
+  });
+  const payout = preview.generatorOptions.payout as { strategy: string; evIndex: number[] };
+  assert.equal(payout.strategy, "mais-milionaria-payout-v1");
+  assert.equal(payout.evIndex.length, 3);
+  assert.ok(preview.games.every((game) => game.numbers.length === 6 && game.secondary?.values.length === 3));
+});
