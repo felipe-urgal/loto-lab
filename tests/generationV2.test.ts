@@ -377,3 +377,18 @@ test("Generator 2.0 payout purpose also serves Dia de Sorte with lucky months", 
   assert.equal(payout.evIndex.length, 3);
   assert.ok(preview.games.every((game) => game.numbers.length === 7 && game.luckyMonth));
 });
+
+test("Generator 2.0 payout purpose also serves Dupla Sena", async () => {
+  const useCase = fakeUseCase(() => megaHistory());
+  const preview = await useCase.execute({
+    lottery: "dupla-sena",
+    gameCount: 3,
+    fixedCount: 0,
+    purpose: "payout",
+    seed: "payout-dupla",
+  });
+  const payout = preview.generatorOptions.payout as { strategy: string; evIndex: number[] };
+  assert.equal(payout.strategy, "dupla-sena-payout-v1");
+  assert.equal(payout.evIndex.length, 3);
+  assert.ok(preview.games.every((game) => game.lottery === "dupla-sena" && game.numbers.length === 6));
+});
