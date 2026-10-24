@@ -12,6 +12,7 @@ import { generateCoveringDesign, type CoveringDesignReport } from "../generator/
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { generateMegaSenaGames, type MegaSenaFixedCount } from "../generator/megaSena.js";
 import { generateLotofacilPayoutGames, type LotofacilPayoutReport } from "../generator/lotofacilPayout.js";
+import { generateQuinaPayoutGames, type QuinaPayoutReport } from "../generator/quinaPayout.js";
 import { generateMegaSenaPayoutGames, type MegaSenaPayoutReport } from "../generator/megaSenaPayout.js";
 import {
   generatePortfolioGames,
@@ -391,7 +392,7 @@ export class GenerationV2UseCase {
         "Multiple-number bets are available only for uniform or portfolio generation",
       );
     }
-    if (purpose === "payout" && input.lottery !== "mega-sena" && input.lottery !== "lotofacil") {
+    if (purpose === "payout" && input.lottery !== "mega-sena" && input.lottery !== "lotofacil" && input.lottery !== "quina") {
       throw new GenerationV2Error(
         "INVALID_ARGUMENT",
         `Payout generation is not available for ${input.lottery}`,
@@ -541,10 +542,14 @@ export class GenerationV2UseCase {
       : null;
     let games: GeneratedGame[];
     let coverageReport: CoveringDesignReport | undefined;
-    let payoutReport: MegaSenaPayoutReport | LotofacilPayoutReport | undefined;
+    let payoutReport: MegaSenaPayoutReport | LotofacilPayoutReport | QuinaPayoutReport | undefined;
     try {
       if (purpose === "payout") {
-        const generatePayout = input.lottery === "lotofacil" ? generateLotofacilPayoutGames : generateMegaSenaPayoutGames;
+        const generatePayout = input.lottery === "lotofacil"
+          ? generateLotofacilPayoutGames
+          : input.lottery === "quina"
+            ? generateQuinaPayoutGames
+            : generateMegaSenaPayoutGames;
         const result = generatePayout({
           gameCount: input.gameCount,
           fixedCount: input.fixedCount,

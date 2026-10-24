@@ -13,7 +13,7 @@ Mesmo propósito `payout` da Mega-Sena (ver `docs/MEGA_SENA_PAYOUT.md`), com um 
 ## Modelo
 
 - Tilt de Poisson condicional sobre o desvio de frequência **encolhido** por validação cruzada em 10 blocos (fator 0,54), que fornece `P(k acertos)` exata por jogo via DP.
-- Índice de rateio `exp(1,35·Σpopularidade)/E_uniforme` aplicado a 14 e 15 acertos.
+- Índice de rateio `exp(c·Σpopularidade)/E_uniforme`, com c=1,35 para 15 acertos e c=1,03 (=1,10·14/15) para 14 acertos.
 - `evIndex` = retorno esperado relativo a um jogo uniforme (1,00): Σ_faixa retorno_médio × lift de probabilidade × (1/rateio nas faixas 14/15).
 
 ## Algoritmo (`lotofacil-payout-v1`)

@@ -16,6 +16,8 @@ export const LOTOFACIL_MODEL = {
   frequencyShrink: 0.54,
   /** Inclinação 15 acertos / escore de popularidade (OOS: 1,31 [0,68–1,86]; teoria 1,43). */
   shareCoefficient: 1.35,
+  /** Faixa de 14 acertos: coeficiente OOS 1,10 × 14/15 (o jogo só acerta 14 das 15 dezenas sorteadas). */
+  shareCoefficient14: 1.03,
   /** Efeito log centrado por dezena (índice 0 = dezena 1). Positivo = mais apostada. */
   popularity: [
     -0.004,  0.014,  0.040, -0.013,  0.049,
@@ -76,13 +78,15 @@ export function lotofacilTierProbabilities(ticket: readonly number[], theta: rea
 
 const UNIFORM_THETA = Array.from({ length: UNIVERSE }, () => 0);
 
-let shareReference: number | undefined;
+const shareReference = new Map<number, number>();
 
-function shareNormaliser(): number {
-  if (shareReference !== undefined) return shareReference;
-  const e = elementary(LOTOFACIL_MODEL.popularity.map((w) => Math.exp(LOTOFACIL_MODEL.shareCoefficient * w)));
-  shareReference = e[DRAW]! / 3_268_760;
-  return shareReference;
+function shareNormaliser(coefficient: number): number {
+  const cached = shareReference.get(coefficient);
+  if (cached !== undefined) return cached;
+  const e = elementary(LOTOFACIL_MODEL.popularity.map((w) => Math.exp(coefficient * w)));
+  const reference = e[DRAW]! / 3_268_760;
+  shareReference.set(coefficient, reference);
+  return reference;
 }
 
 /** Soma dos efeitos de popularidade; menor = menos apostado. */
@@ -91,8 +95,9 @@ export function lotofacilPopularityScore(ticket: readonly number[]): number {
 }
 
 /** Co-ganhadores esperados em 14/15 acertos relativos a um jogo uniforme (1,00). */
-export function lotofacilShareIndex(ticket: readonly number[]): number {
-  return Math.exp(LOTOFACIL_MODEL.shareCoefficient * lotofacilPopularityScore(ticket)) / shareNormaliser();
+export function lotofacilShareIndex(ticket: readonly number[], tier: 14 | 15 = 15): number {
+  const coefficient = tier === 15 ? LOTOFACIL_MODEL.shareCoefficient : LOTOFACIL_MODEL.shareCoefficient14;
+  return Math.exp(coefficient * lotofacilPopularityScore(ticket)) / shareNormaliser(coefficient);
 }
 
 const uniformCache = new Map<string, number[]>();
@@ -111,12 +116,13 @@ export function evaluateLotofacilTicket(ticket: readonly number[]): LotofacilTic
   const uniform = uniformCache.get("15") ?? lotofacilTierProbabilities(ticket, UNIFORM_THETA);
   uniformCache.set("15", uniform);
   const share = lotofacilShareIndex(ticket);
+  const share14 = lotofacilShareIndex(ticket, 14);
   let expected = 0;
   let baseline = 0;
   for (const tier of RETURN_TIERS) {
     const base = LOTOFACIL_MODEL.returns[tier];
     baseline += base;
-    expected += base * (tilted[tier]! / uniform[tier]!) * (tier >= 14 ? 1 / share : 1);
+    expected += base * (tilted[tier]! / uniform[tier]!) * (tier === 15 ? 1 / share : tier === 14 ? 1 / share14 : 1);
   }
   return {
     evIndex: expected / baseline / UNIFORM_EV_REFERENCE,
