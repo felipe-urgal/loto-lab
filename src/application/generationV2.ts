@@ -13,6 +13,7 @@ import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { generateMegaSenaGames, type MegaSenaFixedCount } from "../generator/megaSena.js";
 import { generateLotofacilPayoutGames, type LotofacilPayoutReport } from "../generator/lotofacilPayout.js";
 import { generateQuinaPayoutGames, type QuinaPayoutReport } from "../generator/quinaPayout.js";
+import { generateDiaDeSortePayoutGames, type DiaDeSortePayoutReport } from "../generator/diaDeSortePayout.js";
 import { generateMegaSenaPayoutGames, type MegaSenaPayoutReport } from "../generator/megaSenaPayout.js";
 import {
   generatePortfolioGames,
@@ -392,7 +393,7 @@ export class GenerationV2UseCase {
         "Multiple-number bets are available only for uniform or portfolio generation",
       );
     }
-    if (purpose === "payout" && input.lottery !== "mega-sena" && input.lottery !== "lotofacil" && input.lottery !== "quina") {
+    if (purpose === "payout" && input.lottery !== "mega-sena" && input.lottery !== "lotofacil" && input.lottery !== "quina" && input.lottery !== "dia-de-sorte") {
       throw new GenerationV2Error(
         "INVALID_ARGUMENT",
         `Payout generation is not available for ${input.lottery}`,
@@ -542,14 +543,16 @@ export class GenerationV2UseCase {
       : null;
     let games: GeneratedGame[];
     let coverageReport: CoveringDesignReport | undefined;
-    let payoutReport: MegaSenaPayoutReport | LotofacilPayoutReport | QuinaPayoutReport | undefined;
+    let payoutReport: MegaSenaPayoutReport | LotofacilPayoutReport | QuinaPayoutReport | DiaDeSortePayoutReport | undefined;
     try {
       if (purpose === "payout") {
         const generatePayout = input.lottery === "lotofacil"
           ? generateLotofacilPayoutGames
           : input.lottery === "quina"
             ? generateQuinaPayoutGames
-            : generateMegaSenaPayoutGames;
+            : input.lottery === "dia-de-sorte"
+              ? generateDiaDeSortePayoutGames
+              : generateMegaSenaPayoutGames;
         const result = generatePayout({
           gameCount: input.gameCount,
           fixedCount: input.fixedCount,
