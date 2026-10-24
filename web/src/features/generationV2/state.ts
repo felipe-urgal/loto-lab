@@ -7,6 +7,11 @@ export function supportsExperimental(lottery: LotteryId): boolean {
 }
 
 
+export function supportsPayout(lottery: LotteryId): boolean {
+  return lottery === "mega-sena";
+}
+
+
 export function supportsCoverage(lottery: LotteryId): boolean {
   return lottery === "mega-sena" || lottery === "lotofacil" || lottery === "quina" || lottery === "dupla-sena";
 }
@@ -51,7 +56,7 @@ export function requestPayload(state: GeneratorState, includeSeed = false): Gene
   return {
     lottery: state.lottery,
     gameCount: state.gameCount,
-    fixedCount: state.purpose === "uniform" || state.purpose === "portfolio" ? state.fixed.size : state.fixedCount,
+    fixedCount: state.purpose === "uniform" || state.purpose === "portfolio" || state.purpose === "payout" ? state.fixed.size : state.fixedCount,
     betSize: state.betSize,
     targetContestNumber: state.targetContestNumber,
     purpose: state.purpose,
@@ -109,6 +114,13 @@ export function purposeCopy(purpose: GenerationPurpose): { label: string; descri
       label: "Carteira diversificada",
       description: "Amostra candidatos sem score histórico e prioriza menor sobreposição entre jogos.",
       disclaimer: "Diversificação amplia cobertura entre os jogos; não aumenta a chance individual de uma combinação.",
+    };
+  }
+  if (purpose === "payout") {
+    return {
+      label: "Prêmio máximo (anti-rateio)",
+      description: "Prefere combinações com dezenas menos apostadas pelo público e limita a sobreposição entre os jogos.",
+      disclaimer: "Não aumenta a chance de acertar: todo jogo tem a mesma probabilidade. Se houver ganhadores, tende a reduzir o rateio do prêmio com outros apostadores.",
     };
   }
   if (purpose === "coverage") {

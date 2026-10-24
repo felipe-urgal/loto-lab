@@ -16,7 +16,7 @@ export type LotteryGenerationConfig = {
 };
 export type NumberTier = "strong" | "balanced" | "cold";
 export type SelectionMode = "fix" | "exclude" | "auto";
-export type GenerationPurpose = "uniform" | "portfolio" | "coverage" | "experimental";
+export type GenerationPurpose = "uniform" | "portfolio" | "coverage" | "experimental" | "payout";
 export type GenerationFilterKey = "odd" | "repeated" | "sum";
 export type GenerationRangeEdge = "min" | "max";
 

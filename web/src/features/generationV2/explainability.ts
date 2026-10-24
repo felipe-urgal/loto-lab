@@ -34,7 +34,9 @@ function installWhyPanel(shell: HTMLElement): void {
   const purpose = shell.querySelector<HTMLSelectElement>("#g2-purpose")?.value;
   const purposeCopy = purpose === "experimental"
     ? "A estratégia experimental pode usar evidência histórica; versão e auditoria continuam registradas na prévia."
-    : purpose === "portfolio"
+    : purpose === "payout"
+      ? "O modo prêmio máximo prioriza dezenas menos apostadas (modelo estimado dos ganhadores históricos) e limita a sobreposição; a chance de acerto de cada jogo não muda."
+      : purpose === "portfolio"
       ? "A carteira parte de candidatos válidos e reduz sobreposição entre jogos sem usar score histórico."
       : purpose === "coverage"
         ? "O desdobramento usa Greedy Set Cover para cobrir subconjuntos do pool. Cobertura completa é uma garantia combinatória condicional, não previsão."
@@ -138,7 +140,9 @@ function decoratePreview(shell: HTMLElement): void {
   const purpose = shell.querySelector<HTMLSelectElement>("#g2-purpose")?.value;
   const selectionRationale = purpose === "experimental"
     ? "A seleção respeitou a estratégia experimental declarada e sua evidência versionada."
-    : purpose === "portfolio"
+    : purpose === "payout"
+      ? "A seleção priorizou combinações menos populares entre apostadores, com sobreposição limitada entre jogos."
+      : purpose === "portfolio"
       ? "A seleção priorizou diversidade entre jogos sem score histórico."
       : purpose === "coverage"
         ? "A seleção priorizou ganho de cobertura dos subconjuntos ainda descobertos, com desempate determinístico."

@@ -301,3 +301,30 @@ test("direct uniform generation accepts the exact manual fixed count without an 
   assert.ok(result.games.every(game => game.numbers.includes(7)));
   assert.ok(result.games.every(game => game.fixedNumbers.length === 1 && game.fixedNumbers[0] === 7));
 });
+
+test("Generator 2.0 payout purpose records an auditable report, saves exactly and stays Mega-Sena only", async () => {
+  const useCase = fakeUseCase(() => megaHistory());
+  const input = {
+    lottery: "mega-sena" as const,
+    gameCount: 4,
+    fixedCount: 0,
+    purpose: "payout" as const,
+    seed: "payout-use-case",
+  };
+
+  const preview = await useCase.execute(input);
+  const payout = preview.generatorOptions.payout as { strategy: string; shareIndex: number[]; maxPairOverlap: number };
+  assert.equal(preview.games.length, 4);
+  assert.equal(payout.strategy, "mega-sena-payout-v1");
+  assert.equal(payout.shareIndex.length, 4);
+  assert.ok(payout.maxPairOverlap <= 2);
+
+  const replay = await useCase.execute(input);
+  assert.equal(fingerprint(replay.games), fingerprint(preview.games));
+
+  const saved = await useCase.execute({ ...input, persist: true });
+  assert.equal(fingerprint(saved.games), fingerprint(preview.games));
+
+  await assert.rejects(() => useCase.execute({ ...input, lottery: "lotofacil" }), /Payout generation is not available/);
+  await assert.rejects(() => useCase.execute({ ...input, betSize: 7 }), /Multiple-number bets/);
+});

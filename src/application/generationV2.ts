@@ -11,6 +11,7 @@ import { generateDiaDeSorteGames, type DiaDeSorteFixedCount } from "../generator
 import { generateCoveringDesign, type CoveringDesignReport } from "../generator/coveringDesign.js";
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { generateMegaSenaGames, type MegaSenaFixedCount } from "../generator/megaSena.js";
+import { generateMegaSenaPayoutGames, type MegaSenaPayoutReport } from "../generator/megaSenaPayout.js";
 import {
   generatePortfolioGames,
   generateUniformGames,
@@ -191,7 +192,7 @@ function previewId(
 }
 
 function validateFixedCount(lottery: LotteryId, fixedCount: number, purpose: string, betSize: number): void {
-  if (purpose === "uniform" || purpose === "portfolio") {
+  if (purpose === "uniform" || purpose === "portfolio" || purpose === "payout") {
     if (!Number.isInteger(fixedCount) || fixedCount < 0 || fixedCount > betSize) {
       throw new GenerationV2Error("INVALID_ARGUMENT", `fixedCount must be an integer between 0 and ${betSize}`);
     }
@@ -261,6 +262,8 @@ function isExpectedGeneratorFailure(error: unknown): boolean {
     "Too many numbers",
     "Unable to sample",
     "Unable to build a diversified portfolio",
+    "Unable to build a low-overlap portfolio",
+    "Too many excluded numbers",
     "Unable to select the requested portfolio size",
     "Timemania generation requires an explicit Time do Coração",
     "Coverage constraints leave no valid candidate tickets",
@@ -382,6 +385,18 @@ export class GenerationV2UseCase {
       }
     }
     if (purpose === "experimental" && effectiveBetSize !== config.defaultBetSize) {
+      throw new GenerationV2Error(
+        "INVALID_ARGUMENT",
+        "Multiple-number bets are available only for uniform or portfolio generation",
+      );
+    }
+    if (purpose === "payout" && input.lottery !== "mega-sena") {
+      throw new GenerationV2Error(
+        "INVALID_ARGUMENT",
+        `Payout generation is not available for ${input.lottery}`,
+      );
+    }
+    if (purpose === "payout" && effectiveBetSize !== config.defaultBetSize) {
       throw new GenerationV2Error(
         "INVALID_ARGUMENT",
         "Multiple-number bets are available only for uniform or portfolio generation",
@@ -525,8 +540,26 @@ export class GenerationV2UseCase {
       : null;
     let games: GeneratedGame[];
     let coverageReport: CoveringDesignReport | undefined;
+    let payoutReport: MegaSenaPayoutReport | undefined;
     try {
-      if (purpose === "coverage") {
+      if (purpose === "payout") {
+        const result = generateMegaSenaPayoutGames({
+          gameCount: input.gameCount,
+          fixedCount: input.fixedCount,
+          seed,
+          fixedNumbers: input.fixedNumbers ?? [],
+          excludedNumbers: input.excludedNumbers ?? [],
+          ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
+          ...(referenceContestNumber !== null
+            ? (() => {
+                const referenceContest = scoped.history.find((contest) => contest.number === referenceContestNumber);
+                return referenceContest ? { referenceContest } : {};
+              })()
+            : {}),
+        });
+        games = result.games;
+        payoutReport = result.report;
+      } else if (purpose === "coverage") {
         const result = generateCoveringDesign({
           lottery: input.lottery,
           poolNumbers: input.coveragePoolNumbers ?? [],
@@ -652,6 +685,7 @@ export class GenerationV2UseCase {
       ...(input.favoriteTeam !== undefined ? { favoriteTeam: input.favoriteTeam.trim() } : {}),
       ...(input.columnMarks !== undefined ? { columnMarks: input.columnMarks } : {}),
       ...(coverageReport ? { coverage: coverageReport } : {}),
+      ...(payoutReport ? { payout: payoutReport } : {}),
       ...(input.coveragePoolNumbers !== undefined ? { coveragePoolNumbers: sortedNumbers(input.coveragePoolNumbers) } : {}),
       ...(input.coverageTargetSize !== undefined ? { coverageTargetSize: input.coverageTargetSize } : {}),
       ...(input.coverageBudgetCents !== undefined ? { coverageBudgetCents: input.coverageBudgetCents } : {}),
