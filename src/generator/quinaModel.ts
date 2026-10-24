@@ -14,8 +14,8 @@ export const QUINA_MODEL = {
   id: "quina-ev-v1",
   fitThroughContest: 7150,
   popularityContests: 3474,
-  /** Inclinação OOS por faixa sobre o escore de popularidade (IC95%: 2→0,70–0,87; 3→1,13–1,34; 4→1,40–1,75; 5→0,84–2,20). */
-  shareCoefficients: { 2: 0.79, 3: 1.22, 4: 1.56, 5: 1.55 },
+  /** Inclinação OOS por faixa sobre o escore de popularidade (IC95%: 2→0,70–0,87; 3→1,07–1,34 (1,17: ponto médio das duas divisões); 4→1,40–1,75; 5→0,84–2,20). */
+  shareCoefficients: { 2: 0.79, 3: 1.17, 4: 1.56, 5: 1.55 },
   /** Fração da arrecadação paga por faixa desde 2023. */
   returns: { 2: 0.0435, 3: 0.0436, 4: 0.0458, 5: 0.1993 },
   /** Ganhadores médios por concurso desde 2023 (escala do rateio). */

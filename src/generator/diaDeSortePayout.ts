@@ -1,6 +1,7 @@
 import type { Contest, GeneratedGame } from "../domain/types.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
+import { partitionPayoutCore } from "./payoutPartition.js";
 import { buildMetadata, createSeededRandom } from "./shared.js";
 import { DIA_DE_SORTE_MODEL, evaluateDiaDeSorteTicket } from "./diaDeSorteModel.js";
 
@@ -124,8 +125,7 @@ export function generateDiaDeSortePayoutGames(options: DiaDeSortePayoutOptions):
     return {
       lottery: "dia-de-sorte",
       numbers: entry.numbers,
-      fixedNumbers: [...core],
-      variableNumbers: entry.variable,
+      ...partitionPayoutCore("dia-de-sorte", entry.numbers, core),
       luckyMonth,
       secondary: { kind: "lucky-month", values: [luckyMonth] },
       metadata: buildMetadata(entry.numbers, options.referenceContest, false),

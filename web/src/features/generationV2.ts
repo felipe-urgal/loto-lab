@@ -2,7 +2,8 @@ import { api } from "../core/api.js";
 import { isLotteryId } from "../core/mainContext.js";
 import { currentMainView, onMainViewChanged, onViewRendered, type ViewRenderedDetail } from "../core/viewLifecycle.js";
 import { escapeHtml } from "../shared/escaping.js";
-import { isSelectionMode, isFilterKey, isRangeEdge, requestPayload, planPayload, algorithmSpace, purposeCopy } from "./generationV2/state.js";
+import { usesSharedCore, isSelectionMode, isFilterKey, isRangeEdge, requestPayload, planPayload, algorithmSpace, purposeCopy } from "./generationV2/state.js";
+import { payoutSummaryMarkup } from "./generationV2/payout.js";
 import { formatDecimal, numberLabel, planMarkup, baselineMarkup, configurationSummaryMarkup, workspaceMarkup, selectionBrief, gameMarkup, emptyGamesMarkup, gamesToText, icon } from "./generationV2/view.js";
 import type { GeneratorState, GenerationPlan, GenerationFilterKey, GenerationRangeEdge, GenerationPlanPayload, LotteryId, GenerationPreviewResponse, LotteryGenerationConfig } from "./generationV2/types.js";
 
@@ -138,7 +139,7 @@ function renderPreview(state: GeneratorState): void {
   target.innerHTML = `<div class="g2-preview">
     <div class="section-heading"><h2><img class="coral-spark" src="/assets/images/coral-spark.webp" width="36" height="40" alt="" />Seus jogos</h2><span class="generated-count">${preview.games.length} ${preview.games.length === 1 ? "combinação gerada" : "combinações geradas"}</span><button class="button copy-button" type="button" data-g2-copy>${icon("copy")}Copiar jogos</button></div>
     <div class="g2-game-grid">${preview.games.map(gameMarkup).join("")}</div>
-
+    ${payoutSummaryMarkup(preview.generatorOptions)}
   </div>`;
   const auditTarget = root?.querySelector<HTMLElement>("[data-g2-generated-audit]");
   if (auditTarget) auditTarget.innerHTML = `<details class="g2-preview-audit"><summary>Como estes jogos foram gerados</summary><div class="g2-preview-audit-body"><p>${escapeHtml(purposeCopy(state.purpose).description)}</p><div class="g2-audit-grid"><div><span>Dezenas distintas</span><strong>${audit.uniqueNumbers.length}</strong></div><div><span>Sobreposição média</span><strong>${formatDecimal(audit.averagePairwiseOverlap)}</strong></div></div><p>Referência da geração: ${audit.plan.referenceContestNumber ? `histórico até o concurso #${audit.plan.referenceContestNumber}` : "sem concurso anterior disponível"}.</p><p>Identificador para reprodução: <code>${escapeHtml(seed)}</code></p></div></details>`;
@@ -275,9 +276,15 @@ function bindWorkspace(state: GeneratorState): void {
     const next = select.value;
     if (next !== "uniform" && next !== "portfolio" && next !== "coverage" && next !== "experimental" && next !== "payout") return;
     state.purpose = next;
-    if (next === "uniform" || next === "portfolio" || next === "payout") state.fixedCount = state.fixed.size;
+    if (next === "uniform" || next === "portfolio") state.fixedCount = state.fixed.size;
     if (next === "experimental" && !state.plan.methodology.fixedCountOptions.includes(state.fixedCount)) {
       state.fixedCount = state.plan.methodology.defaultFixedCount;
+    }
+    if (next === "payout") {
+      // Menor núcleo permitido que comporte as dezenas já fixadas; o excedente é descartado.
+      const options = state.plan.methodology.fixedCountOptions;
+      state.fixedCount = options.find((option) => option >= state.fixed.size) ?? options.at(-1) ?? 0;
+      state.fixed = new Set([...state.fixed].slice(0, state.fixedCount));
     }
     if (next === "experimental" || next === "payout") state.betSize = state.plan.drawSize;
     if (next === "coverage") {
@@ -389,8 +396,8 @@ function bindWorkspace(state: GeneratorState): void {
     if (state.selectionMode === "fix") {
       if (state.fixed.has(value)) {
         state.fixed.delete(value);
-      } else if (state.fixed.size >= (state.purpose === "experimental" ? state.fixedCount : state.betSize)) {
-        message = `Você pode fixar até ${state.purpose === "experimental" ? state.fixedCount : state.betSize} dezenas neste modo.`;
+      } else if (state.fixed.size >= (usesSharedCore(state.purpose) ? state.fixedCount : state.betSize)) {
+        message = `Você pode fixar até ${usesSharedCore(state.purpose) ? state.fixedCount : state.betSize} dezenas neste modo.`;
       } else {
         state.excluded.delete(value);
         state.fixed.add(value);
@@ -403,7 +410,7 @@ function bindWorkspace(state: GeneratorState): void {
       state.fixed.delete(value);
       state.excluded.delete(value);
     }
-    if (state.purpose === "uniform" || state.purpose === "portfolio" || state.purpose === "payout") state.fixedCount = state.fixed.size;
+    if (state.purpose === "uniform" || state.purpose === "portfolio") state.fixedCount = state.fixed.size;
     updateNumberButtons(state);
     selectionSummary(state, message);
     if (!message) schedulePlan();

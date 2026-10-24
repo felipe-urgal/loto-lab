@@ -60,7 +60,7 @@ test("payout respects fixed, excluded and structural constraints", () => {
     assert.ok(game.numbers.includes(10));
     assert.ok(!game.numbers.includes(40) && !game.numbers.includes(50));
     assert.ok(game.metadata.odd >= 2 && game.metadata.odd <= 4);
-    assert.equal(game.fixedNumbers.length, 2);
+    assert.ok(game.fixedNumbers.length === 0 || game.fixedNumbers.length === 2);
   }
   assert.equal(new Set(games.map((game) => game.fixedNumbers.join("-"))).size, 1);
 });
@@ -69,4 +69,12 @@ test("payout rejects invalid selections", () => {
   assert.throws(() => generateMegaSenaPayoutGames({ gameCount: 1, fixedCount: 1, seed: "x", fixedNumbers: [5], excludedNumbers: [5] }));
   assert.throws(() => generateMegaSenaPayoutGames({ gameCount: 1, fixedCount: 0, seed: "x", fixedNumbers: [5] }));
   assert.throws(() => generateMegaSenaPayoutGames({ gameCount: 0, fixedCount: 0, seed: "x" }));
+});
+
+test("payout classifies the shared core as fixed only when its size is persistable", () => {
+  const persistable = generateMegaSenaPayoutGames({ gameCount: 2, fixedCount: 2, seed: "core-ok", fixedNumbers: [10] });
+  assert.ok(persistable.games.every((game) => game.fixedNumbers.length === 2 && game.fixedNumbers.includes(10)));
+  const loose = generateMegaSenaPayoutGames({ gameCount: 2, fixedCount: 1, seed: "core-loose", fixedNumbers: [10] });
+  assert.ok(loose.games.every((game) => game.fixedNumbers.length === 0 && game.numbers.includes(10)));
+  assert.ok(loose.games.every((game) => game.variableNumbers.length === 6));
 });

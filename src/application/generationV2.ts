@@ -31,6 +31,7 @@ import {
   type GenerationPlan,
 } from "../generator/planning.js";
 import type { GenerationMode } from "../generator/shared.js";
+import { describePayoutModelAge } from "../generator/payoutModelAge.js";
 import {
   InsufficientGenerationHistoryError,
   MIN_GENERATION_HISTORY,
@@ -43,7 +44,7 @@ type PayoutGeneratorOptions = Parameters<typeof generateMegaSenaPayoutGames>[0] 
 };
 
 const PAYOUT_GENERATORS: Partial<
-  Record<LotteryId, (options: PayoutGeneratorOptions) => { games: GeneratedGame[]; report: object }>
+  Record<LotteryId, (options: PayoutGeneratorOptions) => { games: GeneratedGame[]; report: { fitThroughContest: number } }>
 > = {
   "mega-sena": generateMegaSenaPayoutGames,
   lotofacil: generateLotofacilPayoutGames,
@@ -215,7 +216,7 @@ function previewId(
 }
 
 function validateFixedCount(lottery: LotteryId, fixedCount: number, purpose: string, betSize: number): void {
-  if (purpose === "uniform" || purpose === "portfolio" || purpose === "payout") {
+  if (purpose === "uniform" || purpose === "portfolio") {
     if (!Number.isInteger(fixedCount) || fixedCount < 0 || fixedCount > betSize) {
       throw new GenerationV2Error("INVALID_ARGUMENT", `fixedCount must be an integer between 0 and ${betSize}`);
     }
@@ -563,7 +564,7 @@ export class GenerationV2UseCase {
       : null;
     let games: GeneratedGame[];
     let coverageReport: CoveringDesignReport | undefined;
-    let payoutReport: object | undefined;
+    let payoutReport: { fitThroughContest: number } | undefined;
     try {
       if (purpose === "payout") {
         const generatePayout = PAYOUT_GENERATORS[input.lottery]!;
@@ -711,7 +712,14 @@ export class GenerationV2UseCase {
       ...(input.favoriteTeam !== undefined ? { favoriteTeam: input.favoriteTeam.trim() } : {}),
       ...(input.columnMarks !== undefined ? { columnMarks: input.columnMarks } : {}),
       ...(coverageReport ? { coverage: coverageReport } : {}),
-      ...(payoutReport ? { payout: payoutReport } : {}),
+      ...(payoutReport
+        ? {
+            payout: {
+              ...payoutReport,
+              modelAge: describePayoutModelAge(input.lottery, payoutReport.fitThroughContest, scoped.history.at(-1)?.number),
+            },
+          }
+        : {}),
       ...(input.coveragePoolNumbers !== undefined ? { coveragePoolNumbers: sortedNumbers(input.coveragePoolNumbers) } : {}),
       ...(input.coverageTargetSize !== undefined ? { coverageTargetSize: input.coverageTargetSize } : {}),
       ...(input.coverageBudgetCents !== undefined ? { coverageBudgetCents: input.coverageBudgetCents } : {}),

@@ -1,6 +1,7 @@
 import type { Contest, GeneratedGame } from "../domain/types.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
+import { partitionPayoutCore } from "./payoutPartition.js";
 import { buildMetadata, createSeededRandom } from "./shared.js";
 import {
   MEGA_POPULARITY_MODEL,
@@ -119,8 +120,7 @@ export function generateMegaSenaPayoutGames(options: MegaSenaPayoutOptions): {
   const games: GeneratedGame[] = selected.map((entry) => ({
     lottery: "mega-sena",
     numbers: entry.numbers,
-    fixedNumbers: [...core],
-    variableNumbers: entry.variable,
+    ...partitionPayoutCore("mega-sena", entry.numbers, core),
     metadata: buildMetadata(entry.numbers, options.referenceContest, false),
   }));
   let maxPairOverlap = 0;

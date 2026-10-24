@@ -7,7 +7,7 @@ Mesmo propósito `payout` da Mega-Sena e da Lotofácil, modelo `quina-ev-v1`. Re
 - Sorteio compatível com uniforme: paridade, repetição, soma, décadas, consecutivos. Frequência por dezena tem χ² 101,8/79 gl (p≈0,04), correlação 0,14 entre metades e encolhimento por CV de 0,22: sem viés aproveitável. "Quente/frio" sem sinal (0,32 vs 0,3125 ± 0,008). **Não há tilt de frequência**; a probabilidade de cada faixa é a mesma para todo jogo.
 - **Todas** as faixas são rateadas (retorno desde 2023: 5 acertos 19,9%, 4 acertos 4,6%, 3 acertos 4,4%, 2 acertos 4,4% da arrecadação).
 - Popularidade das dezenas, medida por `log(ganhadores_terno/arrecadação)`: R² fora da amostra 0,81 / 0,70 / 0,44 para 2/3/4 acertos; correlação 0,97 entre as metades do histórico. Mais apostadas: 13, 5, 19, 7, 4, 10; menos: 61, 70, 50, 76, 62.
-- Inclinações OOS por faixa sobre o escore (2→0,79; 3→1,22; 4→1,56; 5→1,55) batem com a teoria (k/3 × ajuste de encolhimento).
+- Inclinações OOS por faixa sobre o escore (2→0,79; 3→1,17; 4→1,56; 5→1,55; ver `scripts/validatePayoutModels.mjs`) batem com a teoria (k/3 × ajuste de encolhimento).
 
 ## Modelo
 

@@ -1,6 +1,7 @@
 import type { Contest, GeneratedGame } from "../domain/types.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
+import { partitionPayoutCore } from "./payoutPartition.js";
 import { buildMetadata, createSeededRandom } from "./shared.js";
 import { evaluateLotofacilTicket, LOTOFACIL_MODEL } from "./lotofacilModel.js";
 
@@ -119,8 +120,7 @@ export function generateLotofacilPayoutGames(options: LotofacilPayoutOptions): {
   const games: GeneratedGame[] = selected.map((entry) => ({
     lottery: "lotofacil",
     numbers: entry.numbers,
-    fixedNumbers: [...core],
-    variableNumbers: entry.variable,
+    ...partitionPayoutCore("lotofacil", entry.numbers, core),
     metadata: buildMetadata(entry.numbers, options.referenceContest, true),
   }));
   let maxPairOverlap = 0;

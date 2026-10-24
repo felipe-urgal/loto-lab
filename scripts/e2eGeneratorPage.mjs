@@ -236,6 +236,14 @@ try {
         assert(await evaluate(client, "document.querySelector('.g2-game-grid')?.textContent") === beforeSync, "Sync must preserve generated games for copying");
         await client.send("Fetch.disable");
       }
+      await evaluate(client, "(() => { const select = document.querySelector('#g2-purpose'); select.value = 'payout'; select.dispatchEvent(new Event('change', { bubbles: true })); })()");
+      await waitFor(client, "document.querySelector('[data-g2-preview]')?.disabled === false", `${lottery.id} payout plan`);
+      await evaluate(client, "document.querySelector('[data-g2-preview]').click()");
+      await waitFor(client, "!!document.querySelector('[data-g2-payout]') && document.querySelectorAll('.g2-game').length === 2", `${lottery.id} payout games and expected-return summary`);
+      const payoutText = await evaluate(client, "document.querySelector('[data-g2-payout]').textContent");
+      assert(payoutText.includes("Retorno esperado estimado") && payoutText.includes("não garantia"), `${lottery.id}: payout summary must carry the estimate and its caveat`);
+      const payoutGames = await evaluate(client, "[...document.querySelectorAll('.g2-game')].map(row => [...row.querySelectorAll('.ball')].map(ball => Number(ball.textContent.trim())))");
+      assert(payoutGames.every(game => game.length === lottery.drawSize && game.includes(7) && game.includes(18) && !game.includes(1)), `${lottery.id}: payout must honor selections and cardinality`);
       const overflow = await evaluate(client, "document.documentElement.scrollWidth > innerWidth + 1");
       assert(!overflow, `${viewport.name}: document overflow`);
       const controls = await evaluate(client, `Array.from(document.querySelectorAll('button, select, input[type=number], summary')).filter(el => el.getClientRects().length && !el.closest('details:not([open]) > :not(summary)')).filter(el => { const r = el.getBoundingClientRect(); return r.width < ${MIN_CONTROL_PX} - 1 || r.height < ${MIN_CONTROL_PX} - 1; }).map(el => el.id || el.outerHTML.slice(0, 100))`);
@@ -243,6 +251,7 @@ try {
       const smallText = await evaluate(client, `Array.from(document.querySelectorAll('label, button, input, select, summary')).filter(el => el.getClientRects().length).filter(el => parseFloat(getComputedStyle(el).fontSize) < ${MIN_FONT_PX}).map(el => el.id || el.tagName)`);
       assert(!smallText.length, `${viewport.name}: functional text below 16px`);
       await evaluate(client, "document.querySelector('[data-g2-customize] summary').click()");
+      await evaluate(client, "(() => { const select = document.querySelector('#g2-purpose'); select.value = 'uniform'; select.dispatchEvent(new Event('change', { bubbles: true })); })()");
     }
     await client.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
     await client.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });

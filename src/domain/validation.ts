@@ -2,7 +2,7 @@ import type { GeneratedGame, LotteryId } from "./types.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { getOfficialBetRule } from "./betRules.js";
 
-const FIXED_COUNTS: Record<LotteryId, readonly number[]> = {
+export const FIXED_COUNTS: Record<LotteryId, readonly number[]> = {
   "mega-sena": [0, 2, 3],
   lotofacil: [8, 9, 10],
   "dia-de-sorte": [0, 2, 3],

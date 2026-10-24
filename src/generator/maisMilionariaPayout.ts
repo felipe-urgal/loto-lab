@@ -1,6 +1,7 @@
 import type { Contest, GeneratedGame } from "../domain/types.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
+import { partitionPayoutCore } from "./payoutPartition.js";
 import { buildMetadata, createSeededRandom } from "./shared.js";
 import { evaluateMaisMilionariaTicket, MAIS_MILIONARIA_MODEL } from "./maisMilionariaModel.js";
 
@@ -123,8 +124,7 @@ export function generateMaisMilionariaPayoutGames(options: MaisMilionariaPayoutO
     return {
       lottery: "mais-milionaria",
       numbers: entry.numbers,
-      fixedNumbers: [...core],
-      variableNumbers: entry.variable,
+      ...partitionPayoutCore("mais-milionaria", entry.numbers, core),
       secondary: { kind: "clovers", values: clovers.slice(0, cloverCount).sort((a, b) => a - b) },
       metadata: buildMetadata(entry.numbers, options.referenceContest, false),
     };
