@@ -277,7 +277,7 @@ export function workspaceMarkup(state: GeneratorState): string {
           <div class="g2-selection-summary" data-g2-selection-summary aria-live="polite"></div>
         </section>
         <section class="preferences-workspace"><h3>Mais possibilidades</h3>
-          ${state.purpose === "experimental" ? `<div class="g2-field"><label for="g2-fixed-count">Dezenas compartilhadas entre jogos</label><select id="g2-fixed-count">${fixedCountOptions(state)}</select></div>` : ""}
+          ${state.purpose === "experimental" || (state.purpose === "payout" && state.plan.methodology.fixedCountOptions.length > 1) ? `<div class="g2-field"><label for="g2-fixed-count">Dezenas compartilhadas entre jogos</label><select id="g2-fixed-count">${fixedCountOptions(state)}</select></div>` : ""}
           <div class="g2-field"><label for="g2-target">Concurso de referência</label><input id="g2-target" type="number" min="1" value="${state.targetContestNumber ?? ""}" placeholder="Próximo concurso" /></div>
           ${state.purpose === "coverage" ? `<div class="g2-field"><label for="g2-coverage-target">Tamanho dos subconjuntos</label><input id="g2-coverage-target" type="number" min="1" max="${state.betSize}" value="${state.coverageTargetSize}" /></div>` : ""}
           ${state.lottery === "super-sete" ? "" : `<details class="g2-subdetails"><summary>Filtros de composição</summary><div class="g2-filter-list">${filtersMarkup(state)}</div></details>`}

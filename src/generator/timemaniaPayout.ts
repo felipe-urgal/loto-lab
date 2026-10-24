@@ -1,6 +1,7 @@
 import type { Contest, GeneratedGame } from "../domain/types.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
+import { partitionPayoutCore } from "./payoutPartition.js";
 import { buildMetadata, createSeededRandom } from "./shared.js";
 import { evaluateTimemaniaTicket, TIMEMANIA_MODEL } from "./timemaniaModel.js";
 
@@ -116,8 +117,7 @@ export function generateTimemaniaPayoutGames(options: TimemaniaPayoutOptions): {
   const games: GeneratedGame[] = selected.map((entry) => ({
     lottery: "timemania",
     numbers: entry.numbers,
-    fixedNumbers: [...core],
-    variableNumbers: entry.variable,
+    ...partitionPayoutCore("timemania", entry.numbers, core),
     secondary: { kind: "favorite-team", values: [favoriteTeam] },
     metadata: buildMetadata(entry.numbers, options.referenceContest, false),
   }));

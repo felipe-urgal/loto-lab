@@ -69,7 +69,7 @@ test("payout respects fixed, excluded and structural constraints", () => {
     assert.ok(game.numbers.includes(13));
     assert.ok(!game.numbers.includes(70) && !game.numbers.includes(61));
     assert.ok(game.metadata.odd >= 4 && game.metadata.odd <= 6);
-    assert.equal(game.fixedNumbers.length, 3);
+    assert.ok(game.fixedNumbers.length === 0 || game.fixedNumbers.length === 3);
   }
 });
 

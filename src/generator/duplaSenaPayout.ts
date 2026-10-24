@@ -1,6 +1,7 @@
 import type { Contest, GeneratedGame } from "../domain/types.js";
 import { getLotteryConfig } from "../lotteries/config.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
+import { partitionPayoutCore } from "./payoutPartition.js";
 import { buildMetadata, createSeededRandom } from "./shared.js";
 import { DUPLA_SENA_MODEL, evaluateDuplaSenaTicket } from "./duplaSenaModel.js";
 
@@ -112,8 +113,7 @@ export function generateDuplaSenaPayoutGames(options: DuplaSenaPayoutOptions): {
   const games: GeneratedGame[] = selected.map((entry) => ({
     lottery: "dupla-sena",
     numbers: entry.numbers,
-    fixedNumbers: [...core],
-    variableNumbers: entry.variable,
+    ...partitionPayoutCore("dupla-sena", entry.numbers, core),
     metadata: buildMetadata(entry.numbers, options.referenceContest, false),
   }));
   let maxPairOverlap = 0;

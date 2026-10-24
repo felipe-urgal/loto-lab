@@ -316,6 +316,9 @@ test("Generator 2.0 payout purpose records an auditable report, saves exactly an
   const payout = preview.generatorOptions.payout as { strategy: string; shareIndex: number[]; maxPairOverlap: number };
   assert.equal(preview.games.length, 4);
   assert.equal(payout.strategy, "mega-sena-payout-v1");
+  const modelAge = (preview.generatorOptions.payout as { modelAge: { fitThroughContest: number; stale: boolean } }).modelAge;
+  assert.equal(modelAge.fitThroughContest, 3073);
+  assert.equal(modelAge.stale, false);
   assert.equal(payout.shareIndex.length, 4);
   assert.ok(payout.maxPairOverlap <= 2);
 
@@ -334,7 +337,7 @@ test("Generator 2.0 payout purpose also serves Lotofácil with its own auditable
   const preview = await useCase.execute({
     lottery: "lotofacil",
     gameCount: 3,
-    fixedCount: 0,
+    fixedCount: 8,
     purpose: "payout",
     seed: "payout-lotofacil",
   });

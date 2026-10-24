@@ -337,3 +337,42 @@
   .g2-plan-grid,
   .g2-audit-grid { grid-template-columns: 1fr; }
 }
+
+.g2-payout {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.g2-payout p {
+  margin: 0;
+}
+
+.g2-payout-games {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.g2-payout-games li {
+  display: grid;
+  gap: 2px;
+  min-width: 76px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.g2-payout-games li span,
+.g2-payout-note {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.g2-payout-warning {
+  color: var(--accent-strong);
+  font-weight: 600;
+}

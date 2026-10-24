@@ -12,6 +12,12 @@ export function supportsPayout(lottery: LotteryId): boolean {
 }
 
 
+/** Modos cujo núcleo fixo compartilhado vem do conjunto permitido da modalidade (e é persistido como tal). */
+export function usesSharedCore(purpose: GenerationPurpose): boolean {
+  return purpose === "experimental" || purpose === "payout";
+}
+
+
 export function supportsCoverage(lottery: LotteryId): boolean {
   return lottery === "mega-sena" || lottery === "lotofacil" || lottery === "quina" || lottery === "dupla-sena";
 }
@@ -56,7 +62,7 @@ export function requestPayload(state: GeneratorState, includeSeed = false): Gene
   return {
     lottery: state.lottery,
     gameCount: state.gameCount,
-    fixedCount: state.purpose === "uniform" || state.purpose === "portfolio" || state.purpose === "payout" ? state.fixed.size : state.fixedCount,
+    fixedCount: state.purpose === "uniform" || state.purpose === "portfolio" ? state.fixed.size : state.fixedCount,
     betSize: state.betSize,
     targetContestNumber: state.targetContestNumber,
     purpose: state.purpose,
