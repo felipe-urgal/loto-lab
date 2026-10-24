@@ -408,3 +408,19 @@ test("Generator 2.0 payout purpose also serves +Milionária with clovers", async
   assert.equal(payout.evIndex.length, 3);
   assert.ok(preview.games.every((game) => game.numbers.length === 6 && game.secondary?.values.length === 3));
 });
+
+test("Generator 2.0 payout purpose also serves Timemania and keeps the explicit team", async () => {
+  const useCase = fakeUseCase(() => megaHistory());
+  const input = {
+    lottery: "timemania" as const,
+    gameCount: 3,
+    fixedCount: 0,
+    purpose: "payout" as const,
+    seed: "payout-timemania",
+  };
+  const preview = await useCase.execute({ ...input, favoriteTeam: "FLAMENGO/RJ" });
+  const payout = preview.generatorOptions.payout as { strategy: string; evIndex: number[] };
+  assert.equal(payout.strategy, "timemania-payout-v1");
+  assert.ok(preview.games.every((game) => game.numbers.length === 10 && game.secondary?.values[0] === "FLAMENGO/RJ"));
+  await assert.rejects(() => useCase.execute(input));
+});
