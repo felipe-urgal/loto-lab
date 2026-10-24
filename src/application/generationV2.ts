@@ -11,11 +11,12 @@ import { generateDiaDeSorteGames, type DiaDeSorteFixedCount } from "../generator
 import { generateCoveringDesign, type CoveringDesignReport } from "../generator/coveringDesign.js";
 import { generateLotofacilGames } from "../generator/lotofacil.js";
 import { generateMegaSenaGames, type MegaSenaFixedCount } from "../generator/megaSena.js";
-import { generateLotofacilPayoutGames, type LotofacilPayoutReport } from "../generator/lotofacilPayout.js";
-import { generateQuinaPayoutGames, type QuinaPayoutReport } from "../generator/quinaPayout.js";
-import { generateDiaDeSortePayoutGames, type DiaDeSortePayoutReport } from "../generator/diaDeSortePayout.js";
-import { generateDuplaSenaPayoutGames, type DuplaSenaPayoutReport } from "../generator/duplaSenaPayout.js";
-import { generateMegaSenaPayoutGames, type MegaSenaPayoutReport } from "../generator/megaSenaPayout.js";
+import { generateDiaDeSortePayoutGames } from "../generator/diaDeSortePayout.js";
+import { generateDuplaSenaPayoutGames } from "../generator/duplaSenaPayout.js";
+import { generateLotofacilPayoutGames } from "../generator/lotofacilPayout.js";
+import { generateMaisMilionariaPayoutGames } from "../generator/maisMilionariaPayout.js";
+import { generateMegaSenaPayoutGames } from "../generator/megaSenaPayout.js";
+import { generateQuinaPayoutGames } from "../generator/quinaPayout.js";
 import {
   generatePortfolioGames,
   generateUniformGames,
@@ -34,6 +35,19 @@ import {
   MIN_GENERATION_HISTORY,
 } from "./generateGames.js";
 import type { ApplicationGameBatch, SaveApplicationGameBatchInput } from "./gameBatch.js";
+
+type PayoutGeneratorOptions = Parameters<typeof generateMegaSenaPayoutGames>[0] & { cloverCount?: number };
+
+const PAYOUT_GENERATORS: Partial<
+  Record<LotteryId, (options: PayoutGeneratorOptions) => { games: GeneratedGame[]; report: object }>
+> = {
+  "mega-sena": generateMegaSenaPayoutGames,
+  lotofacil: generateLotofacilPayoutGames,
+  quina: generateQuinaPayoutGames,
+  "dia-de-sorte": generateDiaDeSortePayoutGames,
+  "dupla-sena": generateDuplaSenaPayoutGames,
+  "mais-milionaria": generateMaisMilionariaPayoutGames,
+};
 
 export interface GenerationV2Input {
   lottery: LotteryId;
@@ -394,7 +408,7 @@ export class GenerationV2UseCase {
         "Multiple-number bets are available only for uniform or portfolio generation",
       );
     }
-    if (purpose === "payout" && input.lottery !== "mega-sena" && input.lottery !== "lotofacil" && input.lottery !== "quina" && input.lottery !== "dia-de-sorte" && input.lottery !== "dupla-sena") {
+    if (purpose === "payout" && !PAYOUT_GENERATORS[input.lottery]) {
       throw new GenerationV2Error(
         "INVALID_ARGUMENT",
         `Payout generation is not available for ${input.lottery}`,
@@ -544,24 +558,17 @@ export class GenerationV2UseCase {
       : null;
     let games: GeneratedGame[];
     let coverageReport: CoveringDesignReport | undefined;
-    let payoutReport: MegaSenaPayoutReport | LotofacilPayoutReport | QuinaPayoutReport | DiaDeSortePayoutReport | DuplaSenaPayoutReport | undefined;
+    let payoutReport: object | undefined;
     try {
       if (purpose === "payout") {
-        const generatePayout = input.lottery === "lotofacil"
-          ? generateLotofacilPayoutGames
-          : input.lottery === "quina"
-            ? generateQuinaPayoutGames
-            : input.lottery === "dia-de-sorte"
-              ? generateDiaDeSortePayoutGames
-              : input.lottery === "dupla-sena"
-                ? generateDuplaSenaPayoutGames
-                : generateMegaSenaPayoutGames;
+        const generatePayout = PAYOUT_GENERATORS[input.lottery]!;
         const result = generatePayout({
           gameCount: input.gameCount,
           fixedCount: input.fixedCount,
           seed,
           fixedNumbers: input.fixedNumbers ?? [],
           excludedNumbers: input.excludedNumbers ?? [],
+          ...(input.cloverCount !== undefined ? { cloverCount: input.cloverCount } : {}),
           ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
           ...(referenceContestNumber !== null
             ? (() => {
