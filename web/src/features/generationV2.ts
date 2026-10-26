@@ -1,4 +1,4 @@
-import { api } from "../core/api.js";
+import { api, ApiError } from "../core/api.js";
 import { isLotteryId } from "../core/mainContext.js";
 import { currentMainView, onMainViewChanged, onViewRendered, type ViewRenderedDetail } from "../core/viewLifecycle.js";
 import { escapeHtml } from "../shared/escaping.js";
@@ -172,7 +172,9 @@ async function generatePreview(state: GeneratorState): Promise<void> {
   } catch (error) {
     if (state.controller.signal.aborted || revision !== (state.revision ?? 0)) return;
     updateFlowState("configure");
-    setError(error instanceof Error ? error.message : "Não foi possível gerar os jogos. Tente novamente.");
+    setError(error instanceof ApiError && error.status === 429
+      ? "Muitas gerações em sequência. Aguarde cerca de um minuto e tente de novo."
+      : error instanceof Error ? error.message : "Não foi possível gerar os jogos. Tente novamente.");
   } finally {
     state.generating = false;
     result?.setAttribute("aria-busy", "false");
