@@ -3,6 +3,7 @@ import { getLotteryConfig } from "../lotteries/config.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
 import { partitionPayoutCore } from "./payoutPartition.js";
 import { buildMetadata, createSeededRandom } from "./shared.js";
+import { selectDiversifiedBatch } from "./payoutSelection.js";
 import { evaluateLotofacilTicket, LOTOFACIL_MODEL } from "./lotofacilModel.js";
 
 const config = getLotteryConfig("lotofacil");
@@ -107,15 +108,8 @@ export function generateLotofacilPayoutGames(options: LotofacilPayoutOptions): {
   pool.sort((a, b) => b.ev - a.ev || a.numbers.join("-").localeCompare(b.numbers.join("-")));
 
   // O EV é aditivo entre jogos; limitar a sobreposição só reduz a variância do lote.
-  const selected: typeof pool = [];
-  let cap = Math.max(INITIAL_OVERLAP_CAP, core.length);
-  while (selected.length < options.gameCount) {
-    const next = pool.find((candidate) =>
-      !selected.includes(candidate) && selected.every((game) => overlapOf(game.numbers, candidate.numbers) <= cap));
-    if (next) selected.push(next);
-    else if (cap < config.drawSize - 1) cap += 1;
-    else throw new Error("Unable to build a low-overlap portfolio with the requested constraints");
-  }
+  const selected = selectDiversifiedBatch(pool, options.gameCount, random, Math.max(INITIAL_OVERLAP_CAP, core.length), config.drawSize - 1);
+  if (!selected) throw new Error("Unable to build a low-overlap portfolio with the requested constraints");
 
   const games: GeneratedGame[] = selected.map((entry) => ({
     lottery: "lotofacil",

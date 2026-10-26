@@ -3,6 +3,7 @@ import { getLotteryConfig } from "../lotteries/config.js";
 import { matchesGenerationConstraints, type GenerationConstraints } from "./planning.js";
 import { partitionPayoutCore } from "./payoutPartition.js";
 import { buildMetadata, createSeededRandom } from "./shared.js";
+import { selectDiversifiedBatch } from "./payoutSelection.js";
 import {
   MEGA_POPULARITY_MODEL,
   megaSenaPopularityScore,
@@ -103,19 +104,8 @@ export function generateMegaSenaPayoutGames(options: MegaSenaPayoutOptions): {
   pool.sort((a, b) => a.score - b.score || a.numbers.join("-").localeCompare(b.numbers.join("-")));
 
   // Lote com sobreposição limitada: dois jogos com 4+ dezenas em comum disputam os mesmos prêmios menores.
-  const selected: typeof pool = [];
-  let cap = Math.max(2, core.length);
-  while (selected.length < options.gameCount) {
-    const next = pool.find((candidate) =>
-      !selected.includes(candidate) && selected.every((game) => overlapOf(game.numbers, candidate.numbers) <= cap));
-    if (next) {
-      selected.push(next);
-    } else if (cap < MAX_OVERLAP_CAP) {
-      cap += 1;
-    } else {
-      throw new Error("Unable to build a low-overlap portfolio with the requested constraints");
-    }
-  }
+  const selected = selectDiversifiedBatch(pool, options.gameCount, random, Math.max(2, core.length), MAX_OVERLAP_CAP);
+  if (!selected) throw new Error("Unable to build a low-overlap portfolio with the requested constraints");
 
   const games: GeneratedGame[] = selected.map((entry) => ({
     lottery: "mega-sena",
