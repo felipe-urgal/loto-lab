@@ -25,7 +25,8 @@ export function validateContest(contest: Contest, config: LotteryConfig): void {
   }
 
   const unique = new Set(contest.numbers);
-  if (unique.size !== contest.numbers.length) {
+  // Super Sete sorteia um dígito por coluna; repetição é válida.
+  if (config.id !== "super-sete" && unique.size !== contest.numbers.length) {
     throw new Error(`Contest ${contest.number} contains duplicated numbers`);
   }
 
