@@ -37,6 +37,6 @@ test("legacy generation HTTP ownership delegates to the application use case", a
   assert.match(server, /const games = new PostgresGameRepository\(options\.pool\)/);
   assert.match(server, /generateGames: new GenerateGamesUseCase\(contests, games\)/);
 
-  assert.match(limits, /generationLimiter = new FixedWindowRateLimiter\(\{ limit: 30, windowMs: 60_000 \}\)/);
+  assert.match(limits, /generationLimiter = new FixedWindowRateLimiter\(\{ limit: 240, windowMs: 60_000 \}\)/);
   assert.match(limits, /generationPlanLimiter = new FixedWindowRateLimiter\(\{ limit: 120, windowMs: 60_000 \}\)/);
 });
