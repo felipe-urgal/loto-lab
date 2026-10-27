@@ -120,7 +120,7 @@ test("single generator owns Portuguese product copy while historical tests remai
   ]);
 
   assert.match(app, /Bora criar/);
-  assert.match(app, /Últimos 3 concursos/);
+  assert.match(app, /Resultados do mês/);
   assert.match(app, /Sincronizar resultados/);
   assert.doesNotMatch(app, /backtests: \["Testes históricos"/);
   assert.doesNotMatch(app, /Resumo do último teste histórico salvo/);

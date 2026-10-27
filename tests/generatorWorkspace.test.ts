@@ -12,12 +12,12 @@ test("copy output contains the exact generated numbers and secondary fields", ()
   assert.equal(gamesToText([{ ...game, lottery: "super-sete", numbers: [], columns: [[0], [1, 3], [2], [3], [4], [5], [6]] }]), "Jogo 01: C1: 0 | C2: 1, 3 | C3: 2 | C4: 3 | C5: 4 | C6: 5 | C7: 6");
 });
 
-test("recent results show at most three contests and preserve zero and two draws", () => {
+test("recent results show every given contest and preserve zero and two draws", () => {
   const items = [4, 3, 2, 1].map(number => ({ number, date: "2026-10-20", numbers: [0, 7] }));
   const html = recentContestsMarkup(items);
-  assert.equal((html.match(/class="recent-row"/g) || []).length, 3);
+  assert.equal((html.match(/class="recent-row"/g) || []).length, 4);
   assert.match(html, />00<\/span>/);
-  assert.doesNotMatch(html, /Concurso #1</);
+  assert.match(html, /Concurso #1</);
   assert.match(recentContestsMarkup([{ ...items[0]!, secondDrawNumbers: [1, 2] }]), /2º sorteio/);
   assert.match(recentContestsMarkup([{ ...items[0]!, secondary: { kind: "favorite-team", values: ["<script>"] } }]), /&lt;script&gt;/);
   assert.match(recentContestsMarkup([]), /Ainda não há resultados/);
