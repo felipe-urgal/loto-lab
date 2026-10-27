@@ -16,7 +16,7 @@ function numbersMarkup(numbers: number[]): string {
 
 export function recentContestsMarkup(items: RecentContest[]): string {
   if (!items.length) return '<div class="history-empty"><strong>Ainda não há resultados por aqui.</strong><p>Sincronize os resultados para carregar os concursos desta modalidade.</p></div>';
-  return items.slice(0, 3).map(contest => {
+  return items.map(contest => {
     const date = new Date(`${contest.date.slice(0, 10)}T12:00:00Z`);
     const formatted = Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(date) : "Data indisponível";
     const first = contest.columns?.length

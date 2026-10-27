@@ -35,9 +35,11 @@ async function loadRecent(): Promise<void> {
   recent.setAttribute("aria-busy", "true");
   recent.innerHTML = '<p class="loading-state">Buscando os últimos concursos…</p>';
   try {
-    const response = await api<{ items: Parameters<typeof recentContestsMarkup>[0] }>(`/contests/${lottery}?limit=3&order=desc`, { signal: controller.signal });
+    const response = await api<{ items: Parameters<typeof recentContestsMarkup>[0] }>(`/contests/${lottery}?limit=40&order=desc`, { signal: controller.signal });
     if (controller.signal.aborted) return;
-    recent.innerHTML = recentContestsMarkup(response?.items || []);
+    const items = response?.items || [];
+    const month = items[0]?.date.slice(0, 7);
+    recent.innerHTML = recentContestsMarkup(items.filter(item => item.date.startsWith(month!)));
   } catch {
     if (controller.signal.aborted) return;
     recent.innerHTML = '<div class="history-empty" role="alert"><strong>Os resultados não carregaram.</strong><p>Você pode continuar no gerador e tentar buscar os concursos novamente.</p><button class="button" type="button" data-history-retry>Tentar novamente</button></div>';
