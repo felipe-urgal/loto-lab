@@ -18,7 +18,7 @@ O catálogo de domínio cobre Mega-Sena, Lotofácil, Dia de Sorte, Quina, Lotoma
 
 ## Stack
 
-- Node.js 24.22.0 LTS + TypeScript
+- Node.js 24.22.1 LTS + TypeScript
 - PostgreSQL 16
 - Frontend HTML/CSS/ES Modules com módulos TypeScript
 - Testes nativos do Node e E2E de navegador
