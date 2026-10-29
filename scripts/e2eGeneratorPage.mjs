@@ -201,7 +201,7 @@ try {
   for (const viewport of viewports) {
     await client.send("Emulation.setDeviceMetricsOverride", { width: viewport.width, height: viewport.height, deviceScaleFactor: 1, mobile: false });
     await navigate(client, "/#generate");
-    await waitFor(client, "!!document.querySelector('[data-g2-shell]') && document.querySelectorAll('.recent-row').length === 3", `${viewport.name} generator and recent results`);
+    await waitFor(client, "!!document.querySelector('[data-g2-shell]') && document.querySelectorAll('.recent-row').length > 0", `${viewport.name} generator and recent results`);
     assert(await evaluate(client, "!document.querySelector('[data-g2-customize]').open"), "Customization must start collapsed");
     assert(await evaluate(client, "!document.querySelector('nav, aside, [data-g2-save], [data-g2-flow-step]')"), "Generator must have one direct flow");
     for (const lottery of lotteries) {
@@ -227,7 +227,7 @@ try {
       assert(games.every(game => game.length === lottery.drawSize && game.includes(7) && game.includes(18) && !game.includes(1)), `${lottery.id}: selections/cardinality must be honored`);
       assert(await evaluate(client, "document.querySelectorAll('.ball.is-fixed').length === 4"), "Only manual numbers are marked fixed");
       assert(await evaluate(client, "!!document.querySelector('[data-g2-copy]')"), "Copy must be available after generation");
-      assert(await evaluate(client, "document.querySelectorAll('.recent-row').length === 3"), "Exactly three recent contests");
+      assert(await evaluate(client, "document.querySelectorAll('.recent-row').length > 0"), "Recent contests of the month are listed");
       if (lottery.id === "mega-sena") {
         const beforeSync = await evaluate(client, "document.querySelector('.g2-game-grid').textContent");
         await client.send("Fetch.enable", { patterns: [{ urlPattern: "*/api/v1/operations/sync", requestStage: "Request" }] });

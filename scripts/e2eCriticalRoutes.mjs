@@ -33,7 +33,7 @@ function expectIncludes(html, values, route) {
 }
 
 const cases = ["/lab", "/strategies", "/ai", "/jobs", "/agenda"]
-  .map(route => [route, ["Bora criar", "g2-shell", "Últimos 3 concursos"]]);
+  .map(route => [route, ["Bora criar", "g2-shell", "Resultados do mês"]]);
 
 for (const [route, markers] of cases) {
   const html = dumpDom(route);
